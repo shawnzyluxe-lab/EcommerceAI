@@ -3,7 +3,7 @@
   "equity": 500.0,
   "halt_reason": "",
   "halted": false,
-  "holdout_credits_remaining": 4,
+  "holdout_credits_remaining": 2,
   "positions": [],
   "settled_cash": 500.0
 }
