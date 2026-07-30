@@ -1,0 +1,9 @@
+{
+  "consecutive_losses": 0,
+  "equity": 500.0,
+  "halt_reason": "",
+  "halted": false,
+  "holdout_credits_remaining": 4,
+  "positions": [],
+  "settled_cash": 500.0
+}

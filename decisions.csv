@@ -1,0 +1,3 @@
+timestamp,date,ticker,suggested_entry,decision,reason,mode
+2026-07-30T07:16:13+00:00,2026-07-29,WFC,83.87,SUGGESTED,risk $3.17,shadow
+2026-07-30T07:21:41+00:00,2026-07-29,WFC,83.87,SUGGESTED,risk $3.17,shadow
