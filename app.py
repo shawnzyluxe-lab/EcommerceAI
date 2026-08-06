@@ -31,6 +31,7 @@ from dashboard_context import (
     MARKETING,
     STRIPE,
     CATALOG,
+    predictive_context,
 )
 
 # Dynamic state for AI command engine

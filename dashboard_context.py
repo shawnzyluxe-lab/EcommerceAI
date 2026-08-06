@@ -10,6 +10,7 @@ import os
 from datetime import datetime, timedelta, timezone
 
 from flask import Flask, render_template, request, jsonify
+from models import PredictiveLogistics
 
 
 BRAND = {
@@ -253,7 +254,7 @@ MARKETING = {
     "copy": "Awaiting generation trigger query text...",
 }
 
-PREDICTIVE = [
+DEFAULT_PREDICTIVE = [
     {
         "sku": "SZL-VAR-B",
         "days": 4,
@@ -269,6 +270,25 @@ PREDICTIVE = [
         "flag": "HEALTHY",
     },
 ]
+
+
+def predictive_context():
+    try:
+        rows = PredictiveLogistics.query.order_by(PredictiveLogistics.days_remaining.asc()).all()
+        if rows:
+            return [
+                {
+                    "sku": r.variant_sku,
+                    "days": r.days_remaining,
+                    "velocity": r.forecasted_demand_velocity,
+                    "restock": r.optimal_restock_date,
+                    "flag": r.status_flag,
+                }
+                for r in rows
+            ]
+    except Exception:
+        pass
+    return DEFAULT_PREDICTIVE
 
 STRIPE = {
     "plan": "Enterprise AI Tier",
@@ -402,7 +422,7 @@ def context():
         "studio": STUDIO,
         "support": SUPPORT,
         "mktg": MARKETING,
-        "predictive": PREDICTIVE,
+        "predictive": predictive_context(),
         "stripe": STRIPE,
         "catalog": CATALOG,
         "automations": AUTOMATIONS,
