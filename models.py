@@ -44,12 +44,14 @@ class ConnectedChannel(db.Model):
 class ActiveSession(db.Model):
     __tablename__ = "active_sessions"
     token = db.Column(db.String(255), primary_key=True)
+    merchant_id = db.Column(db.String(100), db.ForeignKey("merchant_profiles.merchant_id"))
     created_at = db.Column(db.DateTime, server_default=db.func.now())
 
 
 class BusinessMetric(db.Model):
     __tablename__ = "business_metrics"
     id = db.Column(db.Integer, primary_key=True, autoincrement=True)
+    merchant_id = db.Column(db.String(100), db.ForeignKey("merchant_profiles.merchant_id"), default="merchant_shawn_01")
     total_unified_balance = db.Column(db.REAL)
     true_net_profit = db.Column(db.REAL)
     gross_revenue = db.Column(db.REAL)
@@ -64,6 +66,16 @@ class CommerceChannel(db.Model):
     pending_orders = db.Column(db.Integer, default=0)
     conversion_rate = db.Column(db.REAL)
     performance_status = db.Column(db.String(50))
+
+
+class MerchantChannel(db.Model):
+    __tablename__ = "merchant_channels"
+    __table_args__ = (db.UniqueConstraint("merchant_id", "channel_id"),)
+    id = db.Column(db.Integer, primary_key=True, autoincrement=True)
+    merchant_id = db.Column(db.String(100), db.ForeignKey("merchant_profiles.merchant_id"))
+    channel_id = db.Column(db.String(100))
+    pending_orders = db.Column(db.Integer, default=0)
+    conversion_rate = db.Column(db.REAL, default=0.0)
 
 
 class SupportMetric(db.Model):
@@ -120,6 +132,7 @@ class MerchantProfile(db.Model):
     business_name = db.Column(db.String(255))
     admin_email = db.Column(db.String(255), unique=True)
     password_hash = db.Column(db.String(255))
+    account_tier = db.Column(db.String(50), default="Basic Tier")
     created_at = db.Column(db.DateTime, server_default=db.func.now())
 
 

@@ -30,7 +30,7 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-from models import db, Tenant, ConnectedChannel, ActiveSession, BusinessMetric, CommerceChannel, SupportMetric, MarketingStudio, PredictiveLogistics, OutboundTransmission, SaaSBilling, LocalProductCatalog, MerchantProfile, TenantOAuthToken, MerchantMetric, SystemExceptionLog, ProcessedWebhookEvent
+from models import db, Tenant, ConnectedChannel, ActiveSession, BusinessMetric, CommerceChannel, MerchantChannel, SupportMetric, MarketingStudio, PredictiveLogistics, OutboundTransmission, SaaSBilling, LocalProductCatalog, MerchantProfile, TenantOAuthToken, MerchantMetric, SystemExceptionLog, ProcessedWebhookEvent
 from dashboard_context import (
     context,
     COMMAND_RESPONSES,
@@ -147,11 +147,29 @@ def site_wall_authenticated():
     return True
 
 
+def get_merchant_context():
+    """Resolve merchant_id, account_tier, and business_name from the active session cookie."""
+    token = request.cookies.get(SESSION_COOKIE_NAME)
+    if not token:
+        return None
+    s = ActiveSession.query.get(token)
+    if not s or not s.merchant_id:
+        return None
+    profile = MerchantProfile.query.get(s.merchant_id)
+    if not profile:
+        return None
+    return {
+        "id": s.merchant_id,
+        "tier": profile.account_tier or "Basic Tier",
+        "name": profile.business_name,
+    }
+
+
 @app.before_request
 def site_wall_protect():
     if not site_wall_enabled():
         return None
-    if request.endpoint in ('home', 'site_login', 'shopify_orders_webhook', 'register_merchant', 'shopify_oauth_callback', 'health_check', 'static'):
+    if request.endpoint in ('home', 'site_login', 'shopify_orders_webhook', 'tiktok_orders_webhook', 'amazon_orders_webhook', 'register_merchant', 'shopify_oauth_callback', 'health_check', 'static'):
         return None
     if site_wall_authenticated():
         return None
@@ -206,6 +224,7 @@ with app.app_context():
     # Seed or restore business metrics
     if not BusinessMetric.query.first():
         db.session.add(BusinessMetric(
+            merchant_id="merchant_shawn_01",
             total_unified_balance=20560.00,
             true_net_profit=1394.00,
             gross_revenue=4582.00,
@@ -331,10 +350,14 @@ with app.app_context():
 
     # Seed multi-tenant merchant profiles
     if not MerchantProfile.query.first():
-        db.session.add(MerchantProfile(merchant_id="merchant_shawn_01", business_name="Shawnzyluxe Global", admin_email="shawn@shawnzyluxe.com", password_hash=""))
-        db.session.add(MerchantProfile(merchant_id="merchant_guest_02", business_name="Alpha Storefronts", admin_email="guest@alpha.com", password_hash=""))
+        db.session.add(MerchantProfile(merchant_id="merchant_shawn_01", business_name="Shawnzyluxe Pro", admin_email="shawn@shawnzyluxe.com", account_tier="Enterprise AI Tier", password_hash=""))
+        db.session.add(MerchantProfile(merchant_id="merchant_guest_02", business_name="Alpha Storefronts", admin_email="guest@alpha.com", account_tier="Pro Tier", password_hash=""))
         db.session.add(MerchantMetric(merchant_id="merchant_shawn_01", total_unified_balance=20560.00, true_net_profit=1394.00, gross_revenue=4582.00, ai_briefing="System initialized for Shawnzyluxe multi-tenant parameters."))
         db.session.add(MerchantMetric(merchant_id="merchant_guest_02", total_unified_balance=1240.00, true_net_profit=410.00, gross_revenue=890.00, ai_briefing="System initialized for guest merchant clusters."))
+    if not MerchantChannel.query.filter_by(merchant_id="merchant_shawn_01").first():
+        db.session.add(MerchantChannel(merchant_id="merchant_shawn_01", channel_id="shopify", pending_orders=12, conversion_rate=3.4))
+        db.session.add(MerchantChannel(merchant_id="merchant_shawn_01", channel_id="amazon", pending_orders=4, conversion_rate=2.8))
+        db.session.add(MerchantChannel(merchant_id="merchant_shawn_01", channel_id="tiktok", pending_orders=7, conversion_rate=4.1))
     if not SystemExceptionLog.query.first():
         db.session.add(SystemExceptionLog(module_origin="DATABASE_CORE", error_severity="INFO", exception_msg="Relational multi-tenant isolation layer fully hardened."))
     db.session.commit()
@@ -759,6 +782,7 @@ def process_command(cmd_text):
 
     # Persist state to SQLite
     db.session.add(BusinessMetric(
+        merchant_id="merchant_shawn_01",
         total_unified_balance=DASHBOARD_STATE["total_unified_balance"],
         true_net_profit=DASHBOARD_STATE["true_net_profit"],
         gross_revenue=DASHBOARD_STATE["gross_revenue"],
@@ -867,7 +891,8 @@ def site_login():
         if hmac.compare_digest(submitted, SITE_WALL_PASSWORD):
             token = secrets.token_urlsafe(32)
             active_sessions.add(token)
-            db.session.add(ActiveSession(token=token, created_at=datetime.utcnow()))
+            default_merchant = "merchant_shawn_01"
+            db.session.add(ActiveSession(token=token, merchant_id=default_merchant, created_at=datetime.utcnow()))
             db.session.commit()
             response = redirect(url_for('home'))
             response.set_cookie(
@@ -897,6 +922,8 @@ def site_logout():
 
 
 SHOPIFY_WEBHOOK_SECRET = os.environ.get("SHOPIFY_WEBHOOK_SECRET", "").strip().encode()
+TIKTOK_WEBHOOK_SECRET = os.environ.get("TIKTOK_WEBHOOK_SECRET", "").strip().encode()
+AMAZON_WEBHOOK_SECRET = os.environ.get("AMAZON_WEBHOOK_SECRET", "").strip().encode()
 
 
 @app.route('/api/v1/webhooks/shopify-orders', methods=['POST'])
@@ -907,6 +934,7 @@ def shopify_orders_webhook():
         raw_body = request.get_data()
         hmac_header = request.headers.get("X-Shopify-Hmac-SHA256")
         event_id = request.headers.get("X-Shopify-Webhook-Id")
+        merchant_target = request.args.get("merchant_id", "merchant_shawn_01")
 
         if SHOPIFY_WEBHOOK_SECRET:
             if not hmac_header:
@@ -962,12 +990,18 @@ def shopify_orders_webhook():
                     c["orders"] = shopify.pending_orders
 
         db.session.add(BusinessMetric(
+            merchant_id=merchant_target,
             total_unified_balance=new_bal,
             true_net_profit=new_profit,
             gross_revenue=new_gross,
             ai_briefing=new_briefing,
         ))
         db.session.add(ProcessedWebhookEvent(event_id=event_id))
+        mch = MerchantChannel.query.filter_by(merchant_id=merchant_target, channel_id="shopify").first()
+        if not mch:
+            mch = MerchantChannel(merchant_id=merchant_target, channel_id="shopify", pending_orders=0, conversion_rate=3.5)
+            db.session.add(mch)
+        mch.pending_orders += 1
         db.session.commit()
 
         DASHBOARD_STATE["total_unified_balance"] = new_bal
@@ -1015,6 +1049,58 @@ def shopify_orders_webhook():
         return jsonify({"status": "rejected", "reason": "Hardened intercept"}), 400
 
 
+def process_idempotent_channel_event(event_id, merchant_id, platform_id, amount=0.0):
+    """Record a webhook event idempotently and bump the per-merchant channel order count."""
+    if not event_id:
+        return False
+    if ProcessedWebhookEvent.query.get(event_id):
+        return False
+    db.session.add(ProcessedWebhookEvent(event_id=event_id))
+    channel = MerchantChannel.query.filter_by(merchant_id=merchant_id, channel_id=platform_id).first()
+    if not channel:
+        channel = MerchantChannel(merchant_id=merchant_id, channel_id=platform_id, pending_orders=0, conversion_rate=3.5)
+        db.session.add(channel)
+    channel.pending_orders = (channel.pending_orders or 0) + 1
+    return True
+
+
+@app.route('/api/v1/webhooks/tiktok-orders', methods=['POST'])
+@limiter.limit("60 per minute")
+def tiktok_orders_webhook():
+    """Ingest TikTok Shop order events into the isolated merchant channel."""
+    event_id = request.headers.get("X-Tiktok-Event-Id") or request.headers.get("X-TikTok-Event-Id")
+    merchant_target = request.args.get("merchant_id", "merchant_shawn_01")
+    raw = request.get_json() or {}
+    order_price = float(raw.get("order_amount", raw.get("total_amount", 0.00)))
+    try:
+        created = process_idempotent_channel_event(event_id, merchant_target, "tiktok", order_price)
+        db.session.commit()
+        return jsonify({"status": "synchronized" if created else "ignored"}), 200
+    except Exception as e:
+        log_system_exception("TIKTOK_WEBHOOK", "CRITICAL", str(e))
+        db.session.rollback()
+        return jsonify({"status": "rejected", "reason": "Internal error"}), 500
+
+
+@app.route('/api/v1/webhooks/amazon-orders', methods=['POST'])
+@limiter.limit("60 per minute")
+def amazon_orders_webhook():
+    """Ingest Amazon Seller Central order events into the isolated merchant channel."""
+    event_id = request.headers.get("X-Amazon-Sqs-Message-Id")
+    merchant_target = request.args.get("merchant_id", "merchant_shawn_01")
+    raw = request.get_json() or {}
+    payload = raw.get("payload", raw)
+    order_price = float(payload.get("AmazonOrderTotal", payload.get("total", 0.00)))
+    try:
+        created = process_idempotent_channel_event(event_id, merchant_target, "amazon", order_price)
+        db.session.commit()
+        return jsonify({"status": "synchronized" if created else "ignored"}), 200
+    except Exception as e:
+        log_system_exception("AMAZON_WEBHOOK", "CRITICAL", str(e))
+        db.session.rollback()
+        return jsonify({"status": "rejected", "reason": "Internal error"}), 500
+
+
 @app.route('/api/v1/download-report')
 def download_report():
     """Serve the generated CSV ledger to authenticated admins."""
@@ -1026,42 +1112,61 @@ def download_report():
 
 @app.route('/api/v1/telemetry/poll', methods=['GET'])
 def telemetry_poll():
-    """Serve live dashboard metrics for frontend polling fallback."""
-    latest = BusinessMetric.query.order_by(BusinessMetric.id.desc()).first()
-    support = SupportMetric.query.order_by(SupportMetric.id.desc()).first()
-    mktg = MarketingStudio.query.order_by(MarketingStudio.id.desc()).first()
-    channels = {c.channel_id: c.pending_orders for c in CommerceChannel.query.all()}
-    rows = PredictiveLogistics.query.order_by(PredictiveLogistics.days_remaining.asc()).all()
+    """Serve live, tenant-isolated dashboard metrics for frontend polling."""
+    merchant = get_merchant_context()
+    if not merchant:
+        return jsonify({"success": False, "error": "Access Locked"}), 401
 
-    return jsonify({
-        "success": True,
-        "metrics": {
-            "total_balance": f"{latest.total_unified_balance:.2f}" if latest else "0.00",
-            "true_profit": f"{latest.true_net_profit:.2f}" if latest else "0.00",
-            "gross_revenue": f"{latest.gross_revenue:.2f}" if latest else "0.00",
-            "ai_briefing": latest.ai_briefing if latest else "Initializing...",
-        },
-        "channels": channels,
-        "support": {
-            "chats": support.active_chats if support else 0,
-            "sentiment": support.sentiment_score if support else "Optimal",
-            "resolution": support.recent_resolution if support else "No queries active.",
-        },
-        "marketing": {
-            "campaign": mktg.active_campaign if mktg else "Idle",
-            "status": mktg.generation_status if mktg else "Idle",
-            "copy": mktg.copy_preview if mktg else "Awaiting triggers.",
-        },
-        "predictive": [
-            {
-                "sku": r.variant_sku,
-                "days": r.days_remaining,
-                "restock": r.optimal_restock_date,
-                "flag": r.status_flag,
-            }
-            for r in rows
-        ],
-    })
+    try:
+        latest = BusinessMetric.query.filter_by(merchant_id=merchant["id"]).order_by(BusinessMetric.id.desc()).first()
+        if not latest:
+            mprofile = MerchantMetric.query.filter_by(merchant_id=merchant["id"]).first()
+            if mprofile:
+                latest = type("obj", (object,), {
+                    "total_unified_balance": mprofile.total_unified_balance,
+                    "true_net_profit": mprofile.true_net_profit,
+                    "gross_revenue": mprofile.gross_revenue,
+                    "ai_briefing": mprofile.ai_briefing,
+                })()
+        support = SupportMetric.query.order_by(SupportMetric.id.desc()).first()
+        mktg = MarketingStudio.query.order_by(MarketingStudio.id.desc()).first()
+        channels = MerchantChannel.query.filter_by(merchant_id=merchant["id"]).all()
+        rows = PredictiveLogistics.query.order_by(PredictiveLogistics.days_remaining.asc()).all()
+
+        return jsonify({
+            "success": True,
+            "account_tier_context": merchant["tier"],
+            "metrics": {
+                "total_balance": f"{latest.total_unified_balance:.2f}" if latest else "0.00",
+                "true_profit": f"{latest.true_net_profit:.2f}" if latest else "0.00",
+                "gross_revenue": f"{latest.gross_revenue:.2f}" if latest else "0.00",
+                "ai_briefing": latest.ai_briefing if latest else f"Welcome, {merchant['name']}. Initialize your accounts.",
+            },
+            "channels": {c.channel_id: {"orders": c.pending_orders, "cr": c.conversion_rate} for c in channels},
+            "support": {
+                "chats": support.active_chats if support else 0,
+                "sentiment": support.sentiment_score if support else "Optimal",
+                "resolution": support.recent_resolution if support else "No queries active.",
+            },
+            "marketing": {
+                "campaign": mktg.active_campaign if mktg else "Idle",
+                "status": mktg.generation_status if mktg else "Idle",
+                "copy": mktg.copy_preview if mktg else "Awaiting triggers.",
+            },
+            "predictive": [
+                {
+                    "sku": r.variant_sku,
+                    "days": r.days_remaining,
+                    "restock": r.optimal_restock_date,
+                    "flag": r.status_flag,
+                }
+                for r in rows
+            ],
+        })
+    except Exception as e:
+        log_system_exception("TELEMETRY_POLL", "CRITICAL", str(e))
+        db.session.commit()
+        return jsonify({"success": False, "error": str(e)}), 500
 
 
 @app.route('/api/v1/tenant/register', methods=['POST'])

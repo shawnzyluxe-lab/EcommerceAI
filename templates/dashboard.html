@@ -46,6 +46,10 @@
     <div class="topbar">
       <span class="crumb">{{ brand.domain }} / dashboard</span>
       <span class="tag ghost">Sample data</span>
+      <div style="display: flex; align-items: center; gap: 8px; background: rgba(255,255,255,0.7); padding: 4px 12px; border-radius: 20px; border: 1px solid rgba(255,255,255,0.5);">
+        <span style="font-size: 12px; font-weight: 500; color: #5C6E88;">Workspace:</span>
+        <span id="current-merchant-tier-badge" style="font-weight:700; color:#1D2D44; font-family:'JetBrains Mono'; font-size:12px;">Loading Tier...</span>
+      </div>
       <span class="spacer"></span>
       <button class="btn">Invite team</button>
       <button class="btn primary">Connect a channel</button>
@@ -840,13 +844,28 @@ async function performTelemetryWorkspaceSync() {
     }
 
     if (balance) balance.innerText = '$' + data.metrics.gross_revenue;
-    if (shopify) shopify.innerText = (data.channels.shopify || 0) + ' orders';
+    if (shopify) {
+      const s = data.channels.shopify || {orders: 0};
+      shopify.innerText = s.orders + ' orders';
+    }
     if (supportChats) supportChats.innerText = data.support.chats;
     if (supportSentiment) supportSentiment.innerText = data.support.sentiment;
     if (supportResolution) supportResolution.innerText = '"' + data.support.resolution + '"';
     if (marketingCampaign) marketingCampaign.innerText = data.marketing.campaign;
     if (marketingStatus) marketingStatus.innerText = data.marketing.status;
     if (marketingCopy) marketingCopy.innerText = data.marketing.copy;
+
+    function updateTierBadgeDisplay(tierString) {
+      const badge = document.getElementById('current-merchant-tier-badge');
+      if (!badge) return;
+      badge.innerText = tierString;
+      if (tierString && tierString.includes('Enterprise AI')) {
+        badge.style.color = '#9D4EDD';
+      } else {
+        badge.style.color = '#1D2D44';
+      }
+    }
+    if (data.account_tier_context) updateTierBadgeDisplay(data.account_tier_context);
   } catch (error) {
     console.error('Telemetry sync error:', error);
   }
