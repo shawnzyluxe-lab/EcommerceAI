@@ -612,15 +612,22 @@ async function run(q){
   out.style.display = 'block';
   document.getElementById('cmdanswer').textContent = 'Working…';
   document.getElementById('cmddid').innerHTML = '';
-  const r = await fetch('/api/command', {
+  const r = await fetch('/api/v1/execute-command', {
     method:'POST',
     headers:{'Content-Type':'application/json'},
-    body: JSON.stringify({q})
+    body: JSON.stringify({command: q})
   });
   const d = await r.json();
-  document.getElementById('cmdanswer').textContent = d.answer;
-  document.getElementById('cmddid').innerHTML =
-    (d.did || []).map(s => '<span class="chip">' + s + '</span>').join('');
+  if (d.success) {
+    document.getElementById('cmdanswer').textContent = d.updates.ai_briefing;
+    const chips = ['Unified balance: $' + d.updates.total_balance];
+    if (d.updates.clear_orders) chips.push('Order queue cleared');
+    document.getElementById('cmddid').innerHTML =
+      chips.map(s => '<span class="chip">' + s + '</span>').join('');
+  } else {
+    document.getElementById('cmdanswer').textContent = 'Command pattern outside standard operational array layout parameters.';
+    document.getElementById('cmddid').innerHTML = '';
+  }
 }
 
 document.getElementById('cmdgo').addEventListener('click', () => run(input.value));

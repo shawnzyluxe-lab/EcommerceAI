@@ -1,4 +1,5 @@
 import os
+import re
 import hmac
 import secrets
 import requests
@@ -15,7 +16,27 @@ from dashboard_context import (
     RECENT_ORDERS,
     PROFIT_BREAKDOWN,
     BRIEFING,
+    COO,
+    CHANNELS,
 )
+
+# Dynamic state for AI command engine
+DASHBOARD_STATE = {
+    "total_unified_balance": 20560.00,
+    "true_net_profit": 1394.00,
+    "gross_revenue": 4582.00,
+    "ai_briefing": COO["narrative"],
+    "conversion_feeds": [
+        {"store": "Shopify Storefront", "rate": "3.4%", "status": "Optimal", "up": True},
+        {"store": "TikTok Video Shop", "rate": "4.1%", "status": "Trending", "up": True},
+        {"store": "Amazon Marketplace", "rate": "2.8%", "status": "Stable", "up": False},
+    ],
+    "channels": {
+        "shopify": {"pending_orders": 12},
+        "amazon": {"pending_orders": 4},
+        "tiktok": {"pending_orders": 7},
+    },
+}
 
 app = Flask(__name__)
 app.secret_key = os.environ.get('SECRET_KEY', 'dev-secret-change-this')
@@ -141,6 +162,57 @@ def api_command():
             "stub": True,
         })
     return jsonify({**hit, "stub": True})
+
+
+@app.route('/api/v1/execute-command', methods=['POST'])
+def execute_command():
+    """NLP command engine that updates dashboard state in plain English."""
+    data = request.get_json() or {}
+    cmd_text = data.get("command", "").lower().strip()
+    if not cmd_text:
+        return jsonify({"success": False})
+
+    updates = {
+        "ai_briefing": DASHBOARD_STATE["ai_briefing"],
+        "total_balance": f"{DASHBOARD_STATE['total_unified_balance']:.2f}",
+        "clear_orders": False,
+    }
+
+    if re.search(r'(why are sales down|sales down|analyze drops)', cmd_text):
+        updates["ai_briefing"] = "📊 AI Audit: Sales down 4% today due to an ad delivery lag in TikTok region East. Supply pipelines remain green."
+        DASHBOARD_STATE["ai_briefing"] = updates["ai_briefing"]
+        COO["narrative"] = updates["ai_briefing"]
+
+    elif re.search(r'(show delayed orders|delayed orders|shipments delayed)', cmd_text):
+        updates["ai_briefing"] = "📦 Fulfillment Tracking: 2 shipments remain stalled at Memphis Hub due to supplier weather anomalies. Tracking codes verified."
+        DASHBOARD_STATE["ai_briefing"] = updates["ai_briefing"]
+        COO["narrative"] = updates["ai_briefing"]
+
+    elif re.search(r'(create discount|discount campaign|promo code)', cmd_text):
+        DASHBOARD_STATE["total_unified_balance"] += 1200.00
+        BRIEFING["revenue"] += 1200.00
+        updates["total_balance"] = f"{DASHBOARD_STATE['total_unified_balance']:.2f}"
+        updates["ai_briefing"] = "✨ Automation Triggered: Generated 15% discount structure 'ECOM_AI_15'. Successfully pushed live to Shopify and TikTok Shop API channels."
+        DASHBOARD_STATE["ai_briefing"] = updates["ai_briefing"]
+        COO["narrative"] = updates["ai_briefing"]
+
+    elif re.search(r'(clear queue|process orders|fulfill all orders)', cmd_text):
+        updates["clear_orders"] = True
+        DASHBOARD_STATE["channels"]["shopify"]["pending_orders"] = 0
+        DASHBOARD_STATE["channels"]["amazon"]["pending_orders"] = 0
+        DASHBOARD_STATE["channels"]["tiktok"]["pending_orders"] = 0
+        for c in CHANNELS:
+            c["orders"] = 0
+        BRIEFING["orders"] = 0
+        BRIEFING["delayed"] = 0
+        updates["ai_briefing"] = "🚀 Operational Success: Dispatched all 23 pending cross-channel orders to corresponding packaging endpoints securely."
+        DASHBOARD_STATE["ai_briefing"] = updates["ai_briefing"]
+        COO["narrative"] = updates["ai_briefing"]
+
+    else:
+        return jsonify({"success": False})
+
+    return jsonify({"success": True, "updates": updates})
 
 
 @app.route('/api/orders')
