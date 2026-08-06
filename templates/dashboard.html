@@ -3,14 +3,14 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Universal Commerce OS — Shawnzy Luxe</title>
-    <link rel="stylesheet" href="{{ url_for('static', filename='dashboard.css') }}?v=2">
+    <title>Shawnzyluxe Universal Platform</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='dashboard.css') }}?v=3">
 </head>
 <body class="dashboard-page">
 
     <div class="dashboard-canvas">
 
-        <!-- 3D Framer-style floating background shapes -->
+        <!-- 3D floating background shapes -->
         <div class="floating-shape shape-pyramid"></div>
         <div class="floating-shape shape-sphere"></div>
         <div class="floating-shape shape-cube"></div>
@@ -19,7 +19,7 @@
         <div class="floating-shape shape-orb"></div>
 
         <!-- Giant Luxury Background Typography -->
-        <div class="backdrop-text">Ecommerce<br>Operations Center</div>
+        <div class="backdrop-text">Shawnzyluxe<br>E-Com Operations</div>
 
         <div class="foreground">
 
@@ -28,11 +28,11 @@
                 <div class="channel-pills">
                     <div class="pill active">
                         <span class="status-dot shopify"></span>
-                        &#128722; Shopify Connected
+                        &#128722; Shopify Live
                     </div>
                     <div class="pill active">
                         <span class="status-dot amazon"></span>
-                        &#128230; Amazon Live
+                        &#128230; Amazon Sync
                     </div>
                     <div class="pill active">
                         <span class="status-dot tiktok"></span>
@@ -41,48 +41,48 @@
                 </div>
                 <div class="top-right">
                     <div class="unified-balance">
-                        Unified Asset Value: <span style="font-family: 'JetBrains Mono', monospace; font-weight: 500;">${{ '%0.2f'|format(inventory_value) }}</span>
+                        Unified Revenue: <span class="mono">${{ '%0.2f'|format(inventory_value) }}</span>
                     </div>
                     <a class="lock-link" href="{{ url_for('site_logout') }}">Lock Workspace</a>
                 </div>
             </header>
 
-            <!-- Central AI Command Portal -->
+            <!-- AI Command Portal -->
             <section class="ai-portal">
                 <div class="input-bar">
                     <span style="font-size: 20px; margin-right: 10px;">&#129302;</span>
-                    <input type="text" placeholder="Ask AI across all connected platforms...">
-                    <button>Ask</button>
+                    <input type="text" placeholder="Ask AI: 'Show delayed orders and evaluate ad spend conversions'...">
+                    <button>Execute</button>
                 </div>
             </section>
 
-            <!-- Floating Glass Modules -->
+            <!-- Glass Workspace Cards -->
             <div class="metrics-matrix">
 
                 <!-- AI COO Briefing -->
                 <div class="floating-card glass-card">
-                    <h3>&#128200; AI COO Brief</h3>
-                    <p>Good morning, Shawn. Revenue is up 18% this week across channels. Two shipments are delayed on Amazon. TikTok Shop sales are trending.</p>
-                    <p style="font-size: 13px; color: var(--text-muted); margin-top: 10px;">
-                        Connected to {{ shop_name }} · {{ product_count }} products live · avg ${{ '%0.2f'|format(avg_price) }}
-                    </p>
-                    <button class="review-btn">Review Pipeline Actions</button>
+                    <div>
+                        <h3>&#128200; AI COO Briefing</h3>
+                        <p>Good morning, Shawn. Combined e-commerce volume is up 18% this week. Two shipments are flagged as delayed at Amazon fulfillment nodes. TikTok Shop retention metrics are up.</p>
+                        <p class="meta">Connected to {{ shop_name }} · {{ product_count }} products live · avg ${{ '%0.2f'|format(avg_price) }}</p>
+                    </div>
+                    <button class="review-btn">Deploy Optimizations</button>
                 </div>
 
-                <!-- Universal Live Orders -->
+                <!-- Storefront Performance -->
                 <div class="floating-card glass-card">
-                    <h3>&#128230; Universal Live Orders</h3>
+                    <h3>&#128230; Storefront Performance</h3>
                     <div class="metric-row">
-                        <span>&#128717; Shopify Fulfilment</span>
-                        <span class="value">{{ product_count }} Unprocessed</span>
+                        <span>&#128717; Shopify Storefront</span>
+                        <span class="value positive">3.4% Optimal</span>
                     </div>
                     <div class="metric-row">
-                        <span>&#128230; Amazon Logistics</span>
-                        <span class="value">4 Pending</span>
+                        <span>&#127919; TikTok Video Shop</span>
+                        <span class="value positive">4.1% Trending</span>
                     </div>
                     <div class="metric-row">
-                        <span>&#127919; TikTok Shop Flow</span>
-                        <span class="value">7 Pending</span>
+                        <span>&#128230; Amazon Marketplace</span>
+                        <span class="value">2.8% Stable</span>
                     </div>
                 </div>
 

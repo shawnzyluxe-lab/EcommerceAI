@@ -51,6 +51,7 @@ body.dashboard-page {
   text-align: center;
   letter-spacing: -2px;
   line-height: 1;
+  opacity: 0.65;
 }
 
 .foreground {
@@ -167,7 +168,7 @@ body.dashboard-page {
 /* Floating metrics matrix */
 .metrics-matrix {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
   gap: 24px;
   width: 100%;
 }
@@ -246,6 +247,17 @@ body.dashboard-page {
   text-decoration: underline;
 }
 
+.mono {
+  font-family: 'JetBrains Mono', monospace;
+  font-weight: 500;
+}
+
+.meta {
+  font-size: 13px;
+  color: var(--text-muted);
+  margin: 10px 0 0 0;
+}
+
 .empty-slot {
   display: flex;
   align-items: center;
@@ -259,8 +271,9 @@ body.dashboard-page {
   position: absolute;
   z-index: 1;
   pointer-events: none;
-  filter: drop-shadow(0 20px 30px rgba(0,0,0,0.12));
-  animation: float 6s ease-in-out infinite;
+  opacity: 0.2;
+  filter: blur(1px) drop-shadow(0 20px 30px rgba(0,0,0,0.12));
+  animation: float 7s ease-in-out infinite;
 }
 
 .shape-pyramid {
