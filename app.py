@@ -151,7 +151,7 @@ def site_wall_authenticated():
 def site_wall_protect():
     if not site_wall_enabled():
         return None
-    if request.endpoint in ('home', 'site_login', 'shopify_orders_webhook', 'register_merchant', 'shopify_oauth_callback', 'health', 'static'):
+    if request.endpoint in ('home', 'site_login', 'shopify_orders_webhook', 'register_merchant', 'shopify_oauth_callback', 'health_check', 'static'):
         return None
     if site_wall_authenticated():
         return None
