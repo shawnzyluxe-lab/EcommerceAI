@@ -436,6 +436,36 @@
         </div>
       </section>
 
+      <!-- ---------- Predictive Logistics ---------- -->
+      <section class="section" id="logistics">
+        <div class="section-head">
+          <h2>Predictive Logistics</h2>
+          <p>AI demand-velocity forecasting to flag stockouts before they happen.</p>
+          <span class="spacer"></span>
+          <button class="btn blue" onclick="document.getElementById('cmd').value='evaluate shortages'">Evaluate shortages</button>
+        </div>
+        <div class="grid g4">
+          <div class="card" style="border-top: 2px solid #E67E22; background: rgba(255, 244, 230, 0.65);">
+            <div class="card-head">
+              <h3 style="color:#7E3D00;">Predictive Shortages</h3>
+            </div>
+            <div id="analytics-items-container" style="display: flex; flex-direction: column; gap: 12px; font-size: 12px;">
+              {% for p in predictive %}
+              <div style="border-bottom: 1px solid rgba(126,61,0,0.1); padding-bottom: 8px;">
+                <div style="display:flex; justify-content:space-between; margin-bottom:4px;">
+                  <span style="font-weight: 600; color:#7E3D00;">{{ p.sku }}</span>
+                  <span class="tag {{ 'amber' if p.flag == 'CRITICAL_STOCKOUT' else 'green' }}">{{ p.flag }}</span>
+                </div>
+                <div style="color: #5C6E88; font-size:11px;">
+                  Stockout: <span style="font-weight:600; color:#1D2D44;">{{ p.days }} Days left</span> | Restock: <span class="mono">{{ p.restock }}</span>
+                </div>
+              </div>
+              {% endfor %}
+            </div>
+          </div>
+        </div>
+      </section>
+
       <!-- ---------- Marketing Studio ---------- -->
       <section class="section" id="studio">
         <div class="section-head">
@@ -674,6 +704,10 @@ ws.onmessage = function(event) {
     const shopifyCount = document.getElementById('shopify-count');
     if (shopifyCount && data.updates.shopify_orders !== undefined) {
       shopifyCount.textContent = data.updates.shopify_orders;
+    }
+    const analyticsContainer = document.getElementById('analytics-items-container');
+    if (analyticsContainer && data.updates.predictive_html) {
+      analyticsContainer.innerHTML = data.updates.predictive_html;
     }
     if (data.updates.trigger_download) {
       window.location.href = '/api/v1/download-report';

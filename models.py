@@ -83,3 +83,14 @@ class MarketingStudio(db.Model):
     platform_target = db.Column(db.String(100))
     copy_preview = db.Column(db.Text)
     created_at = db.Column(db.DateTime, server_default=db.func.now())
+
+
+class PredictiveLogistics(db.Model):
+    __tablename__ = "predictive_logistics"
+    id = db.Column(db.Integer, primary_key=True, autoincrement=True)
+    variant_sku = db.Column(db.String(100), unique=True, nullable=False)
+    days_remaining = db.Column(db.Integer)
+    forecasted_demand_velocity = db.Column(db.REAL)
+    optimal_restock_date = db.Column(db.String(20))
+    status_flag = db.Column(db.String(50))
+    created_at = db.Column(db.DateTime, server_default=db.func.now())

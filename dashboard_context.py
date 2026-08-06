@@ -253,6 +253,23 @@ MARKETING = {
     "copy": "Awaiting generation trigger query text...",
 }
 
+PREDICTIVE = [
+    {
+        "sku": "SZL-VAR-B",
+        "days": 4,
+        "velocity": 38.5,
+        "restock": "2026-08-10",
+        "flag": "CRITICAL_STOCKOUT",
+    },
+    {
+        "sku": "SZL-VAR-A",
+        "days": 22,
+        "velocity": 12.1,
+        "restock": "2026-08-28",
+        "flag": "HEALTHY",
+    },
+]
+
 # --------------------------------------------------------------------------
 # AI Automation Builder
 # --------------------------------------------------------------------------
@@ -373,6 +390,7 @@ def context():
         "studio": STUDIO,
         "support": SUPPORT,
         "mktg": MARKETING,
+        "predictive": PREDICTIVE,
         "automations": AUTOMATIONS,
         "specialists": SPECIALISTS,
         "health": HEALTH,

@@ -14,7 +14,7 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-from models import db, Tenant, ConnectedChannel, ActiveSession, BusinessMetric, CommerceChannel, SupportMetric, MarketingStudio
+from models import db, Tenant, ConnectedChannel, ActiveSession, BusinessMetric, CommerceChannel, SupportMetric, MarketingStudio, PredictiveLogistics
 from dashboard_context import (
     context,
     COMMAND_RESPONSES,
@@ -219,6 +219,23 @@ with app.app_context():
         MARKETING["status"] = latest_mktg.generation_status
         MARKETING["copy"] = latest_mktg.copy_preview
 
+    # Seed or restore predictive logistics
+    if not PredictiveLogistics.query.first():
+        db.session.add(PredictiveLogistics(
+            variant_sku="SZL-VAR-B",
+            days_remaining=4,
+            forecasted_demand_velocity=38.5,
+            optimal_restock_date=(datetime.utcnow() + timedelta(days=4)).strftime('%Y-%m-%d'),
+            status_flag="CRITICAL_STOCKOUT",
+        ))
+        db.session.add(PredictiveLogistics(
+            variant_sku="SZL-VAR-A",
+            days_remaining=22,
+            forecasted_demand_velocity=12.1,
+            optimal_restock_date="2026-08-28",
+            status_flag="HEALTHY",
+        ))
+
     db.session.commit()
 
     if SHOPIFY_DOMAIN and STOREFRONT_TOKEN and not ConnectedChannel.query.first():
@@ -319,7 +336,18 @@ def process_command(cmd_text):
         DASHBOARD_STATE["ai_briefing"] = updates["ai_briefing"]
         COO["narrative"] = updates["ai_briefing"]
 
-    elif re.search(r'(create discount|discount campaign|promo code|marketing)', cmd_text):
+    elif re.search(r'(generate marketing copy|write copy|email blast|create campaign)', cmd_text):
+        DASHBOARD_STATE["mktg_campaign"] = "Autumn Launch Preview"
+        DASHBOARD_STATE["mktg_status"] = "Deployed"
+        DASHBOARD_STATE["mktg_copy"] = "Email Blast Transmitted: 'The next chapter of style drops soon. Shawnzyluxe Members secure early operational access. Tap to unlock your portal container link now.'"
+        updates["mktg_campaign"] = DASHBOARD_STATE["mktg_campaign"]
+        updates["mktg_status"] = DASHBOARD_STATE["mktg_status"]
+        updates["mktg_copy"] = DASHBOARD_STATE["mktg_copy"]
+        updates["ai_briefing"] = "🚀 Creative Studio Execution: Compiled localized brand content structures and transmitted live email layouts to 4,200 connected profiles."
+        DASHBOARD_STATE["ai_briefing"] = updates["ai_briefing"]
+        COO["narrative"] = updates["ai_briefing"]
+
+    elif re.search(r'(create discount|discount campaign|promo code)', cmd_text):
         DASHBOARD_STATE["total_unified_balance"] += 1200.00
         BRIEFING["revenue"] += 1200.00
         DASHBOARD_STATE["mktg_campaign"] = "ECOM_AI_15 Active"
@@ -330,6 +358,28 @@ def process_command(cmd_text):
         updates["mktg_status"] = DASHBOARD_STATE["mktg_status"]
         updates["mktg_copy"] = DASHBOARD_STATE["mktg_copy"]
         updates["ai_briefing"] = "✨ Marketing Studio Action: Successfully injected dynamic promo script vectors live into connected channel API pipelines."
+        DASHBOARD_STATE["ai_briefing"] = updates["ai_briefing"]
+        COO["narrative"] = updates["ai_briefing"]
+
+    elif re.search(r'(evaluate shortages|predict supply|inventory forecast|shortages)', cmd_text):
+        p_row = PredictiveLogistics.query.filter_by(variant_sku="SZL-VAR-B").first()
+        if p_row:
+            p_row.days_remaining = 3
+            p_row.optimal_restock_date = "2026-08-09"
+            p_row.status_flag = "CRITICAL_STOCKOUT"
+        rows = PredictiveLogistics.query.order_by(PredictiveLogistics.days_remaining.asc()).all()
+        updates["predictive_html"] = "".join([
+            f"""<div style='border-bottom: 1px solid rgba(126,61,0,0.1); padding-bottom: 8px;'>
+  <div style='display:flex; justify-content:space-between; margin-bottom:4px;'>
+    <span style='font-weight: 600; color:#7E3D00;'>{r.variant_sku}</span>
+    <span class='{"badge-alert" if r.status_flag == "CRITICAL_STOCKOUT" else "badge-stable"}'>{r.status_flag}</span>
+  </div>
+  <div style='color: #5C6E88; font-size:11px;'>
+    Stockout: <span style='font-weight:600; color:#1D2D44;'>{r.days_remaining} Days left</span> | Restock: <span style='font-family:"JetBrains Mono";'>{r.optimal_restock_date}</span>
+  </div>
+</div>""" for r in rows
+        ])
+        updates["ai_briefing"] = "🔮 Predictive Model Executed: Velocity analysis maps high risk on SKU 'SZL-VAR-B' within 96 hours. Generated automated supplier batch PO orders."
         DASHBOARD_STATE["ai_briefing"] = updates["ai_briefing"]
         COO["narrative"] = updates["ai_briefing"]
 
