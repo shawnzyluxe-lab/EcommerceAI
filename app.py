@@ -97,6 +97,11 @@ def dashboard():
     return render_template('dashboard.html', **context())
 
 
+@app.route('/home')
+def home_page():
+    return render_template('home.html')
+
+
 @app.route('/api/command', methods=['POST'])
 def api_command():
     q = (request.json or {}).get("q", "").strip().lower().rstrip("?.!")

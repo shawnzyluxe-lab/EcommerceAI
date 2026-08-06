@@ -1,0 +1,61 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Prometheus OS — Home</title>
+    <script src="https://tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        onyx: '#0D0D11',
+                        slateDark: '#16161F',
+                        borderMuted: '#262636',
+                        accentGold: '#D4AF37'
+                    },
+                    fontFamily: {
+                        mono: ['Courier New', 'Courier', 'monospace']
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        .glow-ring { box-shadow: 0 0 15px rgba(212, 175, 55, 0.15); }
+    </style>
+</head>
+<body class="bg-onyx text-gray-100 font-sans antialiased min-h-screen flex flex-col selection:bg-accentGold selection:text-onyx">
+
+    <header class="border-b border-borderMuted bg-onyx/80 backdrop-blur-md px-6 py-4 flex items-center justify-between">
+        <div class="flex items-center space-x-3">
+            <div class="w-3 h-3 bg-accentGold rounded-full glow-ring"></div>
+            <span class="font-mono text-sm tracking-[0.3em] font-bold text-white">PROMETHEUS // OS</span>
+        </div>
+        <a href="/dashboard" class="text-xs tracking-widest text-gray-400 hover:text-white uppercase transition">Dashboard</a>
+    </header>
+
+    <main class="flex-grow flex flex-col items-center justify-center text-center px-4 max-w-5xl mx-auto py-16">
+        <div class="mb-4">
+            <span class="text-xs uppercase tracking-[0.4em] text-accentGold font-mono font-semibold bg-accentGold/10 px-3 py-1 border border-accentGold/20 rounded-full">
+                Staging
+            </span>
+        </div>
+        <h1 class="text-4xl md:text-5xl font-bold tracking-tight text-white mb-6 uppercase max-w-4xl leading-tight">
+            Home Page
+        </h1>
+        <p class="text-gray-400 text-base md:text-lg max-w-2xl mb-12 leading-relaxed">
+            This is the placeholder for the Prometheus OS home/landing layout. Upload a clean <code class="font-mono text-accentGold">index.html</code> and I’ll wire it in behind the existing security gate.
+        </p>
+        <a href="/dashboard" class="border border-accentGold/50 hover:border-accentGold text-accentGold px-6 py-3 text-xs tracking-widest uppercase transition rounded-sm font-mono">
+            Back to Dashboard
+        </a>
+    </main>
+
+    <footer class="border-t border-borderMuted py-6 text-center text-[10px] text-gray-500 font-mono tracking-widest uppercase">
+        © 2026 Prometheus OS — Hardened System Environment
+    </footer>
+
+</body>
+</html>
