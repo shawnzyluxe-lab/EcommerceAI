@@ -89,7 +89,7 @@ def storefront(query, variables=None):
 def home():
     if site_wall_authenticated():
         return redirect(url_for('dashboard'))
-    return render_template('gate.html', error=False, shop_name='Shawnzy Luxe')
+    return render_template('index.html', error=bool(request.args.get('error')))
 
 
 @app.route('/dashboard')
@@ -171,7 +171,7 @@ def site_login():
             )
             return response
         error = True
-    return render_template('gate.html', error=error, shop_name='Shawnzy Luxe')
+    return redirect(url_for('home', error=1)) if error else redirect(url_for('home'))
 
 
 @app.route('/site-logout')
