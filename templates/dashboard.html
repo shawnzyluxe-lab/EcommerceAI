@@ -606,27 +606,40 @@
 const out = document.getElementById('cmdout');
 const input = document.getElementById('cmd');
 
-async function run(q){
+const wsProtocol = window.location.protocol === 'https:' ? 'wss://' : 'ws://';
+const ws = new WebSocket(wsProtocol + window.location.host + '/ws/telemetry');
+
+ws.onopen = function() {
+  console.log('WebSocket telemetry connected');
+};
+
+ws.onmessage = function(event) {
+  const data = JSON.parse(event.data);
+  if (data.type === 'ui_update') {
+    out.style.display = 'block';
+    document.getElementById('cmdanswer').textContent = data.updates.ai_briefing;
+    const chips = ['Unified balance: $' + data.updates.total_balance];
+    if (data.updates.clear_orders) chips.push('Order queue cleared');
+    document.getElementById('cmddid').innerHTML =
+      chips.map(s => '<span class="chip">' + s + '</span>').join('');
+  }
+  if (data.type === 'error') {
+    out.style.display = 'block';
+    document.getElementById('cmdanswer').textContent = data.message;
+    document.getElementById('cmddid').innerHTML = '';
+  }
+};
+
+function run(q){
   if(!q) return;
   input.value = q;
   out.style.display = 'block';
   document.getElementById('cmdanswer').textContent = 'Working…';
   document.getElementById('cmddid').innerHTML = '';
-  const r = await fetch('/api/v1/execute-command', {
-    method:'POST',
-    headers:{'Content-Type':'application/json'},
-    body: JSON.stringify({command: q})
-  });
-  const d = await r.json();
-  if (d.success) {
-    document.getElementById('cmdanswer').textContent = d.updates.ai_briefing;
-    const chips = ['Unified balance: $' + d.updates.total_balance];
-    if (d.updates.clear_orders) chips.push('Order queue cleared');
-    document.getElementById('cmddid').innerHTML =
-      chips.map(s => '<span class="chip">' + s + '</span>').join('');
+  if (ws.readyState === WebSocket.OPEN) {
+    ws.send(JSON.stringify({command: q}));
   } else {
-    document.getElementById('cmdanswer').textContent = 'Command pattern outside standard operational array layout parameters.';
-    document.getElementById('cmddid').innerHTML = '';
+    document.getElementById('cmdanswer').textContent = 'Telemetry link not open yet. Please wait a moment.';
   }
 }
 

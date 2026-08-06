@@ -1,11 +1,13 @@
 import os
 import re
 import hmac
+import json
 import secrets
 import requests
 from datetime import datetime, timedelta
 from urllib.parse import urlencode
 from flask import Flask, render_template, request, redirect, url_for, session, flash, jsonify
+from flask_sock import Sock
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -47,6 +49,33 @@ app.config["SQLALCHEMY_DATABASE_URI"] = os.environ.get(
 app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
 
 db.init_app(app)
+sock = Sock(app)
+
+
+class ConnectionManager:
+    def __init__(self):
+        self.active_connections = []
+
+    def connect(self, websocket):
+        self.active_connections.append(websocket)
+
+    def disconnect(self, websocket):
+        if websocket in self.active_connections:
+            self.active_connections.remove(websocket)
+
+    def broadcast(self, message):
+        dead = []
+        for connection in self.active_connections:
+            try:
+                connection.send(json.dumps(message))
+            except Exception:
+                dead.append(connection)
+        for connection in dead:
+            if connection in self.active_connections:
+                self.active_connections.remove(connection)
+
+
+manager = ConnectionManager()
 
 # ============================================================
 # AEGIS-STYLE SITE PASSWORD WALL
@@ -216,13 +245,10 @@ def api_command():
     return jsonify({**hit, "stub": True})
 
 
-@app.route('/api/v1/execute-command', methods=['POST'])
-def execute_command():
-    """NLP command engine that updates dashboard state in plain English."""
-    data = request.get_json() or {}
-    cmd_text = data.get("command", "").lower().strip()
+def process_command(cmd_text):
+    """Shared NLP engine used by HTTP and WebSocket. Mutates state and persists."""
     if not cmd_text:
-        return jsonify({"success": False})
+        return None
 
     updates = {
         "ai_briefing": DASHBOARD_STATE["ai_briefing"],
@@ -262,7 +288,7 @@ def execute_command():
         COO["narrative"] = updates["ai_briefing"]
 
     else:
-        return jsonify({"success": False})
+        return None
 
     # Persist state to SQLite
     db.session.add(BusinessMetric(
@@ -277,7 +303,38 @@ def execute_command():
             cc.pending_orders = data["pending_orders"]
     db.session.commit()
 
+    return updates
+
+
+@app.route('/api/v1/execute-command', methods=['POST'])
+def execute_command():
+    """HTTP route for the NLP command engine."""
+    data = request.get_json() or {}
+    updates = process_command(data.get("command", "").lower().strip())
+    if updates is None:
+        return jsonify({"success": False})
     return jsonify({"success": True, "updates": updates})
+
+
+@sock.route('/ws/telemetry')
+def telemetry(ws):
+    """WebSocket route that processes commands and broadcasts updates instantly."""
+    manager.connect(ws)
+    try:
+        while True:
+            raw = ws.receive()
+            if raw is None:
+                break
+            payload = json.loads(raw)
+            updates = process_command(payload.get("command", "").lower().strip())
+            if updates is None:
+                ws.send(json.dumps({"type": "error", "message": "Command pattern outside standard operational array layout parameters."}))
+            else:
+                manager.broadcast({"type": "ui_update", "updates": updates})
+    except Exception as e:
+        print("WebSocket error:", e)
+    finally:
+        manager.disconnect(ws)
 
 
 @app.route('/api/orders')
