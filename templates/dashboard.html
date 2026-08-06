@@ -78,7 +78,7 @@
           <span class="crumb" style="font-size:.76rem;color:var(--ink-3)">{{ generated }}</span>
         </div>
         <h2 style="font-size:1.35rem">{{ coo.greeting }}</h2>
-        <p class="say" style="margin-top:8px">
+        <p id="ai-briefing-text" class="say" style="margin-top:8px">
           {% for pre, num, post in coo.summary %}{{ pre }} <strong>{{ num }}</strong>{% if post %} {{ post }}{% endif %}. {% endfor %}
           {{ coo.narrative }}
         </p>
@@ -103,7 +103,7 @@
       <div class="grid g4" style="margin-top:16px">
         <div class="card kpi">
           <div class="label">Revenue today</div>
-          <div class="value">${{ '{:,.0f}'.format(briefing.revenue) }}</div>
+          <div class="value" id="rev-display">${{ '{:,.0f}'.format(briefing.revenue) }}</div>
           <div class="delta up">▲ 18% vs last week</div>
         </div>
         <div class="card kpi">
@@ -812,6 +812,48 @@ function triggerOAuthConnection() {
   if (!shopDomain) return alert('Enter a valid myshopify.com URL string.');
   window.location.href = '/api/v1/auth/shopify/connect?shop=' + encodeURIComponent(shopDomain);
 }
+
+// Live dashboard telemetry polling fallback (3s loop)
+async function performTelemetryWorkspaceSync() {
+  try {
+    const response = await fetch('/api/v1/telemetry/poll');
+    const data = await response.json();
+    if (!data.success) return;
+
+    const briefing = document.getElementById('ai-briefing-text');
+    const balance = document.getElementById('rev-display');
+    const shopify = document.getElementById('shopify-count');
+    const supportChats = document.getElementById('support-chats');
+    const supportSentiment = document.getElementById('support-sentiment');
+    const supportResolution = document.getElementById('support-resolution');
+    const marketingCampaign = document.getElementById('mktg-campaign');
+    const marketingStatus = document.getElementById('mktg-status');
+    const marketingCopy = document.getElementById('mktg-copy');
+
+    if (briefing && briefing.innerText !== data.metrics.ai_briefing) {
+      briefing.style.opacity = '0.3';
+      setTimeout(() => {
+        briefing.innerText = data.metrics.ai_briefing;
+        briefing.style.opacity = '1';
+        if (typeof playChime === 'function') playChime();
+      }, 150);
+    }
+
+    if (balance) balance.innerText = '$' + data.metrics.gross_revenue;
+    if (shopify) shopify.innerText = (data.channels.shopify || 0) + ' orders';
+    if (supportChats) supportChats.innerText = data.support.chats;
+    if (supportSentiment) supportSentiment.innerText = data.support.sentiment;
+    if (supportResolution) supportResolution.innerText = '"' + data.support.resolution + '"';
+    if (marketingCampaign) marketingCampaign.innerText = data.marketing.campaign;
+    if (marketingStatus) marketingStatus.innerText = data.marketing.status;
+    if (marketingCopy) marketingCopy.innerText = data.marketing.copy;
+  } catch (error) {
+    console.error('Telemetry sync error:', error);
+  }
+}
+
+setInterval(performTelemetryWorkspaceSync, 3000);
+document.addEventListener('DOMContentLoaded', performTelemetryWorkspaceSync);
 </script>
 </body>
 </html>

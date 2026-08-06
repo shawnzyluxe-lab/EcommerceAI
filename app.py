@@ -1024,6 +1024,46 @@ def download_report():
     return send_file(target, as_attachment=True, download_name="shawnzyluxe_ledger.csv", mimetype="text/csv")
 
 
+@app.route('/api/v1/telemetry/poll', methods=['GET'])
+def telemetry_poll():
+    """Serve live dashboard metrics for frontend polling fallback."""
+    latest = BusinessMetric.query.order_by(BusinessMetric.id.desc()).first()
+    support = SupportMetric.query.order_by(SupportMetric.id.desc()).first()
+    mktg = MarketingStudio.query.order_by(MarketingStudio.id.desc()).first()
+    channels = {c.channel_id: c.pending_orders for c in CommerceChannel.query.all()}
+    rows = PredictiveLogistics.query.order_by(PredictiveLogistics.days_remaining.asc()).all()
+
+    return jsonify({
+        "success": True,
+        "metrics": {
+            "total_balance": f"{latest.total_unified_balance:.2f}" if latest else "0.00",
+            "true_profit": f"{latest.true_net_profit:.2f}" if latest else "0.00",
+            "gross_revenue": f"{latest.gross_revenue:.2f}" if latest else "0.00",
+            "ai_briefing": latest.ai_briefing if latest else "Initializing...",
+        },
+        "channels": channels,
+        "support": {
+            "chats": support.active_chats if support else 0,
+            "sentiment": support.sentiment_score if support else "Optimal",
+            "resolution": support.recent_resolution if support else "No queries active.",
+        },
+        "marketing": {
+            "campaign": mktg.active_campaign if mktg else "Idle",
+            "status": mktg.generation_status if mktg else "Idle",
+            "copy": mktg.copy_preview if mktg else "Awaiting triggers.",
+        },
+        "predictive": [
+            {
+                "sku": r.variant_sku,
+                "days": r.days_remaining,
+                "restock": r.optimal_restock_date,
+                "flag": r.status_flag,
+            }
+            for r in rows
+        ],
+    })
+
+
 @app.route('/api/v1/tenant/register', methods=['POST'])
 @limiter.limit("5 per hour")
 def register_merchant():
