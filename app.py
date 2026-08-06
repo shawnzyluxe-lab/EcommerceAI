@@ -30,7 +30,7 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-from models import db, Tenant, ConnectedChannel, ActiveSession, BusinessMetric, CommerceChannel, MerchantChannel, SupportMetric, MarketingStudio, PredictiveLogistics, OutboundTransmission, SaaSBilling, LocalProductCatalog, MerchantProfile, TenantOAuthToken, MerchantMetric, SystemExceptionLog, ProcessedWebhookEvent, AdSpendAnalytic
+from models import db, Tenant, ConnectedChannel, ActiveSession, BusinessMetric, CommerceChannel, MerchantChannel, SupportMetric, MarketingStudio, PredictiveLogistics, OutboundTransmission, SaaSBilling, LocalProductCatalog, MerchantProfile, TenantOAuthToken, MerchantMetric, SystemExceptionLog, ProcessedWebhookEvent, AdSpendAnalytic, GeneratedPurchaseOrder
 from dashboard_context import (
     context,
     COMMAND_RESPONSES,
@@ -207,7 +207,7 @@ def enforce_tier_limits(merchant_id, requested_feature):
 def site_wall_protect():
     if not site_wall_enabled():
         return None
-    if request.endpoint in ('home', 'site_login', 'shopify_orders_webhook', 'tiktok_orders_webhook', 'amazon_orders_webhook', 'stripe_billing_webhook', 'register_merchant', 'shopify_oauth_callback', 'health_check', 'static'):
+    if request.endpoint in ('home', 'site_login', 'shopify_orders_webhook', 'tiktok_orders_webhook', 'amazon_orders_webhook', 'stripe_billing_webhook', 'supplier_po_update', 'register_merchant', 'shopify_oauth_callback', 'health_check', 'static'):
         return None
     if site_wall_authenticated():
         return None
@@ -376,6 +376,8 @@ with app.app_context():
         db.session.add(AdSpendAnalytic(merchant_id="merchant_shawn_01", platform_source="Shopify Product Ads", budget_allocated=1500.00, current_spend=420.00, roas=3.4, conversion_count=28))
         db.session.add(AdSpendAnalytic(merchant_id="merchant_shawn_01", platform_source="TikTok Video Ads", budget_allocated=2000.00, current_spend=680.00, roas=4.1, conversion_count=47))
         db.session.add(AdSpendAnalytic(merchant_id="merchant_shawn_01", platform_source="Meta Retargeting Loop", budget_allocated=1200.00, current_spend=310.00, roas=2.9, conversion_count=19))
+    if not GeneratedPurchaseOrder.query.first():
+        db.session.add(GeneratedPurchaseOrder(po_reference="PO-SZL-A8F2", merchant_id="merchant_shawn_01", variant_sku="SZL-VAR-B", units_ordered=450, fulfillment_status="PENDING"))
     db.session.commit()
     billing = SaaSBilling.query.get("merchant_shawn_01")
     if billing:
@@ -1215,6 +1217,87 @@ def stripe_billing_webhook():
         log_system_exception("STRIPE_WEBHOOK", "CRITICAL", str(e))
         db.session.rollback()
         return jsonify({"error": "Internal Processing Stall"}), 500
+
+
+@app.route('/api/v1/tenant/save-credentials', methods=['POST'])
+def save_credentials():
+    """Persist marketplace access tokens in the per-tenant vault."""
+    merchant = get_merchant_context()
+    merchant_id = merchant["id"] if merchant else "merchant_shawn_01"
+    data = request.get_json() or {}
+    platform_id = data.get("platform_id")
+    shop_domain = data.get("shop_domain")
+    access_token = data.get("access_token")
+
+    if not platform_id or not shop_domain or not access_token:
+        return jsonify({"success": False, "error": "Missing key configuration metrics."}), 400
+
+    try:
+        db.session.merge(TenantOAuthToken(
+            shop_domain=shop_domain,
+            merchant_id=merchant_id,
+            platform_id=platform_id,
+            access_token_encrypted=access_token,
+            scope_permissions="read_write_unified",
+        ))
+        db.session.commit()
+        logger.info(f"[Vault] Saved {platform_id} credentials for {merchant_id}")
+        return jsonify({"success": True, "message": f"Successfully mapped channel connection to {shop_domain}."}), 200
+    except Exception as e:
+        log_system_exception("CREDENTIALS_VAULT", "CRITICAL", str(e))
+        db.session.rollback()
+        return jsonify({"success": False, "error": "Database lock encountered."}), 500
+
+
+@app.route('/api/v1/suppliers/po-update', methods=['POST'])
+@limiter.limit("60 per minute")
+def supplier_po_update():
+    """Supplier webhook: update PO tracking and restore stock status."""
+    data = request.get_json() or {}
+    po_ref = data.get("po_reference")
+    tracking_id = data.get("tracking_number")
+    new_status = data.get("status", "SHIPPED")
+
+    if not po_ref or not tracking_id:
+        return jsonify({"error": "Missing validation tokens."}), 400
+
+    try:
+        po = GeneratedPurchaseOrder.query.get(po_ref)
+        if not po:
+            return jsonify({"error": "Unknown PO reference."}), 404
+
+        po.tracking_number = tracking_id
+        po.fulfillment_status = new_status
+
+        # Restore predictive logistics to green
+        pl = PredictiveLogistics.query.filter_by(variant_sku=po.variant_sku).first()
+        if pl:
+            pl.days_remaining = 30
+            pl.status_flag = "HEALTHY"
+            pl.optimal_restock_date = "Healthy Lifecycle"
+
+        # Push COO briefing into business metrics
+        briefing = f"🚚 Supplier Update: PO {po_ref} shipped. Tracking: {tracking_id}. Restock restored."
+        db.session.add(BusinessMetric(
+            merchant_id=po.merchant_id,
+            total_unified_balance=20560.00,
+            true_net_profit=1394.00,
+            gross_revenue=4582.00,
+            ai_briefing=briefing,
+        ))
+        db.session.commit()
+
+        manager.broadcast({
+            "type": "ui_update",
+            "updates": {"ai_briefing": briefing},
+        })
+
+        logger.info(f"[Supplier] PO {po_ref} updated to {new_status} with tracking {tracking_id}")
+        return jsonify({"success": True, "status": "State Sync Complete"}), 200
+    except Exception as e:
+        log_system_exception("SUPPLIER_PO", "CRITICAL", str(e))
+        db.session.rollback()
+        return jsonify({"error": "Internal Processing Error"}), 500
 
 
 @app.route('/api/v1/download-report')

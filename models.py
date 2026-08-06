@@ -176,6 +176,17 @@ class AdSpendAnalytic(db.Model):
     conversion_count = db.Column(db.Integer)
 
 
+class GeneratedPurchaseOrder(db.Model):
+    __tablename__ = "generated_purchase_orders"
+    po_reference = db.Column(db.String(100), primary_key=True)
+    merchant_id = db.Column(db.String(100), db.ForeignKey("merchant_profiles.merchant_id"))
+    variant_sku = db.Column(db.String(100))
+    units_ordered = db.Column(db.Integer)
+    tracking_number = db.Column(db.String(255))
+    fulfillment_status = db.Column(db.String(50), default="PENDING")
+    updated_at = db.Column(db.DateTime, server_default=db.func.now())
+
+
 class ProcessedWebhookEvent(db.Model):
     __tablename__ = "processed_webhook_events"
     event_id = db.Column(db.String(255), primary_key=True)
