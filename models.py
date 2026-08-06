@@ -232,6 +232,15 @@ class ProcessedWebhookEvent(db.Model):
     processed_at = db.Column(db.DateTime, server_default=db.func.now())
 
 
+class MagicLoginToken(db.Model):
+    __tablename__ = "magic_login_tokens"
+    token = db.Column(db.String(255), primary_key=True)
+    admin_email = db.Column(db.String(255))
+    merchant_id = db.Column(db.String(100), db.ForeignKey("merchant_profiles.merchant_id"))
+    expires_at = db.Column(db.DateTime)
+    is_used = db.Column(db.Integer, default=0)
+
+
 class PredictiveLogistics(db.Model):
     __tablename__ = "predictive_logistics"
     id = db.Column(db.Integer, primary_key=True, autoincrement=True)

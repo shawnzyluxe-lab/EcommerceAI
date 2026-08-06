@@ -30,7 +30,7 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-from models import db, Tenant, ConnectedChannel, ActiveSession, BusinessMetric, CommerceChannel, MerchantChannel, SupportMetric, MarketingStudio, PredictiveLogistics, OutboundTransmission, SaaSBilling, LocalProductCatalog, MerchantProfile, TenantOAuthToken, MerchantMetric, SystemExceptionLog, ProcessedWebhookEvent, AdSpendAnalytic, GeneratedPurchaseOrder, AIAgent, AgentMessage, MerchantDecisionLog
+from models import db, Tenant, ConnectedChannel, ActiveSession, BusinessMetric, CommerceChannel, MerchantChannel, SupportMetric, MarketingStudio, PredictiveLogistics, OutboundTransmission, SaaSBilling, LocalProductCatalog, MerchantProfile, TenantOAuthToken, MerchantMetric, SystemExceptionLog, ProcessedWebhookEvent, AdSpendAnalytic, GeneratedPurchaseOrder, AIAgent, AgentMessage, MerchantDecisionLog, MagicLoginToken
 from dashboard_context import (
     context,
     COMMAND_RESPONSES,
@@ -207,7 +207,7 @@ def enforce_tier_limits(merchant_id, requested_feature):
 def site_wall_protect():
     if not site_wall_enabled():
         return None
-    if request.endpoint in ('home', 'site_login', 'shopify_orders_webhook', 'tiktok_orders_webhook', 'amazon_orders_webhook', 'stripe_billing_webhook', 'supplier_po_update', 'execute_mitigation', 'register_merchant', 'shopify_oauth_callback', 'health_check', 'static'):
+    if request.endpoint in ('home', 'site_login', 'shopify_orders_webhook', 'tiktok_orders_webhook', 'amazon_orders_webhook', 'stripe_billing_webhook', 'supplier_po_update', 'execute_mitigation', 'generate_magic_link', 'magic_login', 'register_merchant', 'shopify_oauth_callback', 'health_check', 'static'):
         return None
     if site_wall_authenticated():
         return None
@@ -1671,6 +1671,76 @@ def download_report():
     return send_file(target, as_attachment=True, download_name="shawnzyluxe_ledger.csv", mimetype="text/csv")
 
 
+@app.route('/api/v1/tenant/compile-executive-digest', methods=['POST'])
+@limiter.limit("10 per hour")
+def compile_executive_digest():
+    """Build an editorial-style HTML executive digest from merchant metrics."""
+    merchant = get_merchant_context()
+    merchant_id = merchant["id"] if merchant else "merchant_shawn_01"
+    report_ref = f"DIGEST-SZL-{secrets.token_hex(3).upper()}"
+    target_filename = "shawnzyluxe_executive_digest.html"
+    target_path = os.path.join(GENERATED_DIR, target_filename)
+
+    try:
+        latest = BusinessMetric.query.filter_by(merchant_id=merchant_id).order_by(BusinessMetric.id.desc()).first()
+        bal = latest.total_unified_balance if latest else 0.0
+        profit = latest.true_net_profit if latest else 0.0
+        revenue = latest.gross_revenue if latest else 0.0
+        briefing = latest.ai_briefing if latest else "Metrics stable."
+
+        report_html = f"""<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Shawnzyluxe Executive Digest</title>
+  <style>
+    body {{ font-family: 'Helvetica Neue', Arial, sans-serif; background: #FFFFFF; color: #1C1B19; margin: 40px; line-height: 1.6; }}
+    .header-frame {{ border-bottom: 2px solid #1C1B19; padding-bottom: 20px; margin-bottom: 40px; }}
+    .brand-title {{ font-size: 28px; font-weight: 700; letter-spacing: -1px; text-transform: uppercase; }}
+    .meta-tag {{ font-size: 11px; font-family: 'JetBrains Mono'; color: #706E6A; text-transform: uppercase; margin-top: 4px; }}
+    .metrics-grid {{ display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; margin-bottom: 40px; }}
+    .metric-box {{ background: #FDFBF7; border: 1px solid #EFECE6; padding: 20px; border-radius: 12px; }}
+    .val {{ font-size: 24px; font-weight: bold; color: #2E5236; font-family: 'JetBrains Mono'; margin-top: 6px; }}
+    .briefing-box {{ background: #F4F6F9; padding: 24px; border-radius: 16px; border-left: 4px solid #1C1B19; font-size: 14px; color: #4A5A70; }}
+  </style>
+</head>
+<body>
+  <div class="header-frame">
+    <div class="brand-title">SHAWNZYLUXE OPERATIONS LEDGER</div>
+    <div class="meta-tag">REF: {report_ref} | COMPILED: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}</div>
+  </div>
+  <div class="metrics-grid">
+    <div class="metric-box"><div>Unified Portfolio Balance</div><div class="val">${bal:,.2f}</div></div>
+    <div class="metric-box"><div>True Net Profit</div><div class="val">${profit:,.2f}</div></div>
+    <div class="metric-box"><div>Gross Revenue</div><div class="val">${revenue:,.2f}</div></div>
+  </div>
+  <h3>AI COO Algorithmic Summary</h3>
+  <div class="briefing-box">{briefing}</div>
+</body>
+</html>"""
+
+        with open(target_path, "w") as f:
+            f.write(report_html)
+
+        log_metered_api_usage(merchant_id, 5)
+        db.session.commit()
+
+        logger.info(f"[Report Engine] Compiled digest: {target_path}")
+        return jsonify({"success": True, "message": "Executive digest compiled.", "download_endpoint": "/api/v1/tenant/download-digest"}), 201
+    except Exception as e:
+        log_system_exception("REPORT_GEN", "CRITICAL", str(e))
+        return jsonify({"success": False, "error": "Document generation engine timed out."}), 500
+
+
+@app.route('/api/v1/tenant/download-digest', methods=['GET'])
+def download_digest():
+    """Serve the generated executive digest HTML."""
+    target = os.path.join(GENERATED_DIR, "shawnzyluxe_executive_digest.html")
+    if not os.path.exists(target):
+        return jsonify({"error": "Report data processing. Re-query endpoint."}), 404
+    return send_file(target, as_attachment=True, download_name="shawnzyluxe_executive_digest.html", mimetype="text/html")
+
+
 @app.route('/api/v1/telemetry/poll', methods=['GET'])
 def telemetry_poll():
     """Serve live, tenant-isolated dashboard metrics for frontend polling."""
@@ -1805,6 +1875,106 @@ def register_merchant():
         db.session.rollback()
         logger.warning(f"Tenant registration failed for {admin_email}: {e}")
         return jsonify({"success": False, "error": "Administrative profile email already registered"}), 400
+
+
+@app.route('/api/v1/tenant/generate-magic-link', methods=['POST'])
+@limiter.limit("10 per hour")
+def generate_magic_link():
+    """Generate a time-locked magic link and queue Mailgun dispatch."""
+    data = request.get_json() or {}
+    email = data.get("admin_email", "").strip().lower()
+    business_name = data.get("business_name", "New Storefront Venture")
+    selected_tier = data.get("selected_tier", "Pro Tier")
+
+    if not email:
+        return jsonify({"success": False, "error": "Administrative target email required."}), 400
+
+    try:
+        profile = MerchantProfile.query.filter_by(admin_email=email).first()
+        if not profile:
+            merchant_id = f"merchant_{secrets.token_hex(4)}"
+            db.session.add(MerchantProfile(
+                merchant_id=merchant_id,
+                business_name=business_name,
+                admin_email=email,
+                account_tier=selected_tier,
+            ))
+            db.session.add(SaaSBilling(merchant_id=merchant_id, current_plan=selected_tier))
+            db.session.add(BusinessMetric(
+                merchant_id=merchant_id,
+                total_unified_balance=0.00,
+                true_net_profit=0.00,
+                gross_revenue=0.00,
+                ai_briefing="Workspace initialized via Magic Link.",
+            ))
+        else:
+            merchant_id = profile.merchant_id
+
+        magic_token = secrets.token_urlsafe(32)
+        expires = datetime.now() + timedelta(minutes=15)
+        db.session.add(MagicLoginToken(
+            token=magic_token,
+            admin_email=email,
+            merchant_id=merchant_id,
+            expires_at=expires,
+            is_used=0,
+        ))
+        db.session.commit()
+
+        magic_url = f"{request.url_root.rstrip('/')}/api/v1/auth/magic-login?token={magic_token}"
+
+        # Dispatch via background worker
+        run_async_task(dispatch_external_email, email, "Access Your Shawnzyluxe AI Workspace",
+                       f"<p>Click below to access your workspace:</p><a href='{magic_url}'>{magic_url}</a>")
+
+        log_metered_api_usage(merchant_id, 1)
+        db.session.commit()
+
+        logger.info(f"[Magic Link] Generated for {email}: {magic_url}")
+        return jsonify({"success": True, "message": "Magic authorization link compiled and queued.", "debug_link": magic_url}), 201
+    except Exception as e:
+        log_system_exception("MAGIC_LINK", "CRITICAL", str(e))
+        db.session.rollback()
+        return jsonify({"success": False, "error": "Database concurrency error."}), 500
+
+
+@app.route('/api/v1/auth/magic-login', methods=['GET'])
+def magic_login():
+    """Validate magic token, drop secure session cookie, and redirect to dashboard."""
+    token = request.args.get("token")
+    if not token:
+        return redirect("/?error=missing_token")
+
+    mlink = MagicLoginToken.query.get(token)
+    if not mlink:
+        return redirect("/?error=invalid_token")
+
+    if mlink.is_used or datetime.now() > mlink.expires_at:
+        return redirect("/?error=token_expired")
+
+    # Mark token used and rotate active session
+    mlink.is_used = 1
+    profile = MerchantProfile.query.filter_by(admin_email=mlink.admin_email).first()
+    if not profile:
+        return redirect("/?error=profile_missing")
+
+    session_token = secrets.token_urlsafe(32)
+    active = ActiveSession(token=session_token, merchant_id=profile.merchant_id, created_at=datetime.now())
+    db.session.add(active)
+    db.session.commit()
+
+    active_sessions.add(session_token)
+
+    response = make_response(redirect("/"))
+    response.set_cookie(
+        SESSION_COOKIE_NAME,
+        session_token,
+        max_age=7 * 24 * 60 * 60,
+        httponly=True,
+        samesite="Lax",
+        secure=False,
+    )
+    return response
 
 
 @app.route('/health', methods=['GET'])
