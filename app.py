@@ -8,6 +8,7 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
+from models import db, Tenant, ConnectedChannel
 from dashboard_context import (
     context,
     COMMAND_RESPONSES,
@@ -18,6 +19,12 @@ from dashboard_context import (
 
 app = Flask(__name__)
 app.secret_key = os.environ.get('SECRET_KEY', 'dev-secret-change-this')
+app.config["SQLALCHEMY_DATABASE_URI"] = os.environ.get(
+    "DATABASE_URL", "sqlite:///shawnzyluxe.db"
+)
+app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
+
+db.init_app(app)
 
 # ============================================================
 # AEGIS-STYLE SITE PASSWORD WALL
@@ -63,6 +70,22 @@ CUSTOMER_ACCOUNT_CLIENT_SECRET = os.environ.get('SHOPIFY_CUSTOMER_ACCOUNT_CLIENT
 
 GRAPHQL_URL = f"https://{SHOPIFY_DOMAIN}/api/2024-07/graphql.json" if SHOPIFY_DOMAIN else None
 CUSTOMER_ACCOUNT_BASE = f"https://shopify.com/{SHOPIFY_DOMAIN.split('.')[0]}" if SHOPIFY_DOMAIN else None
+
+with app.app_context():
+    db.create_all()
+    if SHOPIFY_DOMAIN and STOREFRONT_TOKEN and not ConnectedChannel.query.first():
+        tenant = Tenant(company_name="Shawnzy Luxe", tier_level="Pro")
+        db.session.add(tenant)
+        db.session.flush()
+        channel = ConnectedChannel(
+            tenant_id=tenant.id,
+            channel_type="Shopify",
+            store_name=SHOPIFY_DOMAIN,
+            api_access_token=STOREFRONT_TOKEN,
+            sync_status="Pending",
+        )
+        db.session.add(channel)
+        db.session.commit()
 
 
 def storefront(query, variables=None):
