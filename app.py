@@ -1,5 +1,7 @@
 import os
+import hmac
 import requests
+from datetime import timedelta
 from urllib.parse import urlencode
 from flask import Flask, render_template, request, redirect, url_for, session, flash
 from dotenv import load_dotenv
@@ -8,6 +10,44 @@ load_dotenv()
 
 app = Flask(__name__)
 app.secret_key = os.environ.get('SECRET_KEY', 'dev-secret-change-this')
+app.config.update(
+    SESSION_COOKIE_HTTPONLY=True,
+    SESSION_COOKIE_SAMESITE='Lax',
+    PERMANENT_SESSION_LIFETIME=timedelta(days=7),
+)
+app.config['SESSION_COOKIE_SECURE'] = os.environ.get('HTTPS', 'false').lower() == 'true'
+
+# ============================================================
+# SITE PASSWORD WALL (Aegis-style)
+# ============================================================
+
+SITE_WALL_PASSWORD = os.environ.get("SITE_WALL_PASSWORD", "")
+
+
+def site_wall_enabled():
+    """The wall is enabled only when the env variable is set."""
+    return bool(SITE_WALL_PASSWORD)
+
+
+def site_wall_authenticated():
+    """Check whether the browser has passed the password wall."""
+    return session.get("site_wall_authenticated") is True
+
+
+@app.before_request
+def site_wall_protect():
+    if not site_wall_enabled():
+        return None
+    if request.endpoint in ('site_login', 'static'):
+        return None
+    if site_wall_authenticated():
+        return None
+    return redirect(url_for('site_login'))
+
+
+# ============================================================
+# END SITE PASSWORD WALL
+# ============================================================
 
 SHOPIFY_DOMAIN = os.environ.get('SHOPIFY_DOMAIN', '').strip()
 STOREFRONT_TOKEN = os.environ.get('SHOPIFY_STOREFRONT_TOKEN', '').strip()
@@ -75,6 +115,30 @@ def home():
     )
 
 
+@app.route('/site-login', methods=['GET', 'POST'])
+def site_login():
+    if not site_wall_enabled():
+        return redirect(url_for('home'))
+    if site_wall_authenticated():
+        return redirect(url_for('home'))
+
+    error = False
+    if request.method == 'POST':
+        submitted = request.form.get('password', '')
+        if hmac.compare_digest(submitted, SITE_WALL_PASSWORD):
+            session.permanent = True
+            session['site_wall_authenticated'] = True
+            return redirect(url_for('home'))
+        error = True
+    return render_template('gate.html', error=error, shop_name='Shawnzy Luxe')
+
+
+@app.route('/site-logout')
+def site_logout():
+    session.pop('site_wall_authenticated', None)
+    return redirect(url_for('site_login'))
+
+
 @app.route('/login')
 def login():
     return render_template('login.html', domain=SHOPIFY_DOMAIN)
@@ -89,7 +153,8 @@ def account():
 
 @app.route('/logout')
 def logout():
-    session.clear()
+    session.pop('customer_access_token', None)
+    session.pop('customer', None)
     return redirect(url_for('home'))
 
 

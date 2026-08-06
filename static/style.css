@@ -1,17 +1,18 @@
 :root {
-    --bg: #0a0a0a;
-    --surface: #141414;
-    --text: #f2f2f2;
-    --muted: #999;
-    --accent: #c9a962;
-    --border: #2a2a2a;
+    --bg: #faf9f7;
+    --surface: #ffffff;
+    --text: #111111;
+    --muted: #666666;
+    --accent: #ff5a1f;
+    --border: #ececec;
+    --shadow: 0 12px 40px rgba(0, 0, 0, 0.08);
 }
 
 * { box-sizing: border-box; }
 
 body {
     margin: 0;
-    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
     background: var(--bg);
     color: var(--text);
     line-height: 1.5;
@@ -22,50 +23,196 @@ body {
     justify-content: space-between;
     align-items: center;
     padding: 1.2rem 2rem;
-    border-bottom: 1px solid var(--border);
-    background: var(--surface);
+    max-width: 1200px;
+    margin: 0 auto;
+    background: transparent;
     position: sticky;
     top: 0;
     z-index: 10;
 }
 
 .logo {
-    font-weight: 700;
-    letter-spacing: 0.15em;
-    color: var(--accent);
+    font-weight: 800;
+    font-size: 1.1rem;
+    color: var(--text);
     text-decoration: none;
+    letter-spacing: -0.02em;
 }
 
 .nav-links a {
     margin-left: 1.5rem;
     color: var(--text);
     text-decoration: none;
-    font-size: 0.9rem;
-    text-transform: uppercase;
-    letter-spacing: 0.05em;
+    font-size: 0.95rem;
+    font-weight: 500;
 }
 
 .nav-links a:hover { color: var(--accent); }
 
 .hero {
-    padding: 5rem 2rem;
+    position: relative;
+    min-height: 85vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
     text-align: center;
-    background: linear-gradient(180deg, var(--surface) 0%, var(--bg) 100%);
+    overflow: hidden;
+    background: radial-gradient(circle at 50% 120%, #ffe8d6 0%, var(--bg) 55%);
+    padding: 2rem;
+}
+
+.hero-center {
+    position: relative;
+    z-index: 2;
+    max-width: 620px;
+}
+
+.hero-avatar {
+    width: 160px;
+    height: 160px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, #ffd56b 0%, #ff9a3c 100%);
+    box-shadow: var(--shadow), inset 0 -10px 20px rgba(0,0,0,0.08);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin: 0 auto 1.5rem;
+    font-size: 4rem;
+    font-weight: 800;
+    color: #fff;
+    text-shadow: 0 2px 4px rgba(0,0,0,0.1);
 }
 
 .hero h1 {
     margin: 0 0 0.5rem;
-    font-size: 2.8rem;
-    letter-spacing: 0.05em;
+    font-size: 3.4rem;
+    font-weight: 800;
+    letter-spacing: -0.04em;
+    line-height: 1.05;
 }
 
-.hero p {
-    margin: 0;
+.tagline {
+    margin: 0 0 1.8rem;
+    color: var(--muted);
+    font-size: 1.2rem;
+    font-weight: 500;
+}
+
+.btn-primary {
+    display: inline-block;
+    background: var(--text);
+    color: #fff;
+    padding: 0.95rem 2rem;
+    border-radius: 100px;
+    text-decoration: none;
+    font-weight: 600;
+    font-size: 1rem;
+    transition: transform 0.2s ease, background 0.2s ease;
+}
+
+.btn-primary:hover { transform: translateY(-2px); background: #333; }
+
+.shape {
+    position: absolute;
+    z-index: 1;
+    filter: drop-shadow(0 20px 30px rgba(0,0,0,0.12));
+    animation: float 6s ease-in-out infinite;
+}
+
+.shape-pyramid {
+    top: 12%;
+    left: 10%;
+    width: 90px;
+    height: 90px;
+    background: linear-gradient(135deg, #ffb347 0%, #ff8c00 100%);
+    clip-path: polygon(50% 0%, 0% 100%, 100% 100%);
+    animation-delay: 0s;
+}
+
+.shape-sphere {
+    top: 18%;
+    right: 14%;
+    width: 100px;
+    height: 100px;
+    border-radius: 50%;
+    background: radial-gradient(circle at 35% 35%, #e0b3ff 0%, #a855f7 100%);
+    animation-delay: 1s;
+}
+
+.shape-cube {
+    bottom: 22%;
+    left: 15%;
+    width: 80px;
+    height: 80px;
+    border-radius: 22%;
+    background: linear-gradient(135deg, #c7f2a4 0%, #84cc16 100%);
+    transform: rotate(15deg);
+    animation-delay: 2s;
+}
+
+.shape-cylinder {
+    bottom: 20%;
+    right: 12%;
+    width: 70px;
+    height: 120px;
+    border-radius: 100px;
+    background: linear-gradient(180deg, #6dd5fa 0%, #2980b9 100%);
+    animation-delay: 3s;
+}
+
+.shape-star {
+    top: 38%;
+    left: 6%;
+    width: 70px;
+    height: 70px;
+    background: linear-gradient(135deg, #a5f3fc 0%, #22d3ee 100%);
+    clip-path: polygon(50% 0%, 61% 35%, 98% 35%, 68% 57%, 79% 91%, 50% 70%, 21% 91%, 32% 57%, 2% 35%, 39% 35%);
+    animation-delay: 4s;
+}
+
+.shape-orb {
+    top: 55%;
+    right: 8%;
+    width: 60px;
+    height: 60px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, #fde047 0%, #facc15 100%);
+    animation-delay: 5s;
+}
+
+@keyframes float {
+    0%, 100% { transform: translateY(0) rotate(0deg); }
+    50% { transform: translateY(-18px) rotate(4deg); }
+}
+
+.about {
+    text-align: center;
+    padding: 5rem 2rem;
+    max-width: 680px;
+    margin: 0 auto;
+}
+
+.about h2 {
+    font-size: 2rem;
+    font-weight: 800;
+    margin-bottom: 0.8rem;
+    letter-spacing: -0.02em;
+}
+
+.about p {
     color: var(--muted);
     font-size: 1.1rem;
+    margin: 0;
 }
 
 .products { padding: 2rem; max-width: 1200px; margin: 0 auto; }
+
+.section-title {
+    font-size: 1.8rem;
+    font-weight: 800;
+    margin-bottom: 1.5rem;
+    letter-spacing: -0.02em;
+}
 
 .product-grid {
     display: grid;
@@ -76,29 +223,39 @@ body {
 .product-card {
     background: var(--surface);
     border: 1px solid var(--border);
-    border-radius: 8px;
+    border-radius: 16px;
     overflow: hidden;
     padding: 1rem;
+    box-shadow: var(--shadow);
+    transition: transform 0.2s ease;
 }
+
+.product-card:hover { transform: translateY(-4px); }
 
 .product-card img {
     width: 100%;
     height: 260px;
     object-fit: cover;
-    border-radius: 4px;
+    border-radius: 12px;
     display: block;
+    background: #f2f2f2;
 }
 
 .product-image-placeholder {
     width: 100%;
     height: 260px;
-    background: #222;
-    border-radius: 4px;
+    background: linear-gradient(135deg, #f3e8ff 0%, #e0f2fe 100%);
+    border-radius: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--muted);
+    font-weight: 600;
 }
 
-.product-card h3 { margin: 1rem 0 0.25rem; font-size: 1.05rem; }
+.product-card h3 { margin: 1rem 0 0.25rem; font-size: 1.05rem; font-weight: 600; }
 
-.price { color: var(--accent); font-weight: 600; margin: 0.25rem 0; }
+.price { color: var(--accent); font-weight: 700; margin: 0.25rem 0; }
 
 .description { color: var(--muted); font-size: 0.85rem; margin: 0.5rem 0 0; }
 
@@ -106,49 +263,141 @@ body {
     text-align: center;
     padding: 4rem 2rem;
     color: var(--muted);
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 16px;
 }
 
-.notice a { color: var(--accent); }
+.notice a { color: var(--accent); font-weight: 600; }
 
 .auth-page {
     max-width: 420px;
     margin: 4rem auto;
-    padding: 2rem;
+    padding: 2.5rem;
     background: var(--surface);
     border: 1px solid var(--border);
-    border-radius: 8px;
+    border-radius: 16px;
     text-align: center;
-}
-
-.btn-primary {
-    display: inline-block;
-    background: var(--accent);
-    color: #0a0a0a;
-    padding: 0.8rem 1.6rem;
-    border-radius: 4px;
-    text-decoration: none;
-    font-weight: 600;
-    margin: 1rem 0;
+    box-shadow: var(--shadow);
 }
 
 .login-form { display: flex; flex-direction: column; gap: 0.75rem; margin-top: 1.5rem; }
 
 .login-form input, .login-form button {
     padding: 0.75rem;
-    border-radius: 4px;
+    border-radius: 10px;
     border: 1px solid var(--border);
     background: var(--bg);
     color: var(--text);
+    font-family: inherit;
 }
 
-.login-form button { background: var(--accent); color: #0a0a0a; font-weight: 600; }
+.login-form button { background: var(--text); color: #fff; font-weight: 600; }
 
 .small { color: var(--muted); font-size: 0.8rem; }
 
 .footer {
     text-align: center;
     padding: 2rem;
-    border-top: 1px solid var(--border);
     color: var(--muted);
     margin-top: 4rem;
+}
+
+.gate-page {
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--bg);
+    padding: 1.5rem;
+}
+
+.gate-card {
+    width: 100%;
+    max-width: 420px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 24px;
+    padding: 2.5rem;
+    text-align: center;
+    box-shadow: var(--shadow);
+}
+
+.gate-logo {
+    width: 72px;
+    height: 72px;
+    border-radius: 20px;
+    background: linear-gradient(135deg, #ffd56b 0%, #ff9a3c 100%);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 2rem;
+    font-weight: 800;
+    color: #fff;
+    margin: 0 auto 1.2rem;
+    box-shadow: 0 10px 20px rgba(255, 154, 60, 0.25);
+}
+
+.gate-card h1 {
+    margin: 0;
+    font-size: 1.6rem;
+    font-weight: 800;
+    letter-spacing: -0.02em;
+}
+
+.gate-subtitle {
+    color: var(--muted);
+    margin: 0.5rem 0 1.8rem;
+    font-size: 0.95rem;
+}
+
+.gate-card form {
+    display: flex;
+    flex-direction: column;
+    gap: 0.9rem;
+}
+
+.gate-card input[type="password"] {
+    padding: 0.95rem 1.1rem;
+    border-radius: 14px;
+    border: 1px solid var(--border);
+    background: var(--bg);
+    color: var(--text);
+    font-size: 1rem;
+    font-family: inherit;
+    outline: none;
+    transition: border-color 0.2s;
+}
+
+.gate-card input[type="password"]:focus {
+    border-color: #ff9a3c;
+    box-shadow: 0 0 0 3px rgba(255, 154, 60, 0.12);
+}
+
+.gate-card button {
+    padding: 0.95rem;
+    border: 0;
+    border-radius: 14px;
+    background: var(--text);
+    color: #fff;
+    font-size: 1rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: transform 0.2s, background 0.2s;
+}
+
+.gate-card button:hover { transform: translateY(-2px); background: #333; }
+
+.gate-card .error {
+    color: #ef4444;
+    font-size: 0.9rem;
+    margin-bottom: 0.8rem;
+}
+
+@media (max-width: 640px) {
+    .hero h1 { font-size: 2.4rem; }
+    .hero-avatar { width: 120px; height: 120px; font-size: 3rem; }
+    .shape { display: none; }
+    .navbar { padding: 1rem; }
+    .nav-links a { margin-left: 1rem; font-size: 0.85rem; }
 }

@@ -2,11 +2,33 @@
 {% block title %}Shawnzy Luxe{% endblock %}
 {% block content %}
 <section class="hero">
-    <h1>{{ shop_name }}</h1>
-    <p>The machine that sells for you.</p>
+    <div class="shape shape-pyramid"></div>
+    <div class="shape shape-sphere"></div>
+    <div class="shape shape-cube"></div>
+    <div class="shape shape-cylinder"></div>
+    <div class="shape shape-star"></div>
+    <div class="shape shape-orb"></div>
+
+    <div class="hero-center">
+        <div class="hero-avatar">
+            <span>{{ shop_name[0] if shop_name else 'S' }}</span>
+        </div>
+        <h1>{{ shop_name }}</h1>
+        <p class="tagline">The machine that sells for you.</p>
+        <a class="btn-primary" href="#shop">Shop Collection</a>
+    </div>
 </section>
 
-<section class="products">
+<section class="about" id="about">
+    <h2>Curated for the bold</h2>
+    <p>
+        Shawnzy Luxe is a hand-picked selection of standout pieces — fashion,
+        accessories, and everyday luxury for people who move differently.
+    </p>
+</section>
+
+<section class="products" id="shop">
+    <h2 class="section-title">Featured</h2>
     {% if products %}
         <div class="product-grid">
             {% for edge in products %}
@@ -28,7 +50,7 @@
         </div>
     {% else %}
         <div class="notice">
-            <p>Products will load here once Shopify credentials are added to <code>.env</code>.</p>
+            <p>New arrivals loading soon.</p>
             <a href="{{ url_for('login') }}">Customer Login</a>
         </div>
     {% endif %}
