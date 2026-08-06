@@ -3,14 +3,23 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Commerce Command Center — Shawnzy Luxe</title>
+    <title>Universal Commerce OS — Shawnzy Luxe</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='dashboard.css') }}">
 </head>
 <body class="dashboard-page">
 
     <div class="dashboard-canvas">
+
+        <!-- 3D Framer-style floating background shapes -->
+        <div class="floating-shape shape-pyramid"></div>
+        <div class="floating-shape shape-sphere"></div>
+        <div class="floating-shape shape-cube"></div>
+        <div class="floating-shape shape-cylinder"></div>
+        <div class="floating-shape shape-star"></div>
+        <div class="floating-shape shape-orb"></div>
+
         <!-- Giant Luxury Background Typography -->
-        <div class="backdrop-text">Ecommerce Center</div>
+        <div class="backdrop-text">Ecommerce<br>Operations Center</div>
 
         <div class="foreground">
 
@@ -19,100 +28,73 @@
                 <div class="channel-pills">
                     <div class="pill active">
                         <span class="status-dot shopify"></span>
-                        &#128722; Shopify Active
+                        &#128722; Shopify Connected
                     </div>
-                    <div class="pill inactive">
+                    <div class="pill active">
                         <span class="status-dot amazon"></span>
-                        &#128230; Amazon Linked
+                        &#128230; Amazon Live
                     </div>
-                    <div class="pill inactive">
+                    <div class="pill active">
                         <span class="status-dot tiktok"></span>
                         &#127919; TikTok Shop
                     </div>
                 </div>
-                <div class="unified-balance">&#128181; {{ product_count }} Products &middot; ${{ '%0.2f'|format(inventory_value) }}</div>
+                <div class="top-right">
+                    <div class="unified-balance">
+                        Unified Asset Value: <span style="font-family: 'JetBrains Mono', monospace; font-weight: 500;">${{ '%0.2f'|format(inventory_value) }}</span>
+                    </div>
+                    <a class="lock-link" href="{{ url_for('site_logout') }}">Lock Workspace</a>
+                </div>
             </header>
 
             <!-- Central AI Command Portal -->
             <section class="ai-portal">
-                <h2>&#129302; The AI Command Center</h2>
                 <div class="input-bar">
-                    <span>&#128172;</span>
-                    <input type="text" placeholder="How did my stores do today?...">
+                    <span style="font-size: 20px; margin-right: 10px;">&#129302;</span>
+                    <input type="text" placeholder="Ask AI across all connected platforms...">
                     <button>Ask</button>
                 </div>
             </section>
 
-            <!-- Floating Metrics Matrix -->
+            <!-- Floating Glass Modules -->
             <div class="metrics-matrix">
 
                 <!-- AI COO Briefing -->
-                <div class="floating-card">
-                    <h3>&#128200; The AI COO Brief</h3>
-                    <p>Connected to {{ shop_name }}. {{ product_count }} products indexed. Avg price ${{ '%0.2f'|format(avg_price) }}.</p>
-                    <div class="metric-row">
-                        <span>Products</span>
-                        <span class="value positive">{{ product_count }}</span>
-                    </div>
-                    <div class="metric-row">
-                        <span>Avg Price</span>
-                        <span class="value positive">${{ '%0.2f'|format(avg_price) }}</span>
-                    </div>
-                    <button class="approve-btn">Approve Actions</button>
+                <div class="floating-card glass-card">
+                    <h3>&#128200; AI COO Brief</h3>
+                    <p>Good morning, Shawn. Revenue is up 18% this week across channels. Two shipments are delayed on Amazon. TikTok Shop sales are trending.</p>
+                    <p style="font-size: 13px; color: var(--text-muted); margin-top: 10px;">
+                        Connected to {{ shop_name }} · {{ product_count }} products live · avg ${{ '%0.2f'|format(avg_price) }}
+                    </p>
+                    <button class="review-btn">Review Pipeline Actions</button>
                 </div>
 
-                <!-- Central dynamic space / E-Commerce Operations -->
-                <div class="floating-card empty-slot">
-                    <span style="font-family: var(--font-heading); font-size: 22px; color: #EFECE6; text-transform: uppercase; letter-spacing: 2px;">
-                        E-Commerce Operations
-                    </span>
+                <!-- Universal Live Orders -->
+                <div class="floating-card glass-card">
+                    <h3>&#128230; Universal Live Orders</h3>
+                    <div class="metric-row">
+                        <span>&#128717; Shopify Fulfilment</span>
+                        <span class="value">{{ product_count }} Unprocessed</span>
+                    </div>
+                    <div class="metric-row">
+                        <span>&#128230; Amazon Logistics</span>
+                        <span class="value">4 Pending</span>
+                    </div>
+                    <div class="metric-row">
+                        <span>&#127919; TikTok Shop Flow</span>
+                        <span class="value">7 Pending</span>
+                    </div>
                 </div>
 
                 <!-- Real Profit Matrix -->
-                <div class="floating-card">
+                <div class="floating-card glass-card">
                     <h3>&#128176; Real Profit Matrix</h3>
-                    <div class="metric-row">
-                        <span>Ad Spend</span>
-                        <span class="value negative">-$420</span>
-                    </div>
-                    <div class="metric-row">
-                        <span>Product Cost</span>
-                        <span class="value negative">-$1,100</span>
-                    </div>
+                    <p>True spend overhead calculated.</p>
                     <div class="metric-hero">+${{ '%0.2f'|format(inventory_value) }}</div>
-                    <p>Inventory value from live Shopify feed.</p>
-                </div>
-
-                <!-- Universal Orders / Shopify Stream -->
-                <div class="floating-card">
-                    <h3>&#128230; Shopify Live Stream</h3>
                     <div class="metric-row">
-                        <span>&#128717; Products</span>
-                        <span class="value">{{ product_count }} live</span>
+                        <span>Gross Value</span>
+                        <span class="value positive">${{ '%0.2f'|format(inventory_value) }}</span>
                     </div>
-                    <div class="metric-row">
-                        <span>&#128230; Amazon</span>
-                        <span class="value">4 Shipped</span>
-                    </div>
-                    <div class="metric-row">
-                        <span>&#127919; TikTok</span>
-                        <span class="value">0 New</span>
-                    </div>
-                </div>
-
-                <!-- Central stats -->
-                <div class="floating-card empty-slot">
-                    <span style="font-family: var(--font-heading); font-size: 22px; color: #EFECE6; text-transform: uppercase; letter-spacing: 2px;">
-                        Operations Center
-                    </span>
-                </div>
-
-                <!-- Health Score -->
-                <div class="floating-card">
-                    <h3>&#129504; Health Score</h3>
-                    <div class="health-score">94<span style="font-size: 22px; color: var(--text-muted);">/100</span></div>
-                    <p>Ecosystem is operating elegantly.</p>
-                    <a class="recommend-link" href="#">View Recommendations</a>
                 </div>
 
             </div>
