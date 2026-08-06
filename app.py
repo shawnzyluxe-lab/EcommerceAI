@@ -8,7 +8,13 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-from dashboard_context import context, COMMAND_RESPONSES
+from dashboard_context import (
+    context,
+    COMMAND_RESPONSES,
+    RECENT_ORDERS,
+    PROFIT_BREAKDOWN,
+    BRIEFING,
+)
 
 app = Flask(__name__)
 app.secret_key = os.environ.get('SECRET_KEY', 'dev-secret-change-this')
@@ -107,6 +113,33 @@ def api_command():
             "stub": True,
         })
     return jsonify({**hit, "stub": True})
+
+
+@app.route('/api/orders')
+def api_orders():
+    """Return recent orders with computed margin."""
+    return jsonify({
+        "orders": RECENT_ORDERS,
+        "count": len(RECENT_ORDERS),
+        "revenue": BRIEFING["revenue"],
+        "profit": BRIEFING["profit"],
+    })
+
+
+@app.route('/api/profit/breakdown')
+def api_profit_breakdown():
+    """Calculate and return the profit breakdown."""
+    gross = sum(r["amount"] for r in PROFIT_BREAKDOWN if r["kind"] == "in")
+    costs = -sum(r["amount"] for r in PROFIT_BREAKDOWN if r["kind"] == "out")
+    net = gross - costs
+    margin = round(net / gross * 100, 1) if gross else 0.0
+    return jsonify({
+        "gross_revenue": round(gross, 2),
+        "total_costs": round(costs, 2),
+        "net_profit": round(net, 2),
+        "net_margin": margin,
+        "rows": PROFIT_BREAKDOWN,
+    })
 
 
 @app.route('/site-login', methods=['GET', 'POST'])
