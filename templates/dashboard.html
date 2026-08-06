@@ -8,133 +8,112 @@
 </head>
 <body class="dashboard-page">
 
-    <!-- Top Balance Strip -->
-    <header class="top-strip">
-        <div class="channels">
-            <span>🌐</span>
-            <span>Channels: Connected Stores Overview</span>
-            <span style="color: #96BF48;">● Shopify</span>
-            <span style="color: #ccc;">● Amazon</span>
-            <span style="color: #ccc;">● TikTok</span>
-        </div>
-        <div class="balances">
-            <div class="balance-node">
-                <span class="balance-dot shopify"></span>
-                <span class="balance-label">Shopify Balance:</span>
-                <span class="balance-value">$12.4K</span>
-            </div>
-            <div class="balance-node">
-                <span class="balance-dot amazon"></span>
-                <span class="balance-label">Amazon Balance:</span>
-                <span class="balance-value">$8.1K</span>
-            </div>
-        </div>
-    </header>
+    <div class="dashboard-canvas">
+        <!-- Giant Luxury Background Typography -->
+        <div class="backdrop-text">Ecommerce Center</div>
 
-    <div class="dashboard-grid">
+        <div class="foreground">
 
-        <!-- Master Admin Panel -->
-        <aside class="card admin-panel">
-            <h2>👑 Master Admin Panel</h2>
-
-            <div class="admin-group">
-                <h3>Executive Controls</h3>
-                <a class="admin-link" href="#">📊 Platform Audit Logs</a>
-                <a class="admin-link" href="#">💓 Engine Sync Heartbeat</a>
-                <a class="admin-link" href="#">⚙️ Store Connection Controls</a>
-            </div>
-
-            <div class="admin-group">
-                <h3>🛠️ Locked Engineer Panel</h3>
-                <a class="admin-link locked-link" href="#">⛓️ Frontend Webhook Setup</a>
-                <a class="admin-link locked-link" href="#">🔍 Layout UI Sandbox</a>
-                <a class="admin-link locked-link" href="#">🔒 Core Logic Walled</a>
-            </div>
-        </aside>
-
-        <!-- Main Content -->
-        <main class="main-content">
-
-            <!-- AI Command Center -->
-            <section class="card command-center">
-                <h2 style="font-family: var(--font-heading); margin: 0 0 4px;">🤖 The AI Command Center</h2>
-                <input class="command-input" type="text" placeholder='💬 "How did I do today?..."'>
-            </section>
-
-            <!-- AI COO Briefing -->
-            <section class="card coo-briefing">
-                <h2 class="greeting">Good morning, Shawn.</h2>
-                <p class="sub-greeting">Your e-commerce ecosystem is performing elegantly today.</p>
-
-                <div class="profit-callout">
-                    <div class="profit-label">Net Real Profit</div>
-                    <div class="profit-amount">$1,394</div>
+            <!-- Top Strip -->
+            <header class="top-strip">
+                <div class="channel-pills">
+                    <div class="pill active">
+                        <span class="status-dot shopify"></span>
+                        🛒 Shopify Active
+                    </div>
+                    <div class="pill inactive">
+                        <span class="status-dot amazon"></span>
+                        📦 Amazon Linked
+                    </div>
+                    <div class="pill inactive">
+                        <span class="status-dot tiktok"></span>
+                        🎯 TikTok Shop
+                    </div>
                 </div>
+                <div class="unified-balance">� TOTAL: $20,560</div>
+            </header>
 
-                <div class="metrics-row">
-                    <div>Revenue: <span class="metric-value up">$4,582 (▲18%)</span></div>
-                    <div>Real Profit: <span class="metric-value up">$1,394</span></div>
-                </div>
-
-                <div class="coo-alert">
-                    <span class="alert-text">⚠️ Top product selling out in 4 days. Switch to Supplier C?</span>
-                    <button class="approve-btn">Approve</button>
+            <!-- Central AI Command Portal -->
+            <section class="ai-portal">
+                <h2>🤖 The AI Command Center</h2>
+                <div class="input-bar">
+                    <span>�</span>
+                    <input type="text" placeholder="How did my stores do today?...">
+                    <button>Ask</button>
                 </div>
             </section>
 
-            <!-- Stream Grid -->
-            <div class="stream-grid">
+            <!-- Floating Metrics Matrix -->
+            <div class="metrics-matrix">
 
-                <!-- Universal Order Stream -->
-                <section class="card">
-                    <h2>📦 Universal Order Stream</h2>
-                    {% if products %}
-                        {% for p in products[:6] %}
-                            <div class="stream-row">
-                                <span>🛍️ Shopify:</span>
-                                <span class="order-title">{{ p.node.title | default('—') | truncate(32) }}</span>
-                                <span class="order-status">{{ p.node.priceRange.minVariantPrice.amount }} {{ p.node.priceRange.minVariantPrice.currencyCode }}</span>
-                            </div>
-                        {% endfor %}
-                    {% else %}
-                        <div class="stream-row">
-                            <span>🛍️ Shopify:</span>
-                            <span class="order-title">#1042</span>
-                            <span class="order-status">Processing</span>
-                        </div>
-                        <div class="stream-row">
-                            <span>🎯 TikTok:</span>
-                            <span class="order-title">#8841</span>
-                            <span class="order-status">Shipped</span>
-                        </div>
-                        <div class="stream-row">
-                            <span>📦 Amazon:</span>
-                            <span class="order-title">#9021</span>
-                            <span class="order-status">Pending</span>
-                        </div>
-                    {% endif %}
-                </section>
+                <!-- AI COO Briefing -->
+                <div class="floating-card">
+                    <h3>📈 The AI COO Brief</h3>
+                    <p>Revenue is up 18% this week. Top product selling out soon.</p>
+                    <div class="metric-row">
+                        <span>Revenue</span>
+                        <span class="value positive">$4,582</span>
+                    </div>
+                    <button class="approve-btn">Approve Actions</button>
+                </div>
 
-                <!-- Real-Time Profit Engine -->
-                <section class="card">
-                    <h2>💰 Real-Time Profit Engine</h2>
-                    <div class="profit-line negative">
-                        <span>Marketing Ad Spend</span>
-                        <span>-$420</span>
+                <!-- Central dynamic space / E-Commerce Operations -->
+                <div class="floating-card empty-slot">
+                    <span style="font-family: var(--font-heading); font-size: 22px; color: #EFECE6; text-transform: uppercase; letter-spacing: 2px;">
+                        E-Commerce Operations
+                    </span>
+                </div>
+
+                <!-- Real Profit Matrix -->
+                <div class="floating-card">
+                    <h3>💰 Real Profit Matrix</h3>
+                    <div class="metric-row">
+                        <span>Ad Spend</span>
+                        <span class="value negative">-$420</span>
                     </div>
-                    <div class="profit-line negative">
-                        <span>Product Cost (COGS)</span>
-                        <span>-$1,100</span>
+                    <div class="metric-row">
+                        <span>Product Cost</span>
+                        <span class="value negative">-$1,100</span>
                     </div>
-                    <div class="profit-line positive">
-                        <span>Net True Profit</span>
-                        <span>+$2,450</span>
+                    <div class="metric-hero">+$1,394</div>
+                    <p>Net true profit after all costs.</p>
+                </div>
+
+                <!-- Universal Orders -->
+                <div class="floating-card">
+                    <h3>📦 Universal Orders</h3>
+                    <div class="metric-row">
+                        <span>🛍️ Shopify</span>
+                        <span class="value">12 Pending</span>
                     </div>
-                </section>
+                    <div class="metric-row">
+                        <span>📦 Amazon</span>
+                        <span class="value">4 Shipped</span>
+                    </div>
+                    <div class="metric-row">
+                        <span>🎯 TikTok</span>
+                        <span class="value">0 New</span>
+                    </div>
+                </div>
+
+                <!-- Central stats -->
+                <div class="floating-card empty-slot">
+                    <span style="font-family: var(--font-heading); font-size: 22px; color: #EFECE6; text-transform: uppercase; letter-spacing: 2px;">
+                        Operations Center
+                    </span>
+                </div>
+
+                <!-- Health Score -->
+                <div class="floating-card">
+                    <h3>🧠 Health Score</h3>
+                    <div class="health-score">94<span style="font-size: 22px; color: var(--text-muted);">/100</span></div>
+                    <p>Ecosystem is operating elegantly.</p>
+                    <a class="recommend-link" href="#">View Recommendations</a>
+                </div>
 
             </div>
 
-        </main>
+        </div>
     </div>
 
 </body>
