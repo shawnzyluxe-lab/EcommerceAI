@@ -149,6 +149,9 @@ SMTP_PASSWORD = os.environ.get("SMTP_PASSWORD", "")
 MERCHANT_EMAIL = os.environ.get("MERCHANT_EMAIL", "shawn@shawnzyluxe.com")
 SUPPLIER_EMAIL = os.environ.get("SUPPLIER_EMAIL", "production@supplier-c.com")
 
+MAILGUN_API_KEY = os.environ.get("MAILGUN_API_KEY", "")
+MAILGUN_DOMAIN = os.environ.get("MAILGUN_DOMAIN", "")
+
 TWILIO_ACCOUNT_SID = os.environ.get("TWILIO_ACCOUNT_SID", "")
 TWILIO_AUTH_TOKEN = os.environ.get("TWILIO_AUTH_TOKEN", "")
 TWILIO_FROM_NUMBER = os.environ.get("TWILIO_FROM_NUMBER", "")
@@ -349,9 +352,31 @@ def log_system_exception(module, severity, message):
 
 
 def dispatch_external_email(recipient, subject, html_body):
-    """Send transactional email via configured SMTP; log result to outbound_transmissions."""
+    """Send transactional email via Mailgun API or SMTP fallback; log result."""
+    if MAILGUN_API_KEY and MAILGUN_DOMAIN:
+        try:
+            response = requests.post(
+                f"https://api.mailgun.net/v3/{MAILGUN_DOMAIN}/messages",
+                auth=("api", MAILGUN_API_KEY),
+                data={
+                    "from": f"Shawnzyluxe AI <postmaster@{MAILGUN_DOMAIN}>",
+                    "to": recipient,
+                    "subject": subject,
+                    "html": html_body,
+                },
+                timeout=10,
+            )
+            if response.status_code == 200:
+                log_transmission("EMAIL_BLAST", recipient, "DELIVERED", f"Mailgun | Subject: {subject}")
+                return True
+            log_transmission("EMAIL_BLAST", recipient, "FAILED_ROUTING", f"Mailgun {response.status_code}: {response.text}")
+            return False
+        except Exception as e:
+            log_transmission("EMAIL_BLAST", recipient, "FAILED_ROUTING", f"Mailgun: {str(e)}")
+            return False
+
     if not SMTP_USERNAME or not SMTP_PASSWORD:
-        log_transmission("EMAIL_BLAST", recipient, "NO_CREDENTIALS", "SMTP username or password not configured")
+        log_transmission("EMAIL_BLAST", recipient, "NO_CREDENTIALS", "No Mailgun API key or SMTP credentials configured")
         return False
     try:
         msg = MIMEMultipart("alternative")

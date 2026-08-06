@@ -29,6 +29,10 @@ services:
         sync: false
       - key: SMTP_PASSWORD
         sync: false
+      - key: MAILGUN_API_KEY
+        sync: false
+      - key: MAILGUN_DOMAIN
+        sync: false
       - key: MERCHANT_EMAIL
         sync: false
       - key: MERCHANT_PHONE
