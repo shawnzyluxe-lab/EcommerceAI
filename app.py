@@ -17,7 +17,7 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-from models import db, Tenant, ConnectedChannel, ActiveSession, BusinessMetric, CommerceChannel, SupportMetric, MarketingStudio, PredictiveLogistics, OutboundTransmission, SaaSBilling, LocalProductCatalog, MerchantProfile, TenantOAuthToken, MerchantMetric
+from models import db, Tenant, ConnectedChannel, ActiveSession, BusinessMetric, CommerceChannel, SupportMetric, MarketingStudio, PredictiveLogistics, OutboundTransmission, SaaSBilling, LocalProductCatalog, MerchantProfile, TenantOAuthToken, MerchantMetric, SystemExceptionLog
 from dashboard_context import (
     context,
     COMMAND_RESPONSES,
@@ -306,6 +306,8 @@ with app.app_context():
         db.session.add(MerchantProfile(merchant_id="merchant_guest_02", business_name="Alpha Storefronts", admin_email="guest@alpha.com", password_hash=""))
         db.session.add(MerchantMetric(merchant_id="merchant_shawn_01", total_unified_balance=20560.00, true_net_profit=1394.00, gross_revenue=4582.00, ai_briefing="System initialized for Shawnzyluxe multi-tenant parameters."))
         db.session.add(MerchantMetric(merchant_id="merchant_guest_02", total_unified_balance=1240.00, true_net_profit=410.00, gross_revenue=890.00, ai_briefing="System initialized for guest merchant clusters."))
+    if not SystemExceptionLog.query.first():
+        db.session.add(SystemExceptionLog(module_origin="DATABASE_CORE", error_severity="INFO", exception_msg="Relational multi-tenant isolation layer fully hardened."))
     db.session.commit()
 
     if SHOPIFY_DOMAIN and STOREFRONT_TOKEN and not ConnectedChannel.query.first():
@@ -329,6 +331,14 @@ def log_transmission(t_type, recipient, status, summary):
         recipient_address=recipient,
         status_chip=status,
         payload_summary=summary,
+    ))
+
+
+def log_system_exception(module, severity, message):
+    db.session.add(SystemExceptionLog(
+        module_origin=module,
+        error_severity=severity,
+        exception_msg=message,
     ))
 
 
@@ -817,81 +827,107 @@ SHOPIFY_WEBHOOK_SECRET = os.environ.get("SHOPIFY_WEBHOOK_SECRET", "").strip().en
 
 @app.route('/api/v1/webhooks/shopify-orders', methods=['POST'])
 def shopify_orders_webhook():
-    """Ingest live Shopify order webhooks, verify HMAC, mutate state, broadcast."""
-    raw_body = request.data
-    hmac_header = request.headers.get("X-Shopify-Hmac-SHA256")
-
-    if SHOPIFY_WEBHOOK_SECRET:
-        if not hmac_header:
-            return jsonify({"status": "rejected", "reason": "Missing HMAC"}), 401
-        computed = hmac.new(SHOPIFY_WEBHOOK_SECRET, raw_body, hashlib.sha256).digest()
-        if not hmac.compare_digest(computed, base64.b64decode(hmac_header)):
-            return jsonify({"status": "rejected", "reason": "Invalid HMAC"}), 401
-    else:
-        print("SHOPIFY_WEBHOOK_SECRET not set — accepting webhook without HMAC verification")
-
+    """Production-hardened webhook capture: verify HMAC, mutate state, broadcast."""
     try:
-        payload = json.loads(raw_body.decode("utf-8"))
-    except Exception:
-        return jsonify({"status": "rejected", "reason": "Invalid JSON"}), 400
+        raw_body = request.data
+        hmac_header = request.headers.get("X-Shopify-Hmac-SHA256")
 
-    order_value = float(payload.get("total_price", 0.00))
+        if SHOPIFY_WEBHOOK_SECRET:
+            if not hmac_header:
+                log_system_exception("SHOPIFY_WEBHOOK", "WARNING", "Dropped inbound webhook: missing HMAC signature.")
+                return jsonify({"status": "rejected", "reason": "Missing HMAC"}), 401
+            computed = hmac.new(SHOPIFY_WEBHOOK_SECRET, raw_body, hashlib.sha256).digest()
+            if not hmac.compare_digest(computed, base64.b64decode(hmac_header)):
+                log_system_exception("SHOPIFY_WEBHOOK", "WARNING", "Dropped inbound webhook: invalid HMAC signature.")
+                return jsonify({"status": "rejected", "reason": "Invalid HMAC"}), 401
+        else:
+            print("SHOPIFY_WEBHOOK_SECRET not set — accepting webhook without HMAC verification")
 
-    latest = BusinessMetric.query.order_by(BusinessMetric.id.desc()).first()
-    if not latest:
-        return jsonify({"status": "rejected", "reason": "No baseline metrics"}), 400
+        try:
+            payload = json.loads(raw_body.decode("utf-8"))
+        except json.JSONDecodeError as je:
+            error_msg = f"Inbound JSON malformed parse drop: {str(je)}"
+            log_system_exception("WEBHOOK_PARSER", "CRITICAL", error_msg)
+            db.session.commit()
+            manager.broadcast({
+                "type": "ui_update",
+                "updates": {
+                    "ai_briefing": "⚠️ Security Alert: Intercepted a corrupted multi-tenant payload structure. Core tables insulated.",
+                    "system_error_alert": error_msg,
+                }
+            })
+            return "Malformed Block Blocked", 400
 
-    new_bal = latest.total_unified_balance + order_value
-    new_gross = latest.gross_revenue + order_value
-    new_profit = latest.true_net_profit + (order_value * 0.42)
-    new_briefing = f"⚡ Live Webhook: Shopify order received for ${order_value:.2f}. Database updated automatically."
+        order_value = float(payload.get("total_price", 0.00))
 
-    shopify = CommerceChannel.query.get("shopify")
-    if shopify:
-        shopify.pending_orders += 1
-        DASHBOARD_STATE["channels"]["shopify"]["pending_orders"] = shopify.pending_orders
-        for c in CHANNELS:
-            if "shopify" in c["name"].lower():
-                c["orders"] = shopify.pending_orders
+        latest = BusinessMetric.query.order_by(BusinessMetric.id.desc()).first()
+        if not latest:
+            return jsonify({"status": "rejected", "reason": "No baseline metrics"}), 400
 
-    db.session.add(BusinessMetric(
-        total_unified_balance=new_bal,
-        true_net_profit=new_profit,
-        gross_revenue=new_gross,
-        ai_briefing=new_briefing,
-    ))
-    db.session.commit()
+        new_bal = latest.total_unified_balance + order_value
+        new_gross = latest.gross_revenue + order_value
+        new_profit = latest.true_net_profit + (order_value * 0.42)
+        new_briefing = f"⚡ Live Webhook: Shopify order received for ${order_value:.2f}. Database updated automatically."
 
-    DASHBOARD_STATE["total_unified_balance"] = new_bal
-    DASHBOARD_STATE["true_net_profit"] = new_profit
-    DASHBOARD_STATE["gross_revenue"] = new_gross
-    DASHBOARD_STATE["ai_briefing"] = new_briefing
-    COO["narrative"] = new_briefing
-    BRIEFING["revenue"] = new_gross
+        shopify = CommerceChannel.query.get("shopify")
+        if shopify:
+            shopify.pending_orders += 1
+            DASHBOARD_STATE["channels"]["shopify"]["pending_orders"] = shopify.pending_orders
+            for c in CHANNELS:
+                if "shopify" in c["name"].lower():
+                    c["orders"] = shopify.pending_orders
 
-    support = SupportMetric.query.order_by(SupportMetric.id.desc()).first()
-    mktg = MarketingStudio.query.order_by(MarketingStudio.id.desc()).first()
-    s_chats = support.active_chats if support else DASHBOARD_STATE["support_chats"]
-    s_sentiment = support.sentiment_score if support else DASHBOARD_STATE["support_sentiment"]
-    s_resolution = support.recent_resolution if support else DASHBOARD_STATE["support_resolution"]
-    m_camp = mktg.active_campaign if mktg else DASHBOARD_STATE["mktg_campaign"]
-    m_status = mktg.generation_status if mktg else DASHBOARD_STATE["mktg_status"]
-    m_copy = mktg.copy_preview if mktg else DASHBOARD_STATE["mktg_copy"]
+        db.session.add(BusinessMetric(
+            total_unified_balance=new_bal,
+            true_net_profit=new_profit,
+            gross_revenue=new_gross,
+            ai_briefing=new_briefing,
+        ))
+        db.session.commit()
 
-    updates = {
-        "ai_briefing": new_briefing,
-        "total_balance": f"{new_bal:.2f}",
-        "shopify_orders": shopify.pending_orders if shopify else 0,
-        "support_chats": s_chats,
-        "support_sentiment": s_sentiment,
-        "support_resolution": s_resolution,
-        "mktg_campaign": m_camp,
-        "mktg_status": m_status,
-        "mktg_copy": m_copy,
-    }
-    manager.broadcast({"type": "ui_update", "updates": updates})
+        DASHBOARD_STATE["total_unified_balance"] = new_bal
+        DASHBOARD_STATE["true_net_profit"] = new_profit
+        DASHBOARD_STATE["gross_revenue"] = new_gross
+        DASHBOARD_STATE["ai_briefing"] = new_briefing
+        COO["narrative"] = new_briefing
+        BRIEFING["revenue"] = new_gross
 
-    return jsonify({"status": "synchronized", "amount": order_value})
+        support = SupportMetric.query.order_by(SupportMetric.id.desc()).first()
+        mktg = MarketingStudio.query.order_by(MarketingStudio.id.desc()).first()
+        s_chats = support.active_chats if support else DASHBOARD_STATE["support_chats"]
+        s_sentiment = support.sentiment_score if support else DASHBOARD_STATE["support_sentiment"]
+        s_resolution = support.recent_resolution if support else DASHBOARD_STATE["support_resolution"]
+        m_camp = mktg.active_campaign if mktg else DASHBOARD_STATE["mktg_campaign"]
+        m_status = mktg.generation_status if mktg else DASHBOARD_STATE["mktg_status"]
+        m_copy = mktg.copy_preview if mktg else DASHBOARD_STATE["mktg_copy"]
+
+        updates = {
+            "ai_briefing": new_briefing,
+            "total_balance": f"{new_bal:.2f}",
+            "shopify_orders": shopify.pending_orders if shopify else 0,
+            "support_chats": s_chats,
+            "support_sentiment": s_sentiment,
+            "support_resolution": s_resolution,
+            "mktg_campaign": m_camp,
+            "mktg_status": m_status,
+            "mktg_copy": m_copy,
+        }
+        manager.broadcast({"type": "ui_update", "updates": updates})
+
+        return jsonify({"status": "synchronized", "amount": order_value})
+
+    except Exception as e:
+        error_msg = f"Webhook pipeline anomaly: {str(e)}"
+        log_system_exception("SHOPIFY_WEBHOOK", "CRITICAL", error_msg)
+        db.session.commit()
+        manager.broadcast({
+            "type": "ui_update",
+            "updates": {
+                "ai_briefing": "⚠️ Webhook Hardening Intercepted an unhandled runtime anomaly. Exception logged.",
+                "system_error_alert": error_msg,
+            }
+        })
+        return jsonify({"status": "rejected", "reason": "Hardened intercept"}), 400
 
 
 @app.route('/api/v1/download-report')

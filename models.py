@@ -143,6 +143,15 @@ class MerchantMetric(db.Model):
     ai_briefing = db.Column(db.Text)
 
 
+class SystemExceptionLog(db.Model):
+    __tablename__ = "system_exception_logs"
+    id = db.Column(db.Integer, primary_key=True, autoincrement=True)
+    module_origin = db.Column(db.String(100))
+    error_severity = db.Column(db.String(50))
+    exception_msg = db.Column(db.Text)
+    timestamp = db.Column(db.DateTime, server_default=db.func.now())
+
+
 class PredictiveLogistics(db.Model):
     __tablename__ = "predictive_logistics"
     id = db.Column(db.Integer, primary_key=True, autoincrement=True)
