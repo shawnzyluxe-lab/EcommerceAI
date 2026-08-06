@@ -86,6 +86,12 @@
           {% for pre, num, post in coo.summary %}{{ pre }} <strong>{{ num }}</strong>{% if post %} {{ post }}{% endif %}. {% endfor %}
           {{ coo.narrative }}
         </p>
+
+        <div id="ai-mitigation-actions-tray" style="display:none; background:rgba(231,76,60,0.06); border:1px dashed rgba(231,76,60,0.25); padding:12px; border-radius:14px; margin-top:12px;">
+          <div id="mitigation-tray-label" style="font-size:10px; text-transform:uppercase; color:#C0392B; font-weight:700; margin-bottom:8px; font-family:'JetBrains Mono';">AI Recommended Mitigation Interventions</div>
+          <button onclick="commitOneClickMitigation('REROUTE_SUPPLIER_C')" style="width:100%; background:#C0392B; color:#FFFFFF; border:none; border-radius:10px; padding:10px; font-size:12px; font-weight:600; cursor:pointer; box-shadow:0 4px 12px rgba(192,57,43,0.2);">Auto-Reroute to Supplier C Network</button>
+        </div>
+
         <div class="plan">
           {% for s in coo.plan %}
           <div class="step">
@@ -286,6 +292,17 @@
                 {% endfor %}
                 </tbody>
               </table>
+            </div>
+          </div>
+
+          <div class="card" style="grid-column: span 2;">
+            <div class="card-head">
+              <h3>True Profit Analytics Matrix</h3>
+              <span style="font-size: 11px; text-transform: uppercase; color: #8A9BB2; font-family:'JetBrains Mono';">Live SVG vector trend curves</span>
+              <span class="spacer"></span>
+            </div>
+            <div id="realtime-svg-chart-wrapper" style="margin-top:14px; width:100%; height:auto;">
+              <!-- SVG chart injected by telemetry polling loop -->
             </div>
           </div>
         </div>
@@ -913,8 +930,44 @@ async function performTelemetryWorkspaceSync() {
     }
     if (data.account_tier_context) updateTierBadgeDisplay(data.account_tier_context);
     updateCreativeAdOptimizationCard(data.ad_spend_matrix);
+    updateRealtimeSvgChartVector(data.charts ? data.charts.profit_trend_svg : '');
+    manageMitigationTrayDisplay(data.mitigation);
   } catch (error) {
     console.error('Telemetry sync error:', error);
+  }
+}
+
+function manageMitigationTrayDisplay(mitigation) {
+  const tray = document.getElementById('ai-mitigation-actions-tray');
+  if (!tray) return;
+  if (mitigation && mitigation.show_actions) {
+    tray.style.display = 'block';
+    const label = document.getElementById('mitigation-tray-label');
+    if (label) label.innerText = 'AI Mitigation Intervention: ' + mitigation.prompt_label;
+  } else {
+    tray.style.display = 'none';
+  }
+}
+
+function updateRealtimeSvgChartVector(svgHtmlString) {
+  const wrapper = document.getElementById('realtime-svg-chart-wrapper');
+  if (wrapper && svgHtmlString) {
+    wrapper.innerHTML = svgHtmlString;
+  }
+}
+
+async function commitOneClickMitigation(actionKey) {
+  const response = await fetch('/api/v1/tenant/execute-mitigation', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ action_target: actionKey })
+  });
+  const data = await response.json();
+  if (data.success) {
+    alert('AI Operations Engine executed fixed workflow map. Pipeline restored healthy.');
+    performTelemetryWorkspaceSync();
+  } else {
+    alert(data.error || 'Mitigation failed.');
   }
 }
 
