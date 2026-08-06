@@ -12,7 +12,7 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-from models import db, Tenant, ConnectedChannel, ActiveSession, BusinessMetric, CommerceChannel
+from models import db, Tenant, ConnectedChannel, ActiveSession, BusinessMetric, CommerceChannel, SupportMetric
 from dashboard_context import (
     context,
     COMMAND_RESPONSES,
@@ -21,6 +21,7 @@ from dashboard_context import (
     BRIEFING,
     COO,
     CHANNELS,
+    SUPPORT,
 )
 
 # Dynamic state for AI command engine
@@ -39,6 +40,9 @@ DASHBOARD_STATE = {
         "amazon": {"pending_orders": 4},
         "tiktok": {"pending_orders": 7},
     },
+    "support_chats": 3,
+    "support_sentiment": "94% Positive",
+    "support_resolution": "Order #1204 tracking corrected autonomously.",
 }
 
 app = Flask(__name__)
@@ -173,6 +177,22 @@ with app.app_context():
             if cc.channel_name.lower() in ch["name"].lower():
                 ch["orders"] = cc.pending_orders
 
+    # Seed or restore support metrics
+    if not SupportMetric.query.first():
+        db.session.add(SupportMetric(
+            active_chats=DASHBOARD_STATE["support_chats"],
+            sentiment_score=DASHBOARD_STATE["support_sentiment"],
+            recent_resolution=DASHBOARD_STATE["support_resolution"],
+        ))
+    latest_support = SupportMetric.query.order_by(SupportMetric.id.desc()).first()
+    if latest_support:
+        DASHBOARD_STATE["support_chats"] = latest_support.active_chats
+        DASHBOARD_STATE["support_sentiment"] = latest_support.sentiment_score
+        DASHBOARD_STATE["support_resolution"] = latest_support.recent_resolution
+        SUPPORT["chats"] = latest_support.active_chats
+        SUPPORT["sentiment"] = latest_support.sentiment_score
+        SUPPORT["resolution"] = latest_support.recent_resolution
+
     db.session.commit()
 
     if SHOPIFY_DOMAIN and STOREFRONT_TOKEN and not ConnectedChannel.query.first():
@@ -254,6 +274,9 @@ def process_command(cmd_text):
         "ai_briefing": DASHBOARD_STATE["ai_briefing"],
         "total_balance": f"{DASHBOARD_STATE['total_unified_balance']:.2f}",
         "clear_orders": False,
+        "support_chats": DASHBOARD_STATE["support_chats"],
+        "support_sentiment": DASHBOARD_STATE["support_sentiment"],
+        "support_resolution": DASHBOARD_STATE["support_resolution"],
     }
 
     if re.search(r'(why are sales down|sales down|analyze drops)', cmd_text):
@@ -287,6 +310,22 @@ def process_command(cmd_text):
         DASHBOARD_STATE["ai_briefing"] = updates["ai_briefing"]
         COO["narrative"] = updates["ai_briefing"]
 
+    elif re.search(r'(customer support|check chats|support status)', cmd_text):
+        DASHBOARD_STATE["support_chats"] = 3
+        DASHBOARD_STATE["support_sentiment"] = "96% Positive"
+        DASHBOARD_STATE["support_resolution"] = "Identified and resolved checkout latency anomaly."
+        updates["ai_briefing"] = "🎧 Support Audit: AI Agent managing 3 concurrent queries. Average response delay remains optimized under 4 seconds."
+        DASHBOARD_STATE["ai_briefing"] = updates["ai_briefing"]
+        COO["narrative"] = updates["ai_briefing"]
+
+    elif re.search(r'(escalate issue|angry customer|negative sentiment)', cmd_text):
+        DASHBOARD_STATE["support_chats"] = 4
+        DASHBOARD_STATE["support_sentiment"] = "89% Balanced"
+        DASHBOARD_STATE["support_resolution"] = "Ticket #1409 passed smoothly to administrative tier."
+        updates["ai_briefing"] = "⚠️ Urgency Intercept: Flagged 1 ticket displaying frustration on Shopify. Redirected context to manual agent queue."
+        DASHBOARD_STATE["ai_briefing"] = updates["ai_briefing"]
+        COO["narrative"] = updates["ai_briefing"]
+
     else:
         return None
 
@@ -301,6 +340,14 @@ def process_command(cmd_text):
         cc = CommerceChannel.query.get(channel_id)
         if cc:
             cc.pending_orders = data["pending_orders"]
+    db.session.add(SupportMetric(
+        active_chats=DASHBOARD_STATE["support_chats"],
+        sentiment_score=DASHBOARD_STATE["support_sentiment"],
+        recent_resolution=DASHBOARD_STATE["support_resolution"],
+    ))
+    SUPPORT["chats"] = DASHBOARD_STATE["support_chats"]
+    SUPPORT["sentiment"] = DASHBOARD_STATE["support_sentiment"]
+    SUPPORT["resolution"] = DASHBOARD_STATE["support_resolution"]
     db.session.commit()
 
     return updates

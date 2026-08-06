@@ -236,6 +236,9 @@ SUPPORT = {
     "open": 6,
     "escalated": 2,
     "avg_first_reply": "38s",
+    "chats": 3,
+    "sentiment": "94% Positive",
+    "resolution": "Order #1204 tracking corrected autonomously.",
     "threads": [
         {"who": "Dana R.", "topic": "Where is my order?", "state": "auto-resolved", "note": "Tracking sent + ETA"},
         {"who": "Marc T.", "topic": "Return request", "state": "auto-resolved", "note": "Label issued, exchange offered"},

@@ -458,7 +458,7 @@
       <!-- ---------- Support + Automations ---------- -->
       <section class="section" id="support">
         <div class="grid g2">
-          <div class="card">
+          <div class="card" id="support-hub">
             <div class="card-head">
               <h3>AI Customer Support</h3>
               <span class="spacer"></span>
@@ -468,6 +468,13 @@
               <div class="card tight kpi"><div class="label">Open</div><div class="value" style="font-size:1.25rem">{{ support.open }}</div></div>
               <div class="card tight kpi"><div class="label">Escalated</div><div class="value" style="font-size:1.25rem">{{ support.escalated }}</div></div>
               <div class="card tight kpi"><div class="label">First reply</div><div class="value" style="font-size:1.25rem">{{ support.avg_first_reply }}</div></div>
+            </div>
+            <div class="card tight" style="margin-bottom:12px;background:#fff">
+              <div style="display:flex;gap:12px;flex-wrap:wrap;align-items:center">
+                <div><div class="label">Active Chats</div><div class="value" id="support-chats" style="font-size:1.1rem">{{ support.chats }}</div></div>
+                <div><div class="label">Sentiment</div><div class="value" id="support-sentiment" style="font-size:1.1rem">{{ support.sentiment }}</div></div>
+                <div style="min-width:0;flex:1"><div class="label">Latest resolution</div><div class="hint" id="support-resolution">{{ support.resolution }}</div></div>
+              </div>
             </div>
             {% for t in support.threads %}
             <div style="display:flex;gap:10px;align-items:center;padding:8px 0;border-bottom:1px dashed var(--line)">
@@ -622,6 +629,12 @@ ws.onmessage = function(event) {
     if (data.updates.clear_orders) chips.push('Order queue cleared');
     document.getElementById('cmddid').innerHTML =
       chips.map(s => '<span class="chip">' + s + '</span>').join('');
+    const chats = document.getElementById('support-chats');
+    const sentiment = document.getElementById('support-sentiment');
+    const resolution = document.getElementById('support-resolution');
+    if (chats) chats.textContent = data.updates.support_chats;
+    if (sentiment) sentiment.textContent = data.updates.support_sentiment;
+    if (resolution) resolution.textContent = data.updates.support_resolution;
   }
   if (data.type === 'error') {
     out.style.display = 'block';

@@ -64,3 +64,12 @@ class CommerceChannel(db.Model):
     pending_orders = db.Column(db.Integer, default=0)
     conversion_rate = db.Column(db.REAL)
     performance_status = db.Column(db.String(50))
+
+
+class SupportMetric(db.Model):
+    __tablename__ = "support_metrics"
+    id = db.Column(db.Integer, primary_key=True, autoincrement=True)
+    active_chats = db.Column(db.Integer, default=0)
+    sentiment_score = db.Column(db.String(100))
+    recent_resolution = db.Column(db.Text)
+    created_at = db.Column(db.DateTime, server_default=db.func.now())
