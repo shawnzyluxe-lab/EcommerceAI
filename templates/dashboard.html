@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Commerce Command Center — Shawnzy Luxe</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='dashboard.css') }}">
+</head>
+<body class="dashboard-page">
+
+    <!-- Top Balance Strip -->
+    <header class="top-strip">
+        <div class="channels">
+            <span>🌐</span>
+            <span>Channels: Connected Stores Overview</span>
+            <span style="color: #96BF48;">● Shopify</span>
+            <span style="color: #ccc;">● Amazon</span>
+            <span style="color: #ccc;">● TikTok</span>
+        </div>
+        <div class="balances">
+            <div class="balance-node">
+                <span class="balance-dot shopify"></span>
+                <span class="balance-label">Shopify Balance:</span>
+                <span class="balance-value">$12.4K</span>
+            </div>
+            <div class="balance-node">
+                <span class="balance-dot amazon"></span>
+                <span class="balance-label">Amazon Balance:</span>
+                <span class="balance-value">$8.1K</span>
+            </div>
+        </div>
+    </header>
+
+    <div class="dashboard-grid">
+
+        <!-- Master Admin Panel -->
+        <aside class="card admin-panel">
+            <h2>👑 Master Admin Panel</h2>
+
+            <div class="admin-group">
+                <h3>Executive Controls</h3>
+                <a class="admin-link" href="#">📊 Platform Audit Logs</a>
+                <a class="admin-link" href="#">💓 Engine Sync Heartbeat</a>
+                <a class="admin-link" href="#">⚙️ Store Connection Controls</a>
+            </div>
+
+            <div class="admin-group">
+                <h3>🛠️ Locked Engineer Panel</h3>
+                <a class="admin-link locked-link" href="#">⛓️ Frontend Webhook Setup</a>
+                <a class="admin-link locked-link" href="#">🔍 Layout UI Sandbox</a>
+                <a class="admin-link locked-link" href="#">🔒 Core Logic Walled</a>
+            </div>
+        </aside>
+
+        <!-- Main Content -->
+        <main class="main-content">
+
+            <!-- AI Command Center -->
+            <section class="card command-center">
+                <h2 style="font-family: var(--font-heading); margin: 0 0 4px;">🤖 The AI Command Center</h2>
+                <input class="command-input" type="text" placeholder='💬 "How did I do today?..."'>
+            </section>
+
+            <!-- AI COO Briefing -->
+            <section class="card coo-briefing">
+                <h2 class="greeting">Good morning, Shawn.</h2>
+                <p class="sub-greeting">Your e-commerce ecosystem is performing elegantly today.</p>
+
+                <div class="profit-callout">
+                    <div class="profit-label">Net Real Profit</div>
+                    <div class="profit-amount">$1,394</div>
+                </div>
+
+                <div class="metrics-row">
+                    <div>Revenue: <span class="metric-value up">$4,582 (▲18%)</span></div>
+                    <div>Real Profit: <span class="metric-value up">$1,394</span></div>
+                </div>
+
+                <div class="coo-alert">
+                    <span class="alert-text">⚠️ Top product selling out in 4 days. Switch to Supplier C?</span>
+                    <button class="approve-btn">Approve</button>
+                </div>
+            </section>
+
+            <!-- Stream Grid -->
+            <div class="stream-grid">
+
+                <!-- Universal Order Stream -->
+                <section class="card">
+                    <h2>📦 Universal Order Stream</h2>
+                    {% if products %}
+                        {% for p in products[:6] %}
+                            <div class="stream-row">
+                                <span>🛍️ Shopify:</span>
+                                <span class="order-title">{{ p.node.title | default('—') | truncate(32) }}</span>
+                                <span class="order-status">{{ p.node.priceRange.minVariantPrice.amount }} {{ p.node.priceRange.minVariantPrice.currencyCode }}</span>
+                            </div>
+                        {% endfor %}
+                    {% else %}
+                        <div class="stream-row">
+                            <span>🛍️ Shopify:</span>
+                            <span class="order-title">#1042</span>
+                            <span class="order-status">Processing</span>
+                        </div>
+                        <div class="stream-row">
+                            <span>🎯 TikTok:</span>
+                            <span class="order-title">#8841</span>
+                            <span class="order-status">Shipped</span>
+                        </div>
+                        <div class="stream-row">
+                            <span>📦 Amazon:</span>
+                            <span class="order-title">#9021</span>
+                            <span class="order-status">Pending</span>
+                        </div>
+                    {% endif %}
+                </section>
+
+                <!-- Real-Time Profit Engine -->
+                <section class="card">
+                    <h2>💰 Real-Time Profit Engine</h2>
+                    <div class="profit-line negative">
+                        <span>Marketing Ad Spend</span>
+                        <span>-$420</span>
+                    </div>
+                    <div class="profit-line negative">
+                        <span>Product Cost (COGS)</span>
+                        <span>-$1,100</span>
+                    </div>
+                    <div class="profit-line positive">
+                        <span>Net True Profit</span>
+                        <span>+$2,450</span>
+                    </div>
+                </section>
+
+            </div>
+
+        </main>
+    </div>
+
+</body>
+</html>

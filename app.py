@@ -115,6 +115,28 @@ def home():
     )
 
 
+@app.route('/dashboard')
+def dashboard():
+    products = []
+    if GRAPHQL_URL and STOREFRONT_TOKEN:
+        data = storefront(
+            '''{
+                products(first: 12) {
+                    edges {
+                        node {
+                            title
+                            priceRange {
+                                minVariantPrice { amount currencyCode }
+                            }
+                        }
+                    }
+                }
+            }'''
+        )
+        products = data.get('data', {}).get('products', {}).get('edges', [])
+    return render_template('dashboard.html', products=products)
+
+
 @app.route('/site-login', methods=['GET', 'POST'])
 def site_login():
     if not site_wall_enabled():
