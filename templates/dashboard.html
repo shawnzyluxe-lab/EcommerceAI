@@ -124,6 +124,21 @@
         </div>
       </section>
 
+      <!-- ---------- Inter-Agent Dialogue Terminal ---------- -->
+      <section class="section" id="inter-agent-dialogue">
+        <div class="section-head">
+          <h2>Inter-Agent Dialogue Terminal</h2>
+          <p>Real-time background worker communications.</p>
+          <span class="spacer"></span>
+          <span class="tag green" style="font-family:'JetBrains Mono';">STREAM_ACTIVE</span>
+        </div>
+        <div class="glass-card" style="border-top: 2px solid #5C6E88; background: #1C1D21; color:#A8B2C1; font-family:'JetBrains Mono', monospace; padding:14px;">
+          <div id="inter-agent-chat-feed-box" style="display:flex; flex-direction:column; gap:10px; font-size:11px; height:130px; overflow-y:auto; line-height:1.4;">
+            <div style="color:#5C6E88;">Connecting terminal pipeline channels...</div>
+          </div>
+        </div>
+      </section>
+
       <!-- ---------- KPI row ---------- -->
       <div class="grid g4" style="margin-top:16px">
         <div class="card kpi">
@@ -911,6 +926,8 @@ async function performTelemetryWorkspaceSync() {
     const marketingCampaign = document.getElementById('mktg-campaign');
     const marketingStatus = document.getElementById('mktg-status');
     const marketingCopy = document.getElementById('mktg-copy');
+    const stripeUsage = document.getElementById('stripe-usage');
+    const stripeInvoice = document.getElementById('stripe-invoice');
 
     if (briefing && briefing.innerText !== data.metrics.ai_briefing) {
       briefing.style.opacity = '0.3';
@@ -932,6 +949,8 @@ async function performTelemetryWorkspaceSync() {
     if (marketingCampaign) marketingCampaign.innerText = data.marketing.campaign;
     if (marketingStatus) marketingStatus.innerText = data.marketing.status;
     if (marketingCopy) marketingCopy.innerText = data.marketing.copy;
+    if (stripeUsage) stripeUsage.textContent = data.metrics.stripe_usage + ' API Hits';
+    if (stripeInvoice) stripeInvoice.textContent = data.metrics.stripe_invoice;
 
     function updateTierBadgeDisplay(tierString) {
       const badge = document.getElementById('current-merchant-tier-badge');
@@ -947,6 +966,7 @@ async function performTelemetryWorkspaceSync() {
     updateCreativeAdOptimizationCard(data.ad_spend_matrix);
     updateRealtimeSvgChartVector(data.charts ? data.charts.profit_trend_svg : '');
     updateMultiAgentWorkspaceMatrixCard(data.agents_pool);
+    updateInterAgentVisualChatTerminal(data.inter_agent_stream);
     manageMitigationTrayDisplay(data.mitigation);
   } catch (error) {
     console.error('Telemetry sync error:', error);
@@ -982,6 +1002,19 @@ function updateMultiAgentWorkspaceMatrixCard(agentsPoolArray) {
       </div>`;
   });
   container.innerHTML = html;
+}
+
+function updateInterAgentVisualChatTerminal(dialogueStreamArray) {
+  const chatContainer = document.getElementById('inter-agent-chat-feed-box');
+  if (!chatContainer || !dialogueStreamArray) return;
+  let html = "";
+  dialogueStreamArray.forEach(line => {
+    let nameTag = line.sender === 'agent_logistics' ? 'LOGISTICS_AI' : (line.sender === 'agent_finance' ? 'FINANCE_AI' : (line.sender === 'agent_marketing' ? 'MARKETING_AI' : 'SUPPORT_AI'));
+    let nameColor = line.sender === 'agent_logistics' ? '#FF8C00' : (line.sender === 'agent_finance' ? '#22C55E' : '#9D4EDD');
+    html += `<div><span style="color:${nameColor}; font-weight:700;">[${nameTag}]:</span> <span style="color:#E0E6ED;">${line.text}</span></div>`;
+  });
+  chatContainer.innerHTML = html;
+  chatContainer.scrollTop = chatContainer.scrollHeight;
 }
 
 async function executeLearnedMitigationMoat(actionTrigger, decisionVector, vendor) {

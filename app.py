@@ -352,6 +352,7 @@ with app.app_context():
         db.session.add(SaaSBilling(
             merchant_id="merchant_shawn_01",
             stripe_customer_id="cus_R8zX1042",
+            stripe_subscription_item_id="si_R8zX1042_metered",
             current_plan="Enterprise AI Tier",
             metered_usage_units=4820,
             accrued_invoice_value=241.00,
@@ -383,6 +384,13 @@ with app.app_context():
         db.session.add(AIAgent(agent_id="agent_finance", merchant_id="merchant_shawn_01", agent_name="Finance AI Auditor", agent_role="Finance AI", status="IDLE_MONITORING", last_action="Audited ad returns against gross revenue."))
         db.session.add(AIAgent(agent_id="agent_marketing", merchant_id="merchant_shawn_01", agent_name="Marketing Studio Agent", agent_role="Marketing AI", status="IDLE_MONITORING", last_action="Standing by for plain text creative instructions."))
         db.session.add(AIAgent(agent_id="agent_support", merchant_id="merchant_shawn_01", agent_name="Support Sentiments Agent", agent_role="Support AI", status="IDLE_MONITORING", last_action="Monitoring cross-channel customer ticket feeds."))
+    if not AgentMessage.query.first():
+        db.session.add(AgentMessage(sender_agent="agent_logistics", recipient_agent="agent_finance", merchant_id="merchant_shawn_01",
+                                    payload="Alert: SKU SZL-VAR-B inventory velocity tracking indicates total stockout threat in 96 hours.", action_taken="stockout_alert"))
+        db.session.add(AgentMessage(sender_agent="agent_finance", recipient_agent="agent_marketing", merchant_id="merchant_shawn_01",
+                                    payload="Cash flow check verified. Confirmed $1,320 available budget cushion. Approved reorder transaction. Marketing AI, adjust TikTok spend parameters.", action_taken="cash_approved"))
+        db.session.add(AgentMessage(sender_agent="agent_marketing", recipient_agent="agent_logistics", merchant_id="merchant_shawn_01",
+                                    payload="Acknowledged. Suppressing high-velocity TikTok promo ad arrays temporarily. Supplier C Purchase Order generated.", action_taken="ad_adjusted"))
     db.session.commit()
     billing = SaaSBilling.query.get("merchant_shawn_01")
     if billing:
@@ -710,11 +718,45 @@ AUTHORIZATION STAMP: SHAWNZYLUXE AI OPERATIONS ENGINE
     return po_number
 
 
+def report_metered_consumption_to_stripe(merchant_id, quantity_increment):
+    """Sync usage to Stripe's metered endpoint; fall back to local mirror for mock keys."""
+    if not STRIPE_SECRET_KEY or "mock" in STRIPE_SECRET_KEY:
+        logger.info(f"[Stripe Meter Sync] Simulated {quantity_increment} billing hits for {merchant_id}")
+        return True
+
+    try:
+        account = SaaSBilling.query.get(merchant_id)
+        if not account or not account.stripe_subscription_item_id:
+            logger.warning(f"[Stripe Meter Sync] No subscription item for {merchant_id}")
+            return False
+
+        import requests
+        url = f"https://api.stripe.com/v1/subscription_items/{account.stripe_subscription_item_id}/usage_records"
+        headers = {
+            "Authorization": f"Bearer {STRIPE_SECRET_KEY}",
+            "Content-Type": "application/x-www-form-urlencoded",
+        }
+        payload = {
+            "quantity": quantity_increment,
+            "timestamp": int(datetime.utcnow().timestamp()),
+            "action": "increment",
+        }
+        res = requests.post(url, data=payload, headers=headers, timeout=8)
+        if res.status_code == 200 or res.status_code == 201:
+            logger.info(f"[Stripe API Synced] Metered {quantity_increment} units")
+            return True
+        logger.warning(f"[Stripe API] status {res.status_code} body {res.text}")
+    except Exception as e:
+        logger.error(f"Stripe usage connection faulted: {e}")
+    return False
+
+
 def log_metered_api_usage(merchant_id, operations_count):
     account = SaaSBilling.query.get(merchant_id)
     if account:
         account.metered_usage_units += operations_count
         account.accrued_invoice_value += operations_count * 0.05
+    report_metered_consumption_to_stripe(merchant_id, operations_count)
 
 
 def mutate_shopify_product_price(product_id, variant_id, new_price):
@@ -1508,6 +1550,8 @@ def execute_mitigation():
             logger.info(f"[AI Mitigation] Stockout mitigated for {merchant_id}")
             log_merchant_decision(merchant_id, "mitigation_execute", {"action": "REROUTE_SUPPLIER_C"}, build_context_schema(merchant_id))
             db.session.commit()
+            log_metered_api_usage(merchant_id, 15)
+            db.session.commit()
             return jsonify({"success": True, "message": "Fulfillment pipeline re-routed successfully."}), 200
 
         return jsonify({"success": False, "error": "Unknown mitigation target."}), 400
@@ -1608,6 +1652,8 @@ def commit_learned_decision():
             })
 
         db.session.commit()
+        log_metered_api_usage(merchant_id, 5)
+        db.session.commit()
         logger.info(f"[Moat Learning Engine] Decision vector logged. Confidence: {confidence:.2f}")
         return jsonify({"success": True, "confidence_index": confidence}), 200
     except Exception as e:
@@ -1653,6 +1699,7 @@ def telemetry_poll():
         rows = PredictiveLogistics.query.order_by(PredictiveLogistics.days_remaining.asc()).all()
         ads = AdSpendAnalytic.query.filter_by(merchant_id=merchant["id"]).all()
         agents = AIAgent.query.filter_by(merchant_id=merchant["id"]).order_by(AIAgent.agent_id).all()
+        messages = AgentMessage.query.filter_by(merchant_id=merchant["id"]).order_by(AgentMessage.id.desc()).limit(4).all()
 
         return jsonify({
             "success": True,
@@ -1667,11 +1714,17 @@ def telemetry_poll():
                 }
                 for a in ads
             ],
+            "inter_agent_stream": [
+                {"sender": m.sender_agent, "text": m.payload}
+                for m in reversed(messages)
+            ],
             "metrics": {
                 "total_balance": f"{latest.total_unified_balance:.2f}" if latest else "0.00",
                 "true_profit": f"{latest.true_net_profit:.2f}" if latest else "0.00",
                 "gross_revenue": f"{latest.gross_revenue:.2f}" if latest else "0.00",
                 "ai_briefing": latest.ai_briefing if latest else f"Welcome, {merchant['name']}. Initialize your accounts.",
+                "stripe_usage": f"{SaaSBilling.query.get(merchant['id']).metered_usage_units:,}" if SaaSBilling.query.get(merchant['id']) else "0",
+                "stripe_invoice": f"${SaaSBilling.query.get(merchant['id']).accrued_invoice_value:.2f}" if SaaSBilling.query.get(merchant['id']) else "$0.00",
             },
             "channels": {c.channel_id: {"orders": c.pending_orders, "cr": c.conversion_rate} for c in channels},
             "support": {
