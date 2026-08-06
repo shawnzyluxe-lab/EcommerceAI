@@ -13,7 +13,7 @@ app.secret_key = os.environ.get('SECRET_KEY', 'dev-secret-change-this')
 app.config.update(
     SESSION_COOKIE_HTTPONLY=True,
     SESSION_COOKIE_SAMESITE='Lax',
-    PERMANENT_SESSION_LIFETIME=timedelta(days=7),
+    PERMANENT_SESSION_LIFETIME=timedelta(days=1),
 )
 app.config['SESSION_COOKIE_SECURE'] = os.environ.get('HTTPS', 'false').lower() == 'true'
 
