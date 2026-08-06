@@ -1,0 +1,372 @@
+"""
+Shawnzyluxe Commerce AI — dashboard template.
+
+Every panel is driven by the dicts below, so wiring a feature to real data means
+replacing one function/constant and nothing else. Nothing here calls an external
+API: the numbers are illustrative sample data, clearly labelled in the UI.
+"""
+
+import os
+from datetime import datetime, timedelta, timezone
+
+from flask import Flask, render_template, request, jsonify
+
+
+BRAND = {
+    "name": "Shawnzyluxe",
+    "product": "Commerce AI",
+    "owner": "Shawn",
+    "domain": "shawnzyluxe.com",
+}
+
+# --------------------------------------------------------------------------
+# AI COO — the headline panel
+# --------------------------------------------------------------------------
+
+COO = {
+    "greeting": "Good morning, Shawn.",
+    "summary": [
+        ("Revenue is up", "18%", "this week"),
+        ("Top seller projected to sell out in", "4 days", ""),
+    ],
+    "narrative": (
+        "Switching Supplier B to Supplier C would save roughly $2,100 this month. "
+        "Three delayed shipments should be proactively refunded to protect satisfaction scores. "
+        "I have prepared the emails, the purchase order, and the inventory transfer."
+    ),
+    "plan": [
+        {"n": 1, "what": "Email 3 customers with delayed shipments + 15% coupon", "impact": "Retention", "state": "ready"},
+        {"n": 2, "what": "Purchase order: 240 units, Supplier C, 6-day lead", "impact": "-$2,100 cost", "state": "ready"},
+        {"n": 3, "what": "Transfer 60 units Miami → Dallas warehouse", "impact": "1.4d faster", "state": "ready"},
+        {"n": 4, "what": "Raise Product A ad budget by 20%", "impact": "+~$640 rev", "state": "needs review"},
+    ],
+    "confidence": 82,
+}
+
+# --------------------------------------------------------------------------
+# AI Command Center
+# --------------------------------------------------------------------------
+
+COMMAND_SUGGESTIONS = [
+    "How did I do today?",
+    "Why are sales down?",
+    "Which products should I discontinue?",
+    "Show delayed orders.",
+    "Create a discount campaign.",
+    "Reorder my top 3 sellers.",
+]
+
+# Canned responses so the input does something visible before a model is wired in.
+COMMAND_RESPONSES = {
+    "how did i do today": {
+        "answer": "Revenue $4,582 across 61 orders. Profit $1,394 (30.4% margin), up 6% on yesterday.",
+        "did": ["Read 61 orders", "Recomputed margin", "Compared to 7-day mean"],
+    },
+    "why are sales down": {
+        "answer": "Sales are not down overall — TikTok Shop fell 22% while Shopify rose 31%. TikTok CPM rose 41% after your top creative fatigued (frequency 4.8).",
+        "did": ["Split revenue by channel", "Checked ad frequency", "Flagged creative fatigue"],
+    },
+    "which products should i discontinue": {
+        "answer": "Two candidates: Chrome Tumbler 20oz (-4.1% net margin after refunds) and Linen Throw (sell-through 11% in 60 days, $1,840 tied up).",
+        "did": ["Ranked by true margin", "Included refunds + storage", "Checked 60-day sell-through"],
+    },
+    "show delayed orders": {
+        "answer": "3 orders past promised delivery: #1042 (6d, address mismatch), #1038 (5d, carrier delay), #1021 (5d, supplier backorder).",
+        "did": ["Scanned open fulfillments", "Compared promise vs carrier ETA"],
+    },
+    "create a discount campaign": {
+        "answer": "Drafted 'Weekend Lux 15' — 15% off 4 slow movers, capped at 200 redemptions, ends Sunday. Projected $1,180 revenue, $312 margin cost.",
+        "did": ["Selected slow movers", "Modelled margin floor", "Prepared email + SMS copy"],
+    },
+}
+
+# --------------------------------------------------------------------------
+# Universal Commerce Hub
+# --------------------------------------------------------------------------
+
+CHANNELS = [
+    {"name": "Shopify", "abbr": "SH", "color": "#5a8f3d", "state": "connected", "orders": 34, "revenue": 2610.40, "sync": "2 min ago"},
+    {"name": "TikTok Shop", "abbr": "TT", "color": "#111827", "state": "connected", "orders": 14, "revenue": 902.15, "sync": "6 min ago"},
+    {"name": "Amazon", "abbr": "AZ", "color": "#e07b00", "state": "connected", "orders": 9, "revenue": 741.00, "sync": "11 min ago"},
+    {"name": "Etsy", "abbr": "ET", "color": "#f1641e", "state": "connected", "orders": 4, "revenue": 328.60, "sync": "18 min ago"},
+    {"name": "eBay", "abbr": "EB", "color": "#0064d2", "state": "not connected", "orders": 0, "revenue": 0.0, "sync": "—"},
+    {"name": "WooCommerce", "abbr": "WC", "color": "#7f54b3", "state": "not connected", "orders": 0, "revenue": 0.0, "sync": "—"},
+    {"name": "Walmart", "abbr": "WM", "color": "#0071ce", "state": "not connected", "orders": 0, "revenue": 0.0, "sync": "—"},
+    {"name": "BigCommerce", "abbr": "BC", "color": "#121118", "state": "not connected", "orders": 0, "revenue": 0.0, "sync": "—"},
+]
+
+# --------------------------------------------------------------------------
+# AI Business Advisor — morning briefing
+# --------------------------------------------------------------------------
+
+BRIEFING = {
+    "revenue": 4582.00,
+    "profit": 1394.00,
+    "orders": 61,
+    "delayed": 3,
+    "trending": ["Satin Sleep Set", "Chrome Water Bottle"],
+    "action": "Increase ads on Product A by 20%.",
+    "aov": 75.11,
+    "refund_rate": 2.4,
+}
+
+# --------------------------------------------------------------------------
+# Autonomous AI Manager — proactive alerts
+# --------------------------------------------------------------------------
+
+ALERTS = [
+    {"level": "crit", "title": "Inventory will run out in 5 days", "detail": "Satin Sleep Set — 68 units left, selling 13/day. Supplier lead time is 6 days.", "when": "12 min ago", "actions": ["Create PO", "Snooze"]},
+    {"level": "warn", "title": "Supplier prices increased 8%", "detail": "Supplier B raised unit cost $4.10 → $4.43 on 6 SKUs, effective next order.", "when": "1 h ago", "actions": ["Compare suppliers", "Accept"]},
+    {"level": "warn", "title": "Refunds are unusually high", "detail": "Chrome Tumbler at 9.1% vs 2.4% store average — 4 of 6 cite 'lid leaks'.", "when": "3 h ago", "actions": ["Open cases", "Flag supplier"]},
+    {"level": "crit", "title": "This product is becoming unprofitable", "detail": "Chrome Tumbler net margin -4.1% after refunds and return shipping.", "when": "5 h ago", "actions": ["Discontinue", "Reprice"]},
+    {"level": "good", "title": "You should reorder now", "detail": "Reordering Linen Robe today lands stock 2 days before projected stockout.", "when": "Today", "actions": ["Create PO"]},
+]
+
+# --------------------------------------------------------------------------
+# AI Profit Engine — true profit per order
+# --------------------------------------------------------------------------
+
+PROFIT_BREAKDOWN = [
+    {"label": "Gross revenue", "amount": 4582.00, "kind": "in"},
+    {"label": "Product cost", "amount": -1489.20, "kind": "out"},
+    {"label": "Ad spend", "amount": -892.00, "kind": "out"},
+    {"label": "Shipping", "amount": -418.55, "kind": "out"},
+    {"label": "Transaction fees", "amount": -142.04, "kind": "out"},
+    {"label": "Refunds", "amount": -110.00, "kind": "out"},
+    {"label": "Taxes withheld", "amount": -136.21, "kind": "out"},
+]
+
+RECENT_ORDERS = [
+    {"id": "#1042", "channel": "Shopify", "items": 2, "revenue": 128.00, "profit": 38.42, "margin": 30.0, "state": "delayed"},
+    {"id": "#1041", "channel": "TikTok Shop", "items": 1, "revenue": 64.00, "profit": 11.90, "margin": 18.6, "state": "shipped"},
+    {"id": "#1040", "channel": "Shopify", "items": 3, "revenue": 214.50, "profit": 79.10, "margin": 36.9, "state": "shipped"},
+    {"id": "#1039", "channel": "Amazon", "items": 1, "revenue": 82.00, "profit": 14.05, "margin": 17.1, "state": "packed"},
+    {"id": "#1038", "channel": "Etsy", "items": 2, "revenue": 96.40, "profit": 27.60, "margin": 28.6, "state": "delayed"},
+    {"id": "#1037", "channel": "Shopify", "items": 1, "revenue": 58.00, "profit": -3.20, "margin": -5.5, "state": "refunded"},
+]
+
+# --------------------------------------------------------------------------
+# Predictive Analytics
+# --------------------------------------------------------------------------
+
+SALES_SERIES = [
+    {"day": "Mon", "value": 3810, "forecast": False},
+    {"day": "Tue", "value": 4120, "forecast": False},
+    {"day": "Wed", "value": 3990, "forecast": False},
+    {"day": "Thu", "value": 4460, "forecast": False},
+    {"day": "Fri", "value": 4582, "forecast": False},
+    {"day": "Sat", "value": 5140, "forecast": True},
+    {"day": "Sun", "value": 4870, "forecast": True},
+]
+
+FORECASTS = [
+    {"label": "Next week revenue", "value": "$32,400", "note": "±7% · 12-week seasonality"},
+    {"label": "Stockouts predicted", "value": "2 SKUs", "note": "Satin Sleep Set, Linen Robe"},
+    {"label": "Seasonal demand", "value": "+24%", "note": "Gifting window opens in 3 weeks"},
+    {"label": "Cash flow (30d)", "value": "$9,180", "note": "After $6,400 supplier outflow"},
+    {"label": "Best restock date", "value": "Aug 9", "note": "Lands 2 days before stockout"},
+]
+
+# --------------------------------------------------------------------------
+# AI Product Research
+# --------------------------------------------------------------------------
+
+RESEARCH = [
+    {"product": "Silk Pillowcase Set", "signal": "Rising", "trend": 184, "margin": 64, "competition": "Low", "source": "TikTok + Etsy"},
+    {"product": "Ceramic Diffuser", "signal": "Rising", "trend": 96, "margin": 58, "competition": "Medium", "source": "Amazon movers"},
+    {"product": "Chrome Tumbler 20oz", "signal": "Declining", "trend": -38, "margin": 22, "competition": "High", "source": "Category saturation"},
+    {"product": "Weighted Throw", "signal": "Watch", "trend": 12, "margin": 47, "competition": "Medium", "source": "Search volume"},
+]
+
+# --------------------------------------------------------------------------
+# AI Fulfillment
+# --------------------------------------------------------------------------
+
+FULFILLMENT = {
+    "routed_today": 58,
+    "auto_rate": 94,
+    "avg_saving": 1.86,
+    "rows": [
+        {"order": "#1042", "supplier": "Supplier C", "warehouse": "Dallas", "carrier": "UPS Ground", "cost": 6.40, "flag": "Address mismatch"},
+        {"order": "#1041", "supplier": "Supplier A", "warehouse": "Miami", "carrier": "USPS Priority", "cost": 8.10, "flag": ""},
+        {"order": "#1040", "supplier": "Supplier C", "warehouse": "Dallas", "carrier": "UPS Ground", "cost": 6.40, "flag": ""},
+        {"order": "#1039", "supplier": "Supplier B", "warehouse": "Reno", "carrier": "FedEx Home", "cost": 7.25, "flag": "Fraud risk 61"},
+    ],
+}
+
+# --------------------------------------------------------------------------
+# AI Fraud Detection
+# --------------------------------------------------------------------------
+
+FRAUD = [
+    {"order": "#1039", "score": 61, "reasons": "Billing/shipping mismatch · 3 cards tried", "verdict": "review"},
+    {"order": "#1036", "score": 88, "reasons": "Freight forwarder address · velocity 5 orders/2 min", "verdict": "block"},
+    {"order": "#1031", "score": 24, "reasons": "New customer, otherwise clean", "verdict": "allow"},
+]
+
+# --------------------------------------------------------------------------
+# Supply Chain Intelligence
+# --------------------------------------------------------------------------
+
+SUPPLIERS = [
+    {"name": "Supplier A", "price": 4.10, "ship_days": 8, "defect": 1.8, "refund": 2.1, "reliability": 88, "pick": False},
+    {"name": "Supplier B", "price": 4.43, "ship_days": 7, "defect": 3.4, "refund": 4.0, "reliability": 74, "pick": False},
+    {"name": "Supplier C", "price": 3.92, "ship_days": 6, "defect": 1.1, "refund": 1.4, "reliability": 94, "pick": True},
+]
+
+# --------------------------------------------------------------------------
+# AI Marketing Studio
+# --------------------------------------------------------------------------
+
+STUDIO = [
+    {"kind": "Product description", "title": "Satin Sleep Set", "meta": "3 variants · brand voice: warm luxe"},
+    {"kind": "Email campaign", "title": "Weekend Lux 15", "meta": "Subject A/B ready · 4,120 recipients"},
+    {"kind": "SMS campaign", "title": "Restock alert", "meta": "312 opted-in · 118 chars"},
+    {"kind": "Ad copy", "title": "TikTok — hook set", "meta": "5 hooks · new creative angle"},
+    {"kind": "Short-form video", "title": "Unboxing 12s", "meta": "Storyboard + captions"},
+    {"kind": "SEO content", "title": "Best satin sheets", "meta": "1,400 words · 8 keywords"},
+]
+
+# --------------------------------------------------------------------------
+# AI Customer Support
+# --------------------------------------------------------------------------
+
+SUPPORT = {
+    "resolved_rate": 78,
+    "open": 6,
+    "escalated": 2,
+    "avg_first_reply": "38s",
+    "threads": [
+        {"who": "Dana R.", "topic": "Where is my order?", "state": "auto-resolved", "note": "Tracking sent + ETA"},
+        {"who": "Marc T.", "topic": "Return request", "state": "auto-resolved", "note": "Label issued, exchange offered"},
+        {"who": "Priya S.", "topic": "Lid leaks", "state": "escalated", "note": "Defect pattern — routed to you"},
+        {"who": "Alex M.", "topic": "Size exchange", "state": "auto-resolved", "note": "Swapped to L, no charge"},
+    ],
+}
+
+# --------------------------------------------------------------------------
+# AI Automation Builder
+# --------------------------------------------------------------------------
+
+AUTOMATIONS = [
+    {"text": "If inventory falls below 20, notify me and create a purchase order.", "state": "active", "runs": 14},
+    {"text": "If an order is delayed more than 5 days, email the customer and issue a coupon.", "state": "active", "runs": 3},
+    {"text": "If refund rate on a SKU passes 6%, pause its ads and flag the supplier.", "state": "active", "runs": 1},
+    {"text": "Every Monday, summarize channel performance and post it to Slack.", "state": "paused", "runs": 0},
+]
+
+# --------------------------------------------------------------------------
+# Team AI
+# --------------------------------------------------------------------------
+
+SPECIALISTS = [
+    {"name": "Marketing AI", "status": "Rewriting 5 TikTok hooks", "state": "working"},
+    {"name": "Inventory AI", "status": "2 stockouts predicted", "state": "attention"},
+    {"name": "Finance AI", "status": "Margin recomputed · 30.4%", "state": "idle"},
+    {"name": "Logistics AI", "status": "58 orders routed today", "state": "working"},
+    {"name": "Support AI", "status": "78% auto-resolved", "state": "working"},
+    {"name": "Analytics AI", "status": "Forecast refreshed 06:10", "state": "idle"},
+]
+
+# --------------------------------------------------------------------------
+# Business Health Score
+# --------------------------------------------------------------------------
+
+HEALTH = {
+    "score": 74,
+    "components": [
+        {"label": "Profitability", "value": 68, "tone": ""},
+        {"label": "Inventory health", "value": 52, "tone": "amber"},
+        {"label": "Shipping performance", "value": 81, "tone": "green"},
+        {"label": "Customer satisfaction", "value": 88, "tone": "green"},
+        {"label": "Marketing efficiency", "value": 61, "tone": "amber"},
+        {"label": "Cash flow", "value": 79, "tone": "green"},
+    ],
+    "recommendations": [
+        "Reorder Satin Sleep Set today — biggest single lift to inventory health.",
+        "Retire the fatigued TikTok creative; CPM is 41% above your 30-day mean.",
+        "Drop Chrome Tumbler or raise it $6 — it is currently margin-negative.",
+    ],
+}
+
+# --------------------------------------------------------------------------
+# Global Commerce Tools
+# --------------------------------------------------------------------------
+
+GLOBAL_TOOLS = [
+    {"label": "Currency conversion", "value": "7 currencies", "note": "Rates refreshed hourly"},
+    {"label": "Tax calculation", "value": "Nexus: FL, TX", "note": "Auto-applied at checkout"},
+    {"label": "Translation", "value": "4 languages", "note": "EN, ES, FR, DE"},
+    {"label": "Duties & customs", "value": "Estimated", "note": "DDP quotes on 3 lanes"},
+    {"label": "Multi-language storefront", "value": "2 live", "note": "EN, ES"},
+]
+
+# --------------------------------------------------------------------------
+# Mobile AI Copilot
+# --------------------------------------------------------------------------
+
+MOBILE_ACTIONS = [
+    "How much profit did I make today?",
+    "Approve supplier order.",
+    "Show delayed shipments.",
+    "Create a discount.",
+]
+
+NAV = [
+    ("Overview", "#top", True),
+    ("Command Center", "#command", False),
+    ("Commerce Hub", "#channels", False),
+    ("Alerts", "#alerts", False),
+    ("Profit Engine", "#profit", False),
+    ("Predictions", "#predict", False),
+    ("Product Research", "#research", False),
+    ("Fulfillment", "#fulfillment", False),
+    ("Fraud", "#fraud", False),
+    ("Suppliers", "#suppliers", False),
+    ("Marketing Studio", "#studio", False),
+    ("Support", "#support", False),
+    ("Automations", "#automations", False),
+    ("Team AI", "#team", False),
+    ("Health Score", "#health", False),
+    ("Global", "#global", False),
+    ("Mobile Copilot", "#mobile", False),
+]
+
+
+def context():
+    now = datetime.now(timezone.utc)
+    gross = sum(r["amount"] for r in PROFIT_BREAKDOWN if r["kind"] == "in")
+    costs = -sum(r["amount"] for r in PROFIT_BREAKDOWN if r["kind"] == "out")
+    net = gross - costs
+    return {
+        "brand": BRAND,
+        "nav": NAV,
+        "coo": COO,
+        "suggestions": COMMAND_SUGGESTIONS,
+        "channels": CHANNELS,
+        "connected": [c for c in CHANNELS if c["state"] == "connected"],
+        "briefing": BRIEFING,
+        "alerts": ALERTS,
+        "profit_rows": PROFIT_BREAKDOWN,
+        "gross": gross,
+        "costs": costs,
+        "net": net,
+        "net_margin": round(net / gross * 100, 1) if gross else 0.0,
+        "orders": RECENT_ORDERS,
+        "series": SALES_SERIES,
+        "series_max": max(p["value"] for p in SALES_SERIES),
+        "forecasts": FORECASTS,
+        "research": RESEARCH,
+        "fulfillment": FULFILLMENT,
+        "fraud": FRAUD,
+        "suppliers": SUPPLIERS,
+        "studio": STUDIO,
+        "support": SUPPORT,
+        "automations": AUTOMATIONS,
+        "specialists": SPECIALISTS,
+        "health": HEALTH,
+        "global_tools": GLOBAL_TOOLS,
+        "mobile_actions": MOBILE_ACTIONS,
+        "generated": now.strftime("%A, %d %b %Y · %H:%M UTC"),
+    }
+

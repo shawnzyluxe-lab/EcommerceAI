@@ -3,10 +3,12 @@ import hmac
 import secrets
 import requests
 from urllib.parse import urlencode
-from flask import Flask, render_template, request, redirect, url_for, session, flash
+from flask import Flask, render_template, request, redirect, url_for, session, flash, jsonify
 from dotenv import load_dotenv
 
 load_dotenv()
+
+from dashboard_context import context, COMMAND_RESPONSES
 
 app = Flask(__name__)
 app.secret_key = os.environ.get('SECRET_KEY', 'dev-secret-change-this')
@@ -86,50 +88,25 @@ def home():
 
 @app.route('/dashboard')
 def dashboard():
-    products = []
-    shop_name = 'Shawnzy Luxe'
-    product_count = 0
-    inventory_value = 0.0
-    avg_price = 0.0
-    if GRAPHQL_URL and STOREFRONT_TOKEN:
-        data = storefront(
-            '''{
-                shop { name }
-                products(first: 12) {
-                    edges {
-                        node {
-                            title
-                            priceRange {
-                                minVariantPrice { amount currencyCode }
-                            }
-                        }
-                    }
-                }
-            }'''
-        )
-        shop = data.get('data', {}).get('shop', {}) or {}
-        shop_name = shop.get('name', 'Shawnzy Luxe')
-        products = data.get('data', {}).get('products', {}).get('edges', [])
-        product_count = len(products)
-        if products:
-            prices = []
-            for p in products:
-                try:
-                    amount = float(p['node']['priceRange']['minVariantPrice']['amount'])
-                    prices.append(amount)
-                except (KeyError, ValueError, TypeError):
-                    continue
-            if prices:
-                inventory_value = round(sum(prices), 2)
-                avg_price = round(inventory_value / len(prices), 2)
-    return render_template(
-        'dashboard.html',
-        shop_name=shop_name,
-        products=products,
-        product_count=product_count,
-        inventory_value=inventory_value,
-        avg_price=avg_price,
-    )
+    return render_template('dashboard.html', **context())
+
+
+@app.route('/api/command', methods=['POST'])
+def api_command():
+    q = (request.json or {}).get("q", "").strip().lower().rstrip("?.!")
+    hit = COMMAND_RESPONSES.get(q)
+    if not hit:
+        for key, value in COMMAND_RESPONSES.items():
+            if key in q or q in key:
+                hit = value
+                break
+    if not hit:
+        return jsonify({
+            "answer": "Not wired yet — this endpoint returns canned answers until you connect a model.",
+            "did": [],
+            "stub": True,
+        })
+    return jsonify({**hit, "stub": True})
 
 
 @app.route('/site-login', methods=['GET', 'POST'])

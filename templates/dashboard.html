@@ -1,106 +1,633 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Shawnzyluxe Universal Platform</title>
-    <link rel="stylesheet" href="{{ url_for('static', filename='dashboard.css') }}?v=3">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{{ brand.name }} {{ brand.product }} — AI operating system for commerce</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="{{ url_for('static', filename='css/app.css') }}">
 </head>
-<body class="dashboard-page">
+<body>
+<div class="shell">
 
-    <div class="dashboard-canvas">
+  <!-- ================= sidebar ================= -->
+  <aside class="side">
+    <div class="brand"><span class="mark"></span> {{ brand.name }}</div>
+    <div class="navgroup">
+      <div class="label">Workspace</div>
+      {% for label, href, on in nav[:5] %}
+      <a class="item {{ 'on' if on }}" href="{{ href }}"><span class="dot"></span>{{ label }}</a>
+      {% endfor %}
+    </div>
+    <div class="navgroup">
+      <div class="label">Intelligence</div>
+      {% for label, href, on in nav[5:11] %}
+      <a class="item" href="{{ href }}"><span class="dot"></span>{{ label }}</a>
+      {% endfor %}
+    </div>
+    <div class="navgroup">
+      <div class="label">Operations</div>
+      {% for label, href, on in nav[11:] %}
+      <a class="item" href="{{ href }}"><span class="dot"></span>{{ label }}</a>
+      {% endfor %}
+    </div>
+    <div class="navgroup">
+      <div class="label">Store</div>
+      <a class="item" href="#channels"><span class="dot"></span>Channels <span class="pill">{{ connected|length }}/{{ channels|length }}</span></a>
+      <a class="item" href="#global"><span class="dot"></span>Settings</a>
+    </div>
+  </aside>
 
-        <!-- 3D floating background shapes -->
-        <div class="floating-shape shape-pyramid"></div>
-        <div class="floating-shape shape-sphere"></div>
-        <div class="floating-shape shape-cube"></div>
-        <div class="floating-shape shape-cylinder"></div>
-        <div class="floating-shape shape-star"></div>
-        <div class="floating-shape shape-orb"></div>
+  <!-- ================= main ================= -->
+  <main class="main" id="top">
 
-        <!-- Giant Luxury Background Typography -->
-        <div class="backdrop-text">Shawnzyluxe<br>E-Com Operations</div>
-
-        <div class="foreground">
-
-            <!-- Top Strip -->
-            <header class="top-strip">
-                <div class="channel-pills">
-                    <div class="pill active">
-                        <span class="status-dot shopify"></span>
-                        &#128722; Shopify Live
-                    </div>
-                    <div class="pill active">
-                        <span class="status-dot amazon"></span>
-                        &#128230; Amazon Sync
-                    </div>
-                    <div class="pill active">
-                        <span class="status-dot tiktok"></span>
-                        &#127919; TikTok Shop
-                    </div>
-                </div>
-                <div class="top-right">
-                    <div class="unified-balance">
-                        Unified Revenue: <span class="mono">${{ '%0.2f'|format(inventory_value) }}</span>
-                    </div>
-                    <a class="lock-link" href="{{ url_for('site_logout') }}">Lock Workspace</a>
-                </div>
-            </header>
-
-            <!-- AI Command Portal -->
-            <section class="ai-portal">
-                <div class="input-bar">
-                    <span style="font-size: 20px; margin-right: 10px;">&#129302;</span>
-                    <input type="text" placeholder="Ask AI: 'Show delayed orders and evaluate ad spend conversions'...">
-                    <button>Execute</button>
-                </div>
-            </section>
-
-            <!-- Glass Workspace Cards -->
-            <div class="metrics-matrix">
-
-                <!-- AI COO Briefing -->
-                <div class="floating-card glass-card">
-                    <div>
-                        <h3>&#128200; AI COO Briefing</h3>
-                        <p>Good morning, Shawn. Combined e-commerce volume is up 18% this week. Two shipments are flagged as delayed at Amazon fulfillment nodes. TikTok Shop retention metrics are up.</p>
-                        <p class="meta">Connected to {{ shop_name }} · {{ product_count }} products live · avg ${{ '%0.2f'|format(avg_price) }}</p>
-                    </div>
-                    <button class="review-btn">Deploy Optimizations</button>
-                </div>
-
-                <!-- Storefront Performance -->
-                <div class="floating-card glass-card">
-                    <h3>&#128230; Storefront Performance</h3>
-                    <div class="metric-row">
-                        <span>&#128717; Shopify Storefront</span>
-                        <span class="value positive">3.4% Optimal</span>
-                    </div>
-                    <div class="metric-row">
-                        <span>&#127919; TikTok Video Shop</span>
-                        <span class="value positive">4.1% Trending</span>
-                    </div>
-                    <div class="metric-row">
-                        <span>&#128230; Amazon Marketplace</span>
-                        <span class="value">2.8% Stable</span>
-                    </div>
-                </div>
-
-                <!-- Real Profit Matrix -->
-                <div class="floating-card glass-card">
-                    <h3>&#128176; Real Profit Matrix</h3>
-                    <p>True spend overhead calculated.</p>
-                    <div class="metric-hero">+${{ '%0.2f'|format(inventory_value) }}</div>
-                    <div class="metric-row">
-                        <span>Gross Value</span>
-                        <span class="value positive">${{ '%0.2f'|format(inventory_value) }}</span>
-                    </div>
-                </div>
-
-            </div>
-
-        </div>
+    <div class="topbar">
+      <span class="crumb">{{ brand.domain }} / dashboard</span>
+      <span class="tag ghost">Sample data</span>
+      <span class="spacer"></span>
+      <button class="btn">Invite team</button>
+      <button class="btn primary">Connect a channel</button>
+      <div class="avatar">SD</div>
     </div>
 
+    <!-- ---------- hero ---------- -->
+    <section class="hero">
+      <div class="clouds"></div>
+      <div class="inner">
+        <span class="eyebrow">[ AI operating system for commerce ]</span>
+        <h1>Run the whole store. With AI.</h1>
+        <p class="sub">{{ brand.name }} {{ brand.product }} connects every marketplace into one dashboard, then
+        does the work — routing orders, watching margin, reordering stock, and answering customers.</p>
+        <div class="cta">
+          <button class="btn primary">Open Command Center</button>
+          <button class="btn">Watch briefing</button>
+        </div>
+      </div>
+    </section>
+
+    <div class="wrap">
+
+      <!-- ---------- AI COO ---------- -->
+      <section class="coo">
+        <div class="card-head" style="margin-bottom:10px">
+          <span class="tag blue">AI COO</span>
+          <span class="tag ghost">Confidence {{ coo.confidence }}%</span>
+          <span class="spacer"></span>
+          <span class="crumb" style="font-size:.76rem;color:var(--ink-3)">{{ generated }}</span>
+        </div>
+        <h2 style="font-size:1.35rem">{{ coo.greeting }}</h2>
+        <p class="say" style="margin-top:8px">
+          {% for pre, num, post in coo.summary %}{{ pre }} <strong>{{ num }}</strong>{% if post %} {{ post }}{% endif %}. {% endfor %}
+          {{ coo.narrative }}
+        </p>
+        <div class="plan">
+          {% for s in coo.plan %}
+          <div class="step">
+            <span class="n">{{ s.n }}</span>
+            <span>{{ s.what }}</span>
+            <span class="spacer"></span>
+            <span class="tag {{ 'green' if s.state == 'ready' else 'amber' }}">{{ s.impact }}</span>
+          </div>
+          {% endfor %}
+        </div>
+        <div class="approve">
+          <button class="btn blue">Approve all</button>
+          <button class="btn">Review each</button>
+          <button class="btn">Dismiss</button>
+        </div>
+      </section>
+
+      <!-- ---------- KPI row ---------- -->
+      <div class="grid g4" style="margin-top:16px">
+        <div class="card kpi">
+          <div class="label">Revenue today</div>
+          <div class="value">${{ '{:,.0f}'.format(briefing.revenue) }}</div>
+          <div class="delta up">▲ 18% vs last week</div>
+        </div>
+        <div class="card kpi">
+          <div class="label">True profit</div>
+          <div class="value">${{ '{:,.0f}'.format(briefing.profit) }}</div>
+          <div class="delta up">▲ 6% · {{ net_margin }}% margin</div>
+        </div>
+        <div class="card kpi">
+          <div class="label">Orders</div>
+          <div class="value">{{ briefing.orders }}</div>
+          <div class="delta flat">AOV ${{ '%.2f'|format(briefing.aov) }}</div>
+        </div>
+        <div class="card kpi">
+          <div class="label">Needs attention</div>
+          <div class="value">{{ briefing.delayed }}</div>
+          <div class="delta down">delayed shipments</div>
+        </div>
+      </div>
+
+      <!-- ---------- Command Center ---------- -->
+      <section class="section" id="command">
+        <div class="section-head">
+          <h2>AI Command Center</h2>
+          <p>Type or speak — the AI performs the work instead of just answering.</p>
+        </div>
+        <div class="command">
+          <div class="prompt">
+            <span class="mic">◉</span>
+            <input id="cmd" placeholder="Ask anything, or tell it what to do…" autocomplete="off">
+            <button class="btn blue" id="cmdgo">Run</button>
+          </div>
+          <div class="suggests">
+            {% for s in suggestions %}<span class="chip js-chip">{{ s }}</span>{% endfor %}
+          </div>
+          <div class="card tight" id="cmdout" style="margin-top:14px;display:none">
+            <div class="tag blue" style="margin-bottom:8px">Answer</div>
+            <p id="cmdanswer" style="color:var(--ink)"></p>
+            <div id="cmddid" class="suggests" style="margin-top:10px"></div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ---------- Commerce Hub ---------- -->
+      <section class="section" id="channels">
+        <div class="section-head">
+          <h2>Universal Commerce Hub</h2>
+          <p>One login. One dashboard. {{ connected|length }} of {{ channels|length }} channels connected.</p>
+          <span class="spacer"></span>
+          <button class="btn">Manage connections</button>
+        </div>
+        <div class="channels">
+          {% for c in channels %}
+          <div class="channel {{ 'off' if c.state != 'connected' }}">
+            <div class="row">
+              <span class="logo" style="background:{{ c.color }}">{{ c.abbr }}</span>
+              <span class="name">{{ c.name }}</span>
+              <span class="spacer" style="flex:1"></span>
+              <span class="tag {{ 'green' if c.state == 'connected' else 'ghost' }}">{{ 'Live' if c.state == 'connected' else 'Connect' }}</span>
+            </div>
+            {% if c.state == 'connected' %}
+            <div class="meta">{{ c.orders }} orders · ${{ '{:,.0f}'.format(c.revenue) }}</div>
+            <div class="meta">Synced {{ c.sync }}</div>
+            {% else %}
+            <div class="meta">No credentials saved</div>
+            <div class="meta">—</div>
+            {% endif %}
+          </div>
+          {% endfor %}
+        </div>
+      </section>
+
+      <!-- ---------- Briefing + Alerts ---------- -->
+      <section class="section" id="alerts">
+        <div class="grid g12">
+          <div class="card briefing">
+            <div class="card-head">
+              <h3>AI Business Advisor</h3>
+              <span class="spacer"></span>
+              <span class="tag blue">06:10</span>
+            </div>
+            <p style="color:var(--ink);font-weight:600;margin-bottom:8px">Good morning, {{ brand.owner }}.</p>
+            <div class="line"><span class="k">Revenue</span><span class="v">${{ '{:,.0f}'.format(briefing.revenue) }}</span></div>
+            <div class="line"><span class="k">Profit</span><span class="v">${{ '{:,.0f}'.format(briefing.profit) }}</span></div>
+            <div class="line"><span class="k">Delayed</span><span class="v">{{ briefing.delayed }} shipments</span></div>
+            <div class="line"><span class="k">Trending</span><span class="v">{{ briefing.trending|join(', ') }}</span></div>
+            <div class="line"><span class="k">Refund rate</span><span class="v">{{ briefing.refund_rate }}%</span></div>
+            <div class="card tight" style="margin-top:12px;background:#fff">
+              <div class="tag blue" style="margin-bottom:6px">Recommended action</div>
+              <div style="font-weight:600;font-size:.9rem">{{ briefing.action }}</div>
+            </div>
+            <div class="approve" style="margin-top:12px">
+              <button class="btn blue">Apply</button>
+              <button class="btn">Skip</button>
+            </div>
+          </div>
+
+          <div class="card">
+            <div class="card-head">
+              <h3>Autonomous AI Manager</h3>
+              <p class="hint">Proactive — it tells you before you ask.</p>
+              <span class="spacer"></span>
+              <span class="tag amber">{{ alerts|length }} open</span>
+            </div>
+            <div class="feed">
+              {% for a in alerts %}
+              <div class="alert {{ a.level }}">
+                <div class="bar"></div>
+                <div class="body">
+                  <div class="t">{{ a.title }}</div>
+                  <div class="d">{{ a.detail }}</div>
+                  <div class="actions">
+                    {% for act in a.actions %}<button class="btn" style="padding:5px 10px;font-size:.76rem">{{ act }}</button>{% endfor %}
+                  </div>
+                </div>
+                <div class="when">{{ a.when }}</div>
+              </div>
+              {% endfor %}
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ---------- Profit Engine ---------- -->
+      <section class="section" id="profit">
+        <div class="section-head">
+          <h2>AI Profit Engine</h2>
+          <p>Real profit, not revenue — every cost included, per order, in real time.</p>
+        </div>
+        <div class="grid g12">
+          <div class="card">
+            <div class="card-head"><h3>Today's true margin</h3></div>
+            {% for r in profit_rows %}
+            <div class="line" style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px dashed var(--line);font-size:.85rem">
+              <span style="color:var(--ink-3)">{{ r.label }}</span>
+              <span class="mono {{ 'up' if r.kind == 'in' else 'down' }}" style="font-weight:600">
+                {{ '${:,.2f}'.format(r.amount) if r.kind == 'in' else '−${:,.2f}'.format(-r.amount) }}
+              </span>
+            </div>
+            {% endfor %}
+            <div style="display:flex;justify-content:space-between;padding-top:12px;font-weight:800">
+              <span>Net profit</span><span class="mono">${{ '{:,.2f}'.format(net) }}</span>
+            </div>
+            <div class="hint">{{ net_margin }}% net margin after all costs</div>
+          </div>
+
+          <div class="card">
+            <div class="card-head">
+              <h3>Profit per order</h3>
+              <span class="spacer"></span>
+              <span class="tag ghost">Live</span>
+            </div>
+            <div class="scroll">
+              <table>
+                <thead><tr>
+                  <th>Order</th><th>Channel</th><th class="num">Items</th>
+                  <th class="num">Revenue</th><th class="num">Profit</th><th class="num">Margin</th><th>State</th>
+                </tr></thead>
+                <tbody>
+                {% for o in orders %}
+                <tr>
+                  <td class="b mono">{{ o.id }}</td>
+                  <td>{{ o.channel }}</td>
+                  <td class="num">{{ o.items }}</td>
+                  <td class="num mono">${{ '%.2f'|format(o.revenue) }}</td>
+                  <td class="num mono {{ 'up' if o.profit > 0 else 'down' }}" style="font-weight:600">${{ '%.2f'|format(o.profit) }}</td>
+                  <td class="num mono">{{ o.margin }}%</td>
+                  <td><span class="tag {{ {'shipped':'green','delayed':'amber','refunded':'red','packed':'blue'}[o.state] }}">{{ o.state }}</span></td>
+                </tr>
+                {% endfor %}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ---------- Predictive Analytics ---------- -->
+      <section class="section" id="predict">
+        <div class="section-head">
+          <h2>Predictive Analytics</h2>
+          <p>Forecasts for sales, stock, demand, cash, and restock timing.</p>
+        </div>
+        <div class="grid g21">
+          <div class="card">
+            <div class="card-head">
+              <h3>Revenue · 5 actual + 2 forecast</h3>
+              <span class="spacer"></span>
+              <span class="tag ghost">Hatched = forecast</span>
+            </div>
+            <div class="bars">
+              {% for p in series %}
+              <div class="b {{ 'fc' if p.forecast }}" style="height:{{ (p.value / series_max * 100)|round(1) }}%"></div>
+              {% endfor %}
+            </div>
+            <div class="axis">{% for p in series %}<span>{{ p.day }}</span>{% endfor %}</div>
+          </div>
+          <div class="card">
+            <div class="card-head"><h3>Forecasts</h3></div>
+            {% for f in forecasts %}
+            <div style="padding:8px 0;border-bottom:1px dashed var(--line)">
+              <div style="display:flex;justify-content:space-between;font-size:.85rem">
+                <span style="color:var(--ink-3)">{{ f.label }}</span>
+                <span style="font-weight:700">{{ f.value }}</span>
+              </div>
+              <div class="hint">{{ f.note }}</div>
+            </div>
+            {% endfor %}
+          </div>
+        </div>
+      </section>
+
+      <!-- ---------- Product Research ---------- -->
+      <section class="section" id="research">
+        <div class="section-head">
+          <h2>AI Product Research</h2>
+          <p>Scans marketplaces and social trends for rising, declining, and high-margin opportunities.</p>
+        </div>
+        <div class="card">
+          <div class="scroll">
+            <table>
+              <thead><tr>
+                <th>Product</th><th>Signal</th><th class="num">Trend</th>
+                <th class="num">Margin</th><th>Competition</th><th>Source</th><th></th>
+              </tr></thead>
+              <tbody>
+              {% for r in research %}
+              <tr>
+                <td class="b">{{ r.product }}</td>
+                <td><span class="tag {{ {'Rising':'green','Declining':'red','Watch':'amber'}[r.signal] }}">{{ r.signal }}</span></td>
+                <td class="num mono {{ 'up' if r.trend > 0 else 'down' }}">{{ '+' if r.trend > 0 }}{{ r.trend }}%</td>
+                <td class="num mono">{{ r.margin }}%</td>
+                <td>{{ r.competition }}</td>
+                <td style="color:var(--ink-3)">{{ r.source }}</td>
+                <td class="num"><button class="btn" style="padding:4px 9px;font-size:.74rem">Add</button></td>
+              </tr>
+              {% endfor %}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <!-- ---------- Fulfillment + Fraud ---------- -->
+      <section class="section" id="fulfillment">
+        <div class="grid g21">
+          <div class="card">
+            <div class="card-head">
+              <h3>AI Fulfillment</h3>
+              <p class="hint">Auto-routes to supplier, warehouse, and cheapest carrier.</p>
+              <span class="spacer"></span>
+              <span class="tag green">{{ fulfillment.auto_rate }}% automatic</span>
+            </div>
+            <div class="grid g3" style="margin-bottom:14px">
+              <div class="card tight kpi"><div class="label">Routed today</div><div class="value" style="font-size:1.3rem">{{ fulfillment.routed_today }}</div></div>
+              <div class="card tight kpi"><div class="label">Auto rate</div><div class="value" style="font-size:1.3rem">{{ fulfillment.auto_rate }}%</div></div>
+              <div class="card tight kpi"><div class="label">Avg saved / order</div><div class="value" style="font-size:1.3rem">${{ '%.2f'|format(fulfillment.avg_saving) }}</div></div>
+            </div>
+            <div class="scroll">
+              <table>
+                <thead><tr><th>Order</th><th>Supplier</th><th>Warehouse</th><th>Carrier</th><th class="num">Cost</th><th>Flag</th></tr></thead>
+                <tbody>
+                {% for f in fulfillment.rows %}
+                <tr>
+                  <td class="b mono">{{ f.order }}</td><td>{{ f.supplier }}</td><td>{{ f.warehouse }}</td>
+                  <td>{{ f.carrier }}</td><td class="num mono">${{ '%.2f'|format(f.cost) }}</td>
+                  <td>{% if f.flag %}<span class="tag amber">{{ f.flag }}</span>{% else %}<span class="tag green">Clear</span>{% endif %}</td>
+                </tr>
+                {% endfor %}
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <div class="card" id="fraud">
+            <div class="card-head">
+              <h3>AI Fraud Detection</h3>
+              <span class="spacer"></span>
+              <span class="tag red">1 blocked</span>
+            </div>
+            {% for f in fraud %}
+            <div style="padding:10px 0;border-bottom:1px dashed var(--line)">
+              <div style="display:flex;align-items:center;gap:8px">
+                <span class="mono" style="font-weight:700">{{ f.order }}</span>
+                <span class="tag {{ {'block':'red','review':'amber','allow':'green'}[f.verdict] }}">{{ f.verdict }}</span>
+                <span class="spacer" style="flex:1"></span>
+                <span class="mono" style="font-weight:700">{{ f.score }}</span>
+              </div>
+              <div class="track" style="margin-top:6px">
+                <div class="fill {{ 'red' if f.score > 70 else ('amber' if f.score > 40 else 'green') }}" style="width:{{ f.score }}%"></div>
+              </div>
+              <div class="hint">{{ f.reasons }}</div>
+            </div>
+            {% endfor %}
+          </div>
+        </div>
+      </section>
+
+      <!-- ---------- Suppliers ---------- -->
+      <section class="section" id="suppliers">
+        <div class="section-head">
+          <h2>Supply Chain Intelligence</h2>
+          <p>Compares price, speed, defect rate, refunds, and reliability — then picks for you.</p>
+        </div>
+        <div class="card">
+          <div class="scroll">
+            <table>
+              <thead><tr>
+                <th>Supplier</th><th class="num">Unit price</th><th class="num">Ship days</th>
+                <th class="num">Defects</th><th class="num">Refunds</th><th>Reliability</th><th></th>
+              </tr></thead>
+              <tbody>
+              {% for s in suppliers %}
+              <tr>
+                <td class="b">{{ s.name }}</td>
+                <td class="num mono">${{ '%.2f'|format(s.price) }}</td>
+                <td class="num mono">{{ s.ship_days }}</td>
+                <td class="num mono">{{ s.defect }}%</td>
+                <td class="num mono">{{ s.refund }}%</td>
+                <td style="min-width:130px">
+                  <div class="track"><div class="fill {{ 'green' if s.reliability > 85 else 'amber' }}" style="width:{{ s.reliability }}%"></div></div>
+                </td>
+                <td class="num">
+                  {% if s.pick %}<span class="tag green">AI pick</span>{% else %}<button class="btn" style="padding:4px 9px;font-size:.74rem">Switch</button>{% endif %}
+                </td>
+              </tr>
+              {% endfor %}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <!-- ---------- Marketing Studio ---------- -->
+      <section class="section" id="studio">
+        <div class="section-head">
+          <h2>AI Marketing Studio</h2>
+          <p>Descriptions, email, SMS, ad copy, social, SEO, images, and short-form video — in your brand voice.</p>
+          <span class="spacer"></span>
+          <button class="btn blue">Generate</button>
+        </div>
+        <div class="assets">
+          {% for a in studio %}
+          <div class="asset">
+            <div class="thumb"></div>
+            <div class="cap">{{ a.title }}</div>
+            <div class="sub">{{ a.kind }} · {{ a.meta }}</div>
+          </div>
+          {% endfor %}
+        </div>
+      </section>
+
+      <!-- ---------- Support + Automations ---------- -->
+      <section class="section" id="support">
+        <div class="grid g2">
+          <div class="card">
+            <div class="card-head">
+              <h3>AI Customer Support</h3>
+              <span class="spacer"></span>
+              <span class="tag green">{{ support.resolved_rate }}% auto-resolved</span>
+            </div>
+            <div class="grid g3" style="margin-bottom:12px">
+              <div class="card tight kpi"><div class="label">Open</div><div class="value" style="font-size:1.25rem">{{ support.open }}</div></div>
+              <div class="card tight kpi"><div class="label">Escalated</div><div class="value" style="font-size:1.25rem">{{ support.escalated }}</div></div>
+              <div class="card tight kpi"><div class="label">First reply</div><div class="value" style="font-size:1.25rem">{{ support.avg_first_reply }}</div></div>
+            </div>
+            {% for t in support.threads %}
+            <div style="display:flex;gap:10px;align-items:center;padding:8px 0;border-bottom:1px dashed var(--line)">
+              <div style="min-width:0">
+                <div style="font-size:.86rem;font-weight:600">{{ t.who }} — {{ t.topic }}</div>
+                <div class="hint">{{ t.note }}</div>
+              </div>
+              <span class="spacer" style="flex:1"></span>
+              <span class="tag {{ 'amber' if t.state == 'escalated' else 'green' }}">{{ t.state }}</span>
+            </div>
+            {% endfor %}
+          </div>
+
+          <div class="card" id="automations">
+            <div class="card-head">
+              <h3>AI Automation Builder</h3>
+              <p class="hint">Describe it in plain English — it builds the workflow.</p>
+            </div>
+            <div class="prompt" style="margin-bottom:12px">
+              <input placeholder="If inventory falls below 20, notify me and create a purchase order.">
+              <button class="btn blue">Build</button>
+            </div>
+            {% for a in automations %}
+            <div style="display:flex;gap:10px;align-items:flex-start;padding:9px 0;border-bottom:1px dashed var(--line)">
+              <span class="tag {{ 'green' if a.state == 'active' else 'ghost' }}">{{ a.state }}</span>
+              <div style="font-size:.85rem;flex:1">{{ a.text }}<div class="hint">{{ a.runs }} runs</div></div>
+            </div>
+            {% endfor %}
+          </div>
+        </div>
+      </section>
+
+      <!-- ---------- Team AI ---------- -->
+      <section class="section" id="team">
+        <div class="section-head">
+          <h2>Team AI</h2>
+          <p>Each department has its own specialist. They collaborate behind the scenes.</p>
+        </div>
+        <div class="specialists">
+          {% for s in specialists %}
+          <div class="spec">
+            <div class="n">
+              <span class="logo" style="background:linear-gradient(140deg,#93c5fd,#1d4ed8)">AI</span>{{ s.name }}
+              <span class="spacer" style="flex:1"></span>
+              <span class="tag {{ {'working':'blue','attention':'amber','idle':'ghost'}[s.state] }}">{{ s.state }}</span>
+            </div>
+            <div class="s">{{ s.status }}</div>
+          </div>
+          {% endfor %}
+        </div>
+      </section>
+
+      <!-- ---------- Health Score ---------- -->
+      <section class="section" id="health">
+        <div class="section-head">
+          <h2>Business Health Score</h2>
+          <p>One number, six inputs, and the specific moves that raise it.</p>
+        </div>
+        <div class="grid g21">
+          <div class="card">
+            <div class="score" style="margin-bottom:16px">
+              <div class="ring" style="--pct: {{ health.score }}"><div class="inner">{{ health.score }}</div></div>
+              <div>
+                <h3>Fair — improving</h3>
+                <p class="hint">Inventory health is the binding constraint. Fixing it alone is worth roughly +9 points.</p>
+              </div>
+            </div>
+            {% for c in health.components %}
+            <div class="meter">
+              <div class="top"><span>{{ c.label }}</span><span class="v">{{ c.value }}</span></div>
+              <div class="track"><div class="fill {{ c.tone }}" style="width:{{ c.value }}%"></div></div>
+            </div>
+            {% endfor %}
+          </div>
+          <div class="card">
+            <div class="card-head"><h3>Recommendations</h3></div>
+            {% for r in health.recommendations %}
+            <div class="alert good" style="margin-bottom:9px">
+              <div class="bar"></div>
+              <div class="body"><div class="d" style="color:var(--ink-2)">{{ r }}</div></div>
+            </div>
+            {% endfor %}
+            <button class="btn blue" style="width:100%">Apply all recommendations</button>
+          </div>
+        </div>
+      </section>
+
+      <!-- ---------- Global + Mobile ---------- -->
+      <section class="section" id="global">
+        <div class="grid g2">
+          <div class="card">
+            <div class="card-head"><h3>Global Commerce Tools</h3></div>
+            {% for g in global_tools %}
+            <div style="display:flex;justify-content:space-between;align-items:baseline;padding:8px 0;border-bottom:1px dashed var(--line)">
+              <div>
+                <div style="font-size:.86rem;font-weight:600">{{ g.label }}</div>
+                <div class="hint">{{ g.note }}</div>
+              </div>
+              <span class="tag blue">{{ g.value }}</span>
+            </div>
+            {% endfor %}
+          </div>
+
+          <div class="card" id="mobile">
+            <div class="card-head">
+              <h3>Mobile AI Copilot</h3>
+              <p class="hint">Same brain, phone-sized.</p>
+            </div>
+            <div class="card tight" style="max-width:300px;margin:0 auto;border-radius:22px;background:linear-gradient(180deg,#f4f8ff,#fff)">
+              <div class="tag blue" style="margin-bottom:8px">Copilot</div>
+              <p style="font-size:.86rem;color:var(--ink)">Profit today is <strong>${{ '{:,.0f}'.format(briefing.profit) }}</strong> on {{ briefing.orders }} orders. {{ briefing.delayed }} shipments are delayed.</p>
+              <div class="suggests" style="margin-top:10px">
+                {% for m in mobile_actions %}<span class="chip" style="font-size:.74rem">{{ m }}</span>{% endfor %}
+              </div>
+              <div class="prompt" style="margin-top:12px;padding:8px 10px">
+                <span class="mic" style="width:24px;height:24px">◉</span>
+                <input placeholder="Ask or approve…" style="font-size:.82rem">
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <div class="note">
+        <b>Template state.</b> Every panel above renders from the dictionaries in <span class="mono">app.py</span> —
+        replace one dictionary to make one feature real. The numbers shown are illustrative sample data, no
+        marketplace or model is connected yet. <span class="mono">/api/command</span> returns canned answers
+        until you point it at a model.
+      </div>
+
+    </div>
+  </main>
+</div>
+
+<script>
+const out = document.getElementById('cmdout');
+const input = document.getElementById('cmd');
+
+async function run(q){
+  if(!q) return;
+  input.value = q;
+  out.style.display = 'block';
+  document.getElementById('cmdanswer').textContent = 'Working…';
+  document.getElementById('cmddid').innerHTML = '';
+  const r = await fetch('/api/command', {
+    method:'POST',
+    headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({q})
+  });
+  const d = await r.json();
+  document.getElementById('cmdanswer').textContent = d.answer;
+  document.getElementById('cmddid').innerHTML =
+    (d.did || []).map(s => '<span class="chip">' + s + '</span>').join('');
+}
+
+document.getElementById('cmdgo').addEventListener('click', () => run(input.value));
+input.addEventListener('keydown', e => { if(e.key === 'Enter') run(input.value); });
+document.querySelectorAll('.js-chip').forEach(c =>
+  c.addEventListener('click', () => run(c.textContent.trim()))
+);
+</script>
 </body>
 </html>
