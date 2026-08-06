@@ -649,6 +649,8 @@ def process_command(cmd_text):
         if billing:
             DASHBOARD_STATE["stripe_usage"] = billing.metered_usage_units
             DASHBOARD_STATE["stripe_invoice"] = billing.accrued_invoice_value
+            STRIPE["usage"] = billing.metered_usage_units
+            STRIPE["invoice"] = billing.accrued_invoice_value
             updates["stripe_usage"] = billing.metered_usage_units
             updates["stripe_invoice"] = f"{billing.accrued_invoice_value:.2f}"
             updates["ai_briefing"] = f"💰 Stripe Ledger Synced: Profile mapped to <b>{billing.current_plan}</b>. Current billing cycle usage: <b>{billing.metered_usage_units} metered actions</b>. Accrued invoice totals: <b>${billing.accrued_invoice_value:.2f}</b>."
@@ -666,8 +668,10 @@ def process_command(cmd_text):
             if catalog:
                 api_success = mutate_shopify_product_price(catalog.shopify_product_id, catalog.variant_id, target_price)
                 catalog.price = target_price
-                db.session.commit()
                 DASHBOARD_STATE["hoodie_price"] = target_price
+                CATALOG["price"] = target_price
+                CATALOG["title"] = catalog.title
+                CATALOG["sku"] = catalog.variant_id
                 updates["hoodie_price"] = f"{target_price:.2f}"
                 if api_success:
                     updates["ai_briefing"] = f"🛍️ Catalog Matrix Success: Transmitted GraphQL update. <b>{catalog.title}</b> price changed to <b>${target_price:.2f}</b> live on Shopify Storefront."
