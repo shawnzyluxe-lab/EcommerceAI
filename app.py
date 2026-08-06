@@ -379,9 +379,10 @@ with app.app_context():
     if not GeneratedPurchaseOrder.query.first():
         db.session.add(GeneratedPurchaseOrder(po_reference="PO-SZL-A8F2", merchant_id="merchant_shawn_01", variant_sku="SZL-VAR-B", units_ordered=450, fulfillment_status="PENDING"))
     if not AIAgent.query.first():
-        db.session.add(AIAgent(agent_id="logistics_ai", merchant_id="merchant_shawn_01", agent_role="Logistics AI", status="IDLE"))
-        db.session.add(AIAgent(agent_id="finance_ai", merchant_id="merchant_shawn_01", agent_role="Finance AI", status="IDLE"))
-        db.session.add(AIAgent(agent_id="marketing_ai", merchant_id="merchant_shawn_01", agent_role="Marketing AI", status="IDLE"))
+        db.session.add(AIAgent(agent_id="agent_logistics", merchant_id="merchant_shawn_01", agent_name="Logistics AI Specialist", agent_role="Logistics AI", status="IDLE_MONITORING", last_action="Scanned catalog inventories for stockout drops."))
+        db.session.add(AIAgent(agent_id="agent_finance", merchant_id="merchant_shawn_01", agent_name="Finance AI Auditor", agent_role="Finance AI", status="IDLE_MONITORING", last_action="Audited ad returns against gross revenue."))
+        db.session.add(AIAgent(agent_id="agent_marketing", merchant_id="merchant_shawn_01", agent_name="Marketing Studio Agent", agent_role="Marketing AI", status="IDLE_MONITORING", last_action="Standing by for plain text creative instructions."))
+        db.session.add(AIAgent(agent_id="agent_support", merchant_id="merchant_shawn_01", agent_name="Support Sentiments Agent", agent_role="Support AI", status="IDLE_MONITORING", last_action="Monitoring cross-channel customer ticket feeds."))
     db.session.commit()
     billing = SaaSBilling.query.get("merchant_shawn_01")
     if billing:
@@ -496,7 +497,9 @@ def log_merchant_decision(merchant_id, decision_type, decision_vector, context_s
     """Persist every approve/modify decision to power localized learning moats."""
     db.session.add(MerchantDecisionLog(
         merchant_id=merchant_id,
+        action_trigger_type=decision_type,
         decision_type=decision_type,
+        user_decision_vector=str(outcome).upper(),
         decision_vector=json.dumps(decision_vector),
         context_snapshot=json.dumps(context_snapshot),
         outcome=outcome,
@@ -504,26 +507,60 @@ def log_merchant_decision(merchant_id, decision_type, decision_vector, context_s
 
 
 def run_multi_agent_collaboration(merchant_id, trigger):
-    """Internal broker: specialized AI agents hand off actions through private DB channels."""
+    """Internal broker: specialized AI agents cross-reference records through private DB channels."""
     actions = []
-    if trigger == "low_inventory":
-        pl = PredictiveLogistics.query.filter(PredictiveLogistics.days_remaining < 7).first()
+
+    if trigger in ("low_inventory", "inventory_crisis"):
+        pl = PredictiveLogistics.query.filter(PredictiveLogistics.status_flag == "CRITICAL_STOCKOUT").first()
         if pl:
-            # Logistics AI writes draft PO
-            actions.append({"agent": "logistics_ai", "action": f"Drafted reorder for {pl.variant_sku} ({pl.days_remaining} days left)"})
-            db.session.add(AgentMessage(sender_agent="logistics_ai", recipient_agent="finance_ai", merchant_id=merchant_id,
-                                        payload=f"Reorder needed: {pl.variant_sku}", action_taken="draft_po"))
-            # Finance AI validates cash flow
-            actions.append({"agent": "finance_ai", "action": "Cash flow OK; approved capital allocation"})
-            db.session.add(AgentMessage(sender_agent="finance_ai", recipient_agent="marketing_ai", merchant_id=merchant_id,
-                                        payload=f"Pause ads for {pl.variant_sku}; low stock", action_taken="pause_ad_sets"))
-            # Marketing AI pauses ad sets
-            actions.append({"agent": "marketing_ai", "action": f"Paused ad sets tied to {pl.variant_sku}"})
+            logistics = AIAgent.query.get("agent_logistics") or AIAgent(agent_id="agent_logistics")
+            finance = AIAgent.query.get("agent_finance") or AIAgent(agent_id="agent_finance")
+            marketing = AIAgent.query.get("agent_marketing") or AIAgent(agent_id="agent_marketing")
+
+            payload = json.dumps({"alert": "INVENTORY_CRISIS", "target_sku": pl.variant_sku, "time_horizon_days": pl.days_remaining})
+            logistics.status = "ALERT_DISPATCHED"
+            logistics.last_action = f"Flagged structural stockout on {pl.variant_sku}"
+            logistics.queued_payload = payload
+            actions.append({"agent": "agent_logistics", "action": logistics.last_action})
+
+            # Finance AI reads logistics payload, checks ad headroom
+            tiktok = AdSpendAnalytic.query.filter(AdSpendAnalytic.platform_source.ilike("%tiktok%")).first()
+            available_leverage = (tiktok.budget_allocated - tiktok.current_spend) if tiktok else 0
+            finance.status = "PROCESSING_COMPLETE"
+            finance.last_action = "Coordinated cash allocation with Logistics AI"
+            actions.append({"agent": "agent_finance", "action": finance.last_action})
+
+            marketing.status = "QUEUED_ADJUSTMENT"
+            marketing.last_action = f"Trimming TikTok spend to protect {pl.variant_sku} conversion velocity"
+            actions.append({"agent": "agent_marketing", "action": marketing.last_action})
+
+            # Write cross-department briefing
+            brief = f"Multi-Agent Orchestration Active: Logistics AI identified {pl.variant_sku} stockout threat. Finance AI confirmed ${available_leverage:.2f} budget headroom. AI COO queued an automated reorder and suggests trimming TikTok spend temporarily."
+            latest = BusinessMetric.query.filter_by(merchant_id=merchant_id).order_by(BusinessMetric.id.desc()).first()
+            if latest:
+                latest.ai_briefing = brief
+            else:
+                db.session.add(BusinessMetric(merchant_id=merchant_id, total_unified_balance=20560.00, true_net_profit=1394.00, gross_revenue=4582.00, ai_briefing=brief))
+
+            db.session.add(AgentMessage(sender_agent="agent_logistics", recipient_agent="agent_finance", merchant_id=merchant_id,
+                                        payload=payload, action_taken="reorder_cash_check"))
+            db.session.add(AgentMessage(sender_agent="agent_finance", recipient_agent="agent_marketing", merchant_id=merchant_id,
+                                        payload=f"Trim TikTok spend for {pl.variant_sku}", action_taken="pause_ad_sets"))
+
     elif trigger == "sales_down":
-        actions.append({"agent": "finance_ai", "action": "Analyzed revenue trend vs ad spend"})
-        db.session.add(AgentMessage(sender_agent="finance_ai", recipient_agent="marketing_ai", merchant_id=merchant_id,
+        finance = AIAgent.query.get("agent_finance")
+        marketing = AIAgent.query.get("agent_marketing")
+        if finance:
+            finance.status = "PROCESSING_COMPLETE"
+            finance.last_action = "Analyzed revenue trend vs ad spend"
+        if marketing:
+            marketing.status = "QUEUED_ADJUSTMENT"
+            marketing.last_action = "Drafted new creative angles for top campaigns"
+        db.session.add(AgentMessage(sender_agent="agent_finance", recipient_agent="agent_marketing", merchant_id=merchant_id,
                                     payload="ROAS declining; recommend creative refresh", action_taken="creative_refresh"))
-        actions.append({"agent": "marketing_ai", "action": "Drafted new creative angles for top campaigns"})
+        actions.append({"agent": "agent_finance", "action": "Analyzed revenue trend vs ad spend"})
+        actions.append({"agent": "agent_marketing", "action": "Drafted new creative angles for top campaigns"})
+
     db.session.commit()
     return actions
 
@@ -1521,6 +1558,64 @@ def decision_modify():
     return jsonify({"success": True, "status": "decision_modified"})
 
 
+@app.route('/api/v1/tenant/commit-learned-decision', methods=['POST'])
+def commit_learned_decision():
+    """Capture merchant decision, compute confidence index, and mutate state if approved."""
+    merchant = get_merchant_context()
+    merchant_id = merchant["id"] if merchant else "merchant_shawn_01"
+    data = request.get_json() or {}
+    trigger_type = data.get("action_trigger_type")
+    decision_vector = data.get("user_decision_vector", "APPROVED")
+    target_supplier = data.get("chosen_variant_or_supplier", "Supplier C")
+
+    try:
+        approved_count = MerchantDecisionLog.query.filter_by(
+            merchant_id=merchant_id, user_decision_vector="APPROVED"
+        ).count()
+        confidence = min(0.99, 0.70 + (approved_count * 0.05))
+
+        log_merchant_decision(
+            merchant_id=merchant_id,
+            decision_type=trigger_type,
+            decision_vector=decision_vector,
+            context_snapshot=build_context_schema(merchant_id),
+            outcome=decision_vector,
+        )
+        # populate new columns
+        last_log = MerchantDecisionLog.query.filter_by(merchant_id=merchant_id).order_by(MerchantDecisionLog.id.desc()).first()
+        if last_log:
+            last_log.action_trigger_type = trigger_type
+            last_log.user_decision_vector = decision_vector
+            last_log.chosen_variant_or_supplier = target_supplier
+            last_log.computed_confidence_score = confidence
+
+        if decision_vector == "APPROVED":
+            pl = PredictiveLogistics.query.filter_by(variant_sku="SZL-VAR-B").first()
+            if pl:
+                pl.days_remaining = 30
+                pl.status_flag = "HEALTHY"
+            resolved_briefing = f"✔ Action Deployed: Operating variables updated. Decision logged to proprietary memory pool. AI confidence index increased to {confidence*100:.1f}% tracking match."
+            db.session.add(BusinessMetric(
+                merchant_id=merchant_id,
+                total_unified_balance=20560.00,
+                true_net_profit=1394.00,
+                gross_revenue=4582.00,
+                ai_briefing=resolved_briefing,
+            ))
+            manager.broadcast({
+                "type": "ui_update",
+                "updates": {"ai_briefing": resolved_briefing},
+            })
+
+        db.session.commit()
+        logger.info(f"[Moat Learning Engine] Decision vector logged. Confidence: {confidence:.2f}")
+        return jsonify({"success": True, "confidence_index": confidence}), 200
+    except Exception as e:
+        log_system_exception("DECISION_LEARN", "CRITICAL", str(e))
+        db.session.rollback()
+        return jsonify({"success": False, "error": str(e)}), 500
+
+
 @app.route('/api/v1/download-report')
 def download_report():
     """Serve the generated CSV ledger to authenticated admins."""
@@ -1550,13 +1645,14 @@ def telemetry_poll():
                 })()
 
         brief = (latest.ai_briefing or "").lower()
-        show_mitigation = any(k in brief for k in ("stalled", "delayed", "shortage"))
+        show_mitigation = any(k in brief for k in ("stalled", "delayed", "shortage", "orchestration active", "inventory crisis"))
 
         support = SupportMetric.query.order_by(SupportMetric.id.desc()).first()
         mktg = MarketingStudio.query.order_by(MarketingStudio.id.desc()).first()
         channels = MerchantChannel.query.filter_by(merchant_id=merchant["id"]).all()
         rows = PredictiveLogistics.query.order_by(PredictiveLogistics.days_remaining.asc()).all()
         ads = AdSpendAnalytic.query.filter_by(merchant_id=merchant["id"]).all()
+        agents = AIAgent.query.filter_by(merchant_id=merchant["id"]).order_by(AIAgent.agent_id).all()
 
         return jsonify({
             "success": True,
@@ -1593,6 +1689,14 @@ def telemetry_poll():
                 "action_type": "SUPPLIER_REROUTE" if show_mitigation else "",
                 "prompt_label": "Critical Inventory Shortage Flagged on SKU: SZL-VAR-B" if show_mitigation else "",
             },
+            "agents_pool": [
+                {
+                    "name": a.agent_name,
+                    "status": a.status,
+                    "last_action": a.last_action,
+                }
+                for a in agents
+            ],
             "charts": {
                 "profit_trend_svg": generate_profit_trend_svg(merchant["id"]),
             },

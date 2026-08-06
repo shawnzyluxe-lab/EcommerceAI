@@ -103,9 +103,24 @@
           {% endfor %}
         </div>
         <div class="approve">
-          <button class="btn blue">Approve all</button>
-          <button class="btn">Review each</button>
+          <button class="btn blue" onclick="executeLearnedMitigationMoat('INVENTORY_SHORTAGE','APPROVED','Supplier C')">Approve &amp; Execute</button>
+          <button class="btn" onclick="executeLearnedMitigationMoat('INVENTORY_SHORTAGE','MODIFIED','Supplier C')">Modify</button>
           <button class="btn">Dismiss</button>
+        </div>
+      </section>
+
+      <!-- ---------- Team AI Orchestration Loop ---------- -->
+      <section class="section" id="agents">
+        <div class="section-head">
+          <h2>Team AI Orchestration Loop</h2>
+          <p>Real-time background agent collaboration array.</p>
+          <span class="spacer"></span>
+          <button class="btn blue" onclick="executeLearnedMitigationMoat('INVENTORY_SHORTAGE','APPROVED','Supplier C')">Run Override</button>
+        </div>
+        <div class="glass-card" style="border-top: 2px solid #1D2D44; background: rgba(255,255,255,0.95);">
+          <div id="multi-agent-status-matrix-box" style="display:flex; flex-direction:column; gap:12px;">
+            <div style="font-size:12px; color:#5C6E88; text-align:center;">Initializing agent mesh network connectivity...</div>
+          </div>
         </div>
       </section>
 
@@ -931,6 +946,7 @@ async function performTelemetryWorkspaceSync() {
     if (data.account_tier_context) updateTierBadgeDisplay(data.account_tier_context);
     updateCreativeAdOptimizationCard(data.ad_spend_matrix);
     updateRealtimeSvgChartVector(data.charts ? data.charts.profit_trend_svg : '');
+    updateMultiAgentWorkspaceMatrixCard(data.agents_pool);
     manageMitigationTrayDisplay(data.mitigation);
   } catch (error) {
     console.error('Telemetry sync error:', error);
@@ -946,6 +962,40 @@ function manageMitigationTrayDisplay(mitigation) {
     if (label) label.innerText = 'AI Mitigation Intervention: ' + mitigation.prompt_label;
   } else {
     tray.style.display = 'none';
+  }
+}
+
+function updateMultiAgentWorkspaceMatrixCard(agentsPoolArray) {
+  const container = document.getElementById('multi-agent-status-matrix-box');
+  if (!container || !agentsPoolArray) return;
+  let html = "";
+  agentsPoolArray.forEach(agent => {
+    let stateBg = agent.status.includes("ALERT") ? "#FFE3E3" : (agent.status.includes("COMPLETE") || agent.status.includes("QUEUED") ? "#E2F5E9" : "#F4F6F9");
+    let stateColor = agent.status.includes("ALERT") ? "#A82525" : (agent.status.includes("COMPLETE") || agent.status.includes("QUEUED") ? "#1E6B3E" : "#5C6E88");
+    html += `
+      <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid rgba(0,0,0,0.03); padding-bottom:8px; font-size:12px;">
+        <div>
+          <div style="font-weight:700; color:#1D2D44;">${agent.name}</div>
+          <div style="font-size:11px; color:#7F8C8D; font-style:italic;">${agent.last_action}</div>
+        </div>
+        <span style="background:${stateBg}; color:${stateColor}; padding:2px 8px; border-radius:6px; font-size:10px; font-weight:700; font-family:'JetBrains Mono';">${agent.status}</span>
+      </div>`;
+  });
+  container.innerHTML = html;
+}
+
+async function executeLearnedMitigationMoat(actionTrigger, decisionVector, vendor) {
+  const response = await fetch('/api/v1/tenant/commit-learned-decision', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ action_trigger_type: actionTrigger, user_decision_vector: decisionVector, chosen_variant_or_supplier: vendor })
+  });
+  const data = await response.json();
+  if (data.success) {
+    alert(`Proprietary Moat Updated: Logged choice vectors to memory loop. Confidence match: ${(data.confidence_index*100).toFixed(0)}%`);
+    performTelemetryWorkspaceSync();
+  } else {
+    alert(data.error || 'Mitigation failed.');
   }
 }
 

@@ -191,9 +191,11 @@ class AIAgent(db.Model):
     __tablename__ = "ai_agents"
     agent_id = db.Column(db.String(100), primary_key=True)
     merchant_id = db.Column(db.String(100), db.ForeignKey("merchant_profiles.merchant_id"))
+    agent_name = db.Column(db.String(100))
     agent_role = db.Column(db.String(100))
     status = db.Column(db.String(50), default="IDLE")
     last_action = db.Column(db.Text)
+    queued_payload = db.Column(db.Text)
     updated_at = db.Column(db.DateTime, server_default=db.func.now())
 
 
@@ -212,7 +214,11 @@ class MerchantDecisionLog(db.Model):
     __tablename__ = "merchant_decision_logs"
     id = db.Column(db.Integer, primary_key=True, autoincrement=True)
     merchant_id = db.Column(db.String(100), db.ForeignKey("merchant_profiles.merchant_id"))
+    action_trigger_type = db.Column(db.String(100))
     decision_type = db.Column(db.String(100))
+    user_decision_vector = db.Column(db.String(50))
+    chosen_variant_or_supplier = db.Column(db.String(255))
+    computed_confidence_score = db.Column(db.REAL)
     decision_vector = db.Column(db.Text)
     context_snapshot = db.Column(db.Text)
     outcome = db.Column(db.String(50))
