@@ -149,7 +149,7 @@ def site_login():
             response.set_cookie(
                 SESSION_COOKIE_NAME,
                 token,
-                max_age=604800,
+                max_age=300,
                 httponly=True,
                 samesite='Lax',
                 secure=True,
