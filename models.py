@@ -187,6 +187,38 @@ class GeneratedPurchaseOrder(db.Model):
     updated_at = db.Column(db.DateTime, server_default=db.func.now())
 
 
+class AIAgent(db.Model):
+    __tablename__ = "ai_agents"
+    agent_id = db.Column(db.String(100), primary_key=True)
+    merchant_id = db.Column(db.String(100), db.ForeignKey("merchant_profiles.merchant_id"))
+    agent_role = db.Column(db.String(100))
+    status = db.Column(db.String(50), default="IDLE")
+    last_action = db.Column(db.Text)
+    updated_at = db.Column(db.DateTime, server_default=db.func.now())
+
+
+class AgentMessage(db.Model):
+    __tablename__ = "agent_messages"
+    id = db.Column(db.Integer, primary_key=True, autoincrement=True)
+    sender_agent = db.Column(db.String(100))
+    recipient_agent = db.Column(db.String(100))
+    merchant_id = db.Column(db.String(100), db.ForeignKey("merchant_profiles.merchant_id"))
+    payload = db.Column(db.Text)
+    action_taken = db.Column(db.String(255))
+    created_at = db.Column(db.DateTime, server_default=db.func.now())
+
+
+class MerchantDecisionLog(db.Model):
+    __tablename__ = "merchant_decision_logs"
+    id = db.Column(db.Integer, primary_key=True, autoincrement=True)
+    merchant_id = db.Column(db.String(100), db.ForeignKey("merchant_profiles.merchant_id"))
+    decision_type = db.Column(db.String(100))
+    decision_vector = db.Column(db.Text)
+    context_snapshot = db.Column(db.Text)
+    outcome = db.Column(db.String(50))
+    created_at = db.Column(db.DateTime, server_default=db.func.now())
+
+
 class ProcessedWebhookEvent(db.Model):
     __tablename__ = "processed_webhook_events"
     event_id = db.Column(db.String(255), primary_key=True)
