@@ -313,6 +313,7 @@ MOBILE_ACTIONS = [
 ]
 
 NAV = [
+    ("Home", "#", False),
     ("Overview", "#top", True),
     ("Command Center", "#command", False),
     ("Commerce Hub", "#channels", False),
