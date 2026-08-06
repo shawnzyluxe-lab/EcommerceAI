@@ -118,9 +118,14 @@ def home():
 @app.route('/dashboard')
 def dashboard():
     products = []
+    shop_name = 'Shawnzy Luxe'
+    product_count = 0
+    inventory_value = 0.0
+    avg_price = 0.0
     if GRAPHQL_URL and STOREFRONT_TOKEN:
         data = storefront(
             '''{
+                shop { name }
                 products(first: 12) {
                     edges {
                         node {
@@ -133,8 +138,29 @@ def dashboard():
                 }
             }'''
         )
+        shop = data.get('data', {}).get('shop', {}) or {}
+        shop_name = shop.get('name', 'Shawnzy Luxe')
         products = data.get('data', {}).get('products', {}).get('edges', [])
-    return render_template('dashboard.html', products=products)
+        product_count = len(products)
+        if products:
+            prices = []
+            for p in products:
+                try:
+                    amount = float(p['node']['priceRange']['minVariantPrice']['amount'])
+                    prices.append(amount)
+                except (KeyError, ValueError, TypeError):
+                    continue
+            if prices:
+                inventory_value = round(sum(prices), 2)
+                avg_price = round(inventory_value / len(prices), 2)
+    return render_template(
+        'dashboard.html',
+        shop_name=shop_name,
+        products=products,
+        product_count=product_count,
+        inventory_value=inventory_value,
+        avg_price=avg_price,
+    )
 
 
 @app.route('/site-login', methods=['GET', 'POST'])

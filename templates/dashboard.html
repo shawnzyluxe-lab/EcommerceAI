@@ -19,25 +19,25 @@
                 <div class="channel-pills">
                     <div class="pill active">
                         <span class="status-dot shopify"></span>
-                        🛒 Shopify Active
+                        &#128722; Shopify Active
                     </div>
                     <div class="pill inactive">
                         <span class="status-dot amazon"></span>
-                        📦 Amazon Linked
+                        &#128230; Amazon Linked
                     </div>
                     <div class="pill inactive">
                         <span class="status-dot tiktok"></span>
-                        🎯 TikTok Shop
+                        &#127919; TikTok Shop
                     </div>
                 </div>
-                <div class="unified-balance">� TOTAL: $20,560</div>
+                <div class="unified-balance">&#128181; {{ product_count }} Products &middot; ${{ '%0.2f'|format(inventory_value) }}</div>
             </header>
 
             <!-- Central AI Command Portal -->
             <section class="ai-portal">
-                <h2>🤖 The AI Command Center</h2>
+                <h2>&#129302; The AI Command Center</h2>
                 <div class="input-bar">
-                    <span>�</span>
+                    <span>&#128172;</span>
                     <input type="text" placeholder="How did my stores do today?...">
                     <button>Ask</button>
                 </div>
@@ -48,11 +48,15 @@
 
                 <!-- AI COO Briefing -->
                 <div class="floating-card">
-                    <h3>📈 The AI COO Brief</h3>
-                    <p>Revenue is up 18% this week. Top product selling out soon.</p>
+                    <h3>&#128200; The AI COO Brief</h3>
+                    <p>Connected to {{ shop_name }}. {{ product_count }} products indexed. Avg price ${{ '%0.2f'|format(avg_price) }}.</p>
                     <div class="metric-row">
-                        <span>Revenue</span>
-                        <span class="value positive">$4,582</span>
+                        <span>Products</span>
+                        <span class="value positive">{{ product_count }}</span>
+                    </div>
+                    <div class="metric-row">
+                        <span>Avg Price</span>
+                        <span class="value positive">${{ '%0.2f'|format(avg_price) }}</span>
                     </div>
                     <button class="approve-btn">Approve Actions</button>
                 </div>
@@ -66,7 +70,7 @@
 
                 <!-- Real Profit Matrix -->
                 <div class="floating-card">
-                    <h3>💰 Real Profit Matrix</h3>
+                    <h3>&#128176; Real Profit Matrix</h3>
                     <div class="metric-row">
                         <span>Ad Spend</span>
                         <span class="value negative">-$420</span>
@@ -75,23 +79,23 @@
                         <span>Product Cost</span>
                         <span class="value negative">-$1,100</span>
                     </div>
-                    <div class="metric-hero">+$1,394</div>
-                    <p>Net true profit after all costs.</p>
+                    <div class="metric-hero">+${{ '%0.2f'|format(inventory_value) }}</div>
+                    <p>Inventory value from live Shopify feed.</p>
                 </div>
 
-                <!-- Universal Orders -->
+                <!-- Universal Orders / Shopify Stream -->
                 <div class="floating-card">
-                    <h3>📦 Universal Orders</h3>
+                    <h3>&#128230; Shopify Live Stream</h3>
                     <div class="metric-row">
-                        <span>🛍️ Shopify</span>
-                        <span class="value">12 Pending</span>
+                        <span>&#128717; Products</span>
+                        <span class="value">{{ product_count }} live</span>
                     </div>
                     <div class="metric-row">
-                        <span>📦 Amazon</span>
+                        <span>&#128230; Amazon</span>
                         <span class="value">4 Shipped</span>
                     </div>
                     <div class="metric-row">
-                        <span>🎯 TikTok</span>
+                        <span>&#127919; TikTok</span>
                         <span class="value">0 New</span>
                     </div>
                 </div>
@@ -105,7 +109,7 @@
 
                 <!-- Health Score -->
                 <div class="floating-card">
-                    <h3>🧠 Health Score</h3>
+                    <h3>&#129504; Health Score</h3>
                     <div class="health-score">94<span style="font-size: 22px; color: var(--text-muted);">/100</span></div>
                     <p>Ecosystem is operating elegantly.</p>
                     <a class="recommend-link" href="#">View Recommendations</a>
