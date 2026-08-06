@@ -3,13 +3,14 @@ import re
 import hmac
 import secrets
 import requests
+from datetime import datetime, timedelta
 from urllib.parse import urlencode
 from flask import Flask, render_template, request, redirect, url_for, session, flash, jsonify
 from dotenv import load_dotenv
 
 load_dotenv()
 
-from models import db, Tenant, ConnectedChannel
+from models import db, Tenant, ConnectedChannel, ActiveSession, BusinessMetric, CommerceChannel
 from dashboard_context import (
     context,
     COMMAND_RESPONSES,
@@ -64,9 +65,15 @@ def site_wall_enabled():
 
 
 def site_wall_authenticated():
-    """Check whether the browser has a valid server-side session token."""
+    """Check whether the browser has a valid, non-expired session token."""
     token = request.cookies.get(SESSION_COOKIE_NAME)
-    return token is not None and token in active_sessions
+    if token is None or token not in active_sessions:
+        return False
+    s = ActiveSession.query.get(token)
+    if not s or s.created_at < datetime.utcnow() - timedelta(seconds=300):
+        active_sessions.discard(token)
+        return False
+    return True
 
 
 @app.before_request
@@ -94,6 +101,51 @@ CUSTOMER_ACCOUNT_BASE = f"https://shopify.com/{SHOPIFY_DOMAIN.split('.')[0]}" if
 
 with app.app_context():
     db.create_all()
+
+    # Clean expired sessions and restore active ones
+    ActiveSession.query.filter(
+        ActiveSession.created_at < datetime.utcnow() - timedelta(seconds=300)
+    ).delete(synchronize_session=False)
+    db.session.commit()
+    for s in ActiveSession.query.all():
+        active_sessions.add(s.token)
+
+    # Seed or restore business metrics
+    if not BusinessMetric.query.first():
+        db.session.add(BusinessMetric(
+            total_unified_balance=20560.00,
+            true_net_profit=1394.00,
+            gross_revenue=4582.00,
+            ai_briefing=COO["narrative"],
+        ))
+    latest = BusinessMetric.query.order_by(BusinessMetric.id.desc()).first()
+    if latest:
+        DASHBOARD_STATE["total_unified_balance"] = latest.total_unified_balance
+        DASHBOARD_STATE["true_net_profit"] = latest.true_net_profit
+        DASHBOARD_STATE["gross_revenue"] = latest.gross_revenue
+        DASHBOARD_STATE["ai_briefing"] = latest.ai_briefing
+        COO["narrative"] = latest.ai_briefing
+        BRIEFING["revenue"] = latest.gross_revenue
+        BRIEFING["profit"] = latest.true_net_profit
+
+    # Seed or restore commerce channels
+    if not CommerceChannel.query.first():
+        db.session.add(CommerceChannel(channel_id="shopify", channel_name="Shopify Storefront", pending_orders=12, conversion_rate=3.4, performance_status="Optimal"))
+        db.session.add(CommerceChannel(channel_id="tiktok", channel_name="TikTok Video Shop", pending_orders=7, conversion_rate=4.1, performance_status="Trending"))
+        db.session.add(CommerceChannel(channel_id="amazon", channel_name="Amazon Marketplace", pending_orders=4, conversion_rate=2.8, performance_status="Stable"))
+    for cc in CommerceChannel.query.all():
+        DASHBOARD_STATE["channels"][cc.channel_id]["pending_orders"] = cc.pending_orders
+        feed = next((f for f in DASHBOARD_STATE["conversion_feeds"] if cc.channel_name.lower() in f["store"].lower()), None)
+        if feed:
+            feed["rate"] = f"{cc.conversion_rate}%"
+            feed["status"] = cc.performance_status
+            feed["up"] = cc.performance_status.lower() in ("optimal", "trending")
+        for ch in CHANNELS:
+            if cc.channel_name.lower() in ch["name"].lower():
+                ch["orders"] = cc.pending_orders
+
+    db.session.commit()
+
     if SHOPIFY_DOMAIN and STOREFRONT_TOKEN and not ConnectedChannel.query.first():
         tenant = Tenant(company_name="Shawnzy Luxe", tier_level="Pro")
         db.session.add(tenant)
@@ -212,6 +264,19 @@ def execute_command():
     else:
         return jsonify({"success": False})
 
+    # Persist state to SQLite
+    db.session.add(BusinessMetric(
+        total_unified_balance=DASHBOARD_STATE["total_unified_balance"],
+        true_net_profit=DASHBOARD_STATE["true_net_profit"],
+        gross_revenue=DASHBOARD_STATE["gross_revenue"],
+        ai_briefing=DASHBOARD_STATE["ai_briefing"],
+    ))
+    for channel_id, data in DASHBOARD_STATE["channels"].items():
+        cc = CommerceChannel.query.get(channel_id)
+        if cc:
+            cc.pending_orders = data["pending_orders"]
+    db.session.commit()
+
     return jsonify({"success": True, "updates": updates})
 
 
@@ -255,6 +320,8 @@ def site_login():
         if hmac.compare_digest(submitted, SITE_WALL_PASSWORD):
             token = secrets.token_urlsafe(32)
             active_sessions.add(token)
+            db.session.add(ActiveSession(token=token, created_at=datetime.utcnow()))
+            db.session.commit()
             response = redirect(url_for('home'))
             response.set_cookie(
                 SESSION_COOKIE_NAME,
@@ -274,6 +341,9 @@ def site_logout():
     token = request.cookies.get(SESSION_COOKIE_NAME)
     if token and token in active_sessions:
         active_sessions.remove(token)
+    if token:
+        ActiveSession.query.filter_by(token=token).delete()
+        db.session.commit()
     response = redirect(url_for('home'))
     response.delete_cookie(SESSION_COOKIE_NAME)
     return response

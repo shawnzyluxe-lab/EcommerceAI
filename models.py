@@ -39,3 +39,28 @@ class ConnectedChannel(db.Model):
     api_access_token = db.Column(db.Text, nullable=False)
     sync_status = db.Column(db.String(50), default="Active")
     last_successful_sync = db.Column(db.DateTime, nullable=True)
+
+
+class ActiveSession(db.Model):
+    __tablename__ = "active_sessions"
+    token = db.Column(db.String(255), primary_key=True)
+    created_at = db.Column(db.DateTime, server_default=db.func.now())
+
+
+class BusinessMetric(db.Model):
+    __tablename__ = "business_metrics"
+    id = db.Column(db.Integer, primary_key=True, autoincrement=True)
+    total_unified_balance = db.Column(db.REAL)
+    true_net_profit = db.Column(db.REAL)
+    gross_revenue = db.Column(db.REAL)
+    ai_briefing = db.Column(db.Text)
+    created_at = db.Column(db.DateTime, server_default=db.func.now())
+
+
+class CommerceChannel(db.Model):
+    __tablename__ = "commerce_channels"
+    channel_id = db.Column(db.String(100), primary_key=True)
+    channel_name = db.Column(db.String(255), nullable=False)
+    pending_orders = db.Column(db.Integer, default=0)
+    conversion_rate = db.Column(db.REAL)
+    performance_status = db.Column(db.String(50))
