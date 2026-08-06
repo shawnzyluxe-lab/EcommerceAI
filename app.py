@@ -38,11 +38,11 @@ def site_wall_authenticated():
 def site_wall_protect():
     if not site_wall_enabled():
         return None
-    if request.endpoint in ('site_login', 'static'):
+    if request.endpoint in ('home', 'site_login', 'static'):
         return None
     if site_wall_authenticated():
         return None
-    return redirect(url_for('site_login'))
+    return redirect(url_for('home'))
 
 
 # ============================================================
@@ -80,39 +80,9 @@ def storefront(query, variables=None):
 
 @app.route('/')
 def home():
-    products = []
-    shop_name = 'Shawnzy Luxe'
-    if GRAPHQL_URL and STOREFRONT_TOKEN:
-        data = storefront(
-            '''{
-                shop { name }
-                products(first: 12) {
-                    edges {
-                        node {
-                            id
-                            title
-                            handle
-                            description
-                            priceRange {
-                                minVariantPrice { amount currencyCode }
-                            }
-                            images(first: 1) {
-                                edges { node { url } }
-                            }
-                        }
-                    }
-                }
-            }'''
-        )
-        shop = data.get('data', {}).get('shop', {}) or {}
-        shop_name = shop.get('name', 'Shawnzy Luxe')
-        products = shop.get('products', {}).get('edges', [])
-    return render_template(
-        'index.html',
-        shop_name=shop_name,
-        products=products,
-        domain=SHOPIFY_DOMAIN,
-    )
+    if site_wall_authenticated():
+        return redirect(url_for('dashboard'))
+    return render_template('gate.html', error=False, shop_name='Shawnzy Luxe')
 
 
 @app.route('/dashboard')
