@@ -30,7 +30,7 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-from models import db, Tenant, ConnectedChannel, ActiveSession, BusinessMetric, CommerceChannel, MerchantChannel, SupportMetric, MarketingStudio, PredictiveLogistics, OutboundTransmission, SaaSBilling, LocalProductCatalog, MerchantProfile, TenantOAuthToken, MerchantMetric, SystemExceptionLog, ProcessedWebhookEvent
+from models import db, Tenant, ConnectedChannel, ActiveSession, BusinessMetric, CommerceChannel, MerchantChannel, SupportMetric, MarketingStudio, PredictiveLogistics, OutboundTransmission, SaaSBilling, LocalProductCatalog, MerchantProfile, TenantOAuthToken, MerchantMetric, SystemExceptionLog, ProcessedWebhookEvent, AdSpendAnalytic
 from dashboard_context import (
     context,
     COMMAND_RESPONSES,
@@ -207,7 +207,7 @@ def enforce_tier_limits(merchant_id, requested_feature):
 def site_wall_protect():
     if not site_wall_enabled():
         return None
-    if request.endpoint in ('home', 'site_login', 'shopify_orders_webhook', 'tiktok_orders_webhook', 'amazon_orders_webhook', 'register_merchant', 'shopify_oauth_callback', 'health_check', 'static'):
+    if request.endpoint in ('home', 'site_login', 'shopify_orders_webhook', 'tiktok_orders_webhook', 'amazon_orders_webhook', 'stripe_billing_webhook', 'register_merchant', 'shopify_oauth_callback', 'health_check', 'static'):
         return None
     if site_wall_authenticated():
         return None
@@ -234,6 +234,7 @@ TWILIO_FROM_NUMBER = os.environ.get("TWILIO_FROM_NUMBER", "")
 MERCHANT_PHONE = os.environ.get("MERCHANT_PHONE", "")
 
 STRIPE_SECRET_KEY = os.environ.get("STRIPE_SECRET_KEY", "")
+STRIPE_WEBHOOK_SECRET = os.environ.get("STRIPE_WEBHOOK_SECRET", "")
 SHOPIFY_STORE_URL = os.environ.get("SHOPIFY_STORE_URL", "")
 SHOPIFY_ACCESS_TOKEN = os.environ.get("SHOPIFY_ACCESS_TOKEN", "")
 SHOPIFY_CLIENT_ID = os.environ.get("SHOPIFY_CLIENT_ID", "")
@@ -371,6 +372,10 @@ with app.app_context():
             price=45.00,
             inventory_quantity=140,
         ))
+    if not AdSpendAnalytic.query.first():
+        db.session.add(AdSpendAnalytic(merchant_id="merchant_shawn_01", platform_source="Shopify Product Ads", budget_allocated=1500.00, current_spend=420.00, roas=3.4, conversion_count=28))
+        db.session.add(AdSpendAnalytic(merchant_id="merchant_shawn_01", platform_source="TikTok Video Ads", budget_allocated=2000.00, current_spend=680.00, roas=4.1, conversion_count=47))
+        db.session.add(AdSpendAnalytic(merchant_id="merchant_shawn_01", platform_source="Meta Retargeting Loop", budget_allocated=1200.00, current_spend=310.00, roas=2.9, conversion_count=19))
     db.session.commit()
     billing = SaaSBilling.query.get("merchant_shawn_01")
     if billing:
@@ -1175,6 +1180,43 @@ def amazon_orders_webhook():
         return jsonify({"status": "rejected", "reason": "Internal error"}), 500
 
 
+@app.route('/api/v1/webhooks/stripe-billing', methods=['POST'])
+def stripe_billing_webhook():
+    """Process Stripe checkout/subscription events to upgrade merchant tier live."""
+    sig_header = request.headers.get("Stripe-Signature")
+    if not sig_header:
+        logger.warning("Dropped Stripe frame: missing signature.")
+        return jsonify({"error": "Unauthorized"}), 400
+
+    try:
+        payload = request.get_json() or {}
+        event_type = payload.get("type")
+
+        if event_type in ("checkout.session.completed", "customer.subscription.updated"):
+            session_obj = payload.get("data", {}).get("object", {})
+            stripe_cust_id = session_obj.get("customer")
+            metadata = session_obj.get("metadata", {})
+            merchant_target = metadata.get("merchant_id", "merchant_shawn_01")
+            chosen_tier = metadata.get("selected_tier", "Pro Tier")
+
+            profile = MerchantProfile.query.get(merchant_target)
+            if profile:
+                profile.account_tier = chosen_tier
+            billing = SaaSBilling.query.get(merchant_target)
+            if billing:
+                billing.current_plan = chosen_tier
+                billing.stripe_customer_id = stripe_cust_id
+            db.session.commit()
+            logger.info(f"[Stripe Pipeline] Merchant {merchant_target} upgraded to {chosen_tier}")
+            return jsonify({"status": "tier_synchronized"}), 200
+
+        return jsonify({"status": "unhandled_event_passed"}), 200
+    except Exception as e:
+        log_system_exception("STRIPE_WEBHOOK", "CRITICAL", str(e))
+        db.session.rollback()
+        return jsonify({"error": "Internal Processing Stall"}), 500
+
+
 @app.route('/api/v1/download-report')
 def download_report():
     """Serve the generated CSV ledger to authenticated admins."""
@@ -1206,10 +1248,21 @@ def telemetry_poll():
         mktg = MarketingStudio.query.order_by(MarketingStudio.id.desc()).first()
         channels = MerchantChannel.query.filter_by(merchant_id=merchant["id"]).all()
         rows = PredictiveLogistics.query.order_by(PredictiveLogistics.days_remaining.asc()).all()
+        ads = AdSpendAnalytic.query.filter_by(merchant_id=merchant["id"]).all()
 
         return jsonify({
             "success": True,
             "account_tier_context": merchant["tier"],
+            "ad_spend_matrix": [
+                {
+                    "platform": a.platform_source,
+                    "budget": a.budget_allocated,
+                    "spend": a.current_spend,
+                    "roas": a.roas,
+                    "conversions": a.conversion_count,
+                }
+                for a in ads
+            ],
             "metrics": {
                 "total_balance": f"{latest.total_unified_balance:.2f}" if latest else "0.00",
                 "true_profit": f"{latest.true_net_profit:.2f}" if latest else "0.00",
