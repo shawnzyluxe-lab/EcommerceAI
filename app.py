@@ -126,6 +126,12 @@ manager = ConnectionManager()
 SITE_WALL_PASSWORD = "IfxSVNs4iAs"
 SESSION_COOKIE_NAME = "aegis_session_token"
 
+TIER_LIMITS = {
+    "Basic Tier": {"max_monthly_operations": 500, "features_allowed": ["shopify", "support"]},
+    "Pro Tier": {"max_monthly_operations": 5000, "features_allowed": ["shopify", "tiktok", "support", "marketing"]},
+    "Enterprise AI Tier": {"max_monthly_operations": 999999, "features_allowed": ["shopify", "tiktok", "amazon", "support", "marketing"]},
+}
+
 # In-memory active token ring. Server restart clears all sessions.
 active_sessions = set()
 
@@ -163,6 +169,38 @@ def get_merchant_context():
         "tier": profile.account_tier or "Basic Tier",
         "name": profile.business_name,
     }
+
+
+def check_tier_limits(merchant_id, requested_feature):
+    """Return (allowed: bool, reason: str) based on tier and metered usage."""
+    if not merchant_id:
+        return False, "No merchant context"
+    profile = MerchantProfile.query.get(merchant_id)
+    if not profile:
+        return False, "Unknown merchant"
+    account = SaaSBilling.query.get(merchant_id)
+    if not account:
+        return False, "No billing record"
+
+    tier = profile.account_tier or "Basic Tier"
+    limits = TIER_LIMITS.get(tier, TIER_LIMITS["Basic Tier"])
+
+    if requested_feature not in limits["features_allowed"]:
+        return False, f"{tier} does not include {requested_feature} access"
+
+    if account.metered_usage_units >= limits["max_monthly_operations"]:
+        return False, f"Monthly operation limit reached for {tier}"
+
+    return True, "OK"
+
+
+def enforce_tier_limits(merchant_id, requested_feature):
+    """Helper that returns a Flask JSON 403 response or None if allowed."""
+    allowed, reason = check_tier_limits(merchant_id, requested_feature)
+    if not allowed:
+        logger.warning(f"Tier limit blocked: {merchant_id} -> {requested_feature} ({reason})")
+        return jsonify({"error": "Operation Blocked", "reason": reason}), 403
+    return None
 
 
 @app.before_request
@@ -607,6 +645,23 @@ def process_command(cmd_text):
     if not cmd_text:
         return None
 
+    merchant = None
+    try:
+        merchant = get_merchant_context()
+    except Exception:
+        pass
+    merchant_id = merchant["id"] if merchant else "merchant_shawn_01"
+
+    def require_feature(feature, fallback_briefing):
+        allowed, reason = check_tier_limits(merchant_id, feature)
+        if not allowed:
+            logger.warning(f"Command blocked by tier: {merchant_id} / {feature} ({reason})")
+            updates = {"ai_briefing": f"🚫 Tier Limit: {reason}. Upgrade to unlock."}
+            DASHBOARD_STATE["ai_briefing"] = updates["ai_briefing"]
+            COO["narrative"] = updates["ai_briefing"]
+            return updates
+        return None
+
     updates = {
         "ai_briefing": DASHBOARD_STATE["ai_briefing"],
         "total_balance": f"{DASHBOARD_STATE['total_unified_balance']:.2f}",
@@ -634,6 +689,9 @@ def process_command(cmd_text):
         COO["narrative"] = updates["ai_briefing"]
 
     elif re.search(r'(generate marketing copy|write copy|email blast|create campaign)', cmd_text):
+        blocked = require_feature("marketing", "Marketing campaigns are not available on your tier")
+        if blocked:
+            return blocked
         DASHBOARD_STATE["mktg_campaign"] = "Autumn Launch Preview"
         DASHBOARD_STATE["mktg_status"] = "Queued"
         DASHBOARD_STATE["mktg_copy"] = "Email + SMS blast queued for non-blocking dispatch."
@@ -655,6 +713,9 @@ def process_command(cmd_text):
         COO["narrative"] = updates["ai_briefing"]
 
     elif re.search(r'(create discount|discount campaign|promo code)', cmd_text):
+        blocked = require_feature("marketing", "Marketing campaigns are not available on your tier")
+        if blocked:
+            return blocked
         DASHBOARD_STATE["total_unified_balance"] += 1200.00
         BRIEFING["revenue"] += 1200.00
         DASHBOARD_STATE["mktg_campaign"] = "ECOM_AI_15 Active"
@@ -753,6 +814,9 @@ def process_command(cmd_text):
         COO["narrative"] = updates["ai_briefing"]
 
     elif re.search(r'(update price|adjust cost|catalog push)', cmd_text):
+        blocked = require_feature("shopify", "Catalog control is not available on your tier")
+        if blocked:
+            return blocked
         prices = re.findall(r'\d+(?:\.\d+)?', cmd_text)
         if prices:
             target_price = float(prices[0])
@@ -951,6 +1015,10 @@ def shopify_orders_webhook():
             log_system_exception("SHOPIFY_WEBHOOK", "WARNING", "Dropped inbound webhook: missing X-Shopify-Webhook-Id.")
             return jsonify({"status": "rejected", "reason": "Missing event id"}), 400
 
+        blocked = enforce_tier_limits(merchant_target, "shopify")
+        if blocked:
+            return blocked
+
         if ProcessedWebhookEvent.query.get(event_id):
             logger.info(f"Idempotency: order event {event_id} already processed. Ignoring.")
             return jsonify({"status": "duplicate_ignored"}), 200
@@ -1070,6 +1138,9 @@ def tiktok_orders_webhook():
     """Ingest TikTok Shop order events into the isolated merchant channel."""
     event_id = request.headers.get("X-Tiktok-Event-Id") or request.headers.get("X-TikTok-Event-Id")
     merchant_target = request.args.get("merchant_id", "merchant_shawn_01")
+    blocked = enforce_tier_limits(merchant_target, "tiktok")
+    if blocked:
+        return blocked
     raw = request.get_json() or {}
     order_price = float(raw.get("order_amount", raw.get("total_amount", 0.00)))
     try:
@@ -1088,6 +1159,9 @@ def amazon_orders_webhook():
     """Ingest Amazon Seller Central order events into the isolated merchant channel."""
     event_id = request.headers.get("X-Amazon-Sqs-Message-Id")
     merchant_target = request.args.get("merchant_id", "merchant_shawn_01")
+    blocked = enforce_tier_limits(merchant_target, "amazon")
+    if blocked:
+        return blocked
     raw = request.get_json() or {}
     payload = raw.get("payload", raw)
     order_price = float(payload.get("AmazonOrderTotal", payload.get("total", 0.00)))
