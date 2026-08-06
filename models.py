@@ -95,6 +95,25 @@ class OutboundTransmission(db.Model):
     timestamp = db.Column(db.DateTime, server_default=db.func.now())
 
 
+class SaaSBilling(db.Model):
+    __tablename__ = "saas_billing"
+    merchant_id = db.Column(db.String(100), primary_key=True)
+    stripe_customer_id = db.Column(db.String(100))
+    current_plan = db.Column(db.String(100))
+    metered_usage_units = db.Column(db.Integer, default=0)
+    accrued_invoice_value = db.Column(db.REAL, default=0.0)
+    billing_cycle_end = db.Column(db.String(20))
+
+
+class LocalProductCatalog(db.Model):
+    __tablename__ = "local_product_catalog"
+    shopify_product_id = db.Column(db.String(100), primary_key=True)
+    title = db.Column(db.String(255))
+    variant_id = db.Column(db.String(100))
+    price = db.Column(db.REAL)
+    inventory_quantity = db.Column(db.Integer)
+
+
 class PredictiveLogistics(db.Model):
     __tablename__ = "predictive_logistics"
     id = db.Column(db.Integer, primary_key=True, autoincrement=True)

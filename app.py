@@ -17,7 +17,7 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-from models import db, Tenant, ConnectedChannel, ActiveSession, BusinessMetric, CommerceChannel, SupportMetric, MarketingStudio, PredictiveLogistics, OutboundTransmission
+from models import db, Tenant, ConnectedChannel, ActiveSession, BusinessMetric, CommerceChannel, SupportMetric, MarketingStudio, PredictiveLogistics, OutboundTransmission, SaaSBilling, LocalProductCatalog
 from dashboard_context import (
     context,
     COMMAND_RESPONSES,
@@ -28,6 +28,8 @@ from dashboard_context import (
     CHANNELS,
     SUPPORT,
     MARKETING,
+    STRIPE,
+    CATALOG,
 )
 
 # Dynamic state for AI command engine
@@ -52,6 +54,9 @@ DASHBOARD_STATE = {
     "mktg_campaign": "Summer Clearance Blast",
     "mktg_status": "Idle",
     "mktg_copy": "Awaiting generation trigger query text...",
+    "stripe_usage": 4820,
+    "stripe_invoice": 241.00,
+    "hoodie_price": 145.00,
 }
 
 app = Flask(__name__)
@@ -142,6 +147,10 @@ SMTP_USERNAME = os.environ.get("SMTP_USERNAME", "")
 SMTP_PASSWORD = os.environ.get("SMTP_PASSWORD", "")
 MERCHANT_EMAIL = os.environ.get("MERCHANT_EMAIL", "shawn@shawnzyluxe.com")
 SUPPLIER_EMAIL = os.environ.get("SUPPLIER_EMAIL", "production@supplier-c.com")
+
+STRIPE_SECRET_KEY = os.environ.get("STRIPE_SECRET_KEY", "")
+SHOPIFY_STORE_URL = os.environ.get("SHOPIFY_STORE_URL", "")
+SHOPIFY_ACCESS_TOKEN = os.environ.get("SHOPIFY_ACCESS_TOKEN", "")
 
 SHOPIFY_DOMAIN = os.environ.get('SHOPIFY_DOMAIN', '').strip()
 STOREFRONT_TOKEN = os.environ.get('SHOPIFY_STOREFRONT_TOKEN', '').strip()
@@ -248,6 +257,46 @@ with app.app_context():
 
     db.session.commit()
 
+    # Seed or restore SaaS billing and catalog mirror
+    if not SaaSBilling.query.first():
+        db.session.add(SaaSBilling(
+            merchant_id="merchant_shawn_01",
+            stripe_customer_id="cus_R8zX1042",
+            current_plan="Enterprise AI Tier",
+            metered_usage_units=4820,
+            accrued_invoice_value=241.00,
+            billing_cycle_end="2026-09-01",
+        ))
+    if not LocalProductCatalog.query.first():
+        db.session.add(LocalProductCatalog(
+            shopify_product_id="prod_882041",
+            title="Shawnzyluxe Luxury Hoodie",
+            variant_id="var_99201",
+            price=145.00,
+            inventory_quantity=85,
+        ))
+        db.session.add(LocalProductCatalog(
+            shopify_product_id="prod_882042",
+            title="Shawnzyluxe Minimalist Cap",
+            variant_id="var_99202",
+            price=45.00,
+            inventory_quantity=140,
+        ))
+    db.session.commit()
+    billing = SaaSBilling.query.get("merchant_shawn_01")
+    if billing:
+        DASHBOARD_STATE["stripe_usage"] = billing.metered_usage_units
+        DASHBOARD_STATE["stripe_invoice"] = billing.accrued_invoice_value
+        STRIPE["plan"] = billing.current_plan
+        STRIPE["usage"] = billing.metered_usage_units
+        STRIPE["invoice"] = billing.accrued_invoice_value
+    hoodie = LocalProductCatalog.query.get("prod_882041")
+    if hoodie:
+        DASHBOARD_STATE["hoodie_price"] = hoodie.price
+        CATALOG["title"] = hoodie.title
+        CATALOG["sku"] = hoodie.variant_id
+        CATALOG["price"] = hoodie.price
+
     if SHOPIFY_DOMAIN and STOREFRONT_TOKEN and not ConnectedChannel.query.first():
         tenant = Tenant(company_name="Shawnzy Luxe", tier_level="Pro")
         db.session.add(tenant)
@@ -334,6 +383,49 @@ AUTHORIZATION STAMP: SHAWNZYLUXE AI OPERATIONS ENGINE
     return po_number
 
 
+def log_metered_api_usage(merchant_id, operations_count):
+    account = SaaSBilling.query.get(merchant_id)
+    if account:
+        account.metered_usage_units += operations_count
+        account.accrued_invoice_value += operations_count * 0.05
+
+
+def mutate_shopify_product_price(product_id, variant_id, new_price):
+    """Attempt live Shopify Admin API price mutation; fall back to local catalog mirror."""
+    if not SHOPIFY_STORE_URL or not SHOPIFY_ACCESS_TOKEN:
+        return False
+    graphql_url = f"https://{SHOPIFY_STORE_URL}/admin/api/2026-07/graphql.json"
+    headers = {
+        "X-Shopify-Access-Token": SHOPIFY_ACCESS_TOKEN,
+        "Content-Type": "application/json",
+    }
+    query = """
+    mutation productVariantUpdate($input: ProductVariantInput!) {
+      productVariantUpdate(input: $input) {
+        productVariant { id price }
+        userErrors { field message }
+      }
+    }
+    """
+    variables = {
+        "input": {
+            "id": f"gid://shopify/ProductVariant/{variant_id}",
+            "price": str(new_price),
+        }
+    }
+    try:
+        r = requests.post(graphql_url, json={"query": query, "variables": variables}, headers=headers, timeout=8)
+        res_data = r.json()
+        if r.status_code == 200 and not res_data.get("errors") and not res_data.get("data", {}).get("productVariantUpdate", {}).get("userErrors"):
+            local = LocalProductCatalog.query.get(product_id)
+            if local:
+                local.price = new_price
+            return True
+        return False
+    except Exception:
+        return False
+
+
 def storefront(query, variables=None):
     if not GRAPHQL_URL or not STOREFRONT_TOKEN:
         return {}
@@ -405,6 +497,9 @@ def process_command(cmd_text):
         "mktg_campaign": DASHBOARD_STATE["mktg_campaign"],
         "mktg_status": DASHBOARD_STATE["mktg_status"],
         "mktg_copy": DASHBOARD_STATE["mktg_copy"],
+        "stripe_usage": DASHBOARD_STATE["stripe_usage"],
+        "stripe_invoice": f"{DASHBOARD_STATE['stripe_invoice']:.2f}",
+        "hoodie_price": f"{DASHBOARD_STATE['hoodie_price']:.2f}",
     }
 
     if re.search(r'(why are sales down|sales down|analyze drops)', cmd_text):
@@ -525,6 +620,44 @@ def process_command(cmd_text):
         DASHBOARD_STATE["ai_briefing"] = updates["ai_briefing"]
         COO["narrative"] = updates["ai_briefing"]
         updates["trigger_download"] = True
+
+    elif re.search(r'(check billing|stripe invoice|saas usage|view fees)', cmd_text):
+        merchant_id = "merchant_shawn_01"
+        log_metered_api_usage(merchant_id, 1)
+        billing = SaaSBilling.query.get(merchant_id)
+        if billing:
+            DASHBOARD_STATE["stripe_usage"] = billing.metered_usage_units
+            DASHBOARD_STATE["stripe_invoice"] = billing.accrued_invoice_value
+            updates["stripe_usage"] = billing.metered_usage_units
+            updates["stripe_invoice"] = f"{billing.accrued_invoice_value:.2f}"
+            updates["ai_briefing"] = f"💰 Stripe Ledger Synced: Profile mapped to <b>{billing.current_plan}</b>. Current billing cycle usage: <b>{billing.metered_usage_units} metered actions</b>. Accrued invoice totals: <b>${billing.accrued_invoice_value:.2f}</b>."
+        else:
+            updates["ai_briefing"] = "💰 Stripe Ledger: No billing account found."
+        DASHBOARD_STATE["ai_briefing"] = updates["ai_briefing"]
+        COO["narrative"] = updates["ai_briefing"]
+
+    elif re.search(r'(update price|adjust cost|catalog push)', cmd_text):
+        prices = re.findall(r'\d+(?:\.\d+)?', cmd_text)
+        if prices:
+            target_price = float(prices[0])
+            log_metered_api_usage("merchant_shawn_01", 10)
+            catalog = LocalProductCatalog.query.first()
+            if catalog:
+                api_success = mutate_shopify_product_price(catalog.shopify_product_id, catalog.variant_id, target_price)
+                catalog.price = target_price
+                db.session.commit()
+                DASHBOARD_STATE["hoodie_price"] = target_price
+                updates["hoodie_price"] = f"{target_price:.2f}"
+                if api_success:
+                    updates["ai_briefing"] = f"🛍️ Catalog Matrix Success: Transmitted GraphQL update. <b>{catalog.title}</b> price changed to <b>${target_price:.2f}</b> live on Shopify Storefront."
+                else:
+                    updates["ai_briefing"] = f"⚠️ Catalog API Simulation: Shopify API offline. Local table mirror updated: <b>{catalog.title}</b> set to <b>${target_price:.2f}</b>."
+            else:
+                updates["ai_briefing"] = "🛍️ Catalog Error: No catalog products found in local mirror."
+        else:
+            updates["ai_briefing"] = "🛍️ Catalog Error: Specify a valid numerical target. Example: 'update price to 149.99'"
+        DASHBOARD_STATE["ai_briefing"] = updates["ai_briefing"]
+        COO["narrative"] = updates["ai_briefing"]
 
     else:
         return None

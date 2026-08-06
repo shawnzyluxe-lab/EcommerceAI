@@ -466,6 +466,36 @@
         </div>
       </section>
 
+      <!-- ---------- Enterprise Operations ---------- -->
+      <section class="section" id="enterprise">
+        <div class="section-head">
+          <h2>Enterprise Operations</h2>
+          <p>Metered billing and live storefront catalog control.</p>
+          <span class="spacer"></span>
+          <button class="btn blue" onclick="document.getElementById('cmd').value='check billing'">Check billing</button>
+          <button class="btn" style="margin-left:8px" onclick="document.getElementById('cmd').value='update price to 159.50'">Update price</button>
+        </div>
+        <div class="grid g2">
+          <div class="card" style="border-left: 2px solid #6772E5; background: rgba(246, 249, 252, 0.65);">
+            <div class="card-head"><h3 style="color:#32325D;">Stripe SaaS Billing</h3></div>
+            <div class="line"><span class="k">Account Model</span><span class="v">{{ stripe.plan }}</span></div>
+            <div class="line"><span class="k">Metered Volume</span><span class="v" id="stripe-usage">{{ stripe.usage }} API Hits</span></div>
+            <div class="line" style="font-size: 14px; font-weight: 700; color: #32325D;"><span class="k">Accrued Invoice</span><span class="v" id="stripe-invoice">${{ '{:,.2f}'.format(stripe.invoice) }}</span></div>
+          </div>
+
+          <div class="card" style="border-left: 2px solid #5C6E88;">
+            <div class="card-head"><h3>Catalog Control</h3></div>
+            <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid rgba(0,0,0,0.04); padding-bottom:8px;">
+              <div>
+                <div style="font-weight:600; color:#1D2D44;">{{ catalog.title }}</div>
+                <div style="font-size:10px; color:#8A9BB2;">Variant: {{ catalog.sku }}</div>
+              </div>
+              <span id="hoodie-price" style="font-family:'JetBrains Mono'; font-weight:600; color:#1E6B3E;">${{ '{:,.2f}'.format(catalog.price) }}</span>
+            </div>
+          </div>
+        </div>
+      </section>
+
       <!-- ---------- Marketing Studio ---------- -->
       <section class="section" id="studio">
         <div class="section-head">
@@ -709,6 +739,12 @@ ws.onmessage = function(event) {
     if (analyticsContainer && data.updates.predictive_html) {
       analyticsContainer.innerHTML = data.updates.predictive_html;
     }
+    const stripeUsage = document.getElementById('stripe-usage');
+    const stripeInvoice = document.getElementById('stripe-invoice');
+    const hoodiePrice = document.getElementById('hoodie-price');
+    if (stripeUsage) stripeUsage.textContent = data.updates.stripe_usage + ' API Hits';
+    if (stripeInvoice) stripeInvoice.textContent = '$' + data.updates.stripe_invoice;
+    if (hoodiePrice) hoodiePrice.textContent = '$' + data.updates.hoodie_price;
     if (data.updates.trigger_download) {
       window.location.href = '/api/v1/download-report';
     }

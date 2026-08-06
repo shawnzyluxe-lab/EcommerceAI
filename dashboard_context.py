@@ -270,6 +270,18 @@ PREDICTIVE = [
     },
 ]
 
+STRIPE = {
+    "plan": "Enterprise AI Tier",
+    "usage": 4820,
+    "invoice": 241.00,
+}
+
+CATALOG = {
+    "title": "Shawnzyluxe Luxury Hoodie",
+    "sku": "SZL-VAR-A",
+    "price": 145.00,
+}
+
 # --------------------------------------------------------------------------
 # AI Automation Builder
 # --------------------------------------------------------------------------
@@ -391,6 +403,8 @@ def context():
         "support": SUPPORT,
         "mktg": MARKETING,
         "predictive": PREDICTIVE,
+        "stripe": STRIPE,
+        "catalog": CATALOG,
         "automations": AUTOMATIONS,
         "specialists": SPECIALISTS,
         "health": HEALTH,
