@@ -1,7 +1,7 @@
 import os
 import hmac
+import secrets
 import requests
-from datetime import timedelta
 from urllib.parse import urlencode
 from flask import Flask, render_template, request, redirect, url_for, session, flash
 from dotenv import load_dotenv
@@ -10,28 +10,27 @@ load_dotenv()
 
 app = Flask(__name__)
 app.secret_key = os.environ.get('SECRET_KEY', 'dev-secret-change-this')
-app.config.update(
-    SESSION_COOKIE_HTTPONLY=True,
-    SESSION_COOKIE_SAMESITE='Lax',
-    PERMANENT_SESSION_LIFETIME=timedelta(days=1),
-)
-app.config['SESSION_COOKIE_SECURE'] = os.environ.get('HTTPS', 'false').lower() == 'true'
 
 # ============================================================
-# SITE PASSWORD WALL (Aegis-style)
+# AEGIS-STYLE SITE PASSWORD WALL
 # ============================================================
 
 SITE_WALL_PASSWORD = "IfxSVNs4iAs"
+SESSION_COOKIE_NAME = "aegis_session_token"
+
+# In-memory active token ring. Server restart clears all sessions.
+active_sessions = set()
 
 
 def site_wall_enabled():
-    """The wall is enabled only when the env variable is set."""
+    """The wall is enabled only when a password is configured."""
     return bool(SITE_WALL_PASSWORD)
 
 
 def site_wall_authenticated():
-    """Check whether the browser has passed the password wall."""
-    return session.get("site_wall_authenticated") is True
+    """Check whether the browser has a valid server-side session token."""
+    token = request.cookies.get(SESSION_COOKIE_NAME)
+    return token is not None and token in active_sessions
 
 
 @app.before_request
@@ -144,17 +143,30 @@ def site_login():
     if request.method == 'POST':
         submitted = request.form.get('password', '')
         if hmac.compare_digest(submitted, SITE_WALL_PASSWORD):
-            session.permanent = True
-            session['site_wall_authenticated'] = True
-            return redirect(url_for('home'))
+            token = secrets.token_urlsafe(32)
+            active_sessions.add(token)
+            response = redirect(url_for('home'))
+            response.set_cookie(
+                SESSION_COOKIE_NAME,
+                token,
+                max_age=604800,
+                httponly=True,
+                samesite='Lax',
+                secure=True,
+            )
+            return response
         error = True
     return render_template('gate.html', error=error, shop_name='Shawnzy Luxe')
 
 
 @app.route('/site-logout')
 def site_logout():
-    session.pop('site_wall_authenticated', None)
-    return redirect(url_for('site_login'))
+    token = request.cookies.get(SESSION_COOKIE_NAME)
+    if token and token in active_sessions:
+        active_sessions.remove(token)
+    response = redirect(url_for('home'))
+    response.delete_cookie(SESSION_COOKIE_NAME)
+    return response
 
 
 @app.route('/login')
