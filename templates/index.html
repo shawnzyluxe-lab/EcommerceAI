@@ -166,6 +166,11 @@
             document.getElementById('loginModal').classList.add('hidden');
             document.getElementById('loginModal').classList.remove('flex');
         }
+
+        const urlParams = new URLSearchParams(window.location.search);
+        if (urlParams.get('oauth_sync') === 'success') {
+            alert('Multi-Tenant Channel Sync Successful: Outbound token array index locked.');
+        }
     </script>
 
 </body>

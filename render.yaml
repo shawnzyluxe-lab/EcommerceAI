@@ -39,3 +39,9 @@ services:
         sync: false
       - key: SHOPIFY_ACCESS_TOKEN
         sync: false
+      - key: SHOPIFY_CLIENT_ID
+        sync: false
+      - key: SHOPIFY_CLIENT_SECRET
+        sync: false
+      - key: OAUTH_REDIRECT_URI
+        value: https://shawnzyluxe.com

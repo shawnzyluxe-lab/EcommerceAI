@@ -114,6 +114,35 @@ class LocalProductCatalog(db.Model):
     inventory_quantity = db.Column(db.Integer)
 
 
+class MerchantProfile(db.Model):
+    __tablename__ = "merchant_profiles"
+    merchant_id = db.Column(db.String(100), primary_key=True)
+    business_name = db.Column(db.String(255))
+    admin_email = db.Column(db.String(255), unique=True)
+    password_hash = db.Column(db.String(255))
+    created_at = db.Column(db.DateTime, server_default=db.func.now())
+
+
+class TenantOAuthToken(db.Model):
+    __tablename__ = "tenant_oauth_tokens"
+    shop_domain = db.Column(db.String(255), primary_key=True)
+    merchant_id = db.Column(db.String(100), db.ForeignKey("merchant_profiles.merchant_id"))
+    platform_id = db.Column(db.String(50))
+    access_token_encrypted = db.Column(db.Text)
+    scope_permissions = db.Column(db.Text)
+    updated_at = db.Column(db.DateTime, server_default=db.func.now())
+
+
+class MerchantMetric(db.Model):
+    __tablename__ = "multi_tenant_metrics"
+    id = db.Column(db.Integer, primary_key=True, autoincrement=True)
+    merchant_id = db.Column(db.String(100), db.ForeignKey("merchant_profiles.merchant_id"))
+    total_unified_balance = db.Column(db.REAL)
+    true_net_profit = db.Column(db.REAL)
+    gross_revenue = db.Column(db.REAL)
+    ai_briefing = db.Column(db.Text)
+
+
 class PredictiveLogistics(db.Model):
     __tablename__ = "predictive_logistics"
     id = db.Column(db.Integer, primary_key=True, autoincrement=True)

@@ -198,6 +198,13 @@
               <button class="btn blue">Apply</button>
               <button class="btn">Skip</button>
             </div>
+            <div style="margin-top:15px;background:rgba(255,255,255,0.6);padding:12px;border-radius:14px;border:1px solid rgba(29,45,68,0.05);">
+              <div style="font-size:11px;text-transform:uppercase;color:#5C6E88;font-weight:600;margin-bottom:8px;">Link External Storefront</div>
+              <div style="display:flex;gap:8px;">
+                <input id="oauth-shop-input" type="text" placeholder="store.myshopify.com" style="width:100%;border:1px solid #D6E0EE;border-radius:8px;padding:6px 10px;font-size:12px;outline:none;background:#FFFFFF;" />
+                <button onclick="triggerOAuthConnection()" style="background:#1D2D44;color:#FFFFFF;border:none;border-radius:8px;padding:6px 14px;font-size:12px;font-weight:600;cursor:pointer;">Connect</button>
+              </div>
+            </div>
           </div>
 
           <div class="card">
@@ -774,6 +781,12 @@ input.addEventListener('keydown', e => { if(e.key === 'Enter') run(input.value);
 document.querySelectorAll('.js-chip').forEach(c =>
   c.addEventListener('click', () => run(c.textContent.trim()))
 );
+
+function triggerOAuthConnection() {
+  const shopDomain = document.getElementById('oauth-shop-input').value;
+  if (!shopDomain) return alert('Enter a valid myshopify.com URL string.');
+  window.location.href = '/api/v1/auth/shopify/connect?shop=' + encodeURIComponent(shopDomain);
+}
 </script>
 </body>
 </html>

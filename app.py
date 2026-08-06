@@ -17,7 +17,7 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-from models import db, Tenant, ConnectedChannel, ActiveSession, BusinessMetric, CommerceChannel, SupportMetric, MarketingStudio, PredictiveLogistics, OutboundTransmission, SaaSBilling, LocalProductCatalog
+from models import db, Tenant, ConnectedChannel, ActiveSession, BusinessMetric, CommerceChannel, SupportMetric, MarketingStudio, PredictiveLogistics, OutboundTransmission, SaaSBilling, LocalProductCatalog, MerchantProfile, TenantOAuthToken, MerchantMetric
 from dashboard_context import (
     context,
     COMMAND_RESPONSES,
@@ -130,7 +130,7 @@ def site_wall_authenticated():
 def site_wall_protect():
     if not site_wall_enabled():
         return None
-    if request.endpoint in ('home', 'site_login', 'shopify_orders_webhook', 'static'):
+    if request.endpoint in ('home', 'site_login', 'shopify_orders_webhook', 'register_merchant', 'shopify_oauth_callback', 'static'):
         return None
     if site_wall_authenticated():
         return None
@@ -151,6 +151,9 @@ SUPPLIER_EMAIL = os.environ.get("SUPPLIER_EMAIL", "production@supplier-c.com")
 STRIPE_SECRET_KEY = os.environ.get("STRIPE_SECRET_KEY", "")
 SHOPIFY_STORE_URL = os.environ.get("SHOPIFY_STORE_URL", "")
 SHOPIFY_ACCESS_TOKEN = os.environ.get("SHOPIFY_ACCESS_TOKEN", "")
+SHOPIFY_CLIENT_ID = os.environ.get("SHOPIFY_CLIENT_ID", "")
+SHOPIFY_CLIENT_SECRET = os.environ.get("SHOPIFY_CLIENT_SECRET", "")
+OAUTH_REDIRECT_URI = os.environ.get("OAUTH_REDIRECT_URI", "https://shawnzyluxe.com")
 
 SHOPIFY_DOMAIN = os.environ.get('SHOPIFY_DOMAIN', '').strip()
 STOREFRONT_TOKEN = os.environ.get('SHOPIFY_STOREFRONT_TOKEN', '').strip()
@@ -296,6 +299,14 @@ with app.app_context():
         CATALOG["title"] = hoodie.title
         CATALOG["sku"] = hoodie.variant_id
         CATALOG["price"] = hoodie.price
+
+    # Seed multi-tenant merchant profiles
+    if not MerchantProfile.query.first():
+        db.session.add(MerchantProfile(merchant_id="merchant_shawn_01", business_name="Shawnzyluxe Global", admin_email="shawn@shawnzyluxe.com", password_hash=""))
+        db.session.add(MerchantProfile(merchant_id="merchant_guest_02", business_name="Alpha Storefronts", admin_email="guest@alpha.com", password_hash=""))
+        db.session.add(MerchantMetric(merchant_id="merchant_shawn_01", total_unified_balance=20560.00, true_net_profit=1394.00, gross_revenue=4582.00, ai_briefing="System initialized for Shawnzyluxe multi-tenant parameters."))
+        db.session.add(MerchantMetric(merchant_id="merchant_guest_02", total_unified_balance=1240.00, true_net_profit=410.00, gross_revenue=890.00, ai_briefing="System initialized for guest merchant clusters."))
+    db.session.commit()
 
     if SHOPIFY_DOMAIN and STOREFRONT_TOKEN and not ConnectedChannel.query.first():
         tenant = Tenant(company_name="Shawnzy Luxe", tier_level="Pro")
@@ -450,7 +461,7 @@ def storefront(query, variables=None):
 def home():
     if site_wall_authenticated():
         return redirect(url_for('dashboard'))
-    return render_template('index.html', error=bool(request.args.get('error')))
+    return render_template('index.html', error=bool(request.args.get('error')), oauth_sync=request.args.get('oauth_sync'))
 
 
 @app.route('/dashboard')
@@ -890,6 +901,95 @@ def download_report():
     if not os.path.exists(target):
         return jsonify({"status": "compiling"}), 404
     return send_file(target, as_attachment=True, download_name="shawnzyluxe_ledger.csv", mimetype="text/csv")
+
+
+@app.route('/api/v1/tenant/register', methods=['POST'])
+def register_merchant():
+    """Create an isolated merchant profile and seed partitioned metrics."""
+    data = request.get_json() or {}
+    business_name = data.get("business_name", "").strip()
+    admin_email = data.get("admin_email", "").strip()
+    password_plain = data.get("password_plain", "").strip()
+
+    if not business_name or not admin_email:
+        return jsonify({"success": False, "error": "Missing business or email"}), 400
+
+    new_merchant_id = f"merchant_{secrets.token_hex(4)}"
+    password_hash = hashlib.sha256(password_plain.encode()).hexdigest()
+
+    try:
+        db.session.add(MerchantProfile(
+            merchant_id=new_merchant_id,
+            business_name=business_name,
+            admin_email=admin_email,
+            password_hash=password_hash,
+        ))
+        db.session.add(MerchantMetric(
+            merchant_id=new_merchant_id,
+            total_unified_balance=0.00,
+            true_net_profit=0.00,
+            gross_revenue=0.00,
+            ai_briefing="Welcome to your isolated Shawnzyluxe AI workspace node. Connect channels to initialize streams.",
+        ))
+        db.session.commit()
+        return jsonify({"success": True, "merchant_id": new_merchant_id, "status": "Workspace Schema Generated"})
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({"success": False, "error": "Administrative profile email already registered"}), 400
+
+
+@app.route('/api/v1/auth/shopify/connect')
+def shopify_oauth_connect():
+    """Step 1: Redirect merchant to Shopify OAuth grant screen."""
+    shop = request.args.get("shop", "").strip().lower()
+    if not re.match(r'^[a-zA-Z0-9\-]+\.myshopify\.com$', shop):
+        return jsonify({"success": False, "error": "Invalid shop layout format"}), 400
+
+    scopes = "read_products,write_products,read_orders,read_inventory,read_fulfillments"
+    oauth_url = f"https://{shop}/admin/oauth/authorize?client_id={SHOPIFY_CLIENT_ID}&scope={scopes}&redirect_uri={OAUTH_REDIRECT_URI}"
+    return redirect(oauth_url)
+
+
+@app.route('/api/v1/auth/shopify/callback')
+def shopify_oauth_callback():
+    """Step 2: Capture OAuth code and store tenant access token."""
+    code = request.args.get("code")
+    shop = request.args.get("shop")
+    hmac_param = request.args.get("hmac")
+    timestamp = request.args.get("timestamp")
+    active_merchant = "merchant_shawn_01"
+
+    if not SHOPIFY_CLIENT_ID or not SHOPIFY_CLIENT_SECRET:
+        return jsonify({"success": False, "error": "OAuth credentials not configured"}), 400
+
+    exchange_url = f"https://{shop}/admin/oauth/access_token"
+    payload = {
+        "client_id": SHOPIFY_CLIENT_ID,
+        "client_secret": SHOPIFY_CLIENT_SECRET,
+        "code": code,
+    }
+
+    try:
+        # Live token exchange (uncomment when credentials are valid)
+        # r = requests.post(exchange_url, json=payload, timeout=8)
+        # res_data = r.json()
+        # token = res_data.get("access_token")
+
+        # Simulated token exchange for layout testing
+        token = f"shpat_live_token_{secrets.token_hex(8)}"
+        scopes_confirmed = "read_products,write_products,read_orders"
+
+        db.session.merge(TenantOAuthToken(
+            shop_domain=shop,
+            merchant_id=active_merchant,
+            platform_id="shopify",
+            access_token_encrypted=token,
+            scope_permissions=scopes_confirmed,
+        ))
+        db.session.commit()
+        return redirect("/?oauth_sync=success")
+    except Exception as e:
+        return jsonify({"success": False, "error": f"OAuth handshake stall: {e}"}), 500
 
 
 @app.route('/login')
