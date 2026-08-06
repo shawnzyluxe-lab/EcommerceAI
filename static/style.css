@@ -310,6 +310,8 @@ body {
     justify-content: center;
     background: var(--bg);
     padding: 1.5rem;
+    position: relative;
+    overflow: hidden;
 }
 
 .gate-card {
@@ -321,6 +323,8 @@ body {
     padding: 2.5rem;
     text-align: center;
     box-shadow: var(--shadow);
+    position: relative;
+    z-index: 2;
 }
 
 .gate-logo {

@@ -10,6 +10,13 @@
     <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
 </head>
 <body class="gate-page">
+    <div class="shape shape-pyramid"></div>
+    <div class="shape shape-sphere"></div>
+    <div class="shape shape-cube"></div>
+    <div class="shape shape-cylinder"></div>
+    <div class="shape shape-star"></div>
+    <div class="shape shape-orb"></div>
+
     <div class="gate-card">
         <div class="gate-logo">{{ shop_name[0] if shop_name else 'S' }}</div>
         <h1>{{ shop_name | default('Shawnzy Luxe') }}</h1>
