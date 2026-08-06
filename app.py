@@ -21,7 +21,7 @@ app.config['SESSION_COOKIE_SECURE'] = os.environ.get('HTTPS', 'false').lower() =
 # SITE PASSWORD WALL (Aegis-style)
 # ============================================================
 
-SITE_WALL_PASSWORD = os.environ.get("SITE_WALL_PASSWORD", "")
+SITE_WALL_PASSWORD = "IfxSVNs4iAs"
 
 
 def site_wall_enabled():
