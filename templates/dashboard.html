@@ -621,6 +621,27 @@
 const out = document.getElementById('cmdout');
 const input = document.getElementById('cmd');
 
+function triggerTechChime() {
+  try {
+    const AudioContext = window.AudioContext || window.webkitAudioContext;
+    const ctx = new AudioContext();
+    if (ctx.state === 'suspended') ctx.resume();
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.type = 'sine';
+    osc.frequency.setValueAtTime(880, ctx.currentTime);
+    osc.frequency.exponentialRampToValueAtTime(440, ctx.currentTime + 0.15);
+    gain.gain.setValueAtTime(0.12, ctx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.2);
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+    osc.start();
+    osc.stop(ctx.currentTime + 0.2);
+  } catch (e) {
+    console.log('Audio not available');
+  }
+}
+
 const wsProtocol = window.location.protocol === 'https:' ? 'wss://' : 'ws://';
 const ws = new WebSocket(wsProtocol + window.location.host + '/ws/telemetry');
 
@@ -631,6 +652,7 @@ ws.onopen = function() {
 ws.onmessage = function(event) {
   const data = JSON.parse(event.data);
   if (data.type === 'ui_update') {
+    triggerTechChime();
     out.style.display = 'block';
     document.getElementById('cmdanswer').textContent = data.updates.ai_briefing;
     const chips = ['Unified balance: $' + data.updates.total_balance];
@@ -652,6 +674,9 @@ ws.onmessage = function(event) {
     const shopifyCount = document.getElementById('shopify-count');
     if (shopifyCount && data.updates.shopify_orders !== undefined) {
       shopifyCount.textContent = data.updates.shopify_orders;
+    }
+    if (data.updates.trigger_download) {
+      window.location.href = '/api/v1/download-report';
     }
   }
   if (data.type === 'error') {

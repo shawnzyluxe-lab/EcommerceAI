@@ -8,7 +8,7 @@ import secrets
 import requests
 from datetime import datetime, timedelta
 from urllib.parse import urlencode
-from flask import Flask, render_template, request, redirect, url_for, session, flash, jsonify
+from flask import Flask, render_template, request, redirect, url_for, session, flash, jsonify, send_file
 from flask_sock import Sock
 from dotenv import load_dotenv
 
@@ -57,6 +57,9 @@ app.config["SQLALCHEMY_DATABASE_URI"] = os.environ.get(
     "DATABASE_URL", "sqlite:///shawnzyluxe.db"
 )
 app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
+
+GENERATED_DIR = "generated"
+os.makedirs(GENERATED_DIR, exist_ok=True)
 
 db.init_app(app)
 sock = Sock(app)
@@ -297,6 +300,7 @@ def process_command(cmd_text):
         "ai_briefing": DASHBOARD_STATE["ai_briefing"],
         "total_balance": f"{DASHBOARD_STATE['total_unified_balance']:.2f}",
         "clear_orders": False,
+        "trigger_download": False,
         "support_chats": DASHBOARD_STATE["support_chats"],
         "support_sentiment": DASHBOARD_STATE["support_sentiment"],
         "support_resolution": DASHBOARD_STATE["support_resolution"],
@@ -357,6 +361,16 @@ def process_command(cmd_text):
         updates["ai_briefing"] = "⚠️ Urgency Intercept: Flagged 1 ticket displaying frustration on Shopify. Redirected context to manual agent queue."
         DASHBOARD_STATE["ai_briefing"] = updates["ai_briefing"]
         COO["narrative"] = updates["ai_briefing"]
+
+    elif re.search(r'(export report|download excel|generate ledger|report)', cmd_text):
+        target_csv = os.path.join(GENERATED_DIR, "shawnzyluxe_ledger.csv")
+        with open(target_csv, "w") as f:
+            f.write("Platform Ticker Metric ID,Unified Aggregated Liquidity,True Net Margins,Gross E-Commerce Returns\n")
+            f.write(f"SHAWNZYLUXE_CORE_V1,{DASHBOARD_STATE['total_unified_balance']:.2f},{DASHBOARD_STATE['true_net_profit']:.2f},{DASHBOARD_STATE['gross_revenue']:.2f}\n")
+        updates["ai_briefing"] = "📊 Financial Compiler: Generated 'shawnzyluxe_ledger.csv' into server files. Download starting automatically."
+        DASHBOARD_STATE["ai_briefing"] = updates["ai_briefing"]
+        COO["narrative"] = updates["ai_briefing"]
+        updates["trigger_download"] = True
 
     else:
         return None
@@ -580,6 +594,15 @@ def shopify_orders_webhook():
     manager.broadcast({"type": "ui_update", "updates": updates})
 
     return jsonify({"status": "synchronized", "amount": order_value})
+
+
+@app.route('/api/v1/download-report')
+def download_report():
+    """Serve the generated CSV ledger to authenticated admins."""
+    target = os.path.join(GENERATED_DIR, "shawnzyluxe_ledger.csv")
+    if not os.path.exists(target):
+        return jsonify({"status": "compiling"}), 404
+    return send_file(target, as_attachment=True, download_name="shawnzyluxe_ledger.csv", mimetype="text/csv")
 
 
 @app.route('/login')
