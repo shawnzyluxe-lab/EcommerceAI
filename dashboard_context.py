@@ -247,6 +247,12 @@ SUPPORT = {
     ],
 }
 
+MARKETING = {
+    "campaign": "Summer Clearance Blast",
+    "status": "Idle",
+    "copy": "Awaiting generation trigger query text...",
+}
+
 # --------------------------------------------------------------------------
 # AI Automation Builder
 # --------------------------------------------------------------------------
@@ -366,6 +372,7 @@ def context():
         "suppliers": SUPPLIERS,
         "studio": STUDIO,
         "support": SUPPORT,
+        "mktg": MARKETING,
         "automations": AUTOMATIONS,
         "specialists": SPECIALISTS,
         "health": HEALTH,

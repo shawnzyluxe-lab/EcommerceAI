@@ -73,3 +73,13 @@ class SupportMetric(db.Model):
     sentiment_score = db.Column(db.String(100))
     recent_resolution = db.Column(db.Text)
     created_at = db.Column(db.DateTime, server_default=db.func.now())
+
+
+class MarketingStudio(db.Model):
+    __tablename__ = "marketing_studio"
+    id = db.Column(db.Integer, primary_key=True, autoincrement=True)
+    active_campaign = db.Column(db.String(255))
+    generation_status = db.Column(db.String(100))
+    platform_target = db.Column(db.String(100))
+    copy_preview = db.Column(db.Text)
+    created_at = db.Column(db.DateTime, server_default=db.func.now())

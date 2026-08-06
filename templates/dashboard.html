@@ -164,7 +164,7 @@
               <span class="tag {{ 'green' if c.state == 'connected' else 'ghost' }}">{{ 'Live' if c.state == 'connected' else 'Connect' }}</span>
             </div>
             {% if c.state == 'connected' %}
-            <div class="meta">{{ c.orders }} orders · ${{ '{:,.0f}'.format(c.revenue) }}</div>
+            <div class="meta"><span {% if 'shopify' in c.name.lower() %}id="shopify-count"{% endif %}>{{ c.orders }}</span> orders · ${{ '{:,.0f}'.format(c.revenue) }}</div>
             <div class="meta">Synced {{ c.sync }}</div>
             {% else %}
             <div class="meta">No credentials saved</div>
@@ -453,6 +453,14 @@
           </div>
           {% endfor %}
         </div>
+        <div class="card" style="margin-top:18px">
+          <div class="card-head">
+            <h3>Campaign Telemetry</h3>
+          </div>
+          <div class="line"><span class="k">Active</span><span class="v" id="mktg-campaign">{{ mktg.campaign }}</span></div>
+          <div class="line"><span class="k">Status</span><span class="v" id="mktg-status">{{ mktg.status }}</span></div>
+          <div class="hint" id="mktg-copy" style="margin-top:8px">{{ mktg.copy }}</div>
+        </div>
       </section>
 
       <!-- ---------- Support + Automations ---------- -->
@@ -635,6 +643,16 @@ ws.onmessage = function(event) {
     if (chats) chats.textContent = data.updates.support_chats;
     if (sentiment) sentiment.textContent = data.updates.support_sentiment;
     if (resolution) resolution.textContent = data.updates.support_resolution;
+    const mktgCamp = document.getElementById('mktg-campaign');
+    const mktgStatus = document.getElementById('mktg-status');
+    const mktgCopy = document.getElementById('mktg-copy');
+    if (mktgCamp) mktgCamp.textContent = data.updates.mktg_campaign;
+    if (mktgStatus) mktgStatus.textContent = data.updates.mktg_status;
+    if (mktgCopy) mktgCopy.textContent = data.updates.mktg_copy;
+    const shopifyCount = document.getElementById('shopify-count');
+    if (shopifyCount && data.updates.shopify_orders !== undefined) {
+      shopifyCount.textContent = data.updates.shopify_orders;
+    }
   }
   if (data.type === 'error') {
     out.style.display = 'block';

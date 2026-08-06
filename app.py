@@ -1,6 +1,8 @@
 import os
 import re
 import hmac
+import hashlib
+import base64
 import json
 import secrets
 import requests
@@ -12,7 +14,7 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-from models import db, Tenant, ConnectedChannel, ActiveSession, BusinessMetric, CommerceChannel, SupportMetric
+from models import db, Tenant, ConnectedChannel, ActiveSession, BusinessMetric, CommerceChannel, SupportMetric, MarketingStudio
 from dashboard_context import (
     context,
     COMMAND_RESPONSES,
@@ -22,6 +24,7 @@ from dashboard_context import (
     COO,
     CHANNELS,
     SUPPORT,
+    MARKETING,
 )
 
 # Dynamic state for AI command engine
@@ -43,6 +46,9 @@ DASHBOARD_STATE = {
     "support_chats": 3,
     "support_sentiment": "94% Positive",
     "support_resolution": "Order #1204 tracking corrected autonomously.",
+    "mktg_campaign": "Summer Clearance Blast",
+    "mktg_status": "Idle",
+    "mktg_copy": "Awaiting generation trigger query text...",
 }
 
 app = Flask(__name__)
@@ -193,6 +199,23 @@ with app.app_context():
         SUPPORT["sentiment"] = latest_support.sentiment_score
         SUPPORT["resolution"] = latest_support.recent_resolution
 
+    # Seed or restore marketing studio
+    if not MarketingStudio.query.first():
+        db.session.add(MarketingStudio(
+            active_campaign=DASHBOARD_STATE["mktg_campaign"],
+            generation_status=DASHBOARD_STATE["mktg_status"],
+            platform_target="Shopify / SMS",
+            copy_preview=DASHBOARD_STATE["mktg_copy"],
+        ))
+    latest_mktg = MarketingStudio.query.order_by(MarketingStudio.id.desc()).first()
+    if latest_mktg:
+        DASHBOARD_STATE["mktg_campaign"] = latest_mktg.active_campaign
+        DASHBOARD_STATE["mktg_status"] = latest_mktg.generation_status
+        DASHBOARD_STATE["mktg_copy"] = latest_mktg.copy_preview
+        MARKETING["campaign"] = latest_mktg.active_campaign
+        MARKETING["status"] = latest_mktg.generation_status
+        MARKETING["copy"] = latest_mktg.copy_preview
+
     db.session.commit()
 
     if SHOPIFY_DOMAIN and STOREFRONT_TOKEN and not ConnectedChannel.query.first():
@@ -277,6 +300,9 @@ def process_command(cmd_text):
         "support_chats": DASHBOARD_STATE["support_chats"],
         "support_sentiment": DASHBOARD_STATE["support_sentiment"],
         "support_resolution": DASHBOARD_STATE["support_resolution"],
+        "mktg_campaign": DASHBOARD_STATE["mktg_campaign"],
+        "mktg_status": DASHBOARD_STATE["mktg_status"],
+        "mktg_copy": DASHBOARD_STATE["mktg_copy"],
     }
 
     if re.search(r'(why are sales down|sales down|analyze drops)', cmd_text):
@@ -289,11 +315,17 @@ def process_command(cmd_text):
         DASHBOARD_STATE["ai_briefing"] = updates["ai_briefing"]
         COO["narrative"] = updates["ai_briefing"]
 
-    elif re.search(r'(create discount|discount campaign|promo code)', cmd_text):
+    elif re.search(r'(create discount|discount campaign|promo code|marketing)', cmd_text):
         DASHBOARD_STATE["total_unified_balance"] += 1200.00
         BRIEFING["revenue"] += 1200.00
+        DASHBOARD_STATE["mktg_campaign"] = "ECOM_AI_15 Active"
+        DASHBOARD_STATE["mktg_status"] = "Generated"
+        DASHBOARD_STATE["mktg_copy"] = "SMS Blast queued: 'Hey! AI automation selected you for a 15% discount code on Shawnzyluxe today. Use ECOM_AI_15 at checkout!'"
         updates["total_balance"] = f"{DASHBOARD_STATE['total_unified_balance']:.2f}"
-        updates["ai_briefing"] = "✨ Automation Triggered: Generated 15% discount structure 'ECOM_AI_15'. Successfully pushed live to Shopify and TikTok Shop API channels."
+        updates["mktg_campaign"] = DASHBOARD_STATE["mktg_campaign"]
+        updates["mktg_status"] = DASHBOARD_STATE["mktg_status"]
+        updates["mktg_copy"] = DASHBOARD_STATE["mktg_copy"]
+        updates["ai_briefing"] = "✨ Marketing Studio Action: Successfully injected dynamic promo script vectors live into connected channel API pipelines."
         DASHBOARD_STATE["ai_briefing"] = updates["ai_briefing"]
         COO["narrative"] = updates["ai_briefing"]
 
@@ -348,6 +380,21 @@ def process_command(cmd_text):
     SUPPORT["chats"] = DASHBOARD_STATE["support_chats"]
     SUPPORT["sentiment"] = DASHBOARD_STATE["support_sentiment"]
     SUPPORT["resolution"] = DASHBOARD_STATE["support_resolution"]
+    db.session.add(MarketingStudio(
+        active_campaign=DASHBOARD_STATE["mktg_campaign"],
+        generation_status=DASHBOARD_STATE["mktg_status"],
+        platform_target="Shopify / SMS",
+        copy_preview=DASHBOARD_STATE["mktg_copy"],
+    ))
+    MARKETING["campaign"] = DASHBOARD_STATE["mktg_campaign"]
+    MARKETING["status"] = DASHBOARD_STATE["mktg_status"]
+    MARKETING["copy"] = DASHBOARD_STATE["mktg_copy"]
+
+    shopify = CommerceChannel.query.get("shopify")
+    updates["shopify_orders"] = shopify.pending_orders if shopify else 0
+    updates["mktg_campaign"] = DASHBOARD_STATE["mktg_campaign"]
+    updates["mktg_status"] = DASHBOARD_STATE["mktg_status"]
+    updates["mktg_copy"] = DASHBOARD_STATE["mktg_copy"]
     db.session.commit()
 
     return updates
@@ -451,6 +498,88 @@ def site_logout():
     response = redirect(url_for('home'))
     response.delete_cookie(SESSION_COOKIE_NAME)
     return response
+
+
+SHOPIFY_WEBHOOK_SECRET = os.environ.get("SHOPIFY_WEBHOOK_SECRET", "").strip().encode()
+
+
+@app.route('/api/v1/webhooks/shopify-orders', methods=['POST'])
+def shopify_orders_webhook():
+    """Ingest live Shopify order webhooks, verify HMAC, mutate state, broadcast."""
+    raw_body = request.data
+    hmac_header = request.headers.get("X-Shopify-Hmac-SHA256")
+
+    if SHOPIFY_WEBHOOK_SECRET:
+        if not hmac_header:
+            return jsonify({"status": "rejected", "reason": "Missing HMAC"}), 401
+        computed = hmac.new(SHOPIFY_WEBHOOK_SECRET, raw_body, hashlib.sha256).digest()
+        if not hmac.compare_digest(computed, base64.b64decode(hmac_header)):
+            return jsonify({"status": "rejected", "reason": "Invalid HMAC"}), 401
+    else:
+        print("SHOPIFY_WEBHOOK_SECRET not set — accepting webhook without HMAC verification")
+
+    try:
+        payload = json.loads(raw_body.decode("utf-8"))
+    except Exception:
+        return jsonify({"status": "rejected", "reason": "Invalid JSON"}), 400
+
+    order_value = float(payload.get("total_price", 0.00))
+
+    latest = BusinessMetric.query.order_by(BusinessMetric.id.desc()).first()
+    if not latest:
+        return jsonify({"status": "rejected", "reason": "No baseline metrics"}), 400
+
+    new_bal = latest.total_unified_balance + order_value
+    new_gross = latest.gross_revenue + order_value
+    new_profit = latest.true_net_profit + (order_value * 0.42)
+    new_briefing = f"⚡ Live Webhook: Shopify order received for ${order_value:.2f}. Database updated automatically."
+
+    shopify = CommerceChannel.query.get("shopify")
+    if shopify:
+        shopify.pending_orders += 1
+        DASHBOARD_STATE["channels"]["shopify"]["pending_orders"] = shopify.pending_orders
+        for c in CHANNELS:
+            if "shopify" in c["name"].lower():
+                c["orders"] = shopify.pending_orders
+
+    db.session.add(BusinessMetric(
+        total_unified_balance=new_bal,
+        true_net_profit=new_profit,
+        gross_revenue=new_gross,
+        ai_briefing=new_briefing,
+    ))
+    db.session.commit()
+
+    DASHBOARD_STATE["total_unified_balance"] = new_bal
+    DASHBOARD_STATE["true_net_profit"] = new_profit
+    DASHBOARD_STATE["gross_revenue"] = new_gross
+    DASHBOARD_STATE["ai_briefing"] = new_briefing
+    COO["narrative"] = new_briefing
+    BRIEFING["revenue"] = new_gross
+
+    support = SupportMetric.query.order_by(SupportMetric.id.desc()).first()
+    mktg = MarketingStudio.query.order_by(MarketingStudio.id.desc()).first()
+    s_chats = support.active_chats if support else DASHBOARD_STATE["support_chats"]
+    s_sentiment = support.sentiment_score if support else DASHBOARD_STATE["support_sentiment"]
+    s_resolution = support.recent_resolution if support else DASHBOARD_STATE["support_resolution"]
+    m_camp = mktg.active_campaign if mktg else DASHBOARD_STATE["mktg_campaign"]
+    m_status = mktg.generation_status if mktg else DASHBOARD_STATE["mktg_status"]
+    m_copy = mktg.copy_preview if mktg else DASHBOARD_STATE["mktg_copy"]
+
+    updates = {
+        "ai_briefing": new_briefing,
+        "total_balance": f"{new_bal:.2f}",
+        "shopify_orders": shopify.pending_orders if shopify else 0,
+        "support_chats": s_chats,
+        "support_sentiment": s_sentiment,
+        "support_resolution": s_resolution,
+        "mktg_campaign": m_camp,
+        "mktg_status": m_status,
+        "mktg_copy": m_copy,
+    }
+    manager.broadcast({"type": "ui_update", "updates": updates})
+
+    return jsonify({"status": "synchronized", "amount": order_value})
 
 
 @app.route('/login')

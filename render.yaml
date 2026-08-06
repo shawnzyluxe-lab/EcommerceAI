@@ -19,3 +19,5 @@ services:
         generateValue: true
       - key: DATABASE_URL
         sync: false
+      - key: SHOPIFY_WEBHOOK_SECRET
+        sync: false
