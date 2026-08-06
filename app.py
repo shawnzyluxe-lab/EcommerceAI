@@ -24,7 +24,7 @@ logging.basicConfig(
 )
 logger = logging.getLogger("shawnzyluxe_core")
 from urllib.parse import urlencode
-from flask import Flask, render_template, request, redirect, url_for, session, flash, jsonify, send_file
+from flask import Flask, render_template, request, redirect, url_for, session, flash, jsonify, send_file, make_response
 from flask_sock import Sock
 from dotenv import load_dotenv
 
@@ -1959,7 +1959,7 @@ def magic_login():
         return redirect("/?error=profile_missing")
 
     session_token = secrets.token_urlsafe(32)
-    active = ActiveSession(token=session_token, merchant_id=profile.merchant_id, created_at=datetime.now())
+    active = ActiveSession(token=session_token, merchant_id=profile.merchant_id, created_at=datetime.utcnow())
     db.session.add(active)
     db.session.commit()
 
