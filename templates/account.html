@@ -1,0 +1,10 @@
+{% extends 'base.html' %}
+{% block title %}My Account - Shawnzy Luxe{% endblock %}
+{% block content %}
+<section class="auth-page">
+    <h1>My Account</h1>
+    <p>Welcome back. Your orders, saved items, and AI insights will appear here.</p>
+    <pre>{{ customer | tojson(indent=2) if customer else 'Not connected to customer data yet.' }}</pre>
+    <a class="btn-primary" href="{{ url_for('logout') }}">Log Out</a>
+</section>
+{% endblock %}

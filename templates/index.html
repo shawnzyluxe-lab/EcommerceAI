@@ -1,0 +1,36 @@
+{% extends 'base.html' %}
+{% block title %}Shawnzy Luxe{% endblock %}
+{% block content %}
+<section class="hero">
+    <h1>{{ shop_name }}</h1>
+    <p>The machine that sells for you.</p>
+</section>
+
+<section class="products">
+    {% if products %}
+        <div class="product-grid">
+            {% for edge in products %}
+                {% set p = edge.node %}
+                <div class="product-card">
+                    {% if p.images and p.images.edges %}
+                        <img src="{{ p.images.edges[0].node.url }}" alt="{{ p.title }}">
+                    {% else %}
+                        <div class="product-image-placeholder"></div>
+                    {% endif %}
+                    <h3>{{ p.title }}</h3>
+                    <p class="price">
+                        {{ p.priceRange.minVariantPrice.amount }}
+                        {{ p.priceRange.minVariantPrice.currencyCode }}
+                    </p>
+                    <p class="description">{{ p.description | default('') | truncate(100) }}</p>
+                </div>
+            {% endfor %}
+        </div>
+    {% else %}
+        <div class="notice">
+            <p>Products will load here once Shopify credentials are added to <code>.env</code>.</p>
+            <a href="{{ url_for('login') }}">Customer Login</a>
+        </div>
+    {% endif %}
+</section>
+{% endblock %}

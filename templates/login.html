@@ -1,0 +1,27 @@
+{% extends 'base.html' %}
+{% block title %}Login - Shawnzy Luxe{% endblock %}
+{% block content %}
+<section class="auth-page">
+    <h1>Customer Login</h1>
+    <p>Sign in to view orders, save favorites, and access your account.</p>
+
+    {% if domain %}
+        <a class="btn-primary" href="https://{{ domain }}/account">
+            Sign in with Shopify
+        </a>
+    {% else %}
+        <p class="notice">Add your <code>SHOPIFY_DOMAIN</code> to <code>.env</code> to enable login.</p>
+    {% endif %}
+
+    <form class="login-form" method="post" action="#">
+        <input type="email" name="email" placeholder="Email" disabled>
+        <input type="password" name="password" placeholder="Password" disabled>
+        <button type="submit" disabled>Sign In</button>
+    </form>
+
+    <p class="small">
+        Full headless customer login (Customer Account API) is scaffolded in
+        <code>app.py</code> and wired once Shopify OAuth credentials are added.
+    </p>
+</section>
+{% endblock %}

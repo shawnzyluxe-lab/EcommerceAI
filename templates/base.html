@@ -1,0 +1,25 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}Shawnzy Luxe{% endblock %}</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+    <nav class="navbar">
+        <a class="logo" href="{{ url_for('home') }}">SHAWNZY LUXE</a>
+        <div class="nav-links">
+            <a href="{{ url_for('home') }}">Shop</a>
+            <a href="{{ url_for('login') }}">Login</a>
+            <a href="{{ url_for('account') }}">Account</a>
+        </div>
+    </nav>
+    <main>
+        {% block content %}{% endblock %}
+    </main>
+    <footer class="footer">
+        <p>&copy; {{ shop_name | default('Shawnzy Luxe') }}</p>
+    </footer>
+</body>
+</html>
