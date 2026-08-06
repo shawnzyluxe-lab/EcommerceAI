@@ -6,6 +6,9 @@ import base64
 import json
 import secrets
 import requests
+import smtplib
+from email.mime.text import MIMEText
+from email.mime.multipart import MIMEMultipart
 from datetime import datetime, timedelta
 from urllib.parse import urlencode
 from flask import Flask, render_template, request, redirect, url_for, session, flash, jsonify, send_file
@@ -14,7 +17,7 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-from models import db, Tenant, ConnectedChannel, ActiveSession, BusinessMetric, CommerceChannel, SupportMetric, MarketingStudio, PredictiveLogistics
+from models import db, Tenant, ConnectedChannel, ActiveSession, BusinessMetric, CommerceChannel, SupportMetric, MarketingStudio, PredictiveLogistics, OutboundTransmission
 from dashboard_context import (
     context,
     COMMAND_RESPONSES,
@@ -132,6 +135,13 @@ def site_wall_protect():
 # ============================================================
 # END SITE PASSWORD WALL
 # ============================================================
+
+SMTP_SERVER = os.environ.get("SMTP_SERVER", "smtp.mailgun.org")
+SMTP_PORT = int(os.environ.get("SMTP_PORT", "587"))
+SMTP_USERNAME = os.environ.get("SMTP_USERNAME", "")
+SMTP_PASSWORD = os.environ.get("SMTP_PASSWORD", "")
+MERCHANT_EMAIL = os.environ.get("MERCHANT_EMAIL", "shawn@shawnzyluxe.com")
+SUPPLIER_EMAIL = os.environ.get("SUPPLIER_EMAIL", "production@supplier-c.com")
 
 SHOPIFY_DOMAIN = os.environ.get('SHOPIFY_DOMAIN', '').strip()
 STOREFRONT_TOKEN = os.environ.get('SHOPIFY_STOREFRONT_TOKEN', '').strip()
@@ -253,6 +263,77 @@ with app.app_context():
         db.session.commit()
 
 
+def log_transmission(t_type, recipient, status, summary):
+    db.session.add(OutboundTransmission(
+        transmission_type=t_type,
+        recipient_address=recipient,
+        status_chip=status,
+        payload_summary=summary,
+    ))
+
+
+def dispatch_external_email(recipient, subject, html_body):
+    """Send transactional email via configured SMTP; log result to outbound_transmissions."""
+    if not SMTP_USERNAME or not SMTP_PASSWORD:
+        log_transmission("EMAIL_BLAST", recipient, "NO_CREDENTIALS", "SMTP username or password not configured")
+        return False
+    try:
+        msg = MIMEMultipart("alternative")
+        msg["Subject"] = subject
+        msg["From"] = f"Shawnzyluxe AI <{SMTP_USERNAME}>"
+        msg["To"] = recipient
+        msg.attach(MIMEText(html_body, "html"))
+
+        with smtplib.SMTP(SMTP_SERVER, SMTP_PORT) as server:
+            server.starttls()
+            server.login(SMTP_USERNAME, SMTP_PASSWORD)
+            server.sendmail(SMTP_USERNAME, recipient, msg.as_string())
+
+        log_transmission("EMAIL_BLAST", recipient, "DELIVERED", f"Subject: {subject}")
+        return True
+    except Exception as e:
+        log_transmission("EMAIL_BLAST", recipient, "FAILED_ROUTING", str(e))
+        return False
+
+
+def generate_and_send_supplier_po(sku, units_required):
+    """Compile a PO file, save it, email it to the supplier, and log the transmission."""
+    po_number = f"PO-SZL-{secrets.token_hex(4).upper()}"
+    filename = f"{po_number}_ledger.txt"
+    target_path = os.path.join(GENERATED_DIR, filename)
+
+    po_content = f"""==================================================
+SHAWNZYLUXE LOGISTICS OPERATIONS CENTER
+OFFICIAL PURCHASE ORDER RECORD SHEET
+==================================================
+PO REFERENCE: {po_number}
+TIMESTAMP   : {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}
+STATUS      : AUTOMATED_REORDER_TRIGGER
+
+SUPPLIER TARGET NODE : Supplier C Network
+DELIVERY DESTINATION : Main Hub Warehouse Alpha
+
+ORDER SPECIFICATIONS:
+--------------------------------------------------
+ITEM SKU       | QUANTITY ORDERED | COMPLIANCE
+{sku:<14} | {units_required:<16} | COMPLIANT
+--------------------------------------------------
+
+AUTHORIZATION STAMP: SHAWNZYLUXE AI OPERATIONS ENGINE
+=================================================="""
+
+    with open(target_path, "w") as f:
+        f.write(po_content)
+
+    email_body = f"""<h3>Shawnzyluxe Automated Restock Execution</h3>
+<p>Please find the urgent automated purchase request document <b>{po_number}</b>.</p>
+<pre style='background:#F4F6F9; padding:15px; border-radius:8px;'>{po_content}</pre>"""
+    dispatch_external_email(SUPPLIER_EMAIL, f"URGENT: Automated Reorder Request {po_number}", email_body)
+    log_transmission("SUPPLIER_PO", SUPPLIER_EMAIL, "TRANSMITTED", f"PO file {po_number} compiled and emailed.")
+
+    return po_number
+
+
 def storefront(query, variables=None):
     if not GRAPHQL_URL or not STOREFRONT_TOKEN:
         return {}
@@ -338,12 +419,30 @@ def process_command(cmd_text):
 
     elif re.search(r'(generate marketing copy|write copy|email blast|create campaign)', cmd_text):
         DASHBOARD_STATE["mktg_campaign"] = "Autumn Launch Preview"
-        DASHBOARD_STATE["mktg_status"] = "Deployed"
-        DASHBOARD_STATE["mktg_copy"] = "Email Blast Transmitted: 'The next chapter of style drops soon. Shawnzyluxe Members secure early operational access. Tap to unlock your portal container link now.'"
+        DASHBOARD_STATE["mktg_status"] = "Sending API..."
+        DASHBOARD_STATE["mktg_copy"] = "Email Blast queued via SendGrid/Mailgun API channels."
         updates["mktg_campaign"] = DASHBOARD_STATE["mktg_campaign"]
         updates["mktg_status"] = DASHBOARD_STATE["mktg_status"]
         updates["mktg_copy"] = DASHBOARD_STATE["mktg_copy"]
-        updates["ai_briefing"] = "🚀 Creative Studio Execution: Compiled localized brand content structures and transmitted live email layouts to 4,200 connected profiles."
+
+        html_campaign_body = """<div style='font-family:sans-serif; max-width:600px; margin:0 auto; padding:20px; border:1px solid #EAEAEA;'>
+  <h2 style='color:#1D2D44;'>The Autumn Collection Preview</h2>
+  <p>Shawnzyluxe early operational configuration profiles are now open. Secure early access to your platform allocation containers link now.</p>
+  <hr style='border:none; border-top:1px solid #EEEEEE;'/>
+  <p style='font-size:11px; color:#999999;'>Sent via Shawnzyluxe Automated Marketing Engine Hub.</p>
+</div>"""
+        api_success = dispatch_external_email("subscribers-list@shawnzyluxe.com", "The Next Chapter: Shawnzyluxe Autumn Preview", html_campaign_body)
+
+        if api_success:
+            DASHBOARD_STATE["mktg_status"] = "Deployed"
+            DASHBOARD_STATE["mktg_copy"] = "Email Blast Transmitted: 'The next chapter of style drops soon. Shawnzyluxe Members secure early operational access. Tap to unlock your portal container link now.'"
+            updates["ai_briefing"] = "🚀 Creative Studio Success: Compiled localized campaign arrays and successfully transmitted emails via production gateway."
+        else:
+            DASHBOARD_STATE["mktg_status"] = "API_Error"
+            DASHBOARD_STATE["mktg_copy"] = "⚠️ Outbound SMTP campaign failed connection sync. Check error logs."
+            updates["ai_briefing"] = "⚠️ Gateway Warning: Outbound SMTP marketing campaign failed. Verify SMTP credentials."
+        updates["mktg_status"] = DASHBOARD_STATE["mktg_status"]
+        updates["mktg_copy"] = DASHBOARD_STATE["mktg_copy"]
         DASHBOARD_STATE["ai_briefing"] = updates["ai_briefing"]
         COO["narrative"] = updates["ai_briefing"]
 
@@ -364,9 +463,11 @@ def process_command(cmd_text):
     elif re.search(r'(evaluate shortages|predict supply|inventory forecast|shortages)', cmd_text):
         p_row = PredictiveLogistics.query.filter_by(variant_sku="SZL-VAR-B").first()
         if p_row:
-            p_row.days_remaining = 3
-            p_row.optimal_restock_date = "2026-08-09"
-            p_row.status_flag = "CRITICAL_STOCKOUT"
+            po_ref = generate_and_send_supplier_po(p_row.variant_sku, 450)
+            p_row.days_remaining = 30
+            p_row.status_flag = "REORDERED"
+        else:
+            po_ref = None
         rows = PredictiveLogistics.query.order_by(PredictiveLogistics.days_remaining.asc()).all()
         updates["predictive_html"] = "".join([
             f"""<div style='border-bottom: 1px solid rgba(126,61,0,0.1); padding-bottom: 8px;'>
@@ -379,7 +480,10 @@ def process_command(cmd_text):
   </div>
 </div>""" for r in rows
         ])
-        updates["ai_briefing"] = "🔮 Predictive Model Executed: Velocity analysis maps high risk on SKU 'SZL-VAR-B' within 96 hours. Generated automated supplier batch PO orders."
+        if po_ref:
+            updates["ai_briefing"] = f"🔮 Logistics Engine Execution: Compiled asset request sheet <b>{po_ref}</b> and dispatched file data arrays to <b>{SUPPLIER_EMAIL}</b>."
+        else:
+            updates["ai_briefing"] = "🔮 Logistics Engine Analysis: All connected inventory levels track healthy within safe structural parameters."
         DASHBOARD_STATE["ai_briefing"] = updates["ai_briefing"]
         COO["narrative"] = updates["ai_briefing"]
 

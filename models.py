@@ -85,6 +85,16 @@ class MarketingStudio(db.Model):
     created_at = db.Column(db.DateTime, server_default=db.func.now())
 
 
+class OutboundTransmission(db.Model):
+    __tablename__ = "outbound_transmissions"
+    id = db.Column(db.Integer, primary_key=True, autoincrement=True)
+    transmission_type = db.Column(db.String(100))
+    recipient_address = db.Column(db.String(255))
+    status_chip = db.Column(db.String(100))
+    payload_summary = db.Column(db.Text)
+    timestamp = db.Column(db.DateTime, server_default=db.func.now())
+
+
 class PredictiveLogistics(db.Model):
     __tablename__ = "predictive_logistics"
     id = db.Column(db.Integer, primary_key=True, autoincrement=True)
