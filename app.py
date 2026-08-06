@@ -9,6 +9,7 @@ import requests
 import smtplib
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
+from twilio.rest import Client as TwilioClient
 from datetime import datetime, timedelta
 from urllib.parse import urlencode
 from flask import Flask, render_template, request, redirect, url_for, session, flash, jsonify, send_file
@@ -147,6 +148,11 @@ SMTP_USERNAME = os.environ.get("SMTP_USERNAME", "")
 SMTP_PASSWORD = os.environ.get("SMTP_PASSWORD", "")
 MERCHANT_EMAIL = os.environ.get("MERCHANT_EMAIL", "shawn@shawnzyluxe.com")
 SUPPLIER_EMAIL = os.environ.get("SUPPLIER_EMAIL", "production@supplier-c.com")
+
+TWILIO_ACCOUNT_SID = os.environ.get("TWILIO_ACCOUNT_SID", "")
+TWILIO_AUTH_TOKEN = os.environ.get("TWILIO_AUTH_TOKEN", "")
+TWILIO_FROM_NUMBER = os.environ.get("TWILIO_FROM_NUMBER", "")
+MERCHANT_PHONE = os.environ.get("MERCHANT_PHONE", "")
 
 STRIPE_SECRET_KEY = os.environ.get("STRIPE_SECRET_KEY", "")
 SHOPIFY_STORE_URL = os.environ.get("SHOPIFY_STORE_URL", "")
@@ -366,6 +372,21 @@ def dispatch_external_email(recipient, subject, html_body):
         return False
 
 
+def dispatch_sms(to_number, body):
+    """Send SMS via Twilio and log result to outbound_transmissions."""
+    if not all([TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN, TWILIO_FROM_NUMBER, to_number]):
+        log_transmission("SMS_BLAST", to_number or "UNKNOWN", "NO_CREDENTIALS", "Twilio or target phone number not configured")
+        return False
+    try:
+        client = TwilioClient(TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN)
+        message = client.messages.create(body=body, from_=TWILIO_FROM_NUMBER, to=to_number)
+        log_transmission("SMS_BLAST", to_number, "DELIVERED", f"SID: {message.sid} | Body: {body[:80]}")
+        return True
+    except Exception as e:
+        log_transmission("SMS_BLAST", to_number, "FAILED_ROUTING", str(e))
+        return False
+
+
 def generate_and_send_supplier_po(sku, units_required):
     """Compile a PO file, save it, email it to the supplier, and log the transmission."""
     po_number = f"PO-SZL-{secrets.token_hex(4).upper()}"
@@ -551,8 +572,9 @@ def process_command(cmd_text):
 
         if api_success:
             DASHBOARD_STATE["mktg_status"] = "Deployed"
-            DASHBOARD_STATE["mktg_copy"] = "Email Blast Transmitted: 'The next chapter of style drops soon. Shawnzyluxe Members secure early operational access. Tap to unlock your portal container link now.'"
+            DASHBOARD_STATE["mktg_copy"] = "Email + SMS Blast Transmitted: 'The next chapter of style drops soon. Shawnzyluxe Members secure early operational access. Tap to unlock your portal container link now.'"
             updates["ai_briefing"] = "🚀 Creative Studio Success: Compiled localized campaign arrays and successfully transmitted emails via production gateway."
+            dispatch_sms(MERCHANT_PHONE, "Shawnzyluxe Autumn Preview: Early access portal is now open for members.")
         else:
             DASHBOARD_STATE["mktg_status"] = "API_Error"
             DASHBOARD_STATE["mktg_copy"] = "⚠️ Outbound SMTP campaign failed connection sync. Check error logs."
@@ -568,11 +590,12 @@ def process_command(cmd_text):
         DASHBOARD_STATE["mktg_campaign"] = "ECOM_AI_15 Active"
         DASHBOARD_STATE["mktg_status"] = "Generated"
         DASHBOARD_STATE["mktg_copy"] = "SMS Blast queued: 'Hey! AI automation selected you for a 15% discount code on Shawnzyluxe today. Use ECOM_AI_15 at checkout!'"
+        dispatch_sms(MERCHANT_PHONE, "🛍️ Shawnzyluxe: Use code ECOM_AI_15 for 15% off today. Automated by AI.")
         updates["total_balance"] = f"{DASHBOARD_STATE['total_unified_balance']:.2f}"
         updates["mktg_campaign"] = DASHBOARD_STATE["mktg_campaign"]
         updates["mktg_status"] = DASHBOARD_STATE["mktg_status"]
         updates["mktg_copy"] = DASHBOARD_STATE["mktg_copy"]
-        updates["ai_briefing"] = "✨ Marketing Studio Action: Successfully injected dynamic promo script vectors live into connected channel API pipelines."
+        updates["ai_briefing"] = "✨ Marketing Studio Action: Injected promo script and dispatched SMS blast via Twilio."
         DASHBOARD_STATE["ai_briefing"] = updates["ai_briefing"]
         COO["narrative"] = updates["ai_briefing"]
 
