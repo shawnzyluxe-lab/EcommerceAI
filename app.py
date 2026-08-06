@@ -7,10 +7,22 @@ import json
 import secrets
 import requests
 import smtplib
+import logging
+from threading import Thread
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 from twilio.rest import Client as TwilioClient
+from werkzeug.security import generate_password_hash
+from flask_limiter import Limiter
+from flask_limiter.util import get_remote_address
 from datetime import datetime, timedelta
+
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s [%(levelname)s] %(module)s: %(message)s",
+    handlers=[logging.StreamHandler()],
+)
+logger = logging.getLogger("shawnzyluxe_core")
 from urllib.parse import urlencode
 from flask import Flask, render_template, request, redirect, url_for, session, flash, jsonify, send_file
 from flask_sock import Sock
@@ -18,7 +30,7 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-from models import db, Tenant, ConnectedChannel, ActiveSession, BusinessMetric, CommerceChannel, SupportMetric, MarketingStudio, PredictiveLogistics, OutboundTransmission, SaaSBilling, LocalProductCatalog, MerchantProfile, TenantOAuthToken, MerchantMetric, SystemExceptionLog
+from models import db, Tenant, ConnectedChannel, ActiveSession, BusinessMetric, CommerceChannel, SupportMetric, MarketingStudio, PredictiveLogistics, OutboundTransmission, SaaSBilling, LocalProductCatalog, MerchantProfile, TenantOAuthToken, MerchantMetric, SystemExceptionLog, ProcessedWebhookEvent
 from dashboard_context import (
     context,
     COMMAND_RESPONSES,
@@ -62,11 +74,18 @@ DASHBOARD_STATE = {
 }
 
 app = Flask(__name__)
-app.secret_key = os.environ.get('SECRET_KEY', 'dev-secret-change-this')
+app.secret_key = os.environ.get("SECRET_KEY", secrets.token_hex(64))
 app.config["SQLALCHEMY_DATABASE_URI"] = os.environ.get(
     "DATABASE_URL", "sqlite:///shawnzyluxe.db"
 )
 app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
+
+limiter = Limiter(
+    key_func=get_remote_address,
+    app=app,
+    default_limits=["200 per day", "50 per hour"],
+    storage_uri="memory://",
+)
 
 GENERATED_DIR = "generated"
 os.makedirs(GENERATED_DIR, exist_ok=True)
@@ -132,7 +151,7 @@ def site_wall_authenticated():
 def site_wall_protect():
     if not site_wall_enabled():
         return None
-    if request.endpoint in ('home', 'site_login', 'shopify_orders_webhook', 'register_merchant', 'shopify_oauth_callback', 'static'):
+    if request.endpoint in ('home', 'site_login', 'shopify_orders_webhook', 'register_merchant', 'shopify_oauth_callback', 'health', 'static'):
         return None
     if site_wall_authenticated():
         return None
@@ -350,6 +369,17 @@ def log_system_exception(module, severity, message):
         error_severity=severity,
         exception_msg=message,
     ))
+    logger.error(f"[{severity}] {module}: {message}")
+
+
+def run_async_task(target, *args, **kwargs):
+    """Run a function in a daemon thread inside the Flask app context."""
+    def _runner():
+        with app.app_context():
+            target(*args, **kwargs)
+    thread = Thread(target=_runner)
+    thread.daemon = True
+    thread.start()
 
 
 def dispatch_external_email(recipient, subject, html_body):
@@ -445,8 +475,8 @@ AUTHORIZATION STAMP: SHAWNZYLUXE AI OPERATIONS ENGINE
     email_body = f"""<h3>Shawnzyluxe Automated Restock Execution</h3>
 <p>Please find the urgent automated purchase request document <b>{po_number}</b>.</p>
 <pre style='background:#F4F6F9; padding:15px; border-radius:8px;'>{po_content}</pre>"""
-    dispatch_external_email(SUPPLIER_EMAIL, f"URGENT: Automated Reorder Request {po_number}", email_body)
-    log_transmission("SUPPLIER_PO", SUPPLIER_EMAIL, "TRANSMITTED", f"PO file {po_number} compiled and emailed.")
+    log_transmission("SUPPLIER_PO", SUPPLIER_EMAIL, "QUEUED", f"PO file {po_number} compiled; email queued for dispatch.")
+    run_async_task(dispatch_external_email, SUPPLIER_EMAIL, f"URGENT: Automated Reorder Request {po_number}", email_body)
 
     return po_number
 
@@ -510,7 +540,7 @@ def storefront(query, variables=None):
         )
         return r.json()
     except Exception as e:
-        print("Storefront API error:", e)
+        logger.warning(f"Storefront API error: {e}")
         return {}
 
 
@@ -582,8 +612,8 @@ def process_command(cmd_text):
 
     elif re.search(r'(generate marketing copy|write copy|email blast|create campaign)', cmd_text):
         DASHBOARD_STATE["mktg_campaign"] = "Autumn Launch Preview"
-        DASHBOARD_STATE["mktg_status"] = "Sending API..."
-        DASHBOARD_STATE["mktg_copy"] = "Email Blast queued via SendGrid/Mailgun API channels."
+        DASHBOARD_STATE["mktg_status"] = "Queued"
+        DASHBOARD_STATE["mktg_copy"] = "Email + SMS blast queued for non-blocking dispatch."
         updates["mktg_campaign"] = DASHBOARD_STATE["mktg_campaign"]
         updates["mktg_status"] = DASHBOARD_STATE["mktg_status"]
         updates["mktg_copy"] = DASHBOARD_STATE["mktg_copy"]
@@ -594,19 +624,10 @@ def process_command(cmd_text):
   <hr style='border:none; border-top:1px solid #EEEEEE;'/>
   <p style='font-size:11px; color:#999999;'>Sent via Shawnzyluxe Automated Marketing Engine Hub.</p>
 </div>"""
-        api_success = dispatch_external_email("subscribers-list@shawnzyluxe.com", "The Next Chapter: Shawnzyluxe Autumn Preview", html_campaign_body)
+        run_async_task(dispatch_external_email, "subscribers-list@shawnzyluxe.com", "The Next Chapter: Shawnzyluxe Autumn Preview", html_campaign_body)
+        run_async_task(dispatch_sms, MERCHANT_PHONE, "Shawnzyluxe Autumn Preview: Early access portal is now open for members.")
 
-        if api_success:
-            DASHBOARD_STATE["mktg_status"] = "Deployed"
-            DASHBOARD_STATE["mktg_copy"] = "Email + SMS Blast Transmitted: 'The next chapter of style drops soon. Shawnzyluxe Members secure early operational access. Tap to unlock your portal container link now.'"
-            updates["ai_briefing"] = "🚀 Creative Studio Success: Compiled localized campaign arrays and successfully transmitted emails via production gateway."
-            dispatch_sms(MERCHANT_PHONE, "Shawnzyluxe Autumn Preview: Early access portal is now open for members.")
-        else:
-            DASHBOARD_STATE["mktg_status"] = "API_Error"
-            DASHBOARD_STATE["mktg_copy"] = "⚠️ Outbound SMTP campaign failed connection sync. Check error logs."
-            updates["ai_briefing"] = "⚠️ Gateway Warning: Outbound SMTP marketing campaign failed. Verify SMTP credentials."
-        updates["mktg_status"] = DASHBOARD_STATE["mktg_status"]
-        updates["mktg_copy"] = DASHBOARD_STATE["mktg_copy"]
+        updates["ai_briefing"] = "🚀 Creative Studio: Campaign arrays compiled and dispatched to non-blocking worker threads (email + SMS)."
         DASHBOARD_STATE["ai_briefing"] = updates["ai_briefing"]
         COO["narrative"] = updates["ai_briefing"]
 
@@ -614,14 +635,14 @@ def process_command(cmd_text):
         DASHBOARD_STATE["total_unified_balance"] += 1200.00
         BRIEFING["revenue"] += 1200.00
         DASHBOARD_STATE["mktg_campaign"] = "ECOM_AI_15 Active"
-        DASHBOARD_STATE["mktg_status"] = "Generated"
-        DASHBOARD_STATE["mktg_copy"] = "SMS Blast queued: 'Hey! AI automation selected you for a 15% discount code on Shawnzyluxe today. Use ECOM_AI_15 at checkout!'"
-        dispatch_sms(MERCHANT_PHONE, "🛍️ Shawnzyluxe: Use code ECOM_AI_15 for 15% off today. Automated by AI.")
+        DASHBOARD_STATE["mktg_status"] = "Queued"
+        DASHBOARD_STATE["mktg_copy"] = "SMS blast queued for non-blocking dispatch."
+        run_async_task(dispatch_sms, MERCHANT_PHONE, "🛍️ Shawnzyluxe: Use code ECOM_AI_15 for 15% off today. Automated by AI.")
         updates["total_balance"] = f"{DASHBOARD_STATE['total_unified_balance']:.2f}"
         updates["mktg_campaign"] = DASHBOARD_STATE["mktg_campaign"]
         updates["mktg_status"] = DASHBOARD_STATE["mktg_status"]
         updates["mktg_copy"] = DASHBOARD_STATE["mktg_copy"]
-        updates["ai_briefing"] = "✨ Marketing Studio Action: Injected promo script and dispatched SMS blast via Twilio."
+        updates["ai_briefing"] = "✨ Marketing Studio Action: Injected promo script and dispatched SMS to non-blocking worker."
         DASHBOARD_STATE["ai_briefing"] = updates["ai_briefing"]
         COO["narrative"] = updates["ai_briefing"]
 
@@ -801,7 +822,7 @@ def telemetry(ws):
             else:
                 manager.broadcast({"type": "ui_update", "updates": updates})
     except Exception as e:
-        print("WebSocket error:", e)
+        logger.warning(f"WebSocket error: {e}")
     finally:
         manager.disconnect(ws)
 
@@ -879,11 +900,13 @@ SHOPIFY_WEBHOOK_SECRET = os.environ.get("SHOPIFY_WEBHOOK_SECRET", "").strip().en
 
 
 @app.route('/api/v1/webhooks/shopify-orders', methods=['POST'])
+@limiter.limit("60 per minute")
 def shopify_orders_webhook():
-    """Production-hardened webhook capture: verify HMAC, mutate state, broadcast."""
+    """Production-hardened, idempotent webhook capture: verify HMAC, mutate state, broadcast."""
     try:
-        raw_body = request.data
+        raw_body = request.get_data()
         hmac_header = request.headers.get("X-Shopify-Hmac-SHA256")
+        event_id = request.headers.get("X-Shopify-Webhook-Id")
 
         if SHOPIFY_WEBHOOK_SECRET:
             if not hmac_header:
@@ -894,7 +917,15 @@ def shopify_orders_webhook():
                 log_system_exception("SHOPIFY_WEBHOOK", "WARNING", "Dropped inbound webhook: invalid HMAC signature.")
                 return jsonify({"status": "rejected", "reason": "Invalid HMAC"}), 401
         else:
-            print("SHOPIFY_WEBHOOK_SECRET not set — accepting webhook without HMAC verification")
+            logger.warning("SHOPIFY_WEBHOOK_SECRET not set — accepting webhook without HMAC verification")
+
+        if not event_id:
+            log_system_exception("SHOPIFY_WEBHOOK", "WARNING", "Dropped inbound webhook: missing X-Shopify-Webhook-Id.")
+            return jsonify({"status": "rejected", "reason": "Missing event id"}), 400
+
+        if ProcessedWebhookEvent.query.get(event_id):
+            logger.info(f"Idempotency: order event {event_id} already processed. Ignoring.")
+            return jsonify({"status": "duplicate_ignored"}), 200
 
         try:
             payload = json.loads(raw_body.decode("utf-8"))
@@ -936,6 +967,7 @@ def shopify_orders_webhook():
             gross_revenue=new_gross,
             ai_briefing=new_briefing,
         ))
+        db.session.add(ProcessedWebhookEvent(event_id=event_id))
         db.session.commit()
 
         DASHBOARD_STATE["total_unified_balance"] = new_bal
@@ -993,6 +1025,7 @@ def download_report():
 
 
 @app.route('/api/v1/tenant/register', methods=['POST'])
+@limiter.limit("5 per hour")
 def register_merchant():
     """Create an isolated merchant profile and seed partitioned metrics."""
     data = request.get_json() or {}
@@ -1000,11 +1033,11 @@ def register_merchant():
     admin_email = data.get("admin_email", "").strip()
     password_plain = data.get("password_plain", "").strip()
 
-    if not business_name or not admin_email:
-        return jsonify({"success": False, "error": "Missing business or email"}), 400
+    if not business_name or not admin_email or not password_plain:
+        return jsonify({"success": False, "error": "Missing business, email, or password"}), 400
 
     new_merchant_id = f"merchant_{secrets.token_hex(4)}"
-    password_hash = hashlib.sha256(password_plain.encode()).hexdigest()
+    password_hash = generate_password_hash(password_plain, method="pbkdf2:sha256", salt_length=16)
 
     try:
         db.session.add(MerchantProfile(
@@ -1021,10 +1054,44 @@ def register_merchant():
             ai_briefing="Welcome to your isolated Shawnzyluxe AI workspace node. Connect channels to initialize streams.",
         ))
         db.session.commit()
-        return jsonify({"success": True, "merchant_id": new_merchant_id, "status": "Workspace Schema Generated"})
+        logger.info(f"Tenant registered: {new_merchant_id} ({admin_email})")
+        return jsonify({"success": True, "merchant_id": new_merchant_id, "status": "Workspace Schema Generated"}), 201
     except Exception as e:
         db.session.rollback()
+        logger.warning(f"Tenant registration failed for {admin_email}: {e}")
         return jsonify({"success": False, "error": "Administrative profile email already registered"}), 400
+
+
+@app.route('/health', methods=['GET'])
+def health_check():
+    """Sentry-style diagnostic: database and generated storage health."""
+    health = {
+        "status": "HEALTHY",
+        "timestamp": datetime.now().isoformat(),
+        "database_connected": False,
+        "generated_storage_write_access": False,
+    }
+    try:
+        BusinessMetric.query.first()
+        health["database_connected"] = True
+    except Exception as e:
+        health["status"] = "DEGRADED"
+        health["database_error"] = str(e)
+        logger.critical(f"Health check DB failure: {e}")
+
+    try:
+        probe = os.path.join(GENERATED_DIR, ".health_probe")
+        with open(probe, "w") as f:
+            f.write("PROBE_OK")
+        os.remove(probe)
+        health["generated_storage_write_access"] = True
+    except Exception as e:
+        health["status"] = "DEGRADED"
+        health["storage_error"] = str(e)
+        logger.critical(f"Health check storage failure: {e}")
+
+    status_code = 200 if health["status"] == "HEALTHY" else 500
+    return jsonify(health), status_code
 
 
 @app.route('/api/v1/auth/shopify/connect')

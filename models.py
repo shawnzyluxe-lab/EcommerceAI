@@ -152,6 +152,12 @@ class SystemExceptionLog(db.Model):
     timestamp = db.Column(db.DateTime, server_default=db.func.now())
 
 
+class ProcessedWebhookEvent(db.Model):
+    __tablename__ = "processed_webhook_events"
+    event_id = db.Column(db.String(255), primary_key=True)
+    processed_at = db.Column(db.DateTime, server_default=db.func.now())
+
+
 class PredictiveLogistics(db.Model):
     __tablename__ = "predictive_logistics"
     id = db.Column(db.Integer, primary_key=True, autoincrement=True)
