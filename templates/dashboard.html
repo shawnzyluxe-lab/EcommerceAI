@@ -103,10 +103,12 @@
           {% endfor %}
         </div>
         <div class="approve">
+          <button class="btn blue" onclick="executeContextualAIAnalysis()">Run AI COO Analysis</button>
           <button class="btn blue" onclick="executeLearnedMitigationMoat('INVENTORY_SHORTAGE','APPROVED','Supplier C')">Approve &amp; Execute</button>
           <button class="btn" onclick="executeLearnedMitigationMoat('INVENTORY_SHORTAGE','MODIFIED','Supplier C')">Modify</button>
           <button class="btn">Dismiss</button>
         </div>
+        <pre id="ai-output" style="margin-top:12px; padding:12px; background:#0b1020; color:#d4e3ff; border-radius:10px; font-size:12px; white-space:pre-wrap; min-height:60px;">AI COO standing by.</pre>
       </section>
 
       <!-- ---------- Team AI Orchestration Loop ---------- -->
@@ -1090,6 +1092,31 @@ async function commitCredentialsToVault() {
     document.getElementById('vault-token-input').value = '';
   } else {
     alert(data.error || 'Save failed.');
+  }
+}
+
+async function executeContextualAIAnalysis() {
+  const aiOutputBox = document.getElementById('ai-output');
+  aiOutputBox.innerText = "AI COO is analyzing real-time workspace pipelines...";
+
+  const payload = {
+    tenant_id: "tenant_current",
+    active_screen_view: "dashboard",
+    scraped_screen_data: document.body.innerText
+  };
+
+  try {
+    const response = await fetch('/api/v1/ai-coo/execute-analysis', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    });
+
+    if (!response.ok) throw new Error("API Route Degradation Encountered.");
+    const data = await response.json();
+    aiOutputBox.innerText = data.executive_summary;
+  } catch (error) {
+    aiOutputBox.innerText = "AI COO Error: " + error.message;
   }
 }
 

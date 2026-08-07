@@ -18,6 +18,7 @@ from twilio.rest import Client as TwilioClient
 from werkzeug.security import generate_password_hash, check_password_hash
 from smart_router import AISmartRouter, OrderRoutingPayload as SmartOrderPayload, WarehouseInventoryNode
 from product_transformer import ProductTransformerEngine, ShopifyProductLayout
+from ai_coo_engine import AICooEngine, COORunnerPayload
 from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
 from datetime import datetime, timedelta
@@ -1775,6 +1776,46 @@ def tracking_injection():
         return jsonify({"status": "SHOPIFY_INJECTED"}), 200
 
     return jsonify({"detail": "Unsupported storefront channel pipeline execution requested."}), 400
+
+
+@app.route('/api/v1/ai-coo/execute-analysis', methods=['POST'])
+@require_roles([UserRole.ADMIN, UserRole.ENGINEER, UserRole.MERCHANT])
+def ai_coo_execute():
+    """Unified AI COO analysis endpoint combining DB state and screen context."""
+    payload = request.get_json(silent=True) or {}
+    merchant = get_merchant_context()
+    tenant_id = (merchant.get("id") if merchant else "") or payload.get("tenant_id", "")
+
+    if not tenant_id:
+        return jsonify({"detail": "No tenant context available."}), 403
+
+    # Gather DB-derived context
+    sync_errors = [cc.channel_id for cc in CommerceChannel.query.all() if cc.performance_status not in ("Optimal", "Trending", "Stable")]
+    latest = BusinessMetric.query.order_by(BusinessMetric.id.desc()).first()
+    net_profit_margin = 0.0
+    if latest and latest.gross_revenue:
+        net_profit_margin = float(latest.true_net_profit) / float(latest.gross_revenue)
+
+    pl = PredictiveLogistics.query.filter(PredictiveLogistics.days_remaining < 7).first()
+    low_stock_sku = pl.variant_sku if pl else "UNKNOWN"
+    current_velocity = pl.forecasted_demand_velocity if pl else 0.0
+    remaining_stock = pl.days_remaining if pl else 0
+
+    data_context = {
+        "tenant_id": tenant_id,
+        "active_screen_view": payload.get("active_screen_view", "dashboard"),
+        "scraped_screen_data": payload.get("scraped_screen_data", ""),
+        "sync_error_count": len(sync_errors),
+        "sync_errors": sync_errors,
+        "net_profit_margin": net_profit_margin,
+        "low_stock_sku": low_stock_sku,
+        "current_velocity": current_velocity,
+        "remaining_stock": remaining_stock,
+    }
+
+    coo = AICooEngine(tenant_id)
+    result = coo.execute_analysis(data_context)
+    return jsonify(result), 200
 
 
 SHOPIFY_WEBHOOK_SECRET = os.environ.get("SHOPIFY_WEBHOOK_SECRET", "").strip().encode()
