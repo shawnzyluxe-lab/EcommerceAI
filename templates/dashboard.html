@@ -8,13 +8,24 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="{{ url_for('static', filename='css/app.css') }}">
+<style>
+#sidebar { position: relative; transition: width 0.25s ease, padding 0.25s ease; }
+#sidebar-toggle { position: absolute; top: 18px; right: 12px; background: transparent; border: none; font-size: 22px; color: #8B9DAD; cursor: pointer; z-index: 10; }
+#sidebar.collapsed { width: 60px !important; min-width: 60px !important; padding-left: 10px !important; padding-right: 10px !important; }
+#sidebar.collapsed .brand, #sidebar.collapsed .label, #sidebar.collapsed .item span:not(.dot), #sidebar.collapsed .pill { display: none; }
+#sidebar.collapsed .item { justify-content: center; padding: 10px 0; }
+#sidebar.collapsed .navgroup { margin: 0; }
+body.sidebar-collapsed .shell { grid-template-columns: 60px 1fr; }
+@media (max-width: 768px) { #sidebar-toggle { right: 6px; } }
+</style>
 </head>
-<body>
+<body id="app-body">
 <div class="shell">
 
   <!-- ================= sidebar ================= -->
-  <aside class="side">
+  <aside class="side" id="sidebar">
     <div class="brand"><span class="mark"></span> {{ brand.name }}</div>
+    <button id="sidebar-toggle" aria-label="Collapse sidebar" title="Toggle sidebar">≡</button>
     <div class="navgroup">
       <div class="label">Workspace</div>
       {% for label, href, on in nav[:5] %}
@@ -1135,6 +1146,23 @@ function updateCreativeAdOptimizationCard(adMatrixArray) {
   tableBody.innerHTML = html;
 }
 
+function toggleSidebar() {
+  const sidebar = document.getElementById('sidebar');
+  const body = document.getElementById('app-body');
+  sidebar.classList.toggle('collapsed');
+  body.classList.toggle('sidebar-collapsed');
+  localStorage.setItem('sidebarCollapsed', sidebar.classList.contains('collapsed') ? '1' : '0');
+}
+
+function restoreSidebar() {
+  const sidebar = document.getElementById('sidebar');
+  const body = document.getElementById('app-body');
+  if (localStorage.getItem('sidebarCollapsed') === '1') {
+    sidebar.classList.add('collapsed');
+    body.classList.add('sidebar-collapsed');
+  }
+}
+
 function switchView() {
   const hash = window.location.hash || '#top';
   const sections = document.querySelectorAll('main .wrap section.section, main .wrap div[id]');
@@ -1180,7 +1208,9 @@ function updateActiveNav() {
 }
 
 window.addEventListener('hashchange', switchView);
+document.getElementById('sidebar-toggle')?.addEventListener('click', toggleSidebar);
 document.addEventListener('DOMContentLoaded', () => {
+  restoreSidebar();
   performTelemetryWorkspaceSync();
   switchView();
 });
