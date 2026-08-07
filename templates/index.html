@@ -41,25 +41,10 @@
             <a href="#tiers" class="hover:text-white transition">Tiers</a>
             <a href="#security" class="hover:text-white transition">Security</a>
         </nav>
-        <div class="profile-widget relative">
-            <button id="profileBtn" onclick="toggleLoginPopup()" class="border border-white/20 hover:border-accentGold bg-transparent text-white px-5 py-2 text-xs tracking-widest uppercase transition rounded-sm font-mono">
-                Sign In / Access Profile
-            </button>
-            <div id="loginPopup" class="hidden absolute right-0 mt-3 w-80 bg-slateDark border border-borderMuted rounded-sm shadow-2xl p-5 text-left z-50">
-                <h3 class="text-xs font-mono uppercase tracking-widest text-gray-400 mb-4">Account Access Gate</h3>
-                <form id="loginForm" onsubmit="executeSecureLogin(event)">
-                    <input type="email" id="email" class="w-full bg-onyx border border-borderMuted focus:border-accentGold rounded-sm px-3 py-2 text-sm text-white font-mono placeholder:text-gray-600 focus:outline-none transition mb-3" placeholder="Enter System Email" required>
-                    <input type="password" id="password" class="w-full bg-onyx border border-borderMuted focus:border-accentGold rounded-sm px-3 py-2 text-sm text-white font-mono placeholder:text-gray-600 focus:outline-none transition mb-3" placeholder="Password" required>
-                    <input type="hidden" id="g-recaptcha-response" name="g-recaptcha-response">
-                    <button type="submit" class="w-full bg-white hover:bg-accentGold text-onyx font-bold uppercase text-xs tracking-widest py-2 px-4 transition font-mono rounded-sm shadow-md">
-                        Authorize Node
-                    </button>
-                </form>
-            </div>
-        </div>
+        <a href="#auth" class="text-xs tracking-widest text-gray-400 hover:text-white uppercase transition">Access</a>
     </header>
 
-    <main class="flex-grow flex flex-col items-center justify-center text-center px-4 max-w-5xl mx-auto py-16">
+    <main id="auth" class="flex-grow flex flex-col items-center justify-center text-center px-4 max-w-5xl mx-auto py-16">
         <div class="mb-4">
             <span class="text-xs uppercase tracking-[0.4em] text-accentGold font-mono font-semibold bg-accentGold/10 px-3 py-1 border border-accentGold/20 rounded-full">
                 Multi-Channel Autonomous Engine
@@ -74,12 +59,38 @@
             Stop digging through static metrics. Prometheus compiles your sales data, automates real-time net profit accounting, and coordinates specialized background agents to run your supply chain safely under single-click merchant approval.
         </p>
 
-        <div class="w-full max-w-md p-6 bg-slateDark border border-borderMuted rounded-md shadow-2xl text-left">
-            <h3 class="text-xs font-mono uppercase tracking-widest text-gray-400 mb-4">Initialize System Portal</h3>
-            <p class="text-gray-500 text-xs font-mono mb-4">Use the profile menu to authenticate with your merchant email, password, and reCAPTCHA token.</p>
-            <button onclick="toggleLoginPopup()" class="w-full bg-white hover:bg-accentGold text-onyx font-bold uppercase text-xs tracking-widest py-3 px-4 transition font-mono rounded-sm shadow-md">
-                Open Access Gate
-            </button>
+        <div class="w-full max-w-md p-6 bg-slateDark border border-borderMuted rounded-md shadow-2xl text-left" id="authContainer">
+            <div class="flex border-b border-borderMuted mb-6">
+                <button id="loginTab" class="tab-btn active flex-1 py-3 text-xs font-mono uppercase tracking-widest text-center text-white border-b-2 border-accentGold transition" onclick="switchTab('login')">Account Login</button>
+                <button id="signupTab" class="tab-btn flex-1 py-3 text-xs font-mono uppercase tracking-widest text-center text-gray-500 hover:text-white border-b-2 border-transparent transition" onclick="switchTab('signup')">Merchant Registration</button>
+            </div>
+
+            <div id="login-panel" class="form-panel active">
+                <form id="loginForm" onsubmit="handleAuthSubmit(event, 'login')">
+                    <input type="email" id="login-email" class="w-full bg-onyx border border-borderMuted focus:border-accentGold rounded-sm px-3 py-2 text-sm text-white font-mono placeholder:text-gray-600 focus:outline-none transition mb-3" placeholder="System Email" required>
+                    <input type="password" id="login-password" class="w-full bg-onyx border border-borderMuted focus:border-accentGold rounded-sm px-3 py-2 text-sm text-white font-mono placeholder:text-gray-600 focus:outline-none transition mb-3" placeholder="Security Token / Password" required>
+                    <button type="submit" class="w-full bg-white hover:bg-accentGold text-onyx font-bold uppercase text-xs tracking-widest py-3 px-4 transition font-mono rounded-sm shadow-md">
+                        Authorize Session
+                    </button>
+                </form>
+            </div>
+
+            <div id="signup-panel" class="form-panel hidden">
+                <form id="signupForm" onsubmit="handleAuthSubmit(event, 'signup')">
+                    <input type="email" id="signup-email" class="w-full bg-onyx border border-borderMuted focus:border-accentGold rounded-sm px-3 py-2 text-sm text-white font-mono placeholder:text-gray-600 focus:outline-none transition mb-3" placeholder="Enter Registration Email" required>
+                    <input type="password" id="signup-password" class="w-full bg-onyx border border-borderMuted focus:border-accentGold rounded-sm px-3 py-2 text-sm text-white font-mono placeholder:text-gray-600 focus:outline-none transition mb-3" placeholder="Set Secure Password" minlength="8" required>
+                    <label class="text-xs font-mono text-gray-400 mb-1 block">Select Operational Matrix Tier:</label>
+                    <select id="signup-tier" class="w-full bg-onyx border border-borderMuted focus:border-accentGold rounded-sm px-3 py-2 text-sm text-white font-mono mb-3">
+                        <option value="Starter">Starter (2 Stores Max | 500 Orders/Mo Cap)</option>
+                        <option value="Pro">Pro (Unlimited Stores | 5K Orders/Mo Cap)</option>
+                        <option value="Enterprise">Enterprise (Unlimited Volume | Real-Time Sync)</option>
+                    </select>
+                    <button type="submit" class="w-full bg-white hover:bg-accentGold text-onyx font-bold uppercase text-xs tracking-widest py-3 px-4 transition font-mono rounded-sm shadow-md">
+                        Provision New Storefront Node
+                    </button>
+                </form>
+            </div>
+
             {% if error %}
             <div class="text-red-500 font-mono text-xs mt-3">CRITICAL DETECT: AUTHENTICATION FAILURE. HARD SYSTEM LOCKOUT 403 RECORDED.</div>
             {% endif %}
@@ -171,36 +182,60 @@
     <script>
         const recaptchaSiteKey = "{{ recaptcha_site_key }}";
 
-        function toggleLoginPopup() {
-            const popup = document.getElementById('loginPopup');
-            popup.classList.toggle('hidden');
+        function switchTab(type) {
+            document.querySelectorAll('.tab-btn').forEach(btn => {
+                btn.classList.remove('active', 'border-accentGold', 'text-white');
+                btn.classList.add('border-transparent', 'text-gray-500');
+            });
+            document.querySelectorAll('.form-panel').forEach(panel => panel.classList.add('hidden'));
+
+            if (type === 'login') {
+                document.getElementById('loginTab').classList.add('active', 'border-accentGold', 'text-white');
+                document.getElementById('loginTab').classList.remove('border-transparent', 'text-gray-500');
+                document.getElementById('login-panel').classList.remove('hidden');
+            } else {
+                document.getElementById('signupTab').classList.add('active', 'border-accentGold', 'text-white');
+                document.getElementById('signupTab').classList.remove('border-transparent', 'text-gray-500');
+                document.getElementById('signup-panel').classList.remove('hidden');
+            }
         }
 
-        function executeSecureLogin(event) {
+        function handleAuthSubmit(event, targetAction) {
             event.preventDefault();
 
             grecaptcha.ready(function() {
-                grecaptcha.execute(recaptchaSiteKey, {action: 'login'}).then(async function(token) {
-                    document.getElementById('g-recaptcha-response').value = token;
+                grecaptcha.execute(recaptchaSiteKey, {action: targetAction}).then(async function(token) {
+                    let payload = {};
+                    let targetEndpoint = '/api/v1/auth/login';
 
-                    const payload = {
-                        email: document.getElementById('email').value,
-                        password: document.getElementById('password').value,
-                        captcha_token: token
-                    };
+                    if (targetAction === 'login') {
+                        payload = {
+                            email: document.getElementById('login-email').value,
+                            password: document.getElementById('login-password').value,
+                            captcha_token: token
+                        };
+                    } else {
+                        targetEndpoint = '/api/v1/auth/signup';
+                        payload = {
+                            email: document.getElementById('signup-email').value,
+                            password: document.getElementById('signup-password').value,
+                            selected_tier: document.getElementById('signup-tier').value,
+                            captcha_token: token
+                        };
+                    }
 
-                    const response = await fetch('/api/v1/auth/login', {
+                    const response = await fetch(targetEndpoint, {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify(payload)
                     });
 
-                    const data = await response.json();
+                    const serverResult = await response.json();
                     if (response.ok) {
-                        alert("Access Granted. Initializing Session Matrix...");
+                        alert("Verification successful. Executing routing matrix layer...");
                         window.location.href = "/dashboard";
                     } else {
-                        alert("Authorization Failed: " + (data.detail || "Unknown error"));
+                        alert("Security Rejection: " + (serverResult.detail || "Unknown error"));
                     }
                 });
             });

@@ -5,6 +5,7 @@ import hashlib
 import base64
 import json
 import secrets
+import uuid
 import requests
 import smtplib
 import logging
@@ -460,7 +461,7 @@ def enforce_tier_limits(merchant_id, requested_feature):
 def site_wall_protect():
     if not site_wall_enabled():
         return None
-    if request.endpoint in ('home', 'site_login', 'site_logout', 'auth_login', 'shopify_orders_webhook', 'tiktok_orders_webhook', 'amazon_orders_webhook', 'stripe_billing_webhook', 'supplier_po_update', 'execute_mitigation', 'generate_magic_link', 'magic_login', 'register_merchant', 'shopify_oauth_callback', 'health_check', 'static'):
+    if request.endpoint in ('home', 'site_login', 'site_logout', 'auth_login', 'auth_signup', 'shopify_orders_webhook', 'tiktok_orders_webhook', 'amazon_orders_webhook', 'stripe_billing_webhook', 'supplier_po_update', 'execute_mitigation', 'generate_magic_link', 'magic_login', 'register_merchant', 'shopify_oauth_callback', 'health_check', 'static'):
         return None
     if site_wall_authenticated():
         return None
@@ -1520,6 +1521,91 @@ def auth_login():
         secure=app.config.get("SESSION_COOKIE_SECURE", os.environ.get("SESSION_COOKIE_SECURE", "true").lower() == "true"),
     )
     return response, 200
+
+
+TIER_NAME_MAP = {
+    "Starter": "Basic Tier",
+    "Pro": "Pro Tier",
+    "Enterprise": "Enterprise AI Tier",
+}
+
+
+@app.route('/api/v1/auth/signup', methods=['POST'])
+def auth_signup():
+    """Verify reCAPTCHA, create a new merchant + tenant, and issue a session cookie."""
+    payload = request.get_json(silent=True) or {}
+    email = (payload.get("email") or "").strip().lower()
+    password = payload.get("password", "")
+    selected_tier = (payload.get("selected_tier") or "").strip()
+    captcha_token = payload.get("captcha_token", "")
+
+    if not email or not password or len(password) < 8:
+        return jsonify({"detail": "A valid email and a password of at least 8 characters are required."}), 400
+
+    tier = TIER_NAME_MAP.get(selected_tier)
+    if not tier:
+        return jsonify({"detail": "Invalid system tier parameters provided."}), 400
+
+    # 1. Capture Bot Registrations
+    bot_score = verify_captcha_v3(captcha_token)
+    if bot_score < 0.5:
+        return jsonify({"detail": "AUTOMATION EXCLUSION: Registration dropped due to low security compliance score."}), 403
+
+    # 2. Prevent duplicate tenants
+    if MerchantProfile.query.filter_by(admin_email=email).first():
+        return jsonify({"detail": "A merchant account with this email is already provisioned."}), 409
+
+    # 3. Provision tenant and billing records
+    merchant_id = f"tenant_{uuid.uuid4().hex[:8]}"
+    try:
+        db.session.add(MerchantProfile(
+            merchant_id=merchant_id,
+            business_name=f"Storefront {merchant_id}",
+            admin_email=email,
+            account_tier=tier,
+            password_hash=generate_password_hash(password, method="pbkdf2:sha256"),
+        ))
+        db.session.add(SaaSBilling(
+            merchant_id=merchant_id,
+            stripe_customer_id=f"cus_{merchant_id}",
+            current_plan=tier,
+            metered_usage_units=0,
+            accrued_invoice_value=0.0,
+            billing_cycle_end=(datetime.utcnow() + timedelta(days=30)).strftime('%Y-%m-%d'),
+        ))
+        db.session.add(MerchantMetric(
+            merchant_id=merchant_id,
+            total_unified_balance=0.0,
+            true_net_profit=0.0,
+            gross_revenue=0.0,
+            ai_briefing="System initialized. Complete onboarding to activate multi-channel engine.",
+        ))
+        db.session.commit()
+    except Exception as e:
+        logger.error(f"[SIGNUP] Failed to provision {email}: {e}")
+        return jsonify({"detail": "Tenant provisioning failed. Please retry."}), 500
+
+    # 4. Issue session cookie
+    session_token = secrets.token_urlsafe(32)
+    db.session.add(ActiveSession(token=session_token, merchant_id=merchant_id, role=UserRole.MERCHANT.value, created_at=datetime.utcnow()))
+    db.session.commit()
+
+    response = make_response(jsonify({
+        "status": "SUCCESS",
+        "message": "Multi-tenant engine environment provisioned flawlessly.",
+        "tenant_id": merchant_id,
+        "assigned_tier": tier,
+        "monthly_order_limit": TIER_LIMITS[tier]["monthly_order_limit"],
+    }))
+    response.set_cookie(
+        SESSION_COOKIE_NAME,
+        session_token,
+        max_age=SESSION_TIMEOUT_DAYS * 86400,
+        httponly=True,
+        samesite="Lax",
+        secure=app.config.get("SESSION_COOKIE_SECURE", os.environ.get("SESSION_COOKIE_SECURE", "true").lower() == "true"),
+    )
+    return response, 201
 
 
 SHOPIFY_WEBHOOK_SECRET = os.environ.get("SHOPIFY_WEBHOOK_SECRET", "").strip().encode()
