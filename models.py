@@ -281,3 +281,12 @@ class ProductFinancialLedger(db.Model):
     shipping_costs = db.Column(db.Numeric(10, 2), nullable=False)
     net_profit = db.Column(db.Numeric(10, 2), nullable=False)
     recorded_at = db.Column(db.DateTime, server_default=db.func.now())
+
+
+class MerchantSetting(db.Model):
+    __tablename__ = "merchant_settings"
+    merchant_id = db.Column(db.String(100), nullable=False)
+    setting_key = db.Column(db.String(100), nullable=False)
+    setting_value = db.Column(db.Text)
+    updated_at = db.Column(db.DateTime, server_default=db.func.now(), onupdate=db.func.now())
+    __table_args__ = (db.PrimaryKeyConstraint('merchant_id', 'setting_key'),)

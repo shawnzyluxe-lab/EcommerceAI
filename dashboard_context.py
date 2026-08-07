@@ -387,7 +387,6 @@ NAV = [
     ("Automations", "#automations", False),
     ("Team AI", "#team", False),
     ("Health Score", "#health", False),
-    ("Global", "#global", False),
     ("Mobile Copilot", "#mobile", False),
 ]
 

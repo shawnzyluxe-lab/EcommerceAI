@@ -38,7 +38,7 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-from models import db, Tenant, ConnectedChannel, ActiveSession, BusinessMetric, CommerceChannel, MerchantChannel, SupportMetric, MarketingStudio, PredictiveLogistics, OutboundTransmission, SaaSBilling, LocalProductCatalog, MerchantProfile, TenantOAuthToken, MerchantMetric, SystemExceptionLog, ProcessedWebhookEvent, AdSpendAnalytic, GeneratedPurchaseOrder, AIAgent, AgentMessage, MerchantDecisionLog, MagicLoginToken, TrendingProduct, ProductFinancialLedger
+from models import db, Tenant, ConnectedChannel, ActiveSession, BusinessMetric, CommerceChannel, MerchantChannel, SupportMetric, MarketingStudio, PredictiveLogistics, OutboundTransmission, SaaSBilling, LocalProductCatalog, MerchantProfile, TenantOAuthToken, MerchantMetric, SystemExceptionLog, ProcessedWebhookEvent, AdSpendAnalytic, GeneratedPurchaseOrder, AIAgent, AgentMessage, MerchantDecisionLog, MagicLoginToken, TrendingProduct, ProductFinancialLedger, MerchantSetting
 from dashboard_context import (
     context,
     COMMAND_RESPONSES,
@@ -1093,7 +1093,11 @@ def home():
 
 @app.route('/dashboard')
 def dashboard():
-    return render_template('dashboard.html', **context())
+    ctx = context()
+    merchant = get_merchant_context()
+    if merchant:
+        ctx["merchant"] = merchant
+    return render_template('dashboard.html', **ctx)
 
 
 @app.route('/home')
@@ -1816,6 +1820,51 @@ def ai_coo_execute():
     coo = AICooEngine(tenant_id)
     result = coo.execute_analysis(data_context)
     return jsonify(result), 200
+
+
+@app.route('/api/v1/settings/update', methods=['POST'])
+@require_roles([UserRole.ADMIN, UserRole.MERCHANT])
+def update_tenant_settings():
+    """Secure settings storage: channel tokens and AI COO permissions."""
+    merchant = get_merchant_context()
+    if not merchant:
+        return jsonify({"detail": "No merchant context."}), 403
+
+    data = request.get_json(silent=True) or {}
+    tenant_id = data.get("tenant_id") or merchant["id"]
+    if tenant_id != merchant["id"]:
+        return jsonify({"detail": "Cross-tenant settings updates are not permitted."}), 403
+
+    try:
+        for key in ["shopify_key", "tiktok_key"]:
+            value = data.get(key)
+            if value:
+                s = MerchantSetting.query.get((merchant["id"], key))
+                if s:
+                    s.setting_value = value
+                else:
+                    db.session.add(MerchantSetting(merchant_id=merchant["id"], setting_key=key, setting_value=value))
+
+        ai_override = "1" if data.get("ai_automation_allowed") in (True, "true", "1", 1) else "0"
+        s = MerchantSetting.query.get((merchant["id"], "ai_automation_allowed"))
+        if s:
+            s.setting_value = ai_override
+        else:
+            db.session.add(MerchantSetting(merchant_id=merchant["id"], setting_key="ai_automation_allowed", setting_value=ai_override))
+
+        db.session.commit()
+
+        # Engine action logs
+        logger.info(f"[SECURE SECRETS STORAGE] Updated settings for {merchant['id']}")
+
+        return jsonify({
+            "status": "CONFIGURATION_UPDATED",
+            "tenant_id": merchant["id"],
+            "ai_autonomous_status": ai_override == "1",
+        }), 200
+    except Exception as e:
+        logger.error(f"[SETTINGS UPDATE] Failed for {merchant['id']}: {e}")
+        return jsonify({"detail": "Failed to save configuration."}), 500
 
 
 SHOPIFY_WEBHOOK_SECRET = os.environ.get("SHOPIFY_WEBHOOK_SECRET", "").strip().encode()

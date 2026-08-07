@@ -47,7 +47,7 @@ body.sidebar-collapsed .shell { grid-template-columns: 60px 1fr; }
     <div class="navgroup">
       <div class="label">Store</div>
       <a class="item" href="#channels" data-section="#channels"><span class="dot"></span>Channels <span class="pill">{{ connected|length }}/{{ channels|length }}</span></a>
-      <a class="item" href="#global" data-section="#global"><span class="dot"></span>Settings</a>
+      <a class="item" href="#settings" data-section="#settings"><span class="dot"></span>⚙️ System Settings</a>
     </div>
   </aside>
 
@@ -810,6 +810,39 @@ body.sidebar-collapsed .shell { grid-template-columns: 60px 1fr; }
         until you point it at a model.
       </div>
 
+    <section class="section" id="settings">
+      <div class="section-head">
+        <h2>⚙️ System Settings</h2>
+        <p>Platform operations, channel tokens, and AI COO permissions.</p>
+      </div>
+      <div style="background:#fff; padding:25px; border:1px solid #e1e1e1; border-radius:6px; margin-bottom:20px;">
+        <h5 style="margin-top:0; color:#333;">1. Storefront Channel API Tokens</h5>
+        <form id="api-settings-form" onsubmit="saveSystemSettings(event)">
+          <label style="font-size:12px; font-weight:bold; color:#555;">Shopify Admin Access Token:</label>
+          <input type="password" id="set-shopify-token" style="width:100%; padding:10px; margin:5px 0 15px 0; border:1px solid #ccc; border-radius:4px;" placeholder="shpat_xxxxxxxxxxxxxxxxxxxxxxxx">
+
+          <label style="font-size:12px; font-weight:bold; color:#555;">TikTok Shop Developer Cipher Key:</label>
+          <input type="password" id="set-tiktok-token" style="width:100%; padding:10px; margin:5px 0 15px 0; border:1px solid #ccc; border-radius:4px;" placeholder="tt_cipher_v4_xxxxxxxxxxxx">
+
+          <button type="submit" style="background:#222; color:#fff; padding:10px 20px; border:none; border-radius:4px; cursor:pointer;">Update Active Channels</button>
+        </form>
+      </div>
+
+      <div style="background:#fff; padding:25px; border:1px solid #e1e1e1; border-radius:6px; margin-bottom:20px;">
+        <h5 style="margin-top:0; color:#333;">2. Operational Billing Plan</h5>
+        <p style="font-size:14px; margin:0 0 15px 0;">Current Active Organization Tier Level: <strong style="color:#0052cc;">{{ merchant.tier | upper }} PLAN</strong></p>
+        <button style="background:#222; color:#fff; padding:10px 20px; border:none; border-radius:4px; cursor:pointer;" onclick="alert('Tier upgrade flow not yet implemented.')">Modify Subscription Tier Mapping</button>
+      </div>
+
+      <div style="background:#fff; padding:25px; border:1px solid #e1e1e1; border-radius:6px;">
+        <h5 style="margin-top:0; color:#333;">3. Internal AI COO Engine Permissions</h5>
+        <label style="display:flex; align-items:center; cursor:pointer; font-size:14px;">
+          <input type="checkbox" id="coo-auto-reorder" checked style="margin-right:10px;">
+          Allow AI COO to autonomously draft purchase orders when inventory running low
+        </label>
+      </div>
+    </section>
+
     </div>
   </main>
 </div>
@@ -1144,6 +1177,34 @@ function updateCreativeAdOptimizationCard(adMatrixArray) {
     </tr>`;
   });
   tableBody.innerHTML = html;
+}
+
+async function saveSystemSettings(event) {
+  event.preventDefault();
+  const output = document.getElementById('ai-output');
+  if (output) output.innerText = "Saving configuration...";
+
+  const payload = {
+    shopify_key: document.getElementById('set-shopify-token').value,
+    tiktok_key: document.getElementById('set-tiktok-token').value,
+    ai_automation_allowed: document.getElementById('coo-auto-reorder').checked
+  };
+
+  try {
+    const response = await fetch('/api/v1/settings/update', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    });
+    const data = await response.json();
+    if (response.ok) {
+      alert(data.status + ": " + data.tenant_id);
+    } else {
+      alert("Settings save failed: " + (data.detail || "Unknown error"));
+    }
+  } catch (err) {
+    alert("Settings save failed: " + err.message);
+  }
 }
 
 function toggleSidebar() {
