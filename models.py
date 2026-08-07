@@ -1,4 +1,5 @@
 import uuid
+from datetime import datetime
 from flask_sqlalchemy import SQLAlchemy
 
 db = SQLAlchemy()
@@ -249,5 +250,20 @@ class PredictiveLogistics(db.Model):
     days_remaining = db.Column(db.Integer)
     forecasted_demand_velocity = db.Column(db.REAL)
     optimal_restock_date = db.Column(db.String(20))
+    status_flag = db.Column(db.String(50), default="NORMAL")
+
+
+class TrendingProduct(db.Model):
+    __tablename__ = "trending_products"
+    id = db.Column(db.Integer, primary_key=True, autoincrement=True)
+    merchant_id = db.Column(db.String(100), db.ForeignKey("merchant_profiles.merchant_id"), default="merchant_shawn_01")
+    source_platform = db.Column(db.String(50))  # TikTok_Shop, Amazon_Bestsellers
+    external_item_id = db.Column(db.String(100))
+    title = db.Column(db.String(500))
+    sample_image_url = db.Column(db.String(500))
+    current_velocity_score = db.Column(db.REAL)
+    scraped_at = db.Column(db.DateTime, default=datetime.utcnow)
+    tier = db.Column(db.String(50), default="Tier 2")  # Tier 1 (Weekly Top 50), Tier 2 (Momentum)
+    alert_status = db.Column(db.String(50), default="Active")
     status_flag = db.Column(db.String(50))
     created_at = db.Column(db.DateTime, server_default=db.func.now())

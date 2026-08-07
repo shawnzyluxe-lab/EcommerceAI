@@ -34,7 +34,7 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-from models import db, Tenant, ConnectedChannel, ActiveSession, BusinessMetric, CommerceChannel, MerchantChannel, SupportMetric, MarketingStudio, PredictiveLogistics, OutboundTransmission, SaaSBilling, LocalProductCatalog, MerchantProfile, TenantOAuthToken, MerchantMetric, SystemExceptionLog, ProcessedWebhookEvent, AdSpendAnalytic, GeneratedPurchaseOrder, AIAgent, AgentMessage, MerchantDecisionLog, MagicLoginToken
+from models import db, Tenant, ConnectedChannel, ActiveSession, BusinessMetric, CommerceChannel, MerchantChannel, SupportMetric, MarketingStudio, PredictiveLogistics, OutboundTransmission, SaaSBilling, LocalProductCatalog, MerchantProfile, TenantOAuthToken, MerchantMetric, SystemExceptionLog, ProcessedWebhookEvent, AdSpendAnalytic, GeneratedPurchaseOrder, AIAgent, AgentMessage, MerchantDecisionLog, MagicLoginToken, TrendingProduct
 from dashboard_context import (
     context,
     COMMAND_RESPONSES,
@@ -49,6 +49,7 @@ from dashboard_context import (
     CATALOG,
     predictive_context,
 )
+from trend_worker import run_trend_scrape, TrendingProductsScraper
 
 # Dynamic state for AI command engine
 DASHBOARD_STATE = {
@@ -2149,6 +2150,59 @@ def admin_release_lock():
         return jsonify({"status": "OPERATIONAL"}), 200
     except Exception as e:
         return jsonify({"status": "error", "reason": str(e)}), 500
+
+
+@app.route('/api/v1/admin/trends/run-scrape', methods=['POST'])
+@require_roles([UserRole.ADMIN, UserRole.ENGINEER])
+def admin_run_trend_scrape():
+    """Trigger the trending products scraping automation worker in the background."""
+    try:
+        run_async_task(run_trend_scrape)
+        return jsonify({"status": "accepted", "message": "Trend worker queued in background."}), 202
+    except Exception as e:
+        log_system_exception("trend_scrape", f"Trend worker failed: {e}")
+        return jsonify({"status": "error", "reason": str(e)}), 500
+
+
+@app.route('/api/v1/trends/top', methods=['GET'])
+@require_roles([UserRole.ADMIN, UserRole.MERCHANT, UserRole.ENGINEER])
+def trends_top():
+    """Return the Weekly Top 50 (Tier 1) trending products."""
+    items = TrendingProduct.query.filter_by(tier="Tier 1").order_by(TrendingProduct.current_velocity_score.desc()).limit(50).all()
+    return jsonify({
+        "tier": "Tier 1",
+        "count": len(items),
+        "products": [{
+            "id": i.id,
+            "source": i.source_platform,
+            "external_id": i.external_item_id,
+            "title": i.title,
+            "image": i.sample_image_url,
+            "velocity": i.current_velocity_score,
+            "scraped_at": i.scraped_at.isoformat() if i.scraped_at else None,
+        } for i in items]
+    }), 200
+
+
+@app.route('/api/v1/trends/momentum', methods=['GET'])
+@require_roles([UserRole.ADMIN, UserRole.MERCHANT, UserRole.ENGINEER])
+def trends_momentum():
+    """Return real-time momentum alerts (Tier 2) above velocity threshold."""
+    threshold = float(request.args.get("threshold", 0.0))
+    items = TrendingProduct.query.filter(TrendingProduct.tier == "Tier 2", TrendingProduct.current_velocity_score >= threshold).order_by(TrendingProduct.current_velocity_score.desc()).limit(50).all()
+    return jsonify({
+        "tier": "Tier 2",
+        "count": len(items),
+        "products": [{
+            "id": i.id,
+            "source": i.source_platform,
+            "external_id": i.external_item_id,
+            "title": i.title,
+            "image": i.sample_image_url,
+            "velocity": i.current_velocity_score,
+            "scraped_at": i.scraped_at.isoformat() if i.scraped_at else None,
+        } for i in items]
+    }), 200
 
 
 @app.route('/health', methods=['GET'])
