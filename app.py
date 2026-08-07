@@ -132,7 +132,10 @@ manager = ConnectionManager()
 # ============================================================
 
 SITE_WALL_PASSWORD = os.environ.get("SITE_WALL_PASSWORD", "")
-MASTER_ADMIN_EMAIL = os.environ.get("MASTER_ADMIN_EMAIL", "shawn@shawnzyluxe.com")
+MASTER_ADMIN_EMAIL = os.environ.get("MASTER_ADMIN_EMAIL", "shawn@shawnzyluxe.com,admin@shawnzyluxe.com")
+MASTER_ADMIN_EMAILS = [e.strip().lower() for e in MASTER_ADMIN_EMAIL.split(",") if e.strip()]
+ENGINEER_EMAIL = os.environ.get("ENGINEER_EMAIL", "engineer@shawnzyluxe.com")
+ENGINEER_EMAILS = [e.strip().lower() for e in ENGINEER_EMAIL.split(",") if e.strip()]
 RECAPTCHA_SITE_KEY = os.environ.get("RECAPTCHA_SITE_KEY", "")
 RECAPTCHA_SECRET_KEY = os.environ.get("RECAPTCHA_SECRET_KEY", "")
 RECAPTCHA_VERIFY_URL = "https://www.google.com/recaptcha/api/siteverify"
@@ -655,8 +658,11 @@ with app.app_context():
         CATALOG["price"] = hoodie.price
 
     # Seed multi-tenant merchant profiles
+    temp_password = SITE_WALL_PASSWORD if SITE_WALL_PASSWORD else "TempPass_" + secrets.token_hex(8)
     if not MerchantProfile.query.first():
-        db.session.add(MerchantProfile(merchant_id="merchant_shawn_01", business_name="Shawnzyluxe Pro", admin_email="shawn@shawnzyluxe.com", account_tier="Enterprise AI Tier", password_hash=""))
+        db.session.add(MerchantProfile(merchant_id="merchant_shawn_01", business_name="Shawnzyluxe Pro", admin_email="shawn@shawnzyluxe.com", account_tier="Enterprise AI Tier", password_hash=generate_password_hash(temp_password, method="pbkdf2:sha256")))
+        db.session.add(MerchantProfile(merchant_id="merchant_admin_temp", business_name="Temporary Admin", admin_email="admin@shawnzyluxe.com", account_tier="Enterprise AI Tier", password_hash=generate_password_hash(temp_password, method="pbkdf2:sha256")))
+        db.session.add(MerchantProfile(merchant_id="merchant_engineer_temp", business_name="Temporary Engineer", admin_email="engineer@shawnzyluxe.com", account_tier="Pro Tier", password_hash=generate_password_hash(temp_password, method="pbkdf2:sha256")))
         db.session.add(MerchantProfile(merchant_id="merchant_guest_02", business_name="Alpha Storefronts", admin_email="guest@alpha.com", account_tier="Pro Tier", password_hash=""))
         db.session.add(MerchantMetric(merchant_id="merchant_shawn_01", total_unified_balance=20560.00, true_net_profit=1394.00, gross_revenue=4582.00, ai_briefing="System initialized for Shawnzyluxe multi-tenant parameters."))
         db.session.add(MerchantMetric(merchant_id="merchant_guest_02", total_unified_balance=1240.00, true_net_profit=410.00, gross_revenue=890.00, ai_briefing="System initialized for guest merchant clusters."))
@@ -1480,7 +1486,12 @@ def auth_login():
 
     # 3. Issue encrypted session JWT (session cookie + ActiveSession row)
     session_token = secrets.token_urlsafe(32)
-    assigned_role = UserRole.ADMIN.value if email == MASTER_ADMIN_EMAIL.lower() else UserRole.MERCHANT.value
+    if email in MASTER_ADMIN_EMAILS:
+        assigned_role = UserRole.ADMIN.value
+    elif email in ENGINEER_EMAILS:
+        assigned_role = UserRole.ENGINEER.value
+    else:
+        assigned_role = UserRole.MERCHANT.value
     db.session.add(ActiveSession(token=session_token, merchant_id=profile.merchant_id, role=assigned_role, created_at=datetime.utcnow()))
     db.session.commit()
 
@@ -2260,7 +2271,7 @@ def magic_login():
         return redirect("/?error=profile_missing")
 
     session_token = secrets.token_urlsafe(32)
-    assigned_role = UserRole.ADMIN.value if profile.admin_email == MASTER_ADMIN_EMAIL else UserRole.MERCHANT.value
+    assigned_role = UserRole.ADMIN.value if profile.admin_email.lower() in MASTER_ADMIN_EMAILS else UserRole.MERCHANT.value
     active = ActiveSession(token=session_token, merchant_id=profile.merchant_id, role=assigned_role, created_at=datetime.utcnow())
     db.session.add(active)
     db.session.commit()
