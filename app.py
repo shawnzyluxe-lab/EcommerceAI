@@ -657,12 +657,23 @@ with app.app_context():
         CATALOG["sku"] = hoodie.variant_id
         CATALOG["price"] = hoodie.price
 
-    # Seed multi-tenant merchant profiles
-    temp_password = SITE_WALL_PASSWORD if SITE_WALL_PASSWORD else "TempPass_" + secrets.token_hex(8)
-    if not MerchantProfile.query.first():
-        db.session.add(MerchantProfile(merchant_id="merchant_shawn_01", business_name="Shawnzyluxe Pro", admin_email="shawn@shawnzyluxe.com", account_tier="Enterprise AI Tier", password_hash=generate_password_hash(temp_password, method="pbkdf2:sha256")))
-        db.session.add(MerchantProfile(merchant_id="merchant_admin_temp", business_name="Temporary Admin", admin_email="admin@shawnzyluxe.com", account_tier="Enterprise AI Tier", password_hash=generate_password_hash(temp_password, method="pbkdf2:sha256")))
-        db.session.add(MerchantProfile(merchant_id="merchant_engineer_temp", business_name="Temporary Engineer", admin_email="engineer@shawnzyluxe.com", account_tier="Pro Tier", password_hash=generate_password_hash(temp_password, method="pbkdf2:sha256")))
+    # Seed / refresh multi-tenant merchant profiles
+    temp_password = SITE_WALL_PASSWORD if SITE_WALL_PASSWORD else "IfxSVNs4iAs"
+    temp_accounts = [
+        ("merchant_shawn_01", "Shawnzyluxe Pro", "shawn@shawnzyluxe.com", "Enterprise AI Tier"),
+        ("merchant_admin_temp", "Temporary Admin", "admin@shawnzyluxe.com", "Enterprise AI Tier"),
+        ("merchant_engineer_temp", "Temporary Engineer", "engineer@shawnzyluxe.com", "Pro Tier"),
+    ]
+    for mid, name, email, tier in temp_accounts:
+        p = MerchantProfile.query.get(mid)
+        if p:
+            p.business_name = name
+            p.admin_email = email
+            p.account_tier = tier
+            p.password_hash = generate_password_hash(temp_password, method="pbkdf2:sha256")
+        else:
+            db.session.add(MerchantProfile(merchant_id=mid, business_name=name, admin_email=email, account_tier=tier, password_hash=generate_password_hash(temp_password, method="pbkdf2:sha256")))
+    if not MerchantProfile.query.get("merchant_guest_02"):
         db.session.add(MerchantProfile(merchant_id="merchant_guest_02", business_name="Alpha Storefronts", admin_email="guest@alpha.com", account_tier="Pro Tier", password_hash=""))
         db.session.add(MerchantMetric(merchant_id="merchant_shawn_01", total_unified_balance=20560.00, true_net_profit=1394.00, gross_revenue=4582.00, ai_briefing="System initialized for Shawnzyluxe multi-tenant parameters."))
         db.session.add(MerchantMetric(merchant_id="merchant_guest_02", total_unified_balance=1240.00, true_net_profit=410.00, gross_revenue=890.00, ai_briefing="System initialized for guest merchant clusters."))
