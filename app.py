@@ -80,9 +80,11 @@ DASHBOARD_STATE = {
 
 app = Flask(__name__)
 app.secret_key = os.environ.get("SECRET_KEY", secrets.token_hex(64))
-app.config["SQLALCHEMY_DATABASE_URI"] = os.environ.get(
-    "DATABASE_URL", "sqlite:///shawnzyluxe.db"
-)
+DATABASE_URL = os.environ.get("DATABASE_URL", "sqlite:///shawnzyluxe.db")
+# Force psycopg v3 dialect if the user provided a plain postgresql:// URL
+if DATABASE_URL.startswith("postgresql://"):
+    DATABASE_URL = "postgresql+psycopg" + DATABASE_URL[len("postgresql"):]
+app.config["SQLALCHEMY_DATABASE_URI"] = DATABASE_URL
 app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
 
 LIMITER_STORAGE_URI = os.environ.get("LIMITER_STORAGE_URI", "memory://")
