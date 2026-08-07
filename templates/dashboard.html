@@ -18,25 +18,25 @@
     <div class="navgroup">
       <div class="label">Workspace</div>
       {% for label, href, on in nav[:5] %}
-      <a class="item {{ 'on' if on }}" href="{{ href }}"><span class="dot"></span>{{ label }}</a>
+      <a class="item" href="{{ href }}" data-section="{{ href }}"><span class="dot"></span>{{ label }}</a>
       {% endfor %}
     </div>
     <div class="navgroup">
       <div class="label">Intelligence</div>
       {% for label, href, on in nav[5:11] %}
-      <a class="item" href="{{ href }}"><span class="dot"></span>{{ label }}</a>
+      <a class="item" href="{{ href }}" data-section="{{ href }}"><span class="dot"></span>{{ label }}</a>
       {% endfor %}
     </div>
     <div class="navgroup">
       <div class="label">Operations</div>
       {% for label, href, on in nav[11:] %}
-      <a class="item" href="{{ href }}"><span class="dot"></span>{{ label }}</a>
+      <a class="item" href="{{ href }}" data-section="{{ href }}"><span class="dot"></span>{{ label }}</a>
       {% endfor %}
     </div>
     <div class="navgroup">
       <div class="label">Store</div>
-      <a class="item" href="#channels"><span class="dot"></span>Channels <span class="pill">{{ connected|length }}/{{ channels|length }}</span></a>
-      <a class="item" href="#global"><span class="dot"></span>Settings</a>
+      <a class="item" href="#channels" data-section="#channels"><span class="dot"></span>Channels <span class="pill">{{ connected|length }}/{{ channels|length }}</span></a>
+      <a class="item" href="#global" data-section="#global"><span class="dot"></span>Settings</a>
     </div>
   </aside>
 
@@ -1135,8 +1135,23 @@ function updateCreativeAdOptimizationCard(adMatrixArray) {
   tableBody.innerHTML = html;
 }
 
-setInterval(performTelemetryWorkspaceSync, 3000);
-document.addEventListener('DOMContentLoaded', performTelemetryWorkspaceSync);
+function updateActiveNav() {
+  const hash = window.location.hash || '#top';
+  document.querySelectorAll('.side a.item').forEach(link => {
+    const section = link.getAttribute('data-section');
+    if (section === hash || (section && section.endsWith(hash) && hash !== '')) {
+      link.classList.add('on');
+    } else {
+      link.classList.remove('on');
+    }
+  });
+}
+
+window.addEventListener('hashchange', updateActiveNav);
+document.addEventListener('DOMContentLoaded', () => {
+  performTelemetryWorkspaceSync();
+  updateActiveNav();
+});
 </script>
 </body>
 </html>
