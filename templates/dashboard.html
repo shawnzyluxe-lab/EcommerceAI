@@ -15,7 +15,7 @@
   --ink-3:#7d8798;
   --line:#262636;
   --line-2:#1f1f2a;
-  --card:#16161F;
+  --card:#0D0D11;
   --bg:#0D0D11;
   --blue:#D4AF37;
   --blue-2:#e9c65c;
@@ -60,7 +60,15 @@ body{ background:var(--bg); color:var(--ink); font-family:Inter,-apple-system,Bl
 .section h2, .section h3, .section h4{ color:#fff; }
 .section p, .section .hint, .section .meta{ color:var(--ink-2); }
 input, select, textarea{ background:#0D0D11; color:#fff; border:1px solid #262636; }
-#ai-output{ background:#0b1020; }
+#ai-output{ background:#0D0D11; }
+.coo{ background:#0D0D11; border:1px solid #262636; border-radius:var(--radius); padding:22px; box-shadow:var(--shadow); }
+.glass-card{ background:#0D0D11 !important; }
+.tag{ background:#1f1f2a; color:#D4AF37; border:1px solid #262636; }
+.tag.blue{ background:#D4AF37; color:#0D0D11; }
+.tag.green{ background:#1E6B3E; color:#fff; }
+.tag.amber{ background:#7a6d3e; color:#fff; }
+.tag.red{ background:#A82525; color:#fff; }
+.tag.ghost{ background:#0D0D11; color:#7d8798; }
 #sidebar { position: relative; transition: width 0.25s ease, padding 0.25s ease; }
 #sidebar-toggle { position: absolute; top: 18px; right: 12px; background: transparent; border: none; font-size: 22px; color: #8B9DAD; cursor: pointer; z-index: 10; }
 #sidebar.collapsed { width: 60px !important; min-width: 60px !important; padding-left: 10px !important; padding-right: 10px !important; }
@@ -151,7 +159,7 @@ body.sidebar-collapsed .shell { grid-template-columns: 60px 1fr; }
 
         <div id="ai-mitigation-actions-tray" style="display:none; background:rgba(231,76,60,0.06); border:1px dashed rgba(231,76,60,0.25); padding:12px; border-radius:14px; margin-top:12px;">
           <div id="mitigation-tray-label" style="font-size:10px; text-transform:uppercase; color:#C0392B; font-weight:700; margin-bottom:8px; font-family:'JetBrains Mono';">AI Recommended Mitigation Interventions</div>
-          <button onclick="commitOneClickMitigation('REROUTE_SUPPLIER_C')" style="width:100%; background:#C0392B; color:#FFFFFF; border:none; border-radius:10px; padding:10px; font-size:12px; font-weight:600; cursor:pointer; box-shadow:0 4px 12px rgba(192,57,43,0.2);">Auto-Reroute to Supplier C Network</button>
+          <button onclick="commitOneClickMitigation('REROUTE_SUPPLIER_C')" style="width:100%; background:#C0392B; color:#fff; border:none; border-radius:10px; padding:10px; font-size:12px; font-weight:600; cursor:pointer; box-shadow:0 4px 12px rgba(192,57,43,0.2);">Auto-Reroute to Supplier C Network</button>
         </div>
 
         <div class="plan">
@@ -196,7 +204,7 @@ body.sidebar-collapsed .shell { grid-template-columns: 60px 1fr; }
           <span class="spacer"></span>
           <span class="tag green" style="font-family:'JetBrains Mono';">STREAM_ACTIVE</span>
         </div>
-        <div class="glass-card" style="border-top: 2px solid #5C6E88; background: #1C1D21; color:#A8B2C1; font-family:'JetBrains Mono', monospace; padding:14px;">
+        <div class="glass-card" style="border-top: 2px solid #5C6E88; background: #1C1D21; color:#b7bdc9; font-family:'JetBrains Mono', monospace; padding:14px;">
           <div id="inter-agent-chat-feed-box" style="display:flex; flex-direction:column; gap:10px; font-size:11px; height:130px; overflow-y:auto; line-height:1.4;">
             <div style="color:#7d8798;">Connecting terminal pipeline channels...</div>
           </div>
@@ -305,8 +313,8 @@ body.sidebar-collapsed .shell { grid-template-columns: 60px 1fr; }
             <div style="margin-top:15px;background:rgba(255,255,255,0.05);padding:12px;border-radius:14px;border:1px solid rgba(29,45,68,0.05);">
               <div style="font-size:11px;text-transform:uppercase;color:#7d8798;font-weight:600;margin-bottom:8px;">Link External Storefront</div>
               <div style="display:flex;gap:8px;">
-                <input id="oauth-shop-input" type="text" placeholder="store.myshopify.com" style="width:100%;border:1px solid #D6E0EE;border-radius:8px;padding:6px 10px;font-size:12px;outline:none;background:#FFFFFF;" />
-                <button onclick="triggerOAuthConnection()" style="background:#1D2D44;color:#FFFFFF;border:none;border-radius:8px;padding:6px 14px;font-size:12px;font-weight:600;cursor:pointer;">Connect</button>
+                <input id="oauth-shop-input" type="text" placeholder="store.myshopify.com" style="width:100%;border:1px solid #262636;border-radius:8px;padding:6px 10px;font-size:12px;outline:none;background:#0D0D11;" />
+                <button onclick="triggerOAuthConnection()" style="background:#1D2D44;color:#fff;border:none;border-radius:8px;padding:6px 14px;font-size:12px;font-weight:600;cursor:pointer;">Connect</button>
               </div>
             </div>
           </div>
@@ -598,7 +606,7 @@ body.sidebar-collapsed .shell { grid-template-columns: 60px 1fr; }
           <button class="btn" style="margin-left:8px" onclick="document.getElementById('cmd').value='update price to 159.50'">Update price</button>
         </div>
         <div class="grid g4">
-          <div class="card" style="border-left: 2px solid #6772E5; background: rgba(246, 249, 252, 0.65);">
+          <div class="card" style="border-left: 2px solid #6772E5; background: #16161F;">
             <div class="card-head"><h3 style="color:#fff;">Stripe SaaS Billing</h3></div>
             <div class="line"><span class="k">Account Model</span><span class="v">{{ stripe.plan }}</span></div>
             <div class="line"><span class="k">Metered Volume</span><span class="v" id="stripe-usage">{{ stripe.usage }} API Hits</span></div>
@@ -610,7 +618,7 @@ body.sidebar-collapsed .shell { grid-template-columns: 60px 1fr; }
             <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid rgba(0,0,0,0.04); padding-bottom:8px;">
               <div>
                 <div style="font-weight:600; color:#f4f4f6;">{{ catalog.title }}</div>
-                <div style="font-size:10px; color:#8A9BB2;">Variant: {{ catalog.sku }}</div>
+                <div style="font-size:10px; color:#7d8798;">Variant: {{ catalog.sku }}</div>
               </div>
               <span id="hoodie-price" style="font-family:'JetBrains Mono'; font-weight:600; color:#1E6B3E;">${{ '{:,.2f}'.format(catalog.price) }}</span>
             </div>
@@ -631,14 +639,14 @@ body.sidebar-collapsed .shell { grid-template-columns: 60px 1fr; }
           <div class="card" style="border-top: 2px solid #D4AF37; background: #16161F;">
             <div class="card-head"><h3 style="color:#f4f4f6;">Secure Core Connections Vault</h3></div>
             <div style="display: flex; flex-direction: column; gap: 8px;">
-              <select id="vault-platform-select" style="width:100%; padding:8px; border:1px solid #D6E0EE; border-radius:8px; background:#F8FAFC; font-size:12px;">
+              <select id="vault-platform-select" style="width:100%; padding:8px; border:1px solid #262636; border-radius:8px; background:#0D0D11; font-size:12px;">
                 <option value="shopify">Shopify Storefront Node</option>
                 <option value="tiktok">TikTok Commerce Stream</option>
                 <option value="amazon">Amazon Central API</option>
               </select>
-              <input id="vault-domain-input" type="text" placeholder="store-domain.com" style="width:100%; border:1px solid #D6E0EE; border-radius:8px; padding:8px; font-size:12px;" />
-              <input id="vault-token-input" type="password" placeholder="Access Token (shpat_...)" style="width:100%; border:1px solid #D6E0EE; border-radius:8px; padding:8px; font-size:12px;" />
-              <button onclick="commitCredentialsToVault()" style="background:#1D2D44; color:#FFFFFF; border:none; border-radius:10px; padding:10px; font-size:12px; font-weight:600; cursor:pointer;">Encrypt &amp; Save Connection</button>
+              <input id="vault-domain-input" type="text" placeholder="store-domain.com" style="width:100%; border:1px solid #262636; border-radius:8px; padding:8px; font-size:12px;" />
+              <input id="vault-token-input" type="password" placeholder="Access Token (shpat_...)" style="width:100%; border:1px solid #262636; border-radius:8px; padding:8px; font-size:12px;" />
+              <button onclick="commitCredentialsToVault()" style="background:#1D2D44; color:#fff; border:none; border-radius:10px; padding:10px; font-size:12px; font-weight:600; cursor:pointer;">Encrypt &amp; Save Connection</button>
             </div>
           </div>
 
@@ -647,7 +655,7 @@ body.sidebar-collapsed .shell { grid-template-columns: 60px 1fr; }
               <div class="card-head"><h3 style="color:#f4f4f6;">Executive Document Center</h3></div>
               <span style="font-size: 11px; text-transform: uppercase; color: #8A9BB2; font-family:'JetBrains Mono';">Compile high-fashion operational data summaries</span>
             </div>
-            <button onclick="triggerExecutiveReportCompilation()" style="width:100%; background:#1D2D44; color:#FFFFFF; border:none; border-radius:12px; padding:12px; font-size:12px; font-weight:600; cursor:pointer; margin-top:20px; box-shadow:0 4px 12px rgba(29,45,68,0.15);">Generate Operational Digest Sheet</button>
+            <button onclick="triggerExecutiveReportCompilation()" style="width:100%; background:#1D2D44; color:#fff; border:none; border-radius:12px; padding:12px; font-size:12px; font-weight:600; cursor:pointer; margin-top:20px; box-shadow:0 4px 12px rgba(29,45,68,0.15);">Generate Operational Digest Sheet</button>
           </div>
         </div>
       </section>
@@ -687,7 +695,7 @@ body.sidebar-collapsed .shell { grid-template-columns: 60px 1fr; }
           <span class="spacer"></span>
           <button class="btn blue">Optimize</button>
         </div>
-        <div class="glass-card" style="border-left: 2px solid #27AE60; background: rgba(244, 252, 246, 0.75);">
+        <div class="glass-card" style="border-left: 2px solid #27AE60; background: #16161F;">
           <div style="overflow-x:auto;">
             <table style="width:100%; border-collapse:collapse; text-align:left; font-size:12px; color:#b7bdc9;">
               <thead>
@@ -866,31 +874,42 @@ body.sidebar-collapsed .shell { grid-template-columns: 60px 1fr; }
         <h2>⚙️ System Settings</h2>
         <p>Platform operations, channel tokens, and AI COO permissions.</p>
       </div>
-      <div style="background:var(--card); padding:25px; border:1px solid #e1e1e1; border-radius:6px; margin-bottom:20px;">
+      <div style="background:var(--card); padding:25px; border:1px solid #262636; border-radius:6px; margin-bottom:20px;">
         <h5 style="margin-top:0; color:#fff;">1. Storefront Channel API Tokens</h5>
         <form id="api-settings-form" onsubmit="saveSystemSettings(event)">
           <label style="font-size:12px; font-weight:bold; color:#b7bdc9;">Shopify Admin Access Token:</label>
-          <input type="password" id="set-shopify-token" style="width:100%; padding:10px; margin:5px 0 15px 0; border:1px solid #ccc; border-radius:4px;" placeholder="shpat_xxxxxxxxxxxxxxxxxxxxxxxx">
+          <input type="password" id="set-shopify-token" style="width:100%; padding:10px; margin:5px 0 15px 0; border:1px solid #262636; border-radius:4px;" placeholder="shpat_xxxxxxxxxxxxxxxxxxxxxxxx">
 
           <label style="font-size:12px; font-weight:bold; color:#b7bdc9;">TikTok Shop Developer Cipher Key:</label>
-          <input type="password" id="set-tiktok-token" style="width:100%; padding:10px; margin:5px 0 15px 0; border:1px solid #ccc; border-radius:4px;" placeholder="tt_cipher_v4_xxxxxxxxxxxx">
+          <input type="password" id="set-tiktok-token" style="width:100%; padding:10px; margin:5px 0 15px 0; border:1px solid #262636; border-radius:4px;" placeholder="tt_cipher_v4_xxxxxxxxxxxx">
 
           <button type="submit" style="background:#222; color:#fff; padding:10px 20px; border:none; border-radius:4px; cursor:pointer;">Update Active Channels</button>
         </form>
       </div>
 
-      <div style="background:var(--card); padding:25px; border:1px solid #e1e1e1; border-radius:6px; margin-bottom:20px;">
+      <div style="background:var(--card); padding:25px; border:1px solid #262636; border-radius:6px; margin-bottom:20px;">
         <h5 style="margin-top:0; color:#fff;">2. Operational Billing Plan</h5>
         <p style="font-size:14px; margin:0 0 15px 0;">Current Active Organization Tier Level: <strong style="color:#D4AF37;">{{ merchant.tier | upper }} PLAN</strong></p>
         <button style="background:#222; color:#fff; padding:10px 20px; border:none; border-radius:4px; cursor:pointer;" onclick="alert('Tier upgrade flow not yet implemented.')">Modify Subscription Tier Mapping</button>
       </div>
 
-      <div style="background:var(--card); padding:25px; border:1px solid #e1e1e1; border-radius:6px;">
+      <div style="background:var(--card); padding:25px; border:1px solid #262636; border-radius:6px;">
         <h5 style="margin-top:0; color:#fff;">3. Internal AI COO Engine Permissions</h5>
         <label style="display:flex; align-items:center; cursor:pointer; font-size:14px;">
           <input type="checkbox" id="coo-auto-reorder" checked style="margin-right:10px;">
           Allow AI COO to autonomously draft purchase orders when inventory running low
         </label>
+      </div>
+
+      <div style="background:var(--card); padding:25px; border:1px solid #262636; border-radius:6px; margin-top:20px;">
+        <h5 style="margin-top:0; color:#fff;">4. Contact &amp; Support</h5>
+        <p style="font-size:14px; color:#b7bdc9; margin:0 0 12px 0;">Get help with your Prometheus OS node.</p>
+        <div style="display:grid; gap:10px; font-size:13px; color:#f4f4f6;">
+          <div><strong>General Support:</strong> <a href="mailto:support@shawnzyluxe.com" style="color:#D4AF37;">support@shawnzyluxe.com</a></div>
+          <div><strong>Technical Engineering:</strong> <a href="mailto:engineering@shawnzyluxe.com" style="color:#D4AF37;">engineering@shawnzyluxe.com</a></div>
+          <div><strong>Billing &amp; Tiers:</strong> <a href="mailto:billing@shawnzyluxe.com" style="color:#D4AF37;">billing@shawnzyluxe.com</a></div>
+          <div><strong>Emergency Line:</strong> <span style="color:#D4AF37;">+1 (305) 600-7654</span></div>
+        </div>
       </div>
     </section>
 
@@ -1101,7 +1120,7 @@ function updateMultiAgentWorkspaceMatrixCard(agentsPoolArray) {
       <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid rgba(0,0,0,0.03); padding-bottom:8px; font-size:12px;">
         <div>
           <div style="font-weight:700; color:#f4f4f6;">${agent.name}</div>
-          <div style="font-size:11px; color:#7F8C8D; font-style:italic;">${agent.last_action}</div>
+          <div style="font-size:11px; color:#7d8798; font-style:italic;">${agent.last_action}</div>
         </div>
         <span style="background:${stateBg}; color:${stateColor}; padding:2px 8px; border-radius:6px; font-size:10px; font-weight:700; font-family:'JetBrains Mono';">${agent.status}</span>
       </div>`;
