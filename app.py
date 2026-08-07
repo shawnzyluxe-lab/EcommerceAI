@@ -132,14 +132,79 @@ manager = ConnectionManager()
 # ============================================================
 
 SITE_WALL_PASSWORD = os.environ.get("SITE_WALL_PASSWORD", "")
+MASTER_ADMIN_EMAIL = os.environ.get("MASTER_ADMIN_EMAIL", "shawn@shawnzyluxe.com")
 SESSION_COOKIE_NAME = "aegis_session_token"
 SESSION_TIMEOUT_DAYS = int(os.environ.get("SESSION_TIMEOUT_DAYS", "7"))
 
 TIER_LIMITS = {
-    "Basic Tier": {"max_monthly_operations": 500, "features_allowed": ["shopify", "support"]},
-    "Pro Tier": {"max_monthly_operations": 5000, "features_allowed": ["shopify", "tiktok", "support", "marketing"]},
-    "Enterprise AI Tier": {"max_monthly_operations": 999999, "features_allowed": ["shopify", "tiktok", "amazon", "support", "marketing"]},
+    "Basic Tier": {
+        "monthly_order_limit": 500,
+        "max_monthly_operations": 500,
+        "max_store_connections": 2,
+        "sync_frequency_seconds": 900,
+        "advanced_automation": False,
+        "features_allowed": ["shopify", "support"],
+    },
+    "Pro Tier": {
+        "monthly_order_limit": 5000,
+        "max_monthly_operations": 5000,
+        "max_store_connections": 999999,
+        "sync_frequency_seconds": 300,
+        "advanced_automation": True,
+        "features_allowed": ["shopify", "tiktok", "support", "marketing"],
+    },
+    "Enterprise AI Tier": {
+        "monthly_order_limit": 999999,
+        "max_monthly_operations": 999999,
+        "max_store_connections": 999999,
+        "sync_frequency_seconds": 0,
+        "advanced_automation": True,
+        "features_allowed": ["shopify", "tiktok", "amazon", "support", "marketing"],
+    },
 }
+
+
+class TierManager:
+    """Enforces tenant tier limits and feature flags for order automation."""
+
+    @staticmethod
+    def get_tier_meta(tier: str) -> dict:
+        return TIER_LIMITS.get(tier, TIER_LIMITS["Basic Tier"])
+
+    @staticmethod
+    def verify_operational_allowance(merchant_id: str, current_usage: int) -> tuple[bool, str]:
+        """Validate volume capacity before spinning up background workers."""
+        profile = MerchantProfile.query.get(merchant_id)
+        if not profile:
+            return False, "Unknown merchant"
+        account = SaaSBilling.query.get(merchant_id)
+        if not account:
+            return False, "No billing record"
+
+        tier = profile.account_tier or "Basic Tier"
+        meta = TierManager.get_tier_meta(tier)
+        monthly_order_limit = meta["monthly_order_limit"]
+
+        if current_usage >= monthly_order_limit:
+            return False, f"LIMIT EXCEEDED: Brand has consumed its allotment of {monthly_order_limit} orders for this billing cycle. Please upgrade."
+        return True, "OK"
+
+    @staticmethod
+    def route_order_automation(merchant_id: str, order_data: dict) -> dict:
+        """Enforce feature flags based on tier level."""
+        profile = MerchantProfile.query.get(merchant_id)
+        if not profile:
+            return {"status": "SKIPPED", "reason": "Unknown merchant"}
+
+        tier = profile.account_tier or "Basic Tier"
+        meta = TierManager.get_tier_meta(tier)
+
+        if not meta["advanced_automation"]:
+            logger.info(f"[TIER POLICY] Automation skipped for {merchant_id}. {tier} accounts must route orders manually.")
+            return {"status": "SKIPPED", "reason": "Upgrade required for autonomous MCF routing."}
+
+        logger.info(f"[TIER POLICY] Executing automated routing rule for {merchant_id} ({tier}).")
+        return {"status": "DISPATCHED", "destination": "Amazon_FBA_Warehouse", "order_id": order_data.get("order_id")}
 
 
 class UserRole(str, Enum):
@@ -242,12 +307,24 @@ async def dispatch_amazon_mcf(tenant_id: str, sku: str, order_payload: dict):
 
 
 async def process_incoming_order_event(event_data: dict):
-    """Absorb webhook order data, update DB, and fire multi-channel async workers."""
+    """Absorb webhook order data, enforce tier policy, update DB, and fire multi-channel async workers."""
     if not await circuit_breaker.verify_pipeline_clearance():
         logger.warning("[CIRCUIT BREAKER] Incoming order dropped. System sync is HALTED.")
         return False
 
     payload = WebhookOrderPayload.from_dict(event_data)
+
+    # Tier volume and feature-gate enforcement
+    account = SaaSBilling.query.get(payload.tenant_id)
+    current_usage = account.metered_usage_units if account else 0
+    allowed, reason = TierManager.verify_operational_allowance(payload.tenant_id, current_usage)
+    if not allowed:
+        logger.warning(f"[TIER POLICY] TikTok order {payload.order_id} blocked for {payload.tenant_id}: {reason}")
+        return False
+
+    automation = TierManager.route_order_automation(payload.tenant_id, {"order_id": payload.order_id})
+    if automation["status"] == "SKIPPED":
+        logger.info(f"[TIER POLICY] {automation['reason']}")
 
     # Fetch current inventory from the merchant channel mirror
     pl = PredictiveLogistics.query.filter_by(variant_sku=payload.sku).first()
@@ -324,34 +401,34 @@ def get_merchant_context():
 
 
 def check_tier_limits(merchant_id, requested_feature):
-    """Return (allowed: bool, reason: str) based on tier and metered usage."""
+    """Return (allowed: bool, reason: str, status_code: int) based on tier and metered usage."""
     if not merchant_id:
-        return False, "No merchant context"
+        return False, "No merchant context", 403
     profile = MerchantProfile.query.get(merchant_id)
     if not profile:
-        return False, "Unknown merchant"
+        return False, "Unknown merchant", 403
     account = SaaSBilling.query.get(merchant_id)
     if not account:
-        return False, "No billing record"
+        return False, "No billing record", 403
 
     tier = profile.account_tier or "Basic Tier"
-    limits = TIER_LIMITS.get(tier, TIER_LIMITS["Basic Tier"])
+    meta = TierManager.get_tier_meta(tier)
 
-    if requested_feature not in limits["features_allowed"]:
-        return False, f"{tier} does not include {requested_feature} access"
+    if requested_feature not in meta["features_allowed"]:
+        return False, f"{tier} does not include {requested_feature} access", 403
 
-    if account.metered_usage_units >= limits["max_monthly_operations"]:
-        return False, f"Monthly operation limit reached for {tier}"
+    if account.metered_usage_units >= meta["monthly_order_limit"]:
+        return False, f"Monthly operation limit reached for {tier}", 402
 
-    return True, "OK"
+    return True, "OK", 200
 
 
 def enforce_tier_limits(merchant_id, requested_feature):
-    """Helper that returns a Flask JSON 403 response or None if allowed."""
-    allowed, reason = check_tier_limits(merchant_id, requested_feature)
+    """Helper that returns a Flask JSON response or None if allowed."""
+    allowed, reason, status = check_tier_limits(merchant_id, requested_feature)
     if not allowed:
         logger.warning(f"Tier limit blocked: {merchant_id} -> {requested_feature} ({reason})")
-        return jsonify({"error": "Operation Blocked", "reason": reason}), 403
+        return jsonify({"error": "Operation Blocked", "reason": reason}), status
     return None
 
 
@@ -1013,7 +1090,7 @@ def process_command(cmd_text):
     merchant_id = merchant["id"] if merchant else "merchant_shawn_01"
 
     def require_feature(feature, fallback_briefing):
-        allowed, reason = check_tier_limits(merchant_id, feature)
+        allowed, reason, _ = check_tier_limits(merchant_id, feature)
         if not allowed:
             logger.warning(f"Command blocked by tier: {merchant_id} / {feature} ({reason})")
             updates = {"ai_briefing": f"🚫 Tier Limit: {reason}. Upgrade to unlock."}
@@ -2116,7 +2193,8 @@ def magic_login():
         return redirect("/?error=profile_missing")
 
     session_token = secrets.token_urlsafe(32)
-    active = ActiveSession(token=session_token, merchant_id=profile.merchant_id, role=UserRole.MERCHANT.value, created_at=datetime.utcnow())
+    assigned_role = UserRole.ADMIN.value if profile.admin_email == MASTER_ADMIN_EMAIL else UserRole.MERCHANT.value
+    active = ActiveSession(token=session_token, merchant_id=profile.merchant_id, role=assigned_role, created_at=datetime.utcnow())
     db.session.add(active)
     db.session.commit()
 
@@ -2152,6 +2230,28 @@ def admin_release_lock():
         return jsonify({"status": "OPERATIONAL"}), 200
     except Exception as e:
         return jsonify({"status": "error", "reason": str(e)}), 500
+
+
+@app.route('/api/v1/engineer/sandbox-test', methods=['GET'])
+@require_roles([UserRole.ENGINEER, UserRole.ADMIN])
+def engineer_sandbox_test():
+    """Sandboxed environment for outsourced engineers to test Shopify mock sync."""
+    return jsonify({"status": "ACTIVE", "scope": "Sandboxed Shopify mock-data synchronization box."}), 200
+
+
+@app.route('/api/v1/merchant/dashboard', methods=['GET'])
+@require_roles([UserRole.MERCHANT, UserRole.ADMIN])
+def merchant_dashboard():
+    """Standard merchant workspace view."""
+    merchant = get_merchant_context()
+    if not merchant:
+        return jsonify({"error": "No merchant context"}), 403
+    return jsonify({
+        "tenant_id": merchant["id"],
+        "business_name": merchant["name"],
+        "tier": merchant["tier"],
+        "stores": ["Shopify", "TikTok Shop", "Amazon"],
+    }), 200
 
 
 @app.route('/api/v1/admin/trends/run-scrape', methods=['POST'])
