@@ -9,6 +9,58 @@
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="{{ url_for('static', filename='css/app.css') }}">
 <style>
+:root{
+  --ink:#f4f4f6;
+  --ink-2:#b7bdc9;
+  --ink-3:#7d8798;
+  --line:#262636;
+  --line-2:#1f1f2a;
+  --card:#16161F;
+  --bg:#0D0D11;
+  --blue:#D4AF37;
+  --blue-2:#e9c65c;
+  --sky:#2a261b;
+  --green:#27AE60;
+  --green-bg:#102a1d;
+  --amber:#D4AF37;
+  --amber-bg:#2a261b;
+  --red:#e74c3c;
+  --red-bg:#2b1515;
+  --radius:14px;
+  --shadow:0 8px 32px -12px rgba(0,0,0,.45);
+}
+body{ background:var(--bg); color:var(--ink); font-family:Inter,-apple-system,BlinkMacSystemFont,"Segoe UI",Helvetica,Arial,sans-serif; }
+.shell{ grid-template-columns: 260px 1fr; background:var(--bg); }
+.side{ background:#0D0D11; border-right:1px solid #262636; padding:24px 16px; position:sticky; top:0; height:100vh; overflow-y:auto; }
+.brand{ color:#fff; letter-spacing:0.05em; padding:6px 4px 24px; align-items:center; gap:10px; }
+.brand .mark{ width:10px; height:10px; border-radius:50%; background:#D4AF37; box-shadow:0 0 12px rgba(212,175,55,.55); }
+.navgroup .label{ color:#7d8798; letter-spacing:0.1em; font-size:.65rem; }
+.side a.item{ color:#b7bdc9; border-radius:10px; padding:8px 10px; font-size:.84rem; }
+.side a.item:hover{ background:#1f1f2a; color:#fff; }
+.side a.item.on{ background:#2a261b; color:#D4AF37; font-weight:600; }
+.side .dot{ background:#D4AF37; }
+.side .pill{ background:#1f1f2a; color:#D4AF37; }
+.main{ background:var(--bg); }
+.topbar{ background:rgba(13,13,17,.82); backdrop-filter:blur(12px); border-bottom:1px solid #262636; padding:14px 28px; color:#f4f4f6; }
+.topbar .crumb{ color:#7d8798; }
+.btn{ background:#16161F; border-color:#262636; color:var(--ink); }
+.btn:hover{ background:#1f1f2a; }
+.btn.primary{ background:#D4AF37; color:#0D0D11; border-color:#D4AF37; }
+.btn.primary:hover{ background:#e9c65c; }
+.btn.blue{ background:#D4AF37; border-color:#D4AF37; color:#0D0D11; }
+.btn.blue:hover{ background:#e9c65c; }
+.avatar{ background:linear-gradient(140deg,#D4AF37,#7a6d3e); }
+.hero{ background:radial-gradient(1200px 380px at 50% -180px, #1a1a24 0%, #0D0D11 60%, #0D0D11 100%); border-bottom:1px solid #262636; padding:48px 28px 80px; position:relative; }
+.hero .clouds{ display:none; }
+.hero .eyebrow{ color:#D4AF37; background:rgba(212,175,55,.1); border:1px solid rgba(212,175,55,.25); }
+.hero h1{ color:#fff; }
+.hero .sub{ color:#b7bdc9; }
+.card{ background:var(--card); border:1px solid #262636; box-shadow:var(--shadow); border-radius:var(--radius); color:var(--ink); }
+.card-head, .section-head{ color:var(--ink); }
+.section h2, .section h3, .section h4{ color:#fff; }
+.section p, .section .hint, .section .meta{ color:var(--ink-2); }
+input, select, textarea{ background:#0D0D11; color:#fff; border:1px solid #262636; }
+#ai-output{ background:#0b1020; }
 #sidebar { position: relative; transition: width 0.25s ease, padding 0.25s ease; }
 #sidebar-toggle { position: absolute; top: 18px; right: 12px; background: transparent; border: none; font-size: 22px; color: #8B9DAD; cursor: pointer; z-index: 10; }
 #sidebar.collapsed { width: 60px !important; min-width: 60px !important; padding-left: 10px !important; padding-right: 10px !important; }
@@ -24,7 +76,7 @@ body.sidebar-collapsed .shell { grid-template-columns: 60px 1fr; }
 
   <!-- ================= sidebar ================= -->
   <aside class="side" id="sidebar">
-    <div class="brand"><span class="mark"></span> {{ brand.name }}</div>
+    <div class="brand"><span class="mark"></span> PROMETHEUS // OS</div>
     <button id="sidebar-toggle" aria-label="Collapse sidebar" title="Toggle sidebar">≡</button>
     <div class="navgroup">
       <div class="label">Workspace</div>
@@ -56,10 +108,9 @@ body.sidebar-collapsed .shell { grid-template-columns: 60px 1fr; }
 
     <div class="topbar">
       <span class="crumb">{{ brand.domain }} / dashboard</span>
-      <span class="tag ghost">Sample data</span>
-      <div style="display: flex; align-items: center; gap: 8px; background: rgba(255,255,255,0.7); padding: 4px 12px; border-radius: 20px; border: 1px solid rgba(255,255,255,0.5);">
-        <span style="font-size: 12px; font-weight: 500; color: #5C6E88;">Workspace:</span>
-        <span id="current-merchant-tier-badge" style="font-weight:700; color:#1D2D44; font-family:'JetBrains Mono'; font-size:12px;">Loading Tier...</span>
+      <div style="display: flex; align-items: center; gap: 8px; background: rgba(212,175,55,0.1); padding: 4px 12px; border-radius: 20px; border: 1px solid rgba(212,175,55,0.25);">
+        <span style="font-size: 12px; font-weight: 500; color: #D4AF37;">Workspace:</span>
+        <span id="current-merchant-tier-badge" style="font-weight:700; color:#fff; font-family:'JetBrains Mono'; font-size:12px;">Loading Tier...</span>
       </div>
       <span class="spacer"></span>
       <button class="btn">Invite team</button>
@@ -130,9 +181,9 @@ body.sidebar-collapsed .shell { grid-template-columns: 60px 1fr; }
           <span class="spacer"></span>
           <button class="btn blue" onclick="executeLearnedMitigationMoat('INVENTORY_SHORTAGE','APPROVED','Supplier C')">Run Override</button>
         </div>
-        <div class="glass-card" style="border-top: 2px solid #1D2D44; background: rgba(255,255,255,0.95);">
+        <div class="glass-card" style="border-top: 2px solid #D4AF37; background: #16161F;">
           <div id="multi-agent-status-matrix-box" style="display:flex; flex-direction:column; gap:12px;">
-            <div style="font-size:12px; color:#5C6E88; text-align:center;">Initializing agent mesh network connectivity...</div>
+            <div style="font-size:12px; color:#7d8798; text-align:center;">Initializing agent mesh network connectivity...</div>
           </div>
         </div>
       </section>
@@ -147,7 +198,7 @@ body.sidebar-collapsed .shell { grid-template-columns: 60px 1fr; }
         </div>
         <div class="glass-card" style="border-top: 2px solid #5C6E88; background: #1C1D21; color:#A8B2C1; font-family:'JetBrains Mono', monospace; padding:14px;">
           <div id="inter-agent-chat-feed-box" style="display:flex; flex-direction:column; gap:10px; font-size:11px; height:130px; overflow-y:auto; line-height:1.4;">
-            <div style="color:#5C6E88;">Connecting terminal pipeline channels...</div>
+            <div style="color:#7d8798;">Connecting terminal pipeline channels...</div>
           </div>
         </div>
       </section>
@@ -243,7 +294,7 @@ body.sidebar-collapsed .shell { grid-template-columns: 60px 1fr; }
             <div class="line"><span class="k">Delayed</span><span class="v">{{ briefing.delayed }} shipments</span></div>
             <div class="line"><span class="k">Trending</span><span class="v">{{ briefing.trending|join(', ') }}</span></div>
             <div class="line"><span class="k">Refund rate</span><span class="v">{{ briefing.refund_rate }}%</span></div>
-            <div class="card tight" style="margin-top:12px;background:#fff">
+            <div class="card tight" style="margin-top:12px;background:var(--card)">
               <div class="tag blue" style="margin-bottom:6px">Recommended action</div>
               <div style="font-weight:600;font-size:.9rem">{{ briefing.action }}</div>
             </div>
@@ -251,8 +302,8 @@ body.sidebar-collapsed .shell { grid-template-columns: 60px 1fr; }
               <button class="btn blue">Apply</button>
               <button class="btn">Skip</button>
             </div>
-            <div style="margin-top:15px;background:rgba(255,255,255,0.6);padding:12px;border-radius:14px;border:1px solid rgba(29,45,68,0.05);">
-              <div style="font-size:11px;text-transform:uppercase;color:#5C6E88;font-weight:600;margin-bottom:8px;">Link External Storefront</div>
+            <div style="margin-top:15px;background:rgba(255,255,255,0.05);padding:12px;border-radius:14px;border:1px solid rgba(29,45,68,0.05);">
+              <div style="font-size:11px;text-transform:uppercase;color:#7d8798;font-weight:600;margin-bottom:8px;">Link External Storefront</div>
               <div style="display:flex;gap:8px;">
                 <input id="oauth-shop-input" type="text" placeholder="store.myshopify.com" style="width:100%;border:1px solid #D6E0EE;border-radius:8px;padding:6px 10px;font-size:12px;outline:none;background:#FFFFFF;" />
                 <button onclick="triggerOAuthConnection()" style="background:#1D2D44;color:#FFFFFF;border:none;border-radius:8px;padding:6px 14px;font-size:12px;font-weight:600;cursor:pointer;">Connect</button>
@@ -528,7 +579,7 @@ body.sidebar-collapsed .shell { grid-template-columns: 60px 1fr; }
                   <span class="tag {{ 'amber' if p.flag == 'CRITICAL_STOCKOUT' else 'green' }}">{{ p.flag }}</span>
                 </div>
                 <div style="color: #5C6E88; font-size:11px;">
-                  Stockout: <span style="font-weight:600; color:#1D2D44;">{{ p.days }} Days left</span> | Restock: <span class="mono">{{ p.restock }}</span>
+                  Stockout: <span style="font-weight:600; color:#f4f4f6;">{{ p.days }} Days left</span> | Restock: <span class="mono">{{ p.restock }}</span>
                 </div>
               </div>
               {% endfor %}
@@ -548,7 +599,7 @@ body.sidebar-collapsed .shell { grid-template-columns: 60px 1fr; }
         </div>
         <div class="grid g4">
           <div class="card" style="border-left: 2px solid #6772E5; background: rgba(246, 249, 252, 0.65);">
-            <div class="card-head"><h3 style="color:#32325D;">Stripe SaaS Billing</h3></div>
+            <div class="card-head"><h3 style="color:#fff;">Stripe SaaS Billing</h3></div>
             <div class="line"><span class="k">Account Model</span><span class="v">{{ stripe.plan }}</span></div>
             <div class="line"><span class="k">Metered Volume</span><span class="v" id="stripe-usage">{{ stripe.usage }} API Hits</span></div>
             <div class="line" style="font-size: 14px; font-weight: 700; color: #32325D;"><span class="k">Accrued Invoice</span><span class="v" id="stripe-invoice">${{ '{:,.2f}'.format(stripe.invoice) }}</span></div>
@@ -558,7 +609,7 @@ body.sidebar-collapsed .shell { grid-template-columns: 60px 1fr; }
             <div class="card-head"><h3>Catalog Control</h3></div>
             <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid rgba(0,0,0,0.04); padding-bottom:8px;">
               <div>
-                <div style="font-weight:600; color:#1D2D44;">{{ catalog.title }}</div>
+                <div style="font-weight:600; color:#f4f4f6;">{{ catalog.title }}</div>
                 <div style="font-size:10px; color:#8A9BB2;">Variant: {{ catalog.sku }}</div>
               </div>
               <span id="hoodie-price" style="font-family:'JetBrains Mono'; font-weight:600; color:#1E6B3E;">${{ '{:,.2f}'.format(catalog.price) }}</span>
@@ -573,12 +624,12 @@ body.sidebar-collapsed .shell { grid-template-columns: 60px 1fr; }
             </div>
             <div style="border-top: 1px solid rgba(192,57,43,0.08); padding-top: 8px;">
               <div style="font-size: 10px; text-transform: uppercase; color: #95A5A6; font-weight:600; margin-bottom: 4px; font-family:'JetBrains Mono';">Live Exception Logs</div>
-              <p id="live-exception-display" style="margin: 0; color: #2C3E50; font-family: 'JetBrains Mono', monospace; font-size: 11px; white-space: pre-wrap; line-height: 1.3; background: rgba(255,255,255,0.8); padding: 8px; border-radius: 8px; border: 1px solid rgba(192,57,43,0.15);">No warnings flagged. Microservices tracking healthy.</p>
+              <p id="live-exception-display" style="margin: 0; color: #2C3E50; font-family: 'JetBrains Mono', monospace; font-size: 11px; white-space: pre-wrap; line-height: 1.3; background: #0D0D11; padding: 8px; border-radius: 8px; border: 1px solid rgba(192,57,43,0.15);">No warnings flagged. Microservices tracking healthy.</p>
             </div>
           </div>
 
-          <div class="card" style="border-top: 2px solid #1D2D44; background: rgba(255,255,255,0.9);">
-            <div class="card-head"><h3 style="color:#1D2D44;">Secure Core Connections Vault</h3></div>
+          <div class="card" style="border-top: 2px solid #D4AF37; background: #16161F;">
+            <div class="card-head"><h3 style="color:#f4f4f6;">Secure Core Connections Vault</h3></div>
             <div style="display: flex; flex-direction: column; gap: 8px;">
               <select id="vault-platform-select" style="width:100%; padding:8px; border:1px solid #D6E0EE; border-radius:8px; background:#F8FAFC; font-size:12px;">
                 <option value="shopify">Shopify Storefront Node</option>
@@ -593,7 +644,7 @@ body.sidebar-collapsed .shell { grid-template-columns: 60px 1fr; }
 
           <div class="card" style="border-left: 2px solid #1D2D44; display: flex; flex-direction: column; justify-content: space-between;">
             <div>
-              <div class="card-head"><h3 style="color:#1D2D44;">Executive Document Center</h3></div>
+              <div class="card-head"><h3 style="color:#f4f4f6;">Executive Document Center</h3></div>
               <span style="font-size: 11px; text-transform: uppercase; color: #8A9BB2; font-family:'JetBrains Mono';">Compile high-fashion operational data summaries</span>
             </div>
             <button onclick="triggerExecutiveReportCompilation()" style="width:100%; background:#1D2D44; color:#FFFFFF; border:none; border-radius:12px; padding:12px; font-size:12px; font-weight:600; cursor:pointer; margin-top:20px; box-shadow:0 4px 12px rgba(29,45,68,0.15);">Generate Operational Digest Sheet</button>
@@ -638,9 +689,9 @@ body.sidebar-collapsed .shell { grid-template-columns: 60px 1fr; }
         </div>
         <div class="glass-card" style="border-left: 2px solid #27AE60; background: rgba(244, 252, 246, 0.75);">
           <div style="overflow-x:auto;">
-            <table style="width:100%; border-collapse:collapse; text-align:left; font-size:12px; color:#2C3E50;">
+            <table style="width:100%; border-collapse:collapse; text-align:left; font-size:12px; color:#b7bdc9;">
               <thead>
-                <tr style="color:#5C6E88; border-bottom:1px solid rgba(39,174,96,0.1); font-size:11px;">
+                <tr style="color:#7d8798; border-bottom:1px solid rgba(39,174,96,0.1); font-size:11px;">
                   <th style="padding:8px 4px;">Platform</th>
                   <th style="padding:8px 4px;">Budget</th>
                   <th style="padding:8px 4px;">Spend</th>
@@ -674,7 +725,7 @@ body.sidebar-collapsed .shell { grid-template-columns: 60px 1fr; }
               <div class="card tight kpi"><div class="label">Escalated</div><div class="value" style="font-size:1.25rem">{{ support.escalated }}</div></div>
               <div class="card tight kpi"><div class="label">First reply</div><div class="value" style="font-size:1.25rem">{{ support.avg_first_reply }}</div></div>
             </div>
-            <div class="card tight" style="margin-bottom:12px;background:#fff">
+            <div class="card tight" style="margin-bottom:12px;background:var(--card)">
               <div style="display:flex;gap:12px;flex-wrap:wrap;align-items:center">
                 <div><div class="label">Active Chats</div><div class="value" id="support-chats" style="font-size:1.1rem">{{ support.chats }}</div></div>
                 <div><div class="label">Sentiment</div><div class="value" id="support-sentiment" style="font-size:1.1rem">{{ support.sentiment }}</div></div>
@@ -815,27 +866,27 @@ body.sidebar-collapsed .shell { grid-template-columns: 60px 1fr; }
         <h2>⚙️ System Settings</h2>
         <p>Platform operations, channel tokens, and AI COO permissions.</p>
       </div>
-      <div style="background:#fff; padding:25px; border:1px solid #e1e1e1; border-radius:6px; margin-bottom:20px;">
-        <h5 style="margin-top:0; color:#333;">1. Storefront Channel API Tokens</h5>
+      <div style="background:var(--card); padding:25px; border:1px solid #e1e1e1; border-radius:6px; margin-bottom:20px;">
+        <h5 style="margin-top:0; color:#fff;">1. Storefront Channel API Tokens</h5>
         <form id="api-settings-form" onsubmit="saveSystemSettings(event)">
-          <label style="font-size:12px; font-weight:bold; color:#555;">Shopify Admin Access Token:</label>
+          <label style="font-size:12px; font-weight:bold; color:#b7bdc9;">Shopify Admin Access Token:</label>
           <input type="password" id="set-shopify-token" style="width:100%; padding:10px; margin:5px 0 15px 0; border:1px solid #ccc; border-radius:4px;" placeholder="shpat_xxxxxxxxxxxxxxxxxxxxxxxx">
 
-          <label style="font-size:12px; font-weight:bold; color:#555;">TikTok Shop Developer Cipher Key:</label>
+          <label style="font-size:12px; font-weight:bold; color:#b7bdc9;">TikTok Shop Developer Cipher Key:</label>
           <input type="password" id="set-tiktok-token" style="width:100%; padding:10px; margin:5px 0 15px 0; border:1px solid #ccc; border-radius:4px;" placeholder="tt_cipher_v4_xxxxxxxxxxxx">
 
           <button type="submit" style="background:#222; color:#fff; padding:10px 20px; border:none; border-radius:4px; cursor:pointer;">Update Active Channels</button>
         </form>
       </div>
 
-      <div style="background:#fff; padding:25px; border:1px solid #e1e1e1; border-radius:6px; margin-bottom:20px;">
-        <h5 style="margin-top:0; color:#333;">2. Operational Billing Plan</h5>
-        <p style="font-size:14px; margin:0 0 15px 0;">Current Active Organization Tier Level: <strong style="color:#0052cc;">{{ merchant.tier | upper }} PLAN</strong></p>
+      <div style="background:var(--card); padding:25px; border:1px solid #e1e1e1; border-radius:6px; margin-bottom:20px;">
+        <h5 style="margin-top:0; color:#fff;">2. Operational Billing Plan</h5>
+        <p style="font-size:14px; margin:0 0 15px 0;">Current Active Organization Tier Level: <strong style="color:#D4AF37;">{{ merchant.tier | upper }} PLAN</strong></p>
         <button style="background:#222; color:#fff; padding:10px 20px; border:none; border-radius:4px; cursor:pointer;" onclick="alert('Tier upgrade flow not yet implemented.')">Modify Subscription Tier Mapping</button>
       </div>
 
-      <div style="background:#fff; padding:25px; border:1px solid #e1e1e1; border-radius:6px;">
-        <h5 style="margin-top:0; color:#333;">3. Internal AI COO Engine Permissions</h5>
+      <div style="background:var(--card); padding:25px; border:1px solid #e1e1e1; border-radius:6px;">
+        <h5 style="margin-top:0; color:#fff;">3. Internal AI COO Engine Permissions</h5>
         <label style="display:flex; align-items:center; cursor:pointer; font-size:14px;">
           <input type="checkbox" id="coo-auto-reorder" checked style="margin-right:10px;">
           Allow AI COO to autonomously draft purchase orders when inventory running low
@@ -1049,7 +1100,7 @@ function updateMultiAgentWorkspaceMatrixCard(agentsPoolArray) {
     html += `
       <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid rgba(0,0,0,0.03); padding-bottom:8px; font-size:12px;">
         <div>
-          <div style="font-weight:700; color:#1D2D44;">${agent.name}</div>
+          <div style="font-weight:700; color:#f4f4f6;">${agent.name}</div>
           <div style="font-size:11px; color:#7F8C8D; font-style:italic;">${agent.last_action}</div>
         </div>
         <span style="background:${stateBg}; color:${stateColor}; padding:2px 8px; border-radius:6px; font-size:10px; font-weight:700; font-family:'JetBrains Mono';">${agent.status}</span>
@@ -1170,7 +1221,7 @@ function updateCreativeAdOptimizationCard(adMatrixArray) {
   let html = "";
   adMatrixArray.forEach(item => {
     html += `<tr style="border-bottom:1px solid rgba(39,174,96,0.05);">
-      <td style="padding:10px 4px; font-weight:600; color:#1D2D44;">${item.platform}</td>
+      <td style="padding:10px 4px; font-weight:600; color:#f4f4f6;">${item.platform}</td>
       <td style="padding:10px 4px; font-family:'JetBrains Mono';">$${item.budget.toFixed(2)}</td>
       <td style="padding:10px 4px; font-family:'JetBrains Mono';">$${item.spend.toFixed(2)}</td>
       <td style="padding:10px 4px; font-family:'JetBrains Mono'; font-weight:700; color:${item.roas >= 3.0 ? '#1E6B3E' : '#A82525'};">${item.roas}x</td>
