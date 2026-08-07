@@ -3,7 +3,7 @@ services:
     name: shawnzyluxe
     runtime: python
     buildCommand: pip install -r requirements.txt
-    startCommand: gunicorn -k eventlet -w 1 -b 0.0.0.0:$PORT app:app
+    startCommand: gunicorn -w 1 -b 0.0.0.0:$PORT app:app
     envVars:
       - key: PYTHON_VERSION
         value: 3.11.0
@@ -22,6 +22,10 @@ services:
       - key: RECAPTCHA_SITE_KEY
         sync: false
       - key: RECAPTCHA_SECRET_KEY
+        sync: false
+      - key: ENGINEER_EMAIL
+        value: engineer@shawnzyluxe.com
+      - key: TEMP_ACCOUNTS_PASSWORD
         sync: false
       - key: DATABASE_URL
         sync: false

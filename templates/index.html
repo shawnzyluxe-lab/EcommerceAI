@@ -200,43 +200,52 @@
             }
         }
 
+        async function submitAuth(targetAction, token) {
+            let payload = {};
+            let targetEndpoint = '/api/v1/auth/login';
+
+            if (targetAction === 'login') {
+                payload = {
+                    email: document.getElementById('login-email').value,
+                    password: document.getElementById('login-password').value,
+                    captcha_token: token
+                };
+            } else {
+                targetEndpoint = '/api/v1/auth/signup';
+                payload = {
+                    email: document.getElementById('signup-email').value,
+                    password: document.getElementById('signup-password').value,
+                    selected_tier: document.getElementById('signup-tier').value,
+                    captcha_token: token
+                };
+            }
+
+            const response = await fetch(targetEndpoint, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            });
+
+            const serverResult = await response.json();
+            if (response.ok) {
+                window.location.href = "/dashboard";
+            } else {
+                alert("Security Rejection: " + (serverResult.detail || "Unknown error"));
+            }
+        }
+
         function handleAuthSubmit(event, targetAction) {
             event.preventDefault();
 
+            if (!recaptchaSiteKey) {
+                // reCAPTCHA not configured; submit without token (backend fails open when no secret is set)
+                submitAuth(targetAction, "");
+                return;
+            }
+
             grecaptcha.ready(function() {
-                grecaptcha.execute(recaptchaSiteKey, {action: targetAction}).then(async function(token) {
-                    let payload = {};
-                    let targetEndpoint = '/api/v1/auth/login';
-
-                    if (targetAction === 'login') {
-                        payload = {
-                            email: document.getElementById('login-email').value,
-                            password: document.getElementById('login-password').value,
-                            captcha_token: token
-                        };
-                    } else {
-                        targetEndpoint = '/api/v1/auth/signup';
-                        payload = {
-                            email: document.getElementById('signup-email').value,
-                            password: document.getElementById('signup-password').value,
-                            selected_tier: document.getElementById('signup-tier').value,
-                            captcha_token: token
-                        };
-                    }
-
-                    const response = await fetch(targetEndpoint, {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify(payload)
-                    });
-
-                    const serverResult = await response.json();
-                    if (response.ok) {
-                        alert("Verification successful. Executing routing matrix layer...");
-                        window.location.href = "/dashboard";
-                    } else {
-                        alert("Security Rejection: " + (serverResult.detail || "Unknown error"));
-                    }
+                grecaptcha.execute(recaptchaSiteKey, {action: targetAction}).then(function(token) {
+                    submitAuth(targetAction, token);
                 });
             });
         }
