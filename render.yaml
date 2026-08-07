@@ -17,6 +17,12 @@ services:
         sync: false
       - key: SECRET_KEY
         generateValue: true
+      - key: MASTER_ADMIN_EMAIL
+        value: shawn@shawnzyluxe.com
+      - key: RECAPTCHA_SITE_KEY
+        sync: false
+      - key: RECAPTCHA_SECRET_KEY
+        sync: false
       - key: DATABASE_URL
         sync: false
       - key: SHOPIFY_WEBHOOK_SECRET

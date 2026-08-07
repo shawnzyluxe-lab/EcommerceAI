@@ -14,7 +14,7 @@ from threading import Thread
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 from twilio.rest import Client as TwilioClient
-from werkzeug.security import generate_password_hash
+from werkzeug.security import generate_password_hash, check_password_hash
 from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
 from datetime import datetime, timedelta
@@ -133,6 +133,9 @@ manager = ConnectionManager()
 
 SITE_WALL_PASSWORD = os.environ.get("SITE_WALL_PASSWORD", "")
 MASTER_ADMIN_EMAIL = os.environ.get("MASTER_ADMIN_EMAIL", "shawn@shawnzyluxe.com")
+RECAPTCHA_SITE_KEY = os.environ.get("RECAPTCHA_SITE_KEY", "")
+RECAPTCHA_SECRET_KEY = os.environ.get("RECAPTCHA_SECRET_KEY", "")
+RECAPTCHA_VERIFY_URL = "https://www.google.com/recaptcha/api/siteverify"
 SESSION_COOKIE_NAME = "aegis_session_token"
 SESSION_TIMEOUT_DAYS = int(os.environ.get("SESSION_TIMEOUT_DAYS", "7"))
 
@@ -235,6 +238,24 @@ def require_roles(permitted_roles):
             return endpoint_function(*args, **kwargs)
         return wrapper
     return decorator
+
+
+def verify_captcha_v3(token: str) -> float:
+    """Validate a Google reCAPTCHA v3 token and return the bot score (0.0-1.0)."""
+    if not RECAPTCHA_SECRET_KEY:
+        return 1.0  # If not configured, fail open for local dev
+    try:
+        response = requests.post(RECAPTCHA_VERIFY_URL, data={
+            "secret": RECAPTCHA_SECRET_KEY,
+            "response": token,
+        }, timeout=5)
+        if response.status_code == 200:
+            result = response.json()
+            if result.get("success"):
+                return float(result.get("score", 0.0))
+    except Exception as e:
+        logger.warning(f"[CAPTCHA] Verification request failed: {e}")
+    return 0.0
 
 
 @dataclasses.dataclass
@@ -436,7 +457,7 @@ def enforce_tier_limits(merchant_id, requested_feature):
 def site_wall_protect():
     if not site_wall_enabled():
         return None
-    if request.endpoint in ('home', 'site_login', 'shopify_orders_webhook', 'tiktok_orders_webhook', 'amazon_orders_webhook', 'stripe_billing_webhook', 'supplier_po_update', 'execute_mitigation', 'generate_magic_link', 'magic_login', 'register_merchant', 'shopify_oauth_callback', 'health_check', 'static'):
+    if request.endpoint in ('home', 'site_login', 'site_logout', 'auth_login', 'shopify_orders_webhook', 'tiktok_orders_webhook', 'amazon_orders_webhook', 'stripe_billing_webhook', 'supplier_po_update', 'execute_mitigation', 'generate_magic_link', 'magic_login', 'register_merchant', 'shopify_oauth_callback', 'health_check', 'static'):
         return None
     if site_wall_authenticated():
         return None
@@ -1046,7 +1067,7 @@ def storefront(query, variables=None):
 def home():
     if site_wall_authenticated():
         return redirect(url_for('dashboard'))
-    return render_template('index.html', error=bool(request.args.get('error')), oauth_sync=request.args.get('oauth_sync'))
+    return render_template('index.html', error=bool(request.args.get('error')), oauth_sync=request.args.get('oauth_sync'), recaptcha_site_key=RECAPTCHA_SITE_KEY)
 
 
 @app.route('/dashboard')
@@ -1431,6 +1452,52 @@ def site_logout():
     response = redirect(url_for('home'))
     response.delete_cookie(SESSION_COOKIE_NAME)
     return response
+
+
+@app.route('/api/v1/auth/login', methods=['POST'])
+def auth_login():
+    """Verify reCAPTCHA v3, then validate email + password and issue a session cookie."""
+    payload = request.get_json(silent=True) or {}
+    email = (payload.get("email") or "").strip().lower()
+    password = payload.get("password", "")
+    captcha_token = payload.get("captcha_token", "")
+
+    if not email or not password:
+        return jsonify({"detail": "CRITICAL ERROR: Email and password are required."}), 400
+
+    # 1. Enforce Bot Interception Pass
+    bot_score = verify_captcha_v3(captcha_token)
+    if bot_score < 0.5:
+        return jsonify({"detail": "AUTOMATION GUARD: Automated traffic signature identified. Access blocked."}), 403
+
+    # 2. Credential evaluation against DB hash
+    profile = MerchantProfile.query.filter_by(admin_email=email).first()
+    if not profile or not profile.password_hash:
+        return jsonify({"detail": "CRITICAL ERROR: Invalid authentication credentials match failed."}), 401
+
+    if not check_password_hash(profile.password_hash, password):
+        return jsonify({"detail": "CRITICAL ERROR: Invalid authentication credentials match failed."}), 401
+
+    # 3. Issue encrypted session JWT (session cookie + ActiveSession row)
+    session_token = secrets.token_urlsafe(32)
+    assigned_role = UserRole.ADMIN.value if email == MASTER_ADMIN_EMAIL.lower() else UserRole.MERCHANT.value
+    db.session.add(ActiveSession(token=session_token, merchant_id=profile.merchant_id, role=assigned_role, created_at=datetime.utcnow()))
+    db.session.commit()
+
+    response = make_response(jsonify({
+        "status": "AUTHORIZED",
+        "role": assigned_role,
+        "merchant_id": profile.merchant_id,
+    }))
+    response.set_cookie(
+        SESSION_COOKIE_NAME,
+        session_token,
+        max_age=SESSION_TIMEOUT_DAYS * 86400,
+        httponly=True,
+        samesite="Lax",
+        secure=app.config.get("SESSION_COOKIE_SECURE", os.environ.get("SESSION_COOKIE_SECURE", "true").lower() == "true"),
+    )
+    return response, 200
 
 
 SHOPIFY_WEBHOOK_SECRET = os.environ.get("SHOPIFY_WEBHOOK_SECRET", "").strip().encode()

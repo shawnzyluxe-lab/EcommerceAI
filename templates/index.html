@@ -4,6 +4,7 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Prometheus OS — Autonomous Commerce Intelligence</title>
+    <script src="https://www.google.com/recaptcha/api.js?render={{ recaptcha_site_key }}" async defer></script>
     <script src="https://cdn.tailwindcss.com"></script>
     <script>
         tailwind.config = {
@@ -40,9 +41,22 @@
             <a href="#tiers" class="hover:text-white transition">Tiers</a>
             <a href="#security" class="hover:text-white transition">Security</a>
         </nav>
-        <button onclick="openLoginModal()" class="border border-white/20 hover:border-accentGold bg-transparent text-white px-5 py-2 text-xs tracking-widest uppercase transition rounded-sm font-mono">
-            System Login
-        </button>
+        <div class="profile-widget relative">
+            <button id="profileBtn" onclick="toggleLoginPopup()" class="border border-white/20 hover:border-accentGold bg-transparent text-white px-5 py-2 text-xs tracking-widest uppercase transition rounded-sm font-mono">
+                Sign In / Access Profile
+            </button>
+            <div id="loginPopup" class="hidden absolute right-0 mt-3 w-80 bg-slateDark border border-borderMuted rounded-sm shadow-2xl p-5 text-left z-50">
+                <h3 class="text-xs font-mono uppercase tracking-widest text-gray-400 mb-4">Account Access Gate</h3>
+                <form id="loginForm" onsubmit="executeSecureLogin(event)">
+                    <input type="email" id="email" class="w-full bg-onyx border border-borderMuted focus:border-accentGold rounded-sm px-3 py-2 text-sm text-white font-mono placeholder:text-gray-600 focus:outline-none transition mb-3" placeholder="Enter System Email" required>
+                    <input type="password" id="password" class="w-full bg-onyx border border-borderMuted focus:border-accentGold rounded-sm px-3 py-2 text-sm text-white font-mono placeholder:text-gray-600 focus:outline-none transition mb-3" placeholder="Password" required>
+                    <input type="hidden" id="g-recaptcha-response" name="g-recaptcha-response">
+                    <button type="submit" class="w-full bg-white hover:bg-accentGold text-onyx font-bold uppercase text-xs tracking-widest py-2 px-4 transition font-mono rounded-sm shadow-md">
+                        Authorize Node
+                    </button>
+                </form>
+            </div>
+        </div>
     </header>
 
     <main class="flex-grow flex flex-col items-center justify-center text-center px-4 max-w-5xl mx-auto py-16">
@@ -60,19 +74,16 @@
             Stop digging through static metrics. Prometheus compiles your sales data, automates real-time net profit accounting, and coordinates specialized background agents to run your supply chain safely under single-click merchant approval.
         </p>
 
-        <form method="post" action="{{ url_for('site_login') }}" class="w-full max-w-md p-6 bg-slateDark border border-borderMuted rounded-md shadow-2xl text-left">
+        <div class="w-full max-w-md p-6 bg-slateDark border border-borderMuted rounded-md shadow-2xl text-left">
             <h3 class="text-xs font-mono uppercase tracking-widest text-gray-400 mb-4">Initialize System Portal</h3>
-            <div class="space-y-3">
-                <input type="password" name="password" placeholder="ENTER PORTAL WALL PASSWORD..."
-                       class="w-full bg-onyx border border-borderMuted focus:border-accentGold rounded-sm px-4 py-3 text-sm text-white font-mono placeholder:text-gray-600 focus:outline-none transition" required>
-                <button type="submit" class="w-full bg-white hover:bg-accentGold text-onyx font-bold uppercase text-xs tracking-widest py-3 px-4 transition font-mono rounded-sm shadow-md">
-                    Verify Identity and Shield
-                </button>
-            </div>
+            <p class="text-gray-500 text-xs font-mono mb-4">Use the profile menu to authenticate with your merchant email, password, and reCAPTCHA token.</p>
+            <button onclick="toggleLoginPopup()" class="w-full bg-white hover:bg-accentGold text-onyx font-bold uppercase text-xs tracking-widest py-3 px-4 transition font-mono rounded-sm shadow-md">
+                Open Access Gate
+            </button>
             {% if error %}
             <div class="text-red-500 font-mono text-xs mt-3">CRITICAL DETECT: AUTHENTICATION FAILURE. HARD SYSTEM LOCKOUT 403 RECORDED.</div>
             {% endif %}
-        </form>
+        </div>
     </main>
 
     <section id="architecture" class="border-t border-borderMuted bg-slateDark/30 py-16 px-6">
@@ -158,13 +169,41 @@
     </footer>
 
     <script>
-        function openLoginModal() {
-            document.getElementById('loginModal').classList.remove('hidden');
-            document.getElementById('loginModal').classList.add('flex');
+        const recaptchaSiteKey = "{{ recaptcha_site_key }}";
+
+        function toggleLoginPopup() {
+            const popup = document.getElementById('loginPopup');
+            popup.classList.toggle('hidden');
         }
-        function closeLoginModal() {
-            document.getElementById('loginModal').classList.add('hidden');
-            document.getElementById('loginModal').classList.remove('flex');
+
+        function executeSecureLogin(event) {
+            event.preventDefault();
+
+            grecaptcha.ready(function() {
+                grecaptcha.execute(recaptchaSiteKey, {action: 'login'}).then(async function(token) {
+                    document.getElementById('g-recaptcha-response').value = token;
+
+                    const payload = {
+                        email: document.getElementById('email').value,
+                        password: document.getElementById('password').value,
+                        captcha_token: token
+                    };
+
+                    const response = await fetch('/api/v1/auth/login', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(payload)
+                    });
+
+                    const data = await response.json();
+                    if (response.ok) {
+                        alert("Access Granted. Initializing Session Matrix...");
+                        window.location.href = "/dashboard";
+                    } else {
+                        alert("Authorization Failed: " + (data.detail || "Unknown error"));
+                    }
+                });
+            });
         }
 
         const urlParams = new URLSearchParams(window.location.search);
