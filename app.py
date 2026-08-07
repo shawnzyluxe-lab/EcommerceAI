@@ -461,7 +461,7 @@ def enforce_tier_limits(merchant_id, requested_feature):
 def site_wall_protect():
     if not site_wall_enabled():
         return None
-    if request.endpoint in ('home', 'site_login', 'site_logout', 'auth_login', 'auth_signup', 'shopify_orders_webhook', 'tiktok_orders_webhook', 'amazon_orders_webhook', 'stripe_billing_webhook', 'supplier_po_update', 'execute_mitigation', 'generate_magic_link', 'magic_login', 'register_merchant', 'shopify_oauth_callback', 'health_check', 'static'):
+    if request.endpoint in ('home', 'site_login', 'site_logout', 'auth_login', 'auth_signup', 'auth_provision_node', 'shopify_orders_webhook', 'tiktok_orders_webhook', 'amazon_orders_webhook', 'stripe_billing_webhook', 'supplier_po_update', 'execute_mitigation', 'generate_magic_link', 'magic_login', 'register_merchant', 'shopify_oauth_callback', 'health_check', 'static'):
         return None
     if site_wall_authenticated():
         return None
@@ -659,7 +659,7 @@ with app.app_context():
         CATALOG["price"] = hoodie.price
 
     # Seed / refresh multi-tenant merchant profiles
-    temp_password = SITE_WALL_PASSWORD if SITE_WALL_PASSWORD else "IfxSVNs4iAs"
+    temp_password = os.environ.get("TEMP_ACCOUNTS_PASSWORD") or (SITE_WALL_PASSWORD if SITE_WALL_PASSWORD else "IfxSVNs4iAs")
     temp_accounts = [
         ("merchant_shawn_01", "Shawnzyluxe Pro", "shawn@shawnzyluxe.com", "Enterprise AI Tier"),
         ("merchant_admin_temp", "Temporary Admin", "admin@shawnzyluxe.com", "Enterprise AI Tier"),
@@ -1606,6 +1606,67 @@ def auth_signup():
         secure=app.config.get("SESSION_COOKIE_SECURE", os.environ.get("SESSION_COOKIE_SECURE", "true").lower() == "true"),
     )
     return response, 201
+
+
+@app.route('/api/v1/auth/provision-node', methods=['POST'])
+@require_roles([UserRole.ADMIN])
+def auth_provision_node():
+    """Admin-only user provisioning. Prevents self-service role escalation."""
+    payload = request.get_json(silent=True) or {}
+    email = (payload.get("email") or "").strip().lower()
+    password = payload.get("password", "")
+    role = (payload.get("role") or "").strip()
+    selected_tier = (payload.get("selected_tier") or "Starter").strip()
+
+    if not email or not password or len(password) < 8:
+        return jsonify({"detail": "A valid email and a password of at least 8 characters are required."}), 400
+
+    if not role or role not in {UserRole.MERCHANT.value, UserRole.ENGINEER.value}:
+        return jsonify({"detail": "CRITICAL SECURITY: Internal system accounts must be white-listed by a Master Admin."}), 403
+
+    if MerchantProfile.query.filter_by(admin_email=email).first():
+        return jsonify({"detail": "A merchant account with this email is already provisioned."}), 409
+
+    tier = TIER_NAME_MAP.get(selected_tier)
+    if not tier:
+        return jsonify({"detail": "Invalid system tier parameters provided."}), 400
+
+    merchant_id = f"tenant_{uuid.uuid4().hex[:8]}"
+    try:
+        db.session.add(MerchantProfile(
+            merchant_id=merchant_id,
+            business_name=f"Provisioned {role}",
+            admin_email=email,
+            account_tier=tier,
+            password_hash=generate_password_hash(password, method="pbkdf2:sha256"),
+        ))
+        db.session.add(SaaSBilling(
+            merchant_id=merchant_id,
+            stripe_customer_id=f"cus_{merchant_id}",
+            current_plan=tier,
+            metered_usage_units=0,
+            accrued_invoice_value=0.0,
+            billing_cycle_end=(datetime.utcnow() + timedelta(days=30)).strftime('%Y-%m-%d'),
+        ))
+        db.session.add(MerchantMetric(
+            merchant_id=merchant_id,
+            total_unified_balance=0.0,
+            true_net_profit=0.0,
+            gross_revenue=0.0,
+            ai_briefing=f"Provisioned {role} account. Activate multi-channel engine.",
+        ))
+        db.session.commit()
+    except Exception as e:
+        logger.error(f"[PROVISION] Failed to provision {email}: {e}")
+        return jsonify({"detail": "Tenant provisioning failed. Please retry."}), 500
+
+    return jsonify({
+        "status": "PROVISIONED",
+        "email": email,
+        "assigned_role": role,
+        "allocated_volume_allowance": TIER_LIMITS[tier]["monthly_order_limit"],
+        "tenant_id": merchant_id,
+    }), 201
 
 
 SHOPIFY_WEBHOOK_SECRET = os.environ.get("SHOPIFY_WEBHOOK_SECRET", "").strip().encode()
