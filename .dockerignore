@@ -1,0 +1,17 @@
+.env
+.env.example
+__pycache__/
+*.pyc
+.venv/
+env/
+instance/
+generated/
+*.db
+*.sqlite
+migrations/
+.git
+.gitignore
+.pytest_cache/
+tests/
+README.md
+AGENTS.md

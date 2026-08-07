@@ -1,0 +1,124 @@
+version: '3.8'
+
+services:
+  # 1. Edge Layer: Reverse Proxy / Gateway Gatekeeper
+  gateway-proxy:
+    image: nginx:alpine
+    container_name: matrix_gateway_proxy
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./nginx/certs:/etc/nginx/certs:ro
+    depends_on:
+      - api-engine
+    networks:
+      - web-network
+    restart: always
+
+  # 2. Application Layer: Core Multi-Tenant API Engine (Flask)
+  api-engine:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: python_core_api_engine
+    environment:
+      - APP_ENV=production
+      - PYTHON_CORE_VERSION=4.02
+      - DATABASE_URL=postgresql+psycopg://matrix_admin:SecureAdminSecret2026@multi-tenant-db:5432/matrix_prod
+      - REDIS_URL=redis://:HighSpeedCircuitBreakerSecret2026@system-lock-cache:6373/0
+      - LIMITER_STORAGE_URI=redis://:HighSpeedCircuitBreakerSecret2026@system-lock-cache:6373/0
+      - CELERY_BROKER_URL=redis://async-task-broker:6379/1
+      - PROXY_GATE_RESIDENTIAL_A=${PROXY_GATE_RESIDENTIAL_A:-}
+      - PROXY_GATE_RESIDENTIAL_B=${PROXY_GATE_RESIDENTIAL_B:-}
+      - SECRET_KEY=${SECRET_KEY:-}
+      - SITE_WALL_PASSWORD=${SITE_WALL_PASSWORD:-}
+    expose:
+      - "8000"
+    depends_on:
+      - multi-tenant-db
+      - system-lock-cache
+      - async-task-broker
+    networks:
+      - web-network
+      - backend-network
+    restart: always
+
+  # 3. Automation Layer: Trending Products Scraping Engine
+  trend-worker:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: trend_scraping_worker
+    command: python trend_worker.py
+    environment:
+      - APP_ENV=production
+      - DATABASE_URL=postgresql+psycopg://matrix_admin:SecureAdminSecret2026@multi-tenant-db:5432/matrix_prod
+      - REDIS_URL=redis://:HighSpeedCircuitBreakerSecret2026@system-lock-cache:6373/0
+      - LIMITER_STORAGE_URI=redis://:HighSpeedCircuitBreakerSecret2026@system-lock-cache:6373/0
+      - PROXY_GATE_RESIDENTIAL_A=${PROXY_GATE_RESIDENTIAL_A:-http://proxy.network}
+      - PROXY_GATE_RESIDENTIAL_B=${PROXY_GATE_RESIDENTIAL_B:-http://proxy.network}
+      - SCRAPE_INTERVAL_SECONDS=${SCRAPE_INTERVAL_SECONDS:-3600}
+    depends_on:
+      - multi-tenant-db
+      - system-lock-cache
+    networks:
+      - web-network
+      - backend-network
+    restart: always
+
+  # 4. Storage Layer: Multi-Tenant PostgreSQL Core Cluster
+  multi-tenant-db:
+    image: postgres:15-alpine
+    container_name: isolated_tenant_database
+    environment:
+      - POSTGRES_USER=matrix_admin
+      - POSTGRES_PASSWORD=SecureAdminSecret2026
+      - POSTGRES_DB=matrix_prod
+    volumes:
+      - postgres_matrix_data:/var/lib/postgresql/data
+    expose:
+      - "5432"
+    networks:
+      - backend-network
+    deploy:
+      resources:
+        limits:
+          cpus: '2.0'
+          memory: 4G
+    restart: always
+
+  # 5. Caching Layer: High-Speed Circuit Breaker & Lock State
+  system-lock-cache:
+    image: redis:7-alpine
+    container_name: system_lock_redis
+    command: redis-server --port 6373 --requirepass HighSpeedCircuitBreakerSecret2026
+    expose:
+      - "6373"
+    networks:
+      - backend-network
+    restart: always
+
+  # 6. Messaging Layer: Async Task Broker for Long-Running Queues
+  async-task-broker:
+    image: redis:7-alpine
+    container_name: async_task_redis
+    command: redis-server --port 6379
+    expose:
+      - "6379"
+    networks:
+      - backend-network
+    restart: always
+
+networks:
+  web-network:
+    driver: bridge
+    internal: false
+  backend-network:
+    driver: bridge
+    internal: true
+
+volumes:
+  postgres_matrix_data:
+    driver: local

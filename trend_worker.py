@@ -1,6 +1,7 @@
 import os
 import logging
 import asyncio
+import time
 from typing import Dict, Any, List
 from datetime import datetime
 from pydantic import BaseModel, Field, HttpUrl
@@ -140,3 +141,17 @@ class TrendingProductsScraper:
 def run_trend_scrape():
     """Synchronous wrapper for the async trend worker."""
     return asyncio.run(TrendingProductsScraper().execute_automation_loop())
+
+
+SCRAPE_INTERVAL_SECONDS = int(os.environ.get("SCRAPE_INTERVAL_SECONDS", "3600"))
+
+
+if __name__ == "__main__":
+    logger.info("[TREND WORKER] Long-running scheduler started.")
+    while True:
+        try:
+            count = run_trend_scrape()
+            logger.info(f"[TREND WORKER] Scraped {count} products. Sleeping {SCRAPE_INTERVAL_SECONDS}s.")
+        except Exception as e:
+            logger.error(f"[TREND WORKER] Scheduler error: {e}")
+        time.sleep(SCRAPE_INTERVAL_SECONDS)
