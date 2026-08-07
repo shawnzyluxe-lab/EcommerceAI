@@ -5,3 +5,7 @@ __pycache__/
 .venv/
 env/
 instance/
+generated/
+*.db
+*.sqlite
+migrations/

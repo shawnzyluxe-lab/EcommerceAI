@@ -123,8 +123,9 @@ manager = ConnectionManager()
 # AEGIS-STYLE SITE PASSWORD WALL
 # ============================================================
 
-SITE_WALL_PASSWORD = "IfxSVNs4iAs"
+SITE_WALL_PASSWORD = os.environ.get("SITE_WALL_PASSWORD", "")
 SESSION_COOKIE_NAME = "aegis_session_token"
+SESSION_TIMEOUT_DAYS = int(os.environ.get("SESSION_TIMEOUT_DAYS", "7"))
 
 TIER_LIMITS = {
     "Basic Tier": {"max_monthly_operations": 500, "features_allowed": ["shopify", "support"]},
@@ -147,7 +148,7 @@ def site_wall_authenticated():
     if token is None or token not in active_sessions:
         return False
     s = ActiveSession.query.get(token)
-    if not s or s.created_at < datetime.utcnow() - timedelta(seconds=300):
+    if not s or s.created_at < datetime.utcnow() - timedelta(days=SESSION_TIMEOUT_DAYS):
         active_sessions.discard(token)
         return False
     return True
@@ -1186,7 +1187,7 @@ def site_login():
             response.set_cookie(
                 SESSION_COOKIE_NAME,
                 token,
-                max_age=300,
+                max_age=SESSION_TIMEOUT_DAYS * 86400,
                 httponly=True,
                 samesite='Lax',
                 secure=True,
@@ -1969,10 +1970,10 @@ def magic_login():
     response.set_cookie(
         SESSION_COOKIE_NAME,
         session_token,
-        max_age=7 * 24 * 60 * 60,
+        max_age=SESSION_TIMEOUT_DAYS * 86400,
         httponly=True,
         samesite="Lax",
-        secure=False,
+        secure=app.config.get("SESSION_COOKIE_SECURE", os.environ.get("SESSION_COOKIE_SECURE", "true").lower() == "true"),
     )
     return response
 
