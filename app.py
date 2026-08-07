@@ -80,11 +80,12 @@ app.config["SQLALCHEMY_DATABASE_URI"] = os.environ.get(
 )
 app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
 
+LIMITER_STORAGE_URI = os.environ.get("LIMITER_STORAGE_URI", "memory://")
 limiter = Limiter(
     key_func=get_remote_address,
     app=app,
     default_limits=["200 per day", "50 per hour"],
-    storage_uri="memory://",
+    storage_uri=LIMITER_STORAGE_URI,
 )
 
 GENERATED_DIR = "generated"
@@ -133,8 +134,8 @@ TIER_LIMITS = {
     "Enterprise AI Tier": {"max_monthly_operations": 999999, "features_allowed": ["shopify", "tiktok", "amazon", "support", "marketing"]},
 }
 
-# In-memory active token ring. Server restart clears all sessions.
-active_sessions = set()
+# Sessions are stored in the database (ActiveSession table) for worker-safe, persistent auth.
+# No in-memory session ring is used.
 
 
 def site_wall_enabled():
@@ -145,11 +146,10 @@ def site_wall_enabled():
 def site_wall_authenticated():
     """Check whether the browser has a valid, non-expired session token."""
     token = request.cookies.get(SESSION_COOKIE_NAME)
-    if token is None or token not in active_sessions:
+    if token is None:
         return False
     s = ActiveSession.query.get(token)
     if not s or s.created_at < datetime.utcnow() - timedelta(days=SESSION_TIMEOUT_DAYS):
-        active_sessions.discard(token)
         return False
     return True
 
@@ -253,13 +253,11 @@ CUSTOMER_ACCOUNT_BASE = f"https://shopify.com/{SHOPIFY_DOMAIN.split('.')[0]}" if
 with app.app_context():
     db.create_all()
 
-    # Clean expired sessions and restore active ones
+    # Clean expired sessions
     ActiveSession.query.filter(
-        ActiveSession.created_at < datetime.utcnow() - timedelta(seconds=300)
+        ActiveSession.created_at < datetime.utcnow() - timedelta(days=SESSION_TIMEOUT_DAYS)
     ).delete(synchronize_session=False)
     db.session.commit()
-    for s in ActiveSession.query.all():
-        active_sessions.add(s.token)
 
     # Seed or restore business metrics
     if not BusinessMetric.query.first():
@@ -1179,7 +1177,6 @@ def site_login():
         submitted = request.form.get('password', '')
         if hmac.compare_digest(submitted, SITE_WALL_PASSWORD):
             token = secrets.token_urlsafe(32)
-            active_sessions.add(token)
             default_merchant = "merchant_shawn_01"
             db.session.add(ActiveSession(token=token, merchant_id=default_merchant, created_at=datetime.utcnow()))
             db.session.commit()
@@ -1200,8 +1197,6 @@ def site_login():
 @app.route('/site-logout')
 def site_logout():
     token = request.cookies.get(SESSION_COOKIE_NAME)
-    if token and token in active_sessions:
-        active_sessions.remove(token)
     if token:
         ActiveSession.query.filter_by(token=token).delete()
         db.session.commit()
@@ -1963,8 +1958,6 @@ def magic_login():
     active = ActiveSession(token=session_token, merchant_id=profile.merchant_id, created_at=datetime.utcnow())
     db.session.add(active)
     db.session.commit()
-
-    active_sessions.add(session_token)
 
     response = make_response(redirect("/"))
     response.set_cookie(
