@@ -267,3 +267,17 @@ class TrendingProduct(db.Model):
     alert_status = db.Column(db.String(50), default="Active")
     status_flag = db.Column(db.String(50))
     created_at = db.Column(db.DateTime, server_default=db.func.now())
+
+
+class ProductFinancialLedger(db.Model):
+    __tablename__ = "product_financial_ledger"
+    ledger_id = db.Column(db.String(36), primary_key=True, default=_uuid)
+    tenant_id = db.Column(db.String(50), nullable=False)
+    order_id = db.Column(db.String(100), unique=True, nullable=False)
+    sales_channel = db.Column(db.String(50), nullable=False)  # Shopify, Amazon, TikTokShop
+    gross_revenue = db.Column(db.Numeric(10, 2), nullable=False)
+    marketplace_fees = db.Column(db.Numeric(10, 2), nullable=False)
+    cost_of_goods_sold = db.Column(db.Numeric(10, 2), nullable=False)
+    shipping_costs = db.Column(db.Numeric(10, 2), nullable=False)
+    net_profit = db.Column(db.Numeric(10, 2), nullable=False)
+    recorded_at = db.Column(db.DateTime, server_default=db.func.now())
