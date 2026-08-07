@@ -1135,11 +1135,43 @@ function updateCreativeAdOptimizationCard(adMatrixArray) {
   tableBody.innerHTML = html;
 }
 
+function switchView() {
+  const hash = window.location.hash || '#top';
+  const sections = document.querySelectorAll('main .wrap section.section, main .wrap div[id]');
+
+  if (hash === '#top' || hash === '#overview' || !document.querySelector(hash)) {
+    // Overview mode: show all major sections
+    sections.forEach(s => s.style.display = '');
+  } else {
+    const target = document.querySelector(hash);
+    if (!target) return;
+    const parentSection = target.closest('section.section');
+
+    // Hide all top-level dashboard sections
+    document.querySelectorAll('main .wrap section.section').forEach(s => s.style.display = 'none');
+
+    // Show the section that contains the target
+    if (parentSection) {
+      parentSection.style.display = '';
+    } else if (target.tagName === 'SECTION') {
+      target.style.display = '';
+    } else {
+      // Fallback: target is a card inside a section; show its parent section
+      const fallback = target.closest('main .wrap > section, .wrap');
+      if (fallback) fallback.style.display = '';
+    }
+
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }
+
+  updateActiveNav();
+}
+
 function updateActiveNav() {
   const hash = window.location.hash || '#top';
   document.querySelectorAll('.side a.item').forEach(link => {
     const section = link.getAttribute('data-section');
-    if (section === hash || (section && section.endsWith(hash) && hash !== '')) {
+    if (section === hash) {
       link.classList.add('on');
     } else {
       link.classList.remove('on');
@@ -1147,10 +1179,10 @@ function updateActiveNav() {
   });
 }
 
-window.addEventListener('hashchange', updateActiveNav);
+window.addEventListener('hashchange', switchView);
 document.addEventListener('DOMContentLoaded', () => {
   performTelemetryWorkspaceSync();
-  updateActiveNav();
+  switchView();
 });
 </script>
 </body>
