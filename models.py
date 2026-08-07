@@ -45,6 +45,7 @@ class ActiveSession(db.Model):
     __tablename__ = "active_sessions"
     token = db.Column(db.String(255), primary_key=True)
     merchant_id = db.Column(db.String(100), db.ForeignKey("merchant_profiles.merchant_id"))
+    role = db.Column(db.String(50), default="Merchant")
     created_at = db.Column(db.DateTime, server_default=db.func.now())
 
 

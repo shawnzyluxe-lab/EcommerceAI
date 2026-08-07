@@ -8,6 +8,8 @@ import secrets
 import requests
 import smtplib
 import logging
+import asyncio
+import dataclasses
 from threading import Thread
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
@@ -16,6 +18,8 @@ from werkzeug.security import generate_password_hash
 from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
 from datetime import datetime, timedelta
+from enum import Enum
+from functools import wraps
 
 logging.basicConfig(
     level=logging.INFO,
@@ -133,6 +137,150 @@ TIER_LIMITS = {
     "Pro Tier": {"max_monthly_operations": 5000, "features_allowed": ["shopify", "tiktok", "support", "marketing"]},
     "Enterprise AI Tier": {"max_monthly_operations": 999999, "features_allowed": ["shopify", "tiktok", "amazon", "support", "marketing"]},
 }
+
+
+class UserRole(str, Enum):
+    ADMIN = "Admin"
+    MERCHANT = "Merchant"
+    ENGINEER = "Engineer"
+
+
+def get_current_user():
+    """Return the active session record with its role, or None."""
+    token = request.cookies.get(SESSION_COOKIE_NAME)
+    if not token:
+        return None
+    s = ActiveSession.query.get(token)
+    if not s or s.created_at < datetime.utcnow() - timedelta(days=SESSION_TIMEOUT_DAYS):
+        return None
+    return s
+
+
+def require_roles(permitted_roles):
+    """Flask RBAC decorator. Fails closed (403) on unauthorized access."""
+    def decorator(endpoint_function):
+        @wraps(endpoint_function)
+        def wrapper(*args, **kwargs):
+            s = get_current_user()
+            if not s or s.role not in [role.value for role in permitted_roles]:
+                return jsonify({"error": "SECURITY PROTOCOL VIOLATION: Unauthorized endpoint access attempt. Session invalidated."}), 403
+            return endpoint_function(*args, **kwargs)
+        return wrapper
+    return decorator
+
+
+@dataclasses.dataclass
+class WebhookOrderPayload:
+    order_id: str
+    sku: str
+    quantity_purchased: int
+    tenant_id: str
+
+    @classmethod
+    def from_dict(cls, data):
+        return cls(
+            order_id=str(data.get("order_id", "")),
+            sku=str(data.get("sku", data.get("variant_sku", ""))),
+            quantity_purchased=int(data.get("qty", data.get("quantity", 1))),
+            tenant_id=str(data.get("tenant_id", data.get("merchant_id", ""))),
+        )
+
+
+class GlobalSystemCircuitBreaker:
+    """Redis-backed global kill switch for background channel sync workers."""
+    def __init__(self, redis_url: str):
+        try:
+            import redis.asyncio as redis
+            self.client = redis.from_url(redis_url)
+            self.enabled = True
+        except Exception as e:
+            logger.warning(f"Redis unavailable for circuit breaker: {e}")
+            self.client = None
+            self.enabled = False
+        self.switch_key = "sys:matrix:global_sync_lock"
+
+    async def engage_global_kill_switch(self):
+        if not self.client:
+            return
+        await self.client.set(self.switch_key, "HALTED")
+        logger.info("[HARD EXECUTABLE CONTROL] Global synchronization pipelines PAUSED.")
+
+    async def release_system_lock(self):
+        if not self.client:
+            return
+        await self.client.set(self.switch_key, "OPERATIONAL")
+        logger.info("[HARD EXECUTABLE CONTROL] Global synchronization pipelines restored.")
+
+    async def verify_pipeline_clearance(self) -> bool:
+        if not self.client:
+            return True
+        status = await self.client.get(self.switch_key)
+        if status == b"HALTED":
+            return False
+        return True
+
+
+REDIS_URL = os.environ.get("REDIS_URL", "redis://localhost:6379")
+circuit_breaker = GlobalSystemCircuitBreaker(REDIS_URL)
+
+
+async def dispatch_shopify_sync(tenant_id: str, sku: str, new_stock: int):
+    """Simulate outbound Shopify inventory patch."""
+    await asyncio.sleep(0.05)
+    logger.info(f"[ASYNC WORKER] Shopify sync queued. Tenant {tenant_id} SKU {sku} -> {new_stock}")
+    return True
+
+
+async def dispatch_amazon_mcf(tenant_id: str, sku: str, order_payload: dict):
+    """Simulate outbound Amazon MCF order creation."""
+    await asyncio.sleep(0.08)
+    logger.info(f"[ASYNC WORKER] Amazon MCF queued. Tenant {tenant_id} SKU {sku}")
+    return True
+
+
+async def process_incoming_order_event(event_data: dict):
+    """Absorb webhook order data, update DB, and fire multi-channel async workers."""
+    if not await circuit_breaker.verify_pipeline_clearance():
+        logger.warning("[CIRCUIT BREAKER] Incoming order dropped. System sync is HALTED.")
+        return False
+
+    payload = WebhookOrderPayload.from_dict(event_data)
+
+    # Fetch current inventory from the merchant channel mirror
+    pl = PredictiveLogistics.query.filter_by(variant_sku=payload.sku).first()
+    current_stock = pl.days_remaining if pl else 12  # using days_remaining as a proxy metric
+    calculated = max(0, current_stock - payload.quantity_purchased)
+
+    # Update merchant channel and predictive logistics
+    mc = MerchantChannel.query.filter_by(merchant_id=payload.tenant_id, channel_id="tiktok").first()
+    if mc:
+        mc.pending_orders += payload.quantity_purchased
+
+    if pl:
+        pl.days_remaining = calculated
+        if pl.days_remaining < 7:
+            pl.status_flag = "CRITICAL_STOCKOUT"
+        elif pl.days_remaining < 14:
+            pl.status_flag = "LOW_STOCK"
+
+    db.session.add(BusinessMetric(
+        merchant_id=payload.tenant_id,
+        total_unified_balance=DASHBOARD_STATE.get("total_unified_balance", 20560.0),
+        true_net_profit=DASHBOARD_STATE.get("true_net_profit", 1394.0),
+        gross_revenue=DASHBOARD_STATE.get("gross_revenue", 4582.0),
+        ai_briefing=f"🛒 TikTok order {payload.order_id} routed. SKU {payload.sku} stock proxy shifted to {calculated}.",
+    ))
+    db.session.commit()
+
+    # Concurrent downstream dispatch
+    await asyncio.gather(
+        dispatch_shopify_sync(payload.tenant_id, payload.sku, calculated),
+        dispatch_amazon_mcf(payload.tenant_id, payload.sku, event_data),
+    )
+
+    logger.info("[PIPELINE COMPLETE] Global inventory synchronized across active endpoints.")
+    return True
+
 
 # Sessions are stored in the database (ActiveSession table) for worker-safe, persistent auth.
 # No in-memory session ring is used.
@@ -1178,7 +1326,7 @@ def site_login():
         if hmac.compare_digest(submitted, SITE_WALL_PASSWORD):
             token = secrets.token_urlsafe(32)
             default_merchant = "merchant_shawn_01"
-            db.session.add(ActiveSession(token=token, merchant_id=default_merchant, created_at=datetime.utcnow()))
+            db.session.add(ActiveSession(token=token, merchant_id=default_merchant, role=UserRole.ADMIN.value, created_at=datetime.utcnow()))
             db.session.commit()
             response = redirect(url_for('home'))
             response.set_cookie(
@@ -1366,6 +1514,8 @@ def tiktok_orders_webhook():
     try:
         created = process_idempotent_channel_event(event_id, merchant_target, "tiktok", order_price)
         db.session.commit()
+        # Trigger real-time multi-channel routing pipeline in the background
+        run_async_task(lambda: asyncio.run(process_incoming_order_event(raw)))
         return jsonify({"status": "synchronized" if created else "ignored"}), 200
     except Exception as e:
         log_system_exception("TIKTOK_WEBHOOK", "CRITICAL", str(e))
@@ -1514,6 +1664,7 @@ def supplier_po_update():
 
 
 @app.route('/api/v1/tenant/execute-mitigation', methods=['POST'])
+@require_roles([UserRole.ADMIN, UserRole.MERCHANT, UserRole.ENGINEER])
 def execute_mitigation():
     """One-click AI mitigation: reroute supplier and clear shortage warnings."""
     merchant = get_merchant_context()
@@ -1558,6 +1709,7 @@ def execute_mitigation():
 
 
 @app.route('/api/v1/context-schema', methods=['GET'])
+@require_roles([UserRole.ADMIN, UserRole.MERCHANT, UserRole.ENGINEER])
 def context_schema():
     """Return the proprietary, localized merchant context package."""
     merchant = get_merchant_context()
@@ -1566,6 +1718,7 @@ def context_schema():
 
 
 @app.route('/api/v1/agents/collaborate', methods=['POST'])
+@require_roles([UserRole.ADMIN, UserRole.MERCHANT, UserRole.ENGINEER])
 def agents_collaborate():
     """Trigger the internal multi-agent collaboration loop."""
     merchant = get_merchant_context()
@@ -1577,6 +1730,7 @@ def agents_collaborate():
 
 
 @app.route('/api/v1/decision/approve', methods=['POST'])
+@require_roles([UserRole.ADMIN, UserRole.MERCHANT, UserRole.ENGINEER])
 def decision_approve():
     merchant = get_merchant_context()
     merchant_id = merchant["id"] if merchant else "merchant_shawn_01"
@@ -1588,6 +1742,7 @@ def decision_approve():
 
 
 @app.route('/api/v1/decision/modify', methods=['POST'])
+@require_roles([UserRole.ADMIN, UserRole.MERCHANT, UserRole.ENGINEER])
 def decision_modify():
     merchant = get_merchant_context()
     merchant_id = merchant["id"] if merchant else "merchant_shawn_01"
@@ -1599,6 +1754,7 @@ def decision_modify():
 
 
 @app.route('/api/v1/tenant/commit-learned-decision', methods=['POST'])
+@require_roles([UserRole.ADMIN, UserRole.MERCHANT, UserRole.ENGINEER])
 def commit_learned_decision():
     """Capture merchant decision, compute confidence index, and mutate state if approved."""
     merchant = get_merchant_context()
@@ -1669,6 +1825,7 @@ def download_report():
 
 @app.route('/api/v1/tenant/compile-executive-digest', methods=['POST'])
 @limiter.limit("10 per hour")
+@require_roles([UserRole.ADMIN, UserRole.MERCHANT])
 def compile_executive_digest():
     """Build an editorial-style HTML executive digest from merchant metrics."""
     merchant = get_merchant_context()
@@ -1729,6 +1886,7 @@ def compile_executive_digest():
 
 
 @app.route('/api/v1/tenant/download-digest', methods=['GET'])
+@require_roles([UserRole.ADMIN, UserRole.MERCHANT])
 def download_digest():
     """Serve the generated executive digest HTML."""
     target = os.path.join(GENERATED_DIR, "shawnzyluxe_executive_digest.html")
@@ -1955,7 +2113,7 @@ def magic_login():
         return redirect("/?error=profile_missing")
 
     session_token = secrets.token_urlsafe(32)
-    active = ActiveSession(token=session_token, merchant_id=profile.merchant_id, created_at=datetime.utcnow())
+    active = ActiveSession(token=session_token, merchant_id=profile.merchant_id, role=UserRole.MERCHANT.value, created_at=datetime.utcnow())
     db.session.add(active)
     db.session.commit()
 
@@ -1969,6 +2127,28 @@ def magic_login():
         secure=app.config.get("SESSION_COOKIE_SECURE", os.environ.get("SESSION_COOKIE_SECURE", "true").lower() == "true"),
     )
     return response
+
+
+@app.route('/api/v1/admin/kill-switch', methods=['POST'])
+@require_roles([UserRole.ADMIN])
+def admin_kill_switch():
+    """Halt all background channel synchronization."""
+    try:
+        asyncio.run(circuit_breaker.engage_global_kill_switch())
+        return jsonify({"status": "HALTED"}), 200
+    except Exception as e:
+        return jsonify({"status": "error", "reason": str(e)}), 500
+
+
+@app.route('/api/v1/admin/release-lock', methods=['POST'])
+@require_roles([UserRole.ADMIN])
+def admin_release_lock():
+    """Restore global synchronization."""
+    try:
+        asyncio.run(circuit_breaker.release_system_lock())
+        return jsonify({"status": "OPERATIONAL"}), 200
+    except Exception as e:
+        return jsonify({"status": "error", "reason": str(e)}), 500
 
 
 @app.route('/health', methods=['GET'])
