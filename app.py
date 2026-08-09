@@ -1369,8 +1369,10 @@ def process_command(cmd_text):
         COO["narrative"] = updates["ai_briefing"]
 
     elif re.search(r'(show briefing|watch briefing|business briefing)', cmd_text):
+        rev = DASHBOARD_STATE.get("gross_revenue", 0) or BRIEFING.get("revenue", 0)
+        profit = DASHBOARD_STATE.get("true_net_profit", 0) or BRIEFING.get("profit", 0)
         updates["ai_briefing"] = (
-            f"📊 Business Briefing: Revenue ${BRIEFING['revenue']:,.0f}, profit ${BRIEFING['profit']:,.0f}, "
+            f"📊 Business Briefing: Revenue ${rev:,.0f}, profit ${profit:,.0f}, "
             f"{BRIEFING['orders']} orders, {BRIEFING['delayed']} delayed. "
             f"Top trending: {', '.join(BRIEFING['trending'])}."
         )
