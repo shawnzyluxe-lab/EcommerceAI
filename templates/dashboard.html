@@ -882,6 +882,8 @@ ws.onmessage = function(event) {
     triggerTechChime();
     out.style.display = 'block';
     document.getElementById('cmdanswer').textContent = data.updates.ai_briefing;
+    const aiOut = document.getElementById('ai-output');
+    if (aiOut) aiOut.textContent = data.updates.ai_briefing;
     const chips = ['Unified balance: $' + data.updates.total_balance];
     if (data.updates.clear_orders) chips.push('Order queue cleared');
     document.getElementById('cmddid').innerHTML =
