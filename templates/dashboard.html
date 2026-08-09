@@ -9,74 +9,16 @@
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="{{ url_for('static', filename='css/app.css') }}">
 <style>
-:root{
-  --ink:#f4f4f6;
-  --ink-2:#b7bdc9;
-  --ink-3:#7d8798;
-  --line:#262636;
-  --line-2:#1f1f2a;
-  --card:#0D0D11;
-  --bg:#0D0D11;
-  --blue:#D4AF37;
-  --blue-2:#e9c65c;
-  --sky:#2a261b;
-  --green:#27AE60;
-  --green-bg:#102a1d;
-  --amber:#D4AF37;
-  --amber-bg:#2a261b;
-  --red:#e74c3c;
-  --red-bg:#2b1515;
-  --radius:14px;
-  --shadow:0 8px 32px -12px rgba(0,0,0,.45);
-}
-body{ background:var(--bg); color:var(--ink); font-family:Inter,-apple-system,BlinkMacSystemFont,"Segoe UI",Helvetica,Arial,sans-serif; }
-.shell{ grid-template-columns: 260px 1fr; background:var(--bg); }
-.side{ background:#0D0D11; border-right:1px solid #262636; padding:24px 16px; position:sticky; top:0; height:100vh; overflow-y:auto; }
-.brand{ color:#fff; letter-spacing:0.05em; padding:6px 4px 24px; align-items:center; gap:10px; }
-.brand .mark{ width:10px; height:10px; border-radius:50%; background:#D4AF37; box-shadow:0 0 12px rgba(212,175,55,.55); }
-.navgroup .label{ color:#7d8798; letter-spacing:0.1em; font-size:.65rem; }
-.side a.item{ color:#b7bdc9; border-radius:10px; padding:8px 10px; font-size:.84rem; }
-.side a.item:hover{ background:#1f1f2a; color:#fff; }
-.side a.item.on{ background:#2a261b; color:#D4AF37; font-weight:600; }
-.side .dot{ background:#D4AF37; }
-.side .pill{ background:#1f1f2a; color:#D4AF37; }
-.main{ background:var(--bg); }
-.topbar{ background:rgba(13,13,17,.82); backdrop-filter:blur(12px); border-bottom:1px solid #262636; padding:14px 28px; color:#f4f4f6; }
-.topbar .crumb{ color:#7d8798; }
-.btn{ background:#16161F; border-color:#262636; color:var(--ink); }
-.btn:hover{ background:#1f1f2a; }
-.btn.primary{ background:#D4AF37; color:#0D0D11; border-color:#D4AF37; }
-.btn.primary:hover{ background:#e9c65c; }
-.btn.blue{ background:#D4AF37; border-color:#D4AF37; color:#0D0D11; }
-.btn.blue:hover{ background:#e9c65c; }
-.avatar{ background:linear-gradient(140deg,#D4AF37,#7a6d3e); }
-.hero{ background:radial-gradient(1200px 380px at 50% -180px, #1a1a24 0%, #0D0D11 60%, #0D0D11 100%); border-bottom:1px solid #262636; padding:48px 28px 80px; position:relative; }
-.hero .clouds{ display:none; }
-.hero .eyebrow{ color:#D4AF37; background:rgba(212,175,55,.1); border:1px solid rgba(212,175,55,.25); }
-.hero h1{ color:#fff; }
-.hero .sub{ color:#b7bdc9; }
-.card{ background:var(--card); border:1px solid #262636; box-shadow:var(--shadow); border-radius:var(--radius); color:var(--ink); }
-.card-head, .section-head{ color:var(--ink); }
-.section h2, .section h3, .section h4{ color:#fff; }
-.section p, .section .hint, .section .meta{ color:var(--ink-2); }
-input, select, textarea{ background:#0D0D11; color:#fff; border:1px solid #262636; }
-#ai-output{ background:#0D0D11; }
-.coo{ background:#0D0D11; border:1px solid #262636; border-radius:var(--radius); padding:22px; box-shadow:var(--shadow); }
-.glass-card{ background:#0D0D11 !important; }
-.tag{ background:#1f1f2a; color:#D4AF37; border:1px solid #262636; }
-.tag.blue{ background:#D4AF37; color:#0D0D11; }
-.tag.green{ background:#1E6B3E; color:#fff; }
-.tag.amber{ background:#7a6d3e; color:#fff; }
-.tag.red{ background:#A82525; color:#fff; }
-.tag.ghost{ background:#0D0D11; color:#7d8798; }
+.glass-card { border-radius: var(--radius); padding: 18px; background: var(--card); border: 1px solid var(--line); }
 #sidebar { position: relative; transition: width 0.25s ease, padding 0.25s ease; }
-#sidebar-toggle { position: absolute; top: 18px; right: 12px; background: transparent; border: none; font-size: 22px; color: #8B9DAD; cursor: pointer; z-index: 10; }
+#sidebar-toggle { position: absolute; top: 18px; right: 12px; background: transparent; border: none; font-size: 22px; color: #6b7488; cursor: pointer; z-index: 10; }
 #sidebar.collapsed { width: 60px !important; min-width: 60px !important; padding-left: 10px !important; padding-right: 10px !important; }
 #sidebar.collapsed .brand, #sidebar.collapsed .label, #sidebar.collapsed .item span:not(.dot), #sidebar.collapsed .pill { display: none; }
 #sidebar.collapsed .item { justify-content: center; padding: 10px 0; }
 #sidebar.collapsed .navgroup { margin: 0; }
 body.sidebar-collapsed .shell { grid-template-columns: 60px 1fr; }
 @media (max-width: 768px) { #sidebar-toggle { right: 6px; } }
+input, select, textarea { background: #fff; color: var(--ink); border: 1px solid var(--line); }
 </style>
 </head>
 <body id="app-body">
@@ -86,29 +28,14 @@ body.sidebar-collapsed .shell { grid-template-columns: 60px 1fr; }
   <aside class="side" id="sidebar">
     <div class="brand"><span class="mark"></span> PROMETHEUS // OS</div>
     <button id="sidebar-toggle" aria-label="Collapse sidebar" title="Toggle sidebar">≡</button>
+    {% for group, items in nav %}
     <div class="navgroup">
-      <div class="label">Workspace</div>
-      {% for label, href, on in nav[:5] %}
-      <a class="item" href="{{ href }}" data-section="{{ href }}"><span class="dot"></span>{{ label }}</a>
+      <div class="label">{{ group }}</div>
+      {% for label, href, on in items %}
+      <a class="item" href="{{ href }}" data-section="{{ href }}"><span class="dot"></span>{{ label }}{% if label == 'Channels' %}<span class="pill">{{ connected|length }}/{{ channels|length }}</span>{% endif %}</a>
       {% endfor %}
     </div>
-    <div class="navgroup">
-      <div class="label">Intelligence</div>
-      {% for label, href, on in nav[5:11] %}
-      <a class="item" href="{{ href }}" data-section="{{ href }}"><span class="dot"></span>{{ label }}</a>
-      {% endfor %}
-    </div>
-    <div class="navgroup">
-      <div class="label">Operations</div>
-      {% for label, href, on in nav[11:] %}
-      <a class="item" href="{{ href }}" data-section="{{ href }}"><span class="dot"></span>{{ label }}</a>
-      {% endfor %}
-    </div>
-    <div class="navgroup">
-      <div class="label">Store</div>
-      <a class="item" href="#channels" data-section="#channels"><span class="dot"></span>Channels <span class="pill">{{ connected|length }}/{{ channels|length }}</span></a>
-      <a class="item" href="#settings" data-section="#settings"><span class="dot"></span>⚙️ System Settings</a>
-    </div>
+    {% endfor %}
   </aside>
 
   <!-- ================= main ================= -->
@@ -116,13 +43,13 @@ body.sidebar-collapsed .shell { grid-template-columns: 60px 1fr; }
 
     <div class="topbar">
       <span class="crumb">{{ brand.domain }} / dashboard</span>
-      <div style="display: flex; align-items: center; gap: 8px; background: rgba(212,175,55,0.1); padding: 4px 12px; border-radius: 20px; border: 1px solid rgba(212,175,55,0.25);">
-        <span style="font-size: 12px; font-weight: 500; color: #D4AF37;">Workspace:</span>
-        <span id="current-merchant-tier-badge" style="font-weight:700; color:#fff; font-family:'JetBrains Mono'; font-size:12px;">Loading Tier...</span>
+      <div style="display: flex; align-items: center; gap: 8px; background: rgba(29,78,216,0.08); padding: 4px 12px; border-radius: 20px; border: 1px solid rgba(29,78,216,0.25)">
+        <span style="font-size: 12px; font-weight: 500; color: #1d4ed8">Workspace:</span>
+        <span id="current-merchant-tier-badge" style="font-weight: 700; color: #0b1220; font-family: 'JetBrains Mono'; font-size: 12px">Loading Tier...</span>
       </div>
       <span class="spacer"></span>
-      <button class="btn">Invite team</button>
-      <button class="btn primary">Connect a channel</button>
+      <button class="btn" onclick="run('invite team')">Invite team</button>
+      <button class="btn primary" onclick="window.location.hash='#channels'">Connect a channel</button>
       <div class="avatar">SD</div>
     </div>
 
@@ -135,8 +62,8 @@ body.sidebar-collapsed .shell { grid-template-columns: 60px 1fr; }
         <p class="sub">{{ brand.name }} {{ brand.product }} connects every marketplace into one dashboard, then
         does the work — routing orders, watching margin, reordering stock, and answering customers.</p>
         <div class="cta">
-          <button class="btn primary">Open Command Center</button>
-          <button class="btn">Watch briefing</button>
+          <button class="btn primary" onclick="window.location.hash='#command'">Open Command Center</button>
+          <button class="btn" onclick="run('watch briefing')">Watch briefing</button>
         </div>
       </div>
     </section>
@@ -145,21 +72,21 @@ body.sidebar-collapsed .shell { grid-template-columns: 60px 1fr; }
 
       <!-- ---------- AI COO ---------- -->
       <section class="coo">
-        <div class="card-head" style="margin-bottom:10px">
+        <div class="card-head" style="margin-bottom: 10px">
           <span class="tag blue">AI COO</span>
           <span class="tag ghost">Confidence {{ coo.confidence }}%</span>
           <span class="spacer"></span>
-          <span class="crumb" style="font-size:.76rem;color:var(--ink-3)">{{ generated }}</span>
+          <span class="crumb" style="font-size: .76rem; color: var(--ink-3)">{{ generated }}</span>
         </div>
-        <h2 style="font-size:1.35rem">{{ coo.greeting }}</h2>
-        <p id="ai-briefing-text" class="say" style="margin-top:8px">
+        <h2 style="font-size: 1.35rem">{{ coo.greeting }}</h2>
+        <p id="ai-briefing-text" class="say" style="margin-top: 8px">
           {% for pre, num, post in coo.summary %}{{ pre }} <strong>{{ num }}</strong>{% if post %} {{ post }}{% endif %}. {% endfor %}
           {{ coo.narrative }}
         </p>
 
-        <div id="ai-mitigation-actions-tray" style="display:none; background:rgba(231,76,60,0.06); border:1px dashed rgba(231,76,60,0.25); padding:12px; border-radius:14px; margin-top:12px;">
-          <div id="mitigation-tray-label" style="font-size:10px; text-transform:uppercase; color:#C0392B; font-weight:700; margin-bottom:8px; font-family:'JetBrains Mono';">AI Recommended Mitigation Interventions</div>
-          <button onclick="commitOneClickMitigation('REROUTE_SUPPLIER_C')" style="width:100%; background:#C0392B; color:#fff; border:none; border-radius:10px; padding:10px; font-size:12px; font-weight:600; cursor:pointer; box-shadow:0 4px 12px rgba(192,57,43,0.2);">Auto-Reroute to Supplier C Network</button>
+        <div id="ai-mitigation-actions-tray" style="display: none; background: rgba(239,68,68,0.06); border: 1px dashed rgba(239,68,68,0.25); padding: 12px; border-radius: 14px; margin-top: 12px">
+          <div id="mitigation-tray-label" style="font-size: 10px; text-transform: uppercase; color: #dc2626; font-weight: 700; margin-bottom: 8px; font-family: 'JetBrains Mono'">AI Recommended Mitigation Interventions</div>
+          <button onclick="commitOneClickMitigation('REROUTE_SUPPLIER_C')" style="width: 100%; background: #dc2626; color: #ffffff; border: none; border-radius: 10px; padding: 10px; font-size: 12px; font-weight: 600; cursor: pointer; box-shadow: 0 4px 12px rgba(192,57,43,0.2)">Auto-Reroute to Supplier C Network</button>
         </div>
 
         <div class="plan">
@@ -176,9 +103,9 @@ body.sidebar-collapsed .shell { grid-template-columns: 60px 1fr; }
           <button class="btn blue" onclick="executeContextualAIAnalysis()">Run AI COO Analysis</button>
           <button class="btn blue" onclick="executeLearnedMitigationMoat('INVENTORY_SHORTAGE','APPROVED','Supplier C')">Approve &amp; Execute</button>
           <button class="btn" onclick="executeLearnedMitigationMoat('INVENTORY_SHORTAGE','MODIFIED','Supplier C')">Modify</button>
-          <button class="btn">Dismiss</button>
+          <button class="btn" onclick="run('dismiss')">Dismiss</button>
         </div>
-        <pre id="ai-output" style="margin-top:12px; padding:12px; background:#0b1020; color:#d4e3ff; border-radius:10px; font-size:12px; white-space:pre-wrap; min-height:60px;">AI COO standing by.</pre>
+        <pre id="ai-output" style="margin-top: 12px; padding: 12px; background: #f7faff; color: #0b1220; border-radius: 10px; font-size: 12px; white-space: pre-wrap; min-height: 60px">AI COO standing by.</pre>
       </section>
 
       <!-- ---------- Team AI Orchestration Loop ---------- -->
@@ -189,9 +116,9 @@ body.sidebar-collapsed .shell { grid-template-columns: 60px 1fr; }
           <span class="spacer"></span>
           <button class="btn blue" onclick="executeLearnedMitigationMoat('INVENTORY_SHORTAGE','APPROVED','Supplier C')">Run Override</button>
         </div>
-        <div class="glass-card" style="border-top: 2px solid #D4AF37; background: #16161F;">
-          <div id="multi-agent-status-matrix-box" style="display:flex; flex-direction:column; gap:12px;">
-            <div style="font-size:12px; color:#7d8798; text-align:center;">Initializing agent mesh network connectivity...</div>
+        <div class="glass-card" style="border-top: 2px solid #1d4ed8; background: #ffffff">
+          <div id="multi-agent-status-matrix-box" style="display: flex; flex-direction: column; gap: 12px">
+            <div style="font-size: 12px; color: #64748b; text-align: center">Initializing agent mesh network connectivity...</div>
           </div>
         </div>
       </section>
@@ -202,17 +129,17 @@ body.sidebar-collapsed .shell { grid-template-columns: 60px 1fr; }
           <h2>Inter-Agent Dialogue Terminal</h2>
           <p>Real-time background worker communications.</p>
           <span class="spacer"></span>
-          <span class="tag green" style="font-family:'JetBrains Mono';">STREAM_ACTIVE</span>
+          <span class="tag green" style="font-family: 'JetBrains Mono'">STREAM_ACTIVE</span>
         </div>
-        <div class="glass-card" style="border-top: 2px solid #5C6E88; background: #1C1D21; color:#b7bdc9; font-family:'JetBrains Mono', monospace; padding:14px;">
-          <div id="inter-agent-chat-feed-box" style="display:flex; flex-direction:column; gap:10px; font-size:11px; height:130px; overflow-y:auto; line-height:1.4;">
-            <div style="color:#7d8798;">Connecting terminal pipeline channels...</div>
+        <div class="glass-card" style="border-top: 2px solid #64748b; background: #ffffff; color: #475569; font-family: 'JetBrains Mono', monospace; padding: 14px">
+          <div id="inter-agent-chat-feed-box" style="display: flex; flex-direction: column; gap: 10px; font-size: 11px; height: 130px; overflow-y: auto; line-height: 1.4">
+            <div style="color: #64748b">Connecting terminal pipeline channels...</div>
           </div>
         </div>
       </section>
 
       <!-- ---------- KPI row ---------- -->
-      <div class="grid g4" style="margin-top:16px">
+      <div class="grid g4" style="margin-top: 16px">
         <div class="card kpi">
           <div class="label">Revenue today</div>
           <div class="value" id="rev-display">${{ '{:,.0f}'.format(briefing.revenue) }}</div>
@@ -250,10 +177,10 @@ body.sidebar-collapsed .shell { grid-template-columns: 60px 1fr; }
           <div class="suggests">
             {% for s in suggestions %}<span class="chip js-chip">{{ s }}</span>{% endfor %}
           </div>
-          <div class="card tight" id="cmdout" style="margin-top:14px;display:none">
-            <div class="tag blue" style="margin-bottom:8px">Answer</div>
-            <p id="cmdanswer" style="color:var(--ink)"></p>
-            <div id="cmddid" class="suggests" style="margin-top:10px"></div>
+          <div class="card tight" id="cmdout" style="margin-top: 14px; display: none">
+            <div class="tag blue" style="margin-bottom: 8px">Answer</div>
+            <p id="cmdanswer" style="color: var(--ink)"></p>
+            <div id="cmddid" class="suggests" style="margin-top: 10px"></div>
           </div>
         </div>
       </section>
@@ -264,15 +191,15 @@ body.sidebar-collapsed .shell { grid-template-columns: 60px 1fr; }
           <h2>Universal Commerce Hub</h2>
           <p>One login. One dashboard. {{ connected|length }} of {{ channels|length }} channels connected.</p>
           <span class="spacer"></span>
-          <button class="btn">Manage connections</button>
+          <button class="btn" onclick="window.location.hash='#channels'">Manage connections</button>
         </div>
         <div class="channels">
           {% for c in channels %}
           <div class="channel {{ 'off' if c.state != 'connected' }}">
             <div class="row">
-              <span class="logo" style="background:{{ c.color }}">{{ c.abbr }}</span>
+              <span class="logo" style="background: {{ c.color }}">{{ c.abbr }}</span>
               <span class="name">{{ c.name }}</span>
-              <span class="spacer" style="flex:1"></span>
+              <span class="spacer" style="flex: 1"></span>
               <span class="tag {{ 'green' if c.state == 'connected' else 'ghost' }}">{{ 'Live' if c.state == 'connected' else 'Connect' }}</span>
             </div>
             {% if c.state == 'connected' %}
@@ -296,25 +223,25 @@ body.sidebar-collapsed .shell { grid-template-columns: 60px 1fr; }
               <span class="spacer"></span>
               <span class="tag blue">06:10</span>
             </div>
-            <p style="color:var(--ink);font-weight:600;margin-bottom:8px">Good morning, {{ brand.owner }}.</p>
+            <p style="color: var(--ink); font-weight: 600; margin-bottom: 8px">Good morning, {{ brand.owner }}.</p>
             <div class="line"><span class="k">Revenue</span><span class="v">${{ '{:,.0f}'.format(briefing.revenue) }}</span></div>
             <div class="line"><span class="k">Profit</span><span class="v">${{ '{:,.0f}'.format(briefing.profit) }}</span></div>
             <div class="line"><span class="k">Delayed</span><span class="v">{{ briefing.delayed }} shipments</span></div>
             <div class="line"><span class="k">Trending</span><span class="v">{{ briefing.trending|join(', ') }}</span></div>
             <div class="line"><span class="k">Refund rate</span><span class="v">{{ briefing.refund_rate }}%</span></div>
-            <div class="card tight" style="margin-top:12px;background:var(--card)">
-              <div class="tag blue" style="margin-bottom:6px">Recommended action</div>
-              <div style="font-weight:600;font-size:.9rem">{{ briefing.action }}</div>
+            <div class="card tight" style="margin-top: 12px; background: var(--card)">
+              <div class="tag blue" style="margin-bottom: 6px">Recommended action</div>
+              <div style="font-weight: 600; font-size: .9rem">{{ briefing.action }}</div>
             </div>
-            <div class="approve" style="margin-top:12px">
-              <button class="btn blue">Apply</button>
-              <button class="btn">Skip</button>
+            <div class="approve" style="margin-top: 12px">
+              <button class="btn blue" onclick="run('apply recommendation')">Apply</button>
+              <button class="btn" onclick="run('skip recommendation')">Skip</button>
             </div>
-            <div style="margin-top:15px;background:rgba(255,255,255,0.05);padding:12px;border-radius:14px;border:1px solid rgba(29,45,68,0.05);">
-              <div style="font-size:11px;text-transform:uppercase;color:#7d8798;font-weight:600;margin-bottom:8px;">Link External Storefront</div>
-              <div style="display:flex;gap:8px;">
-                <input id="oauth-shop-input" type="text" placeholder="store.myshopify.com" style="width:100%;border:1px solid #262636;border-radius:8px;padding:6px 10px;font-size:12px;outline:none;background:#0D0D11;" />
-                <button onclick="triggerOAuthConnection()" style="background:#1D2D44;color:#fff;border:none;border-radius:8px;padding:6px 14px;font-size:12px;font-weight:600;cursor:pointer;">Connect</button>
+            <div style="margin-top: 15px; background: rgba(0,0,0,0.03); padding: 12px; border-radius: 14px; border: 1px solid rgba(11,18,32,0.05)">
+              <div style="font-size: 11px; text-transform: uppercase; color: #64748b; font-weight: 600; margin-bottom: 8px">Link External Storefront</div>
+              <div style="display: flex; gap: 8px">
+                <input id="oauth-shop-input" type="text" placeholder="store.myshopify.com" style="width: 100%; border: 1px solid #e4e8f0; border-radius: 8px; padding: 6px 10px; font-size: 12px; outline: none; background: #ffffff" />
+                <button onclick="triggerOAuthConnection()" style="background: #1d4ed8; color: #ffffff; border: none; border-radius: 8px; padding: 6px 14px; font-size: 12px; font-weight: 600; cursor: pointer">Connect</button>
               </div>
             </div>
           </div>
@@ -334,7 +261,7 @@ body.sidebar-collapsed .shell { grid-template-columns: 60px 1fr; }
                   <div class="t">{{ a.title }}</div>
                   <div class="d">{{ a.detail }}</div>
                   <div class="actions">
-                    {% for act in a.actions %}<button class="btn" style="padding:5px 10px;font-size:.76rem">{{ act }}</button>{% endfor %}
+                    {% for act in a.actions %}<button class="btn" style="padding: 5px 10px; font-size: .76rem" onclick="run('{{ act|lower }}')">{{ act }}</button>{% endfor %}
                   </div>
                 </div>
                 <div class="when">{{ a.when }}</div>
@@ -355,14 +282,14 @@ body.sidebar-collapsed .shell { grid-template-columns: 60px 1fr; }
           <div class="card">
             <div class="card-head"><h3>Today's true margin</h3></div>
             {% for r in profit_rows %}
-            <div class="line" style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px dashed var(--line);font-size:.85rem">
-              <span style="color:var(--ink-3)">{{ r.label }}</span>
-              <span class="mono {{ 'up' if r.kind == 'in' else 'down' }}" style="font-weight:600">
+            <div class="line" style="display: flex; justify-content: space-between; padding: 6px 0; border-bottom: 1px dashed var(--line); font-size: .85rem">
+              <span style="color: var(--ink-3)">{{ r.label }}</span>
+              <span class="mono {{ 'up' if r.kind == 'in' else 'down' }}" style="font-weight: 600">
                 {{ '${:,.2f}'.format(r.amount) if r.kind == 'in' else '−${:,.2f}'.format(-r.amount) }}
               </span>
             </div>
             {% endfor %}
-            <div style="display:flex;justify-content:space-between;padding-top:12px;font-weight:800">
+            <div style="display: flex; justify-content: space-between; padding-top: 12px; font-weight: 800">
               <span>Net profit</span><span class="mono">${{ '{:,.2f}'.format(net) }}</span>
             </div>
             <div class="hint">{{ net_margin }}% net margin after all costs</div>
@@ -387,7 +314,7 @@ body.sidebar-collapsed .shell { grid-template-columns: 60px 1fr; }
                   <td>{{ o.channel }}</td>
                   <td class="num">{{ o.items }}</td>
                   <td class="num mono">${{ '%.2f'|format(o.revenue) }}</td>
-                  <td class="num mono {{ 'up' if o.profit > 0 else 'down' }}" style="font-weight:600">${{ '%.2f'|format(o.profit) }}</td>
+                  <td class="num mono {{ 'up' if o.profit > 0 else 'down' }}" style="font-weight: 600">${{ '%.2f'|format(o.profit) }}</td>
                   <td class="num mono">{{ o.margin }}%</td>
                   <td><span class="tag {{ {'shipped':'green','delayed':'amber','refunded':'red','packed':'blue'}[o.state] }}">{{ o.state }}</span></td>
                 </tr>
@@ -397,13 +324,13 @@ body.sidebar-collapsed .shell { grid-template-columns: 60px 1fr; }
             </div>
           </div>
 
-          <div class="card" style="grid-column: span 2;">
+          <div class="card" style="grid-column: span 2">
             <div class="card-head">
               <h3>True Profit Analytics Matrix</h3>
-              <span style="font-size: 11px; text-transform: uppercase; color: #8A9BB2; font-family:'JetBrains Mono';">Live SVG vector trend curves</span>
+              <span style="font-size: 11px; text-transform: uppercase; color: #94a3b8; font-family: 'JetBrains Mono'">Live SVG vector trend curves</span>
               <span class="spacer"></span>
             </div>
-            <div id="realtime-svg-chart-wrapper" style="margin-top:14px; width:100%; height:auto;">
+            <div id="realtime-svg-chart-wrapper" style="margin-top: 14px; width: 100%; height: auto">
               <!-- SVG chart injected by telemetry polling loop -->
             </div>
           </div>
@@ -425,7 +352,7 @@ body.sidebar-collapsed .shell { grid-template-columns: 60px 1fr; }
             </div>
             <div class="bars">
               {% for p in series %}
-              <div class="b {{ 'fc' if p.forecast }}" style="height:{{ (p.value / series_max * 100)|round(1) }}%"></div>
+              <div class="b {{ 'fc' if p.forecast }}" style="height: {{ (p.value / series_max * 100)|round(1) }}%"></div>
               {% endfor %}
             </div>
             <div class="axis">{% for p in series %}<span>{{ p.day }}</span>{% endfor %}</div>
@@ -433,10 +360,10 @@ body.sidebar-collapsed .shell { grid-template-columns: 60px 1fr; }
           <div class="card">
             <div class="card-head"><h3>Forecasts</h3></div>
             {% for f in forecasts %}
-            <div style="padding:8px 0;border-bottom:1px dashed var(--line)">
-              <div style="display:flex;justify-content:space-between;font-size:.85rem">
-                <span style="color:var(--ink-3)">{{ f.label }}</span>
-                <span style="font-weight:700">{{ f.value }}</span>
+            <div style="padding: 8px 0; border-bottom: 1px dashed var(--line)">
+              <div style="display: flex; justify-content: space-between; font-size: .85rem">
+                <span style="color: var(--ink-3)">{{ f.label }}</span>
+                <span style="font-weight: 700">{{ f.value }}</span>
               </div>
               <div class="hint">{{ f.note }}</div>
             </div>
@@ -466,8 +393,8 @@ body.sidebar-collapsed .shell { grid-template-columns: 60px 1fr; }
                 <td class="num mono {{ 'up' if r.trend > 0 else 'down' }}">{{ '+' if r.trend > 0 }}{{ r.trend }}%</td>
                 <td class="num mono">{{ r.margin }}%</td>
                 <td>{{ r.competition }}</td>
-                <td style="color:var(--ink-3)">{{ r.source }}</td>
-                <td class="num"><button class="btn" style="padding:4px 9px;font-size:.74rem">Add</button></td>
+                <td style="color: var(--ink-3)">{{ r.source }}</td>
+                <td class="num"><button class="btn" style="padding: 4px 9px; font-size: .74rem" onclick="run('add product')">Add</button></td>
               </tr>
               {% endfor %}
               </tbody>
@@ -486,10 +413,10 @@ body.sidebar-collapsed .shell { grid-template-columns: 60px 1fr; }
               <span class="spacer"></span>
               <span class="tag green">{{ fulfillment.auto_rate }}% automatic</span>
             </div>
-            <div class="grid g3" style="margin-bottom:14px">
-              <div class="card tight kpi"><div class="label">Routed today</div><div class="value" style="font-size:1.3rem">{{ fulfillment.routed_today }}</div></div>
-              <div class="card tight kpi"><div class="label">Auto rate</div><div class="value" style="font-size:1.3rem">{{ fulfillment.auto_rate }}%</div></div>
-              <div class="card tight kpi"><div class="label">Avg saved / order</div><div class="value" style="font-size:1.3rem">${{ '%.2f'|format(fulfillment.avg_saving) }}</div></div>
+            <div class="grid g3" style="margin-bottom: 14px">
+              <div class="card tight kpi"><div class="label">Routed today</div><div class="value" style="font-size: 1.3rem">{{ fulfillment.routed_today }}</div></div>
+              <div class="card tight kpi"><div class="label">Auto rate</div><div class="value" style="font-size: 1.3rem">{{ fulfillment.auto_rate }}%</div></div>
+              <div class="card tight kpi"><div class="label">Avg saved / order</div><div class="value" style="font-size: 1.3rem">${{ '%.2f'|format(fulfillment.avg_saving) }}</div></div>
             </div>
             <div class="scroll">
               <table>
@@ -514,15 +441,15 @@ body.sidebar-collapsed .shell { grid-template-columns: 60px 1fr; }
               <span class="tag red">1 blocked</span>
             </div>
             {% for f in fraud %}
-            <div style="padding:10px 0;border-bottom:1px dashed var(--line)">
-              <div style="display:flex;align-items:center;gap:8px">
-                <span class="mono" style="font-weight:700">{{ f.order }}</span>
+            <div style="padding: 10px 0; border-bottom: 1px dashed var(--line)">
+              <div style="display: flex; align-items: center; gap: 8px">
+                <span class="mono" style="font-weight: 700">{{ f.order }}</span>
                 <span class="tag {{ {'block':'red','review':'amber','allow':'green'}[f.verdict] }}">{{ f.verdict }}</span>
-                <span class="spacer" style="flex:1"></span>
-                <span class="mono" style="font-weight:700">{{ f.score }}</span>
+                <span class="spacer" style="flex: 1"></span>
+                <span class="mono" style="font-weight: 700">{{ f.score }}</span>
               </div>
-              <div class="track" style="margin-top:6px">
-                <div class="fill {{ 'red' if f.score > 70 else ('amber' if f.score > 40 else 'green') }}" style="width:{{ f.score }}%"></div>
+              <div class="track" style="margin-top: 6px">
+                <div class="fill {{ 'red' if f.score > 70 else ('amber' if f.score > 40 else 'green') }}" style="width: {{ f.score }}%"></div>
               </div>
               <div class="hint">{{ f.reasons }}</div>
             </div>
@@ -552,11 +479,11 @@ body.sidebar-collapsed .shell { grid-template-columns: 60px 1fr; }
                 <td class="num mono">{{ s.ship_days }}</td>
                 <td class="num mono">{{ s.defect }}%</td>
                 <td class="num mono">{{ s.refund }}%</td>
-                <td style="min-width:130px">
-                  <div class="track"><div class="fill {{ 'green' if s.reliability > 85 else 'amber' }}" style="width:{{ s.reliability }}%"></div></div>
+                <td style="min-width: 130px">
+                  <div class="track"><div class="fill {{ 'green' if s.reliability > 85 else 'amber' }}" style="width: {{ s.reliability }}%"></div></div>
                 </td>
                 <td class="num">
-                  {% if s.pick %}<span class="tag green">AI pick</span>{% else %}<button class="btn" style="padding:4px 9px;font-size:.74rem">Switch</button>{% endif %}
+                  {% if s.pick %}<span class="tag green">AI pick</span>{% else %}<button class="btn" style="padding: 4px 9px; font-size: .74rem" onclick="run('switch supplier')">Switch</button>{% endif %}
                 </td>
               </tr>
               {% endfor %}
@@ -572,22 +499,22 @@ body.sidebar-collapsed .shell { grid-template-columns: 60px 1fr; }
           <h2>Predictive Logistics</h2>
           <p>AI demand-velocity forecasting to flag stockouts before they happen.</p>
           <span class="spacer"></span>
-          <button class="btn blue" onclick="document.getElementById('cmd').value='evaluate shortages'">Evaluate shortages</button>
+          <button class="btn blue" onclick="run('evaluate shortages')">Evaluate shortages</button>
         </div>
         <div class="grid g4">
-          <div class="card" style="border-top: 2px solid #E67E22; background: rgba(255, 244, 230, 0.65);">
+          <div class="card" style="border-top: 2px solid #f97316; background: rgba(255, 244, 230, 0.65)">
             <div class="card-head">
-              <h3 style="color:#7E3D00;">Predictive Shortages</h3>
+              <h3 style="color: #c2410c">Predictive Shortages</h3>
             </div>
-            <div id="analytics-items-container" style="display: flex; flex-direction: column; gap: 12px; font-size: 12px;">
+            <div id="analytics-items-container" style="display: flex; flex-direction: column; gap: 12px; font-size: 12px">
               {% for p in predictive %}
-              <div style="border-bottom: 1px solid rgba(126,61,0,0.1); padding-bottom: 8px;">
-                <div style="display:flex; justify-content:space-between; margin-bottom:4px;">
-                  <span style="font-weight: 600; color:#7E3D00;">{{ p.sku }}</span>
+              <div style="border-bottom: 1px solid rgba(194,65,12,0.1); padding-bottom: 8px">
+                <div style="display: flex; justify-content: space-between; margin-bottom: 4px">
+                  <span style="font-weight: 600; color: #c2410c">{{ p.sku }}</span>
                   <span class="tag {{ 'amber' if p.flag == 'CRITICAL_STOCKOUT' else 'green' }}">{{ p.flag }}</span>
                 </div>
-                <div style="color: #5C6E88; font-size:11px;">
-                  Stockout: <span style="font-weight:600; color:#f4f4f6;">{{ p.days }} Days left</span> | Restock: <span class="mono">{{ p.restock }}</span>
+                <div style="color: #64748b; font-size: 11px">
+                  Stockout: <span style="font-weight: 600; color: #0b1220">{{ p.days }} Days left</span> | Restock: <span class="mono">{{ p.restock }}</span>
                 </div>
               </div>
               {% endfor %}
@@ -602,60 +529,60 @@ body.sidebar-collapsed .shell { grid-template-columns: 60px 1fr; }
           <h2>Enterprise Operations</h2>
           <p>Metered billing and live storefront catalog control.</p>
           <span class="spacer"></span>
-          <button class="btn blue" onclick="document.getElementById('cmd').value='check billing'">Check billing</button>
-          <button class="btn" style="margin-left:8px" onclick="document.getElementById('cmd').value='update price to 159.50'">Update price</button>
+          <button class="btn blue" onclick="run('check billing')">Check billing</button>
+          <button class="btn" style="margin-left: 8px" onclick="run('update price to 159.50')">Update price</button>
         </div>
         <div class="grid g4">
-          <div class="card" style="border-left: 2px solid #6772E5; background: #16161F;">
-            <div class="card-head"><h3 style="color:#fff;">Stripe SaaS Billing</h3></div>
+          <div class="card" style="border-left: 2px solid #6366f1; background: #ffffff">
+            <div class="card-head"><h3 style="color: #0b1220">Stripe SaaS Billing</h3></div>
             <div class="line"><span class="k">Account Model</span><span class="v">{{ stripe.plan }}</span></div>
             <div class="line"><span class="k">Metered Volume</span><span class="v" id="stripe-usage">{{ stripe.usage }} API Hits</span></div>
-            <div class="line" style="font-size: 14px; font-weight: 700; color: #32325D;"><span class="k">Accrued Invoice</span><span class="v" id="stripe-invoice">${{ '{:,.2f}'.format(stripe.invoice) }}</span></div>
+            <div class="line" style="font-size: 14px; font-weight: 700; color: #1e3a8a"><span class="k">Accrued Invoice</span><span class="v" id="stripe-invoice">${{ '{:,.2f}'.format(stripe.invoice) }}</span></div>
           </div>
 
-          <div class="card" style="border-left: 2px solid #5C6E88;">
+          <div class="card" style="border-left: 2px solid #64748b">
             <div class="card-head"><h3>Catalog Control</h3></div>
-            <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid rgba(0,0,0,0.04); padding-bottom:8px;">
+            <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid rgba(0,0,0,0.04); padding-bottom: 8px">
               <div>
-                <div style="font-weight:600; color:#f4f4f6;">{{ catalog.title }}</div>
-                <div style="font-size:10px; color:#7d8798;">Variant: {{ catalog.sku }}</div>
+                <div style="font-weight: 600; color: #0b1220">{{ catalog.title }}</div>
+                <div style="font-size: 10px; color: #64748b">Variant: {{ catalog.sku }}</div>
               </div>
-              <span id="hoodie-price" style="font-family:'JetBrains Mono'; font-weight:600; color:#1E6B3E;">${{ '{:,.2f}'.format(catalog.price) }}</span>
+              <span id="hoodie-price" style="font-family: 'JetBrains Mono'; font-weight: 600; color: #16a34a">${{ '{:,.2f}'.format(catalog.price) }}</span>
             </div>
           </div>
 
-          <div class="card" style="border-left: 2px solid #E74C3C; background: rgba(255, 240, 240, 0.7);">
-            <div class="card-head"><h3 style="color:#C0392B;">System Machine Health</h3></div>
-            <div style="display: flex; justify-content: space-between; margin-bottom: 10px;">
-              <span style="color: #7F8C8D;">Core Kernel:</span>
-              <span style="font-weight:600; color:#27AE60;" id="system-status-chip">ONLINE_HARDENED</span>
+          <div class="card" style="border-left: 2px solid #ef4444; background: rgba(255, 240, 240, 0.7)">
+            <div class="card-head"><h3 style="color: #dc2626">System Machine Health</h3></div>
+            <div style="display: flex; justify-content: space-between; margin-bottom: 10px">
+              <span style="color: #7F8C8D">Core Kernel:</span>
+              <span style="font-weight: 600; color: #16a34a" id="system-status-chip">ONLINE_HARDENED</span>
             </div>
-            <div style="border-top: 1px solid rgba(192,57,43,0.08); padding-top: 8px;">
-              <div style="font-size: 10px; text-transform: uppercase; color: #95A5A6; font-weight:600; margin-bottom: 4px; font-family:'JetBrains Mono';">Live Exception Logs</div>
-              <p id="live-exception-display" style="margin: 0; color: #2C3E50; font-family: 'JetBrains Mono', monospace; font-size: 11px; white-space: pre-wrap; line-height: 1.3; background: #0D0D11; padding: 8px; border-radius: 8px; border: 1px solid rgba(192,57,43,0.15);">No warnings flagged. Microservices tracking healthy.</p>
+            <div style="border-top: 1px solid rgba(220,38,38,0.08); padding-top: 8px">
+              <div style="font-size: 10px; text-transform: uppercase; color: #94a3b8; font-weight: 600; margin-bottom: 4px; font-family: 'JetBrains Mono'">Live Exception Logs</div>
+              <p id="live-exception-display" style="margin: 0; color: #334155; font-family: 'JetBrains Mono', monospace; font-size: 11px; white-space: pre-wrap; line-height: 1.3; background: #ffffff; padding: 8px; border-radius: 8px; border: 1px solid rgba(220,38,38,0.15)">No warnings flagged. Microservices tracking healthy.</p>
             </div>
           </div>
 
-          <div class="card" style="border-top: 2px solid #D4AF37; background: #16161F;">
-            <div class="card-head"><h3 style="color:#f4f4f6;">Secure Core Connections Vault</h3></div>
-            <div style="display: flex; flex-direction: column; gap: 8px;">
-              <select id="vault-platform-select" style="width:100%; padding:8px; border:1px solid #262636; border-radius:8px; background:#0D0D11; font-size:12px;">
+          <div class="card" style="border-top: 2px solid #1d4ed8; background: #ffffff">
+            <div class="card-head"><h3 style="color: #0b1220">Secure Core Connections Vault</h3></div>
+            <div style="display: flex; flex-direction: column; gap: 8px">
+              <select id="vault-platform-select" style="width: 100%; padding: 8px; border: 1px solid #e4e8f0; border-radius: 8px; background: #ffffff; font-size: 12px">
                 <option value="shopify">Shopify Storefront Node</option>
                 <option value="tiktok">TikTok Commerce Stream</option>
                 <option value="amazon">Amazon Central API</option>
               </select>
-              <input id="vault-domain-input" type="text" placeholder="store-domain.com" style="width:100%; border:1px solid #262636; border-radius:8px; padding:8px; font-size:12px;" />
-              <input id="vault-token-input" type="password" placeholder="Access Token (shpat_...)" style="width:100%; border:1px solid #262636; border-radius:8px; padding:8px; font-size:12px;" />
-              <button onclick="commitCredentialsToVault()" style="background:#1D2D44; color:#fff; border:none; border-radius:10px; padding:10px; font-size:12px; font-weight:600; cursor:pointer;">Encrypt &amp; Save Connection</button>
+              <input id="vault-domain-input" type="text" placeholder="store-domain.com" style="width: 100%; border: 1px solid #e4e8f0; border-radius: 8px; padding: 8px; font-size: 12px" />
+              <input id="vault-token-input" type="password" placeholder="Access Token (shpat_...)" style="width: 100%; border: 1px solid #e4e8f0; border-radius: 8px; padding: 8px; font-size: 12px" />
+              <button onclick="commitCredentialsToVault()" style="background: #1d4ed8; color: #ffffff; border: none; border-radius: 10px; padding: 10px; font-size: 12px; font-weight: 600; cursor: pointer">Encrypt &amp; Save Connection</button>
             </div>
           </div>
 
-          <div class="card" style="border-left: 2px solid #1D2D44; display: flex; flex-direction: column; justify-content: space-between;">
+          <div class="card" style="border-left: 2px solid #1d4ed8; display: flex; flex-direction: column; justify-content: space-between">
             <div>
-              <div class="card-head"><h3 style="color:#f4f4f6;">Executive Document Center</h3></div>
-              <span style="font-size: 11px; text-transform: uppercase; color: #8A9BB2; font-family:'JetBrains Mono';">Compile high-fashion operational data summaries</span>
+              <div class="card-head"><h3 style="color: #0b1220">Executive Document Center</h3></div>
+              <span style="font-size: 11px; text-transform: uppercase; color: #94a3b8; font-family: 'JetBrains Mono'">Compile high-fashion operational data summaries</span>
             </div>
-            <button onclick="triggerExecutiveReportCompilation()" style="width:100%; background:#1D2D44; color:#fff; border:none; border-radius:12px; padding:12px; font-size:12px; font-weight:600; cursor:pointer; margin-top:20px; box-shadow:0 4px 12px rgba(29,45,68,0.15);">Generate Operational Digest Sheet</button>
+            <button onclick="triggerExecutiveReportCompilation()" style="width: 100%; background: #1d4ed8; color: #ffffff; border: none; border-radius: 12px; padding: 12px; font-size: 12px; font-weight: 600; cursor: pointer; margin-top: 20px; box-shadow: 0 4px 12px rgba(11,18,32,0.12)">Generate Operational Digest Sheet</button>
           </div>
         </div>
       </section>
@@ -666,7 +593,7 @@ body.sidebar-collapsed .shell { grid-template-columns: 60px 1fr; }
           <h2>AI Marketing Studio</h2>
           <p>Descriptions, email, SMS, ad copy, social, SEO, images, and short-form video — in your brand voice.</p>
           <span class="spacer"></span>
-          <button class="btn blue">Generate</button>
+          <button class="btn blue" onclick="run('generate marketing copy')">Generate</button>
         </div>
         <div class="assets">
           {% for a in studio %}
@@ -677,13 +604,13 @@ body.sidebar-collapsed .shell { grid-template-columns: 60px 1fr; }
           </div>
           {% endfor %}
         </div>
-        <div class="card" style="margin-top:18px">
+        <div class="card" style="margin-top: 18px">
           <div class="card-head">
             <h3>Campaign Telemetry</h3>
           </div>
           <div class="line"><span class="k">Active</span><span class="v" id="mktg-campaign">{{ mktg.campaign }}</span></div>
           <div class="line"><span class="k">Status</span><span class="v" id="mktg-status">{{ mktg.status }}</span></div>
-          <div class="hint" id="mktg-copy" style="margin-top:8px">{{ mktg.copy }}</div>
+          <div class="hint" id="mktg-copy" style="margin-top: 8px">{{ mktg.copy }}</div>
         </div>
       </section>
 
@@ -693,25 +620,25 @@ body.sidebar-collapsed .shell { grid-template-columns: 60px 1fr; }
           <h2>AI Creative Ad Optimization</h2>
           <p>Cross-channel ad spend, ROAS, and conversion velocity.</p>
           <span class="spacer"></span>
-          <button class="btn blue">Optimize</button>
+          <button class="btn blue" onclick="run('optimize ads')">Optimize</button>
         </div>
-        <div class="glass-card" style="border-left: 2px solid #27AE60; background: #16161F;">
-          <div style="overflow-x:auto;">
-            <table style="width:100%; border-collapse:collapse; text-align:left; font-size:12px; color:#b7bdc9;">
+        <div class="glass-card" style="border-left: 2px solid #16a34a; background: #ffffff">
+          <div style="overflow-x: auto">
+            <table style="width: 100%; border-collapse: collapse; text-align: left; font-size: 12px; color: #475569">
               <thead>
-                <tr style="color:#7d8798; border-bottom:1px solid rgba(39,174,96,0.1); font-size:11px;">
-                  <th style="padding:8px 4px;">Platform</th>
-                  <th style="padding:8px 4px;">Budget</th>
-                  <th style="padding:8px 4px;">Spend</th>
-                  <th style="padding:8px 4px;">True ROAS</th>
+                <tr style="color: #64748b; border-bottom: 1px solid rgba(34,197,94,0.1); font-size: 11px">
+                  <th style="padding: 8px 4px">Platform</th>
+                  <th style="padding: 8px 4px">Budget</th>
+                  <th style="padding: 8px 4px">Spend</th>
+                  <th style="padding: 8px 4px">True ROAS</th>
                 </tr>
               </thead>
               <tbody id="ad-spend-rows-injector">
-                <tr style="border-bottom:1px solid rgba(0,0,0,0.02);">
-                  <td style="padding:8px 4px; font-weight:600;">Loading channels...</td>
-                  <td style="padding:8px 4px;">$0.00</td>
-                  <td style="padding:8px 4px;">$0.00</td>
-                  <td style="padding:8px 4px; color:#27AE60; font-weight:600;">0.0x</td>
+                <tr style="border-bottom: 1px solid rgba(0,0,0,0.02)">
+                  <td style="padding: 8px 4px; font-weight: 600">Loading channels...</td>
+                  <td style="padding: 8px 4px">$0.00</td>
+                  <td style="padding: 8px 4px">$0.00</td>
+                  <td style="padding: 8px 4px; color: #16a34a; font-weight: 600">0.0x</td>
                 </tr>
               </tbody>
             </table>
@@ -728,25 +655,25 @@ body.sidebar-collapsed .shell { grid-template-columns: 60px 1fr; }
               <span class="spacer"></span>
               <span class="tag green">{{ support.resolved_rate }}% auto-resolved</span>
             </div>
-            <div class="grid g3" style="margin-bottom:12px">
-              <div class="card tight kpi"><div class="label">Open</div><div class="value" style="font-size:1.25rem">{{ support.open }}</div></div>
-              <div class="card tight kpi"><div class="label">Escalated</div><div class="value" style="font-size:1.25rem">{{ support.escalated }}</div></div>
-              <div class="card tight kpi"><div class="label">First reply</div><div class="value" style="font-size:1.25rem">{{ support.avg_first_reply }}</div></div>
+            <div class="grid g3" style="margin-bottom: 12px">
+              <div class="card tight kpi"><div class="label">Open</div><div class="value" style="font-size: 1.25rem">{{ support.open }}</div></div>
+              <div class="card tight kpi"><div class="label">Escalated</div><div class="value" style="font-size: 1.25rem">{{ support.escalated }}</div></div>
+              <div class="card tight kpi"><div class="label">First reply</div><div class="value" style="font-size: 1.25rem">{{ support.avg_first_reply }}</div></div>
             </div>
-            <div class="card tight" style="margin-bottom:12px;background:var(--card)">
-              <div style="display:flex;gap:12px;flex-wrap:wrap;align-items:center">
-                <div><div class="label">Active Chats</div><div class="value" id="support-chats" style="font-size:1.1rem">{{ support.chats }}</div></div>
-                <div><div class="label">Sentiment</div><div class="value" id="support-sentiment" style="font-size:1.1rem">{{ support.sentiment }}</div></div>
-                <div style="min-width:0;flex:1"><div class="label">Latest resolution</div><div class="hint" id="support-resolution">{{ support.resolution }}</div></div>
+            <div class="card tight" style="margin-bottom: 12px; background: var(--card)">
+              <div style="display: flex; gap: 12px; flex-wrap: wrap; align-items: center">
+                <div><div class="label">Active Chats</div><div class="value" id="support-chats" style="font-size: 1.1rem">{{ support.chats }}</div></div>
+                <div><div class="label">Sentiment</div><div class="value" id="support-sentiment" style="font-size: 1.1rem">{{ support.sentiment }}</div></div>
+                <div style="min-width: 0; flex: 1"><div class="label">Latest resolution</div><div class="hint" id="support-resolution">{{ support.resolution }}</div></div>
               </div>
             </div>
             {% for t in support.threads %}
-            <div style="display:flex;gap:10px;align-items:center;padding:8px 0;border-bottom:1px dashed var(--line)">
-              <div style="min-width:0">
-                <div style="font-size:.86rem;font-weight:600">{{ t.who }} — {{ t.topic }}</div>
+            <div style="display: flex; gap: 10px; align-items: center; padding: 8px 0; border-bottom: 1px dashed var(--line)">
+              <div style="min-width: 0">
+                <div style="font-size: .86rem; font-weight: 600">{{ t.who }} — {{ t.topic }}</div>
                 <div class="hint">{{ t.note }}</div>
               </div>
-              <span class="spacer" style="flex:1"></span>
+              <span class="spacer" style="flex: 1"></span>
               <span class="tag {{ 'amber' if t.state == 'escalated' else 'green' }}">{{ t.state }}</span>
             </div>
             {% endfor %}
@@ -757,14 +684,14 @@ body.sidebar-collapsed .shell { grid-template-columns: 60px 1fr; }
               <h3>AI Automation Builder</h3>
               <p class="hint">Describe it in plain English — it builds the workflow.</p>
             </div>
-            <div class="prompt" style="margin-bottom:12px">
-              <input placeholder="If inventory falls below 20, notify me and create a purchase order.">
-              <button class="btn blue">Build</button>
+            <div class="prompt" style="margin-bottom: 12px">
+              <input id="automation-input" placeholder="If inventory falls below 20, notify me and create a purchase order.">
+              <button class="btn blue" onclick="run('build automation for ' + (document.getElementById('automation-input').value || 'restock alerts'))">Build</button>
             </div>
             {% for a in automations %}
-            <div style="display:flex;gap:10px;align-items:flex-start;padding:9px 0;border-bottom:1px dashed var(--line)">
+            <div style="display: flex; gap: 10px; align-items: flex-start; padding: 9px 0; border-bottom: 1px dashed var(--line)">
               <span class="tag {{ 'green' if a.state == 'active' else 'ghost' }}">{{ a.state }}</span>
-              <div style="font-size:.85rem;flex:1">{{ a.text }}<div class="hint">{{ a.runs }} runs</div></div>
+              <div style="font-size: .85rem; flex: 1">{{ a.text }}<div class="hint">{{ a.runs }} runs</div></div>
             </div>
             {% endfor %}
           </div>
@@ -781,8 +708,8 @@ body.sidebar-collapsed .shell { grid-template-columns: 60px 1fr; }
           {% for s in specialists %}
           <div class="spec">
             <div class="n">
-              <span class="logo" style="background:linear-gradient(140deg,#93c5fd,#1d4ed8)">AI</span>{{ s.name }}
-              <span class="spacer" style="flex:1"></span>
+              <span class="logo" style="background: linear-gradient(140deg,#93c5fd,#1d4ed8)">AI</span>{{ s.name }}
+              <span class="spacer" style="flex: 1"></span>
               <span class="tag {{ {'working':'blue','attention':'amber','idle':'ghost'}[s.state] }}">{{ s.state }}</span>
             </div>
             <div class="s">{{ s.status }}</div>
@@ -799,7 +726,7 @@ body.sidebar-collapsed .shell { grid-template-columns: 60px 1fr; }
         </div>
         <div class="grid g21">
           <div class="card">
-            <div class="score" style="margin-bottom:16px">
+            <div class="score" style="margin-bottom: 16px">
               <div class="ring" style="--pct: {{ health.score }}"><div class="inner">{{ health.score }}</div></div>
               <div>
                 <h3>Fair — improving</h3>
@@ -809,19 +736,19 @@ body.sidebar-collapsed .shell { grid-template-columns: 60px 1fr; }
             {% for c in health.components %}
             <div class="meter">
               <div class="top"><span>{{ c.label }}</span><span class="v">{{ c.value }}</span></div>
-              <div class="track"><div class="fill {{ c.tone }}" style="width:{{ c.value }}%"></div></div>
+              <div class="track"><div class="fill {{ c.tone }}" style="width: {{ c.value }}%"></div></div>
             </div>
             {% endfor %}
           </div>
           <div class="card">
             <div class="card-head"><h3>Recommendations</h3></div>
             {% for r in health.recommendations %}
-            <div class="alert good" style="margin-bottom:9px">
+            <div class="alert good" style="margin-bottom: 9px">
               <div class="bar"></div>
-              <div class="body"><div class="d" style="color:var(--ink-2)">{{ r }}</div></div>
+              <div class="body"><div class="d" style="color: var(--ink-2)">{{ r }}</div></div>
             </div>
             {% endfor %}
-            <button class="btn blue" style="width:100%">Apply all recommendations</button>
+            <button class="btn blue" style="width: 100%" onclick="run('apply all recommendations')">Apply all recommendations</button>
           </div>
         </div>
       </section>
@@ -832,9 +759,9 @@ body.sidebar-collapsed .shell { grid-template-columns: 60px 1fr; }
           <div class="card">
             <div class="card-head"><h3>Global Commerce Tools</h3></div>
             {% for g in global_tools %}
-            <div style="display:flex;justify-content:space-between;align-items:baseline;padding:8px 0;border-bottom:1px dashed var(--line)">
+            <div style="display: flex; justify-content: space-between; align-items: baseline; padding: 8px 0; border-bottom: 1px dashed var(--line)">
               <div>
-                <div style="font-size:.86rem;font-weight:600">{{ g.label }}</div>
+                <div style="font-size: .86rem; font-weight: 600">{{ g.label }}</div>
                 <div class="hint">{{ g.note }}</div>
               </div>
               <span class="tag blue">{{ g.value }}</span>
@@ -847,15 +774,15 @@ body.sidebar-collapsed .shell { grid-template-columns: 60px 1fr; }
               <h3>Mobile AI Copilot</h3>
               <p class="hint">Same brain, phone-sized.</p>
             </div>
-            <div class="card tight" style="max-width:300px;margin:0 auto;border-radius:22px;background:linear-gradient(180deg,#f4f8ff,#fff)">
-              <div class="tag blue" style="margin-bottom:8px">Copilot</div>
-              <p style="font-size:.86rem;color:var(--ink)">Profit today is <strong>${{ '{:,.0f}'.format(briefing.profit) }}</strong> on {{ briefing.orders }} orders. {{ briefing.delayed }} shipments are delayed.</p>
-              <div class="suggests" style="margin-top:10px">
-                {% for m in mobile_actions %}<span class="chip" style="font-size:.74rem">{{ m }}</span>{% endfor %}
+            <div class="card tight" style="max-width: 300px; margin: 0 auto; border-radius: 22px; background: linear-gradient(180deg,#f4f8ff,#ffffff)">
+              <div class="tag blue" style="margin-bottom: 8px">Copilot</div>
+              <p style="font-size: .86rem; color: var(--ink)">Profit today is <strong>${{ '{:,.0f}'.format(briefing.profit) }}</strong> on {{ briefing.orders }} orders. {{ briefing.delayed }} shipments are delayed.</p>
+              <div class="suggests" style="margin-top: 10px">
+                {% for m in mobile_actions %}<span class="chip" style="font-size: .74rem">{{ m }}</span>{% endfor %}
               </div>
-              <div class="prompt" style="margin-top:12px;padding:8px 10px">
-                <span class="mic" style="width:24px;height:24px">◉</span>
-                <input placeholder="Ask or approve…" style="font-size:.82rem">
+              <div class="prompt" style="margin-top: 12px; padding: 8px 10px">
+                <span class="mic" style="width: 24px; height: 24px">◉</span>
+                <input placeholder="Ask or approve…" style="font-size: .82rem">
               </div>
             </div>
           </div>
@@ -874,41 +801,41 @@ body.sidebar-collapsed .shell { grid-template-columns: 60px 1fr; }
         <h2>⚙️ System Settings</h2>
         <p>Platform operations, channel tokens, and AI COO permissions.</p>
       </div>
-      <div style="background:var(--card); padding:25px; border:1px solid #262636; border-radius:6px; margin-bottom:20px;">
-        <h5 style="margin-top:0; color:#fff;">1. Storefront Channel API Tokens</h5>
+      <div style="background: var(--card); padding: 25px; border: 1px solid #e4e8f0; border-radius: 6px; margin-bottom: 20px">
+        <h5 style="margin-top: 0; color: #0b1220">1. Storefront Channel API Tokens</h5>
         <form id="api-settings-form" onsubmit="saveSystemSettings(event)">
-          <label style="font-size:12px; font-weight:bold; color:#b7bdc9;">Shopify Admin Access Token:</label>
-          <input type="password" id="set-shopify-token" style="width:100%; padding:10px; margin:5px 0 15px 0; border:1px solid #262636; border-radius:4px;" placeholder="shpat_xxxxxxxxxxxxxxxxxxxxxxxx">
+          <label style="font-size: 12px; font-weight: bold; color: #475569">Shopify Admin Access Token:</label>
+          <input type="password" id="set-shopify-token" style="width: 100%; padding: 10px; margin: 5px 0 15px 0; border: 1px solid #e4e8f0; border-radius: 4px" placeholder="shpat_xxxxxxxxxxxxxxxxxxxxxxxx">
 
-          <label style="font-size:12px; font-weight:bold; color:#b7bdc9;">TikTok Shop Developer Cipher Key:</label>
-          <input type="password" id="set-tiktok-token" style="width:100%; padding:10px; margin:5px 0 15px 0; border:1px solid #262636; border-radius:4px;" placeholder="tt_cipher_v4_xxxxxxxxxxxx">
+          <label style="font-size: 12px; font-weight: bold; color: #475569">TikTok Shop Developer Cipher Key:</label>
+          <input type="password" id="set-tiktok-token" style="width: 100%; padding: 10px; margin: 5px 0 15px 0; border: 1px solid #e4e8f0; border-radius: 4px" placeholder="tt_cipher_v4_xxxxxxxxxxxx">
 
-          <button type="submit" style="background:#222; color:#fff; padding:10px 20px; border:none; border-radius:4px; cursor:pointer;">Update Active Channels</button>
+          <button type="submit" style="background: #1d4ed8; color: #ffffff; padding: 10px 20px; border: none; border-radius: 4px; cursor: pointer">Update Active Channels</button>
         </form>
       </div>
 
-      <div style="background:var(--card); padding:25px; border:1px solid #262636; border-radius:6px; margin-bottom:20px;">
-        <h5 style="margin-top:0; color:#fff;">2. Operational Billing Plan</h5>
-        <p style="font-size:14px; margin:0 0 15px 0;">Current Active Organization Tier Level: <strong style="color:#D4AF37;">{{ merchant.tier | upper }} PLAN</strong></p>
-        <button style="background:#222; color:#fff; padding:10px 20px; border:none; border-radius:4px; cursor:pointer;" onclick="alert('Tier upgrade flow not yet implemented.')">Modify Subscription Tier Mapping</button>
+      <div style="background: var(--card); padding: 25px; border: 1px solid #e4e8f0; border-radius: 6px; margin-bottom: 20px">
+        <h5 style="margin-top: 0; color: #0b1220">2. Operational Billing Plan</h5>
+        <p style="font-size: 14px; margin: 0 0 15px 0">Current Active Organization Tier Level: <strong style="color: #1d4ed8">{{ merchant.tier | upper }} PLAN</strong></p>
+        <button style="background: #1d4ed8; color: #ffffff; padding: 10px 20px; border: none; border-radius: 4px; cursor: pointer" onclick="run('modify subscription tier mapping')">Modify Subscription Tier Mapping</button>
       </div>
 
-      <div style="background:var(--card); padding:25px; border:1px solid #262636; border-radius:6px;">
-        <h5 style="margin-top:0; color:#fff;">3. Internal AI COO Engine Permissions</h5>
-        <label style="display:flex; align-items:center; cursor:pointer; font-size:14px;">
-          <input type="checkbox" id="coo-auto-reorder" checked style="margin-right:10px;">
+      <div style="background: var(--card); padding: 25px; border: 1px solid #e4e8f0; border-radius: 6px">
+        <h5 style="margin-top: 0; color: #0b1220">3. Internal AI COO Engine Permissions</h5>
+        <label style="display: flex; align-items: center; cursor: pointer; font-size: 14px">
+          <input type="checkbox" id="coo-auto-reorder" checked style="margin-right: 10px">
           Allow AI COO to autonomously draft purchase orders when inventory running low
         </label>
       </div>
 
-      <div style="background:var(--card); padding:25px; border:1px solid #262636; border-radius:6px; margin-top:20px;">
-        <h5 style="margin-top:0; color:#fff;">4. Contact &amp; Support</h5>
-        <p style="font-size:14px; color:#b7bdc9; margin:0 0 12px 0;">Get help with your Prometheus OS node.</p>
-        <div style="display:grid; gap:10px; font-size:13px; color:#f4f4f6;">
-          <div><strong>General Support:</strong> <a href="mailto:support@shawnzyluxe.com" style="color:#D4AF37;">support@shawnzyluxe.com</a></div>
-          <div><strong>Technical Engineering:</strong> <a href="mailto:engineering@shawnzyluxe.com" style="color:#D4AF37;">engineering@shawnzyluxe.com</a></div>
-          <div><strong>Billing &amp; Tiers:</strong> <a href="mailto:billing@shawnzyluxe.com" style="color:#D4AF37;">billing@shawnzyluxe.com</a></div>
-          <div><strong>Emergency Line:</strong> <span style="color:#D4AF37;">+1 (305) 600-7654</span></div>
+      <div style="background: var(--card); padding: 25px; border: 1px solid #e4e8f0; border-radius: 6px; margin-top: 20px">
+        <h5 style="margin-top: 0; color: #0b1220">4. Contact &amp; Support</h5>
+        <p style="font-size: 14px; color: #475569; margin: 0 0 12px 0">Get help with your Prometheus OS node.</p>
+        <div style="display: grid; gap: 10px; font-size: 13px; color: #0b1220">
+          <div><strong>General Support:</strong> <a href="mailto:support@shawnzyluxe.com" style="color: #1d4ed8">support@shawnzyluxe.com</a></div>
+          <div><strong>Technical Engineering:</strong> <a href="mailto:engineering@shawnzyluxe.com" style="color: #1d4ed8">engineering@shawnzyluxe.com</a></div>
+          <div><strong>Billing &amp; Tiers:</strong> <a href="mailto:billing@shawnzyluxe.com" style="color: #1d4ed8">billing@shawnzyluxe.com</a></div>
+          <div><strong>Emergency Line:</strong> <span style="color: #1d4ed8">+1 (305) 600-7654</span></div>
         </div>
       </div>
     </section>
@@ -1018,7 +945,29 @@ function run(q){
   if (ws.readyState === WebSocket.OPEN) {
     ws.send(JSON.stringify({command: q}));
   } else {
-    document.getElementById('cmdanswer').textContent = 'Telemetry link not open yet. Please wait a moment.';
+    fetch('/api/v1/execute-command', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({command: q})
+    })
+    .then(r => r.json())
+    .then(data => {
+      if (data.success && data.updates) {
+        triggerTechChime();
+        document.getElementById('cmdanswer').textContent = data.updates.ai_briefing;
+        const aiOut = document.getElementById('ai-output');
+        if (aiOut) aiOut.textContent = data.updates.ai_briefing;
+        const chips = ['Unified balance: $' + (data.updates.total_balance || '0.00')];
+        if (data.updates.clear_orders) chips.push('Order queue cleared');
+        document.getElementById('cmddid').innerHTML = chips.map(s => '<span class="chip">' + s + '</span>').join('');
+      } else {
+        document.getElementById('cmdanswer').textContent = 'Command not recognized. Try another phrase.';
+        document.getElementById('cmddid').innerHTML = '';
+      }
+    })
+    .catch(err => {
+      document.getElementById('cmdanswer').textContent = 'Telemetry link failed. ' + err;
+    });
   }
 }
 
@@ -1117,12 +1066,12 @@ function updateMultiAgentWorkspaceMatrixCard(agentsPoolArray) {
     let stateBg = agent.status.includes("ALERT") ? "#FFE3E3" : (agent.status.includes("COMPLETE") || agent.status.includes("QUEUED") ? "#E2F5E9" : "#F4F6F9");
     let stateColor = agent.status.includes("ALERT") ? "#A82525" : (agent.status.includes("COMPLETE") || agent.status.includes("QUEUED") ? "#1E6B3E" : "#5C6E88");
     html += `
-      <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid rgba(0,0,0,0.03); padding-bottom:8px; font-size:12px;">
+      <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid rgba(0,0,0,0.03); padding-bottom: 8px; font-size: 12px">
         <div>
-          <div style="font-weight:700; color:#f4f4f6;">${agent.name}</div>
-          <div style="font-size:11px; color:#7d8798; font-style:italic;">${agent.last_action}</div>
+          <div style="font-weight: 700; color: #0b1220">${agent.name}</div>
+          <div style="font-size: 11px; color: #64748b; font-style: italic">${agent.last_action}</div>
         </div>
-        <span style="background:${stateBg}; color:${stateColor}; padding:2px 8px; border-radius:6px; font-size:10px; font-weight:700; font-family:'JetBrains Mono';">${agent.status}</span>
+        <span style="background: ${stateBg}; color: ${stateColor}; padding: 2px 8px; border-radius: 6px; font-size: 10px; font-weight: 700; font-family: 'JetBrains Mono'">${agent.status}</span>
       </div>`;
   });
   container.innerHTML = html;
@@ -1135,7 +1084,7 @@ function updateInterAgentVisualChatTerminal(dialogueStreamArray) {
   dialogueStreamArray.forEach(line => {
     let nameTag = line.sender === 'agent_logistics' ? 'LOGISTICS_AI' : (line.sender === 'agent_finance' ? 'FINANCE_AI' : (line.sender === 'agent_marketing' ? 'MARKETING_AI' : 'SUPPORT_AI'));
     let nameColor = line.sender === 'agent_logistics' ? '#FF8C00' : (line.sender === 'agent_finance' ? '#22C55E' : '#9D4EDD');
-    html += `<div><span style="color:${nameColor}; font-weight:700;">[${nameTag}]:</span> <span style="color:#E0E6ED;">${line.text}</span></div>`;
+    html += `<div><span style="color: ${nameColor}; font-weight: 700">[${nameTag}]:</span> <span style="color: #475569">${line.text}</span></div>`;
   });
   chatContainer.innerHTML = html;
   chatContainer.scrollTop = chatContainer.scrollHeight;
@@ -1239,11 +1188,11 @@ function updateCreativeAdOptimizationCard(adMatrixArray) {
   if (!tableBody || !adMatrixArray) return;
   let html = "";
   adMatrixArray.forEach(item => {
-    html += `<tr style="border-bottom:1px solid rgba(39,174,96,0.05);">
-      <td style="padding:10px 4px; font-weight:600; color:#f4f4f6;">${item.platform}</td>
-      <td style="padding:10px 4px; font-family:'JetBrains Mono';">$${item.budget.toFixed(2)}</td>
-      <td style="padding:10px 4px; font-family:'JetBrains Mono';">$${item.spend.toFixed(2)}</td>
-      <td style="padding:10px 4px; font-family:'JetBrains Mono'; font-weight:700; color:${item.roas >= 3.0 ? '#1E6B3E' : '#A82525'};">${item.roas}x</td>
+    html += `<tr style="border-bottom: 1px solid rgba(34,197,94,0.05)">
+      <td style="padding: 10px 4px; font-weight: 600; color: #0b1220">${item.platform}</td>
+      <td style="padding: 10px 4px; font-family: 'JetBrains Mono'">$${item.budget.toFixed(2)}</td>
+      <td style="padding: 10px 4px; font-family: 'JetBrains Mono'">$${item.spend.toFixed(2)}</td>
+      <td style="padding: 10px 4px; font-family: 'JetBrains Mono'; font-weight: 700; color: ${item.roas >= 3.0 ? '#16a34a' : '#b91c1c'}">${item.roas}x</td>
     </tr>`;
   });
   tableBody.innerHTML = html;

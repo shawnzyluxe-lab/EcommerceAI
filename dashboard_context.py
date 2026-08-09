@@ -371,23 +371,33 @@ MOBILE_ACTIONS = [
 ]
 
 NAV = [
-    ("Home", "/home", False),
-    ("Overview", "#top", True),
-    ("Command Center", "#command", False),
-    ("Commerce Hub", "#channels", False),
-    ("Alerts", "#alerts", False),
-    ("Profit Engine", "#profit", False),
-    ("Predictions", "#predict", False),
-    ("Product Research", "#research", False),
-    ("Fulfillment", "#fulfillment", False),
-    ("Fraud", "#fraud", False),
-    ("Suppliers", "#suppliers", False),
-    ("Marketing Studio", "#studio", False),
-    ("Support", "#support", False),
-    ("Automations", "#automations", False),
-    ("Team AI", "#team", False),
-    ("Health Score", "#health", False),
-    ("Mobile Copilot", "#mobile", False),
+    ("Workspace", [
+        ("Home", "/home", False),
+        ("Overview", "#top", True),
+        ("Command Center", "#command", False),
+        ("Commerce Hub", "#channels", False),
+        ("Alerts", "#alerts", False),
+    ]),
+    ("Intelligence", [
+        ("Profit Engine", "#profit", False),
+        ("Predictions", "#predict", False),
+        ("Product Research", "#research", False),
+        ("Fulfillment", "#fulfillment", False),
+        ("Fraud", "#fraud", False),
+        ("Suppliers", "#suppliers", False),
+    ]),
+    ("Operations", [
+        ("Marketing Studio", "#studio", False),
+        ("Support", "#support", False),
+        ("Automations", "#automations", False),
+        ("Team AI", "#team", False),
+        ("Health Score", "#health", False),
+        ("Mobile Copilot", "#mobile", False),
+    ]),
+    ("Store", [
+        ("Channels", "#channels", False),
+        ("System Settings", "#settings", False),
+    ]),
 ]
 
 
@@ -429,6 +439,7 @@ def context():
         "health": HEALTH,
         "global_tools": GLOBAL_TOOLS,
         "mobile_actions": MOBILE_ACTIONS,
+        "merchant": {"tier": "basic", "name": BRAND["owner"]},
         "generated": now.strftime("%A, %d %b %Y · %H:%M UTC"),
     }
 
