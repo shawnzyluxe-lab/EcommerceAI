@@ -11,6 +11,7 @@ import smtplib
 import logging
 import asyncio
 import dataclasses
+import time
 from threading import Thread
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
@@ -31,7 +32,7 @@ logging.basicConfig(
     handlers=[logging.StreamHandler()],
 )
 logger = logging.getLogger("shawnzyluxe_core")
-from urllib.parse import urlencode
+from urllib.parse import urlencode, parse_qsl
 from flask import Flask, render_template, request, redirect, url_for, session, flash, jsonify, send_file, make_response
 from flask_sock import Sock
 from dotenv import load_dotenv
@@ -662,7 +663,10 @@ with app.app_context():
         CATALOG["price"] = hoodie.price
 
     # Seed / refresh multi-tenant merchant profiles
-    temp_password = os.environ.get("TEMP_ACCOUNTS_PASSWORD") or (SITE_WALL_PASSWORD if SITE_WALL_PASSWORD else "IfxSVNs4iAs")
+    temp_password = os.environ.get("TEMP_ACCOUNTS_PASSWORD") or SITE_WALL_PASSWORD
+    if not temp_password:
+        temp_password = secrets.token_urlsafe(32)
+        logger.warning("TEMP_ACCOUNTS_PASSWORD and SITE_WALL_PASSWORD are not set; generated a random temp password for seeded accounts.")
     temp_accounts = [
         ("merchant_shawn_01", "Shawnzyluxe Pro", "shawn@shawnzyluxe.com", "Enterprise AI Tier"),
         ("merchant_admin_temp", "Temporary Admin", "admin@shawnzyluxe.com", "Enterprise AI Tier"),
@@ -1882,6 +1886,9 @@ def shopify_orders_webhook():
         event_id = request.headers.get("X-Shopify-Webhook-Id")
         merchant_target = request.args.get("merchant_id", "merchant_shawn_01")
 
+        if not SHOPIFY_WEBHOOK_SECRET and not app.config.get("TESTING"):
+            log_system_exception("SHOPIFY_WEBHOOK", "WARNING", "Rejected inbound webhook: secret not configured.")
+            return jsonify({"status": "rejected", "reason": "Webhook secret not configured"}), 401
         if SHOPIFY_WEBHOOK_SECRET:
             if not hmac_header:
                 log_system_exception("SHOPIFY_WEBHOOK", "WARNING", "Dropped inbound webhook: missing HMAC signature.")
@@ -1890,8 +1897,6 @@ def shopify_orders_webhook():
             if not hmac.compare_digest(computed, base64.b64decode(hmac_header)):
                 log_system_exception("SHOPIFY_WEBHOOK", "WARNING", "Dropped inbound webhook: invalid HMAC signature.")
                 return jsonify({"status": "rejected", "reason": "Invalid HMAC"}), 401
-        else:
-            logger.warning("SHOPIFY_WEBHOOK_SECRET not set — accepting webhook without HMAC verification")
 
         if not event_id:
             log_system_exception("SHOPIFY_WEBHOOK", "WARNING", "Dropped inbound webhook: missing X-Shopify-Webhook-Id.")
@@ -2059,16 +2064,51 @@ def amazon_orders_webhook():
         return jsonify({"status": "rejected", "reason": "Internal error"}), 500
 
 
+def _verify_stripe_signature(payload, sig_header, secret):
+    """Verify a Stripe webhook signature (t=<ts>,v1=<sig>)."""
+    if not secret or not sig_header:
+        return False
+    try:
+        timestamp = None
+        signature = None
+        for part in sig_header.split(","):
+            if "=" in part:
+                key, value = part.split("=", 1)
+                if key == "t":
+                    timestamp = value
+                elif key == "v1":
+                    signature = value
+        if not timestamp or not signature:
+            return False
+        signed_payload = f"{timestamp}.{payload}"
+        expected = hmac.new(secret.encode("utf-8"), signed_payload.encode("utf-8"), hashlib.sha256).hexdigest()
+        if not hmac.compare_digest(expected, signature):
+            return False
+        if abs(int(time.time()) - int(timestamp)) > 300:
+            logger.warning("Stripe webhook timestamp outside tolerance window.")
+            return False
+        return True
+    except Exception:
+        return False
+
+
 @app.route('/api/v1/webhooks/stripe-billing', methods=['POST'])
+@limiter.limit("60 per minute")
 def stripe_billing_webhook():
     """Process Stripe checkout/subscription events to upgrade merchant tier live."""
+    raw_body = request.get_data(as_text=True)
     sig_header = request.headers.get("Stripe-Signature")
-    if not sig_header:
-        logger.warning("Dropped Stripe frame: missing signature.")
-        return jsonify({"error": "Unauthorized"}), 400
+
+    if not STRIPE_WEBHOOK_SECRET:
+        logger.warning("Rejected Stripe webhook: STRIPE_WEBHOOK_SECRET not configured.")
+        return jsonify({"error": "Unauthorized"}), 401
+
+    if not _verify_stripe_signature(raw_body, sig_header, STRIPE_WEBHOOK_SECRET):
+        logger.warning("Rejected Stripe webhook: invalid signature.")
+        return jsonify({"error": "Unauthorized"}), 401
 
     try:
-        payload = request.get_json() or {}
+        payload = json.loads(raw_body)
         event_type = payload.get("type")
 
         if event_type in ("checkout.session.completed", "customer.subscription.updated"):
@@ -2598,8 +2638,11 @@ def generate_magic_link():
         log_metered_api_usage(merchant_id, 1)
         db.session.commit()
 
-        logger.info(f"[Magic Link] Generated for {email}: {magic_url}")
-        return jsonify({"success": True, "message": "Magic authorization link compiled and queued.", "debug_link": magic_url}), 201
+        logger.info(f"[Magic Link] Generated for {email}")
+        response = {"success": True, "message": "Magic authorization link compiled and queued."}
+        if app.config.get("TESTING") or os.environ.get("DEBUG_MAGIC_LINK"):
+            response["debug_link"] = magic_url
+        return jsonify(response), 201
     except Exception as e:
         log_system_exception("MAGIC_LINK", "CRITICAL", str(e))
         db.session.rollback()
@@ -2787,16 +2830,42 @@ def shopify_oauth_connect():
 
 @app.route('/api/v1/auth/shopify/callback')
 def shopify_oauth_callback():
-    """Step 2: Capture OAuth code and store tenant access token."""
+    """Step 2: Verify Shopify callback, exchange code for an access token, and store it."""
     code = request.args.get("code")
-    shop = request.args.get("shop")
+    shop = request.args.get("shop", "").strip().lower()
     hmac_param = request.args.get("hmac")
     timestamp = request.args.get("timestamp")
     active_merchant = "merchant_shawn_01"
 
+    if not shop or not re.match(r'^[a-zA-Z0-9\-]+\.myshopify\.com$', shop):
+        return jsonify({"success": False, "error": "Invalid or missing shop parameter."}), 400
     if not SHOPIFY_CLIENT_ID or not SHOPIFY_CLIENT_SECRET:
         return jsonify({"success": False, "error": "OAuth credentials not configured"}), 400
+    if not code or not hmac_param or not timestamp:
+        return jsonify({"success": False, "error": "Missing OAuth callback parameters."}), 400
 
+    # HMAC validation
+    try:
+        ts = int(timestamp)
+        if abs(int(time.time()) - ts) > 600:
+            return jsonify({"success": False, "error": "OAuth callback timestamp expired."}), 400
+    except (ValueError, TypeError):
+        return jsonify({"success": False, "error": "Invalid OAuth callback timestamp."}), 400
+
+    query_string = request.query_string.decode("utf-8") if request.query_string else ""
+    params = parse_qsl(query_string, keep_blank_values=True)
+    sorted_params = sorted((k, v) for k, v in params if k not in ("hmac", "signature"))
+    expected_message = urlencode(sorted_params, safe=":/")
+    expected_hmac = hmac.new(
+        SHOPIFY_CLIENT_SECRET.encode("utf-8"),
+        expected_message.encode("utf-8"),
+        hashlib.sha256,
+    ).hexdigest()
+    if not hmac.compare_digest(expected_hmac, hmac_param):
+        logger.warning(f"Invalid Shopify OAuth HMAC for shop {shop}")
+        return jsonify({"success": False, "error": "Invalid OAuth HMAC signature."}), 401
+
+    # Exchange the authorization code for a real access token
     exchange_url = f"https://{shop}/admin/oauth/access_token"
     payload = {
         "client_id": SHOPIFY_CLIENT_ID,
@@ -2805,14 +2874,13 @@ def shopify_oauth_callback():
     }
 
     try:
-        # Live token exchange (uncomment when credentials are valid)
-        # r = requests.post(exchange_url, json=payload, timeout=8)
-        # res_data = r.json()
-        # token = res_data.get("access_token")
-
-        # Simulated token exchange for layout testing
-        token = f"shpat_live_token_{secrets.token_hex(8)}"
-        scopes_confirmed = "read_products,write_products,read_orders"
+        r = requests.post(exchange_url, data=payload, timeout=10)
+        r.raise_for_status()
+        res_data = r.json()
+        token = res_data.get("access_token")
+        scopes_confirmed = res_data.get("scope", "")
+        if not token:
+            return jsonify({"success": False, "error": "Shopify did not return an access token."}), 502
 
         db.session.merge(TenantOAuthToken(
             shop_domain=shop,
@@ -2822,8 +2890,13 @@ def shopify_oauth_callback():
             scope_permissions=scopes_confirmed,
         ))
         db.session.commit()
+        logger.info(f"[Shopify OAuth] Access token obtained for {shop}")
         return redirect("/?oauth_sync=success")
+    except requests.HTTPError as e:
+        logger.error(f"[Shopify OAuth] Token exchange failed: {e}")
+        return jsonify({"success": False, "error": "Shopify token exchange failed."}), 502
     except Exception as e:
+        logger.error(f"[Shopify OAuth] Unexpected error: {e}")
         return jsonify({"success": False, "error": f"OAuth handshake stall: {e}"}), 500
 
 
