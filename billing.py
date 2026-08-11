@@ -66,9 +66,8 @@ def create_checkout_session(merchant_id, email, name, include_startup_addon=Fals
     db.session.commit()
 
     line_items = [{"price": PRICE_BETA_MONTHLY, "quantity": 1}]
-    add_invoice_items = []
     if include_startup_addon and PRICE_STARTUP_ADDON:
-        add_invoice_items.append({"price": PRICE_STARTUP_ADDON})
+        line_items.append({"price": PRICE_STARTUP_ADDON, "quantity": 1})
 
     params = {
         "customer": customer_id,
@@ -92,8 +91,6 @@ def create_checkout_session(merchant_id, email, name, include_startup_addon=Fals
         "automatic_tax": {"enabled": False},
         "managed_payments": {"enabled": False},
     }
-    if add_invoice_items:
-        params["add_invoice_items"] = add_invoice_items
 
     session = stripe.checkout.Session.create(**params)
     return session.url, session.id, customer_id
