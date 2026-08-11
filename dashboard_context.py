@@ -445,7 +445,7 @@ NAV_GROUPS = [
     {
         "label": "Store",
         "links": [
-            {"id": "startup_pack", "label": "Startup Pack", "url": "/dashboard/startup-pack", "icon": "☆"},
+            {"id": "startup_pack", "label": "Brand Build", "url": "/dashboard/startup-pack", "icon": "☆"},
             {"id": "store_catalog", "label": "Store Catalog", "url": "/dashboard/store-catalog", "icon": "▤"},
             {"id": "apps", "label": "Apps", "url": "/dashboard/apps", "icon": "◫"},
             {"id": "themes", "label": "Themes", "url": "/dashboard/themes", "icon": "◉"},

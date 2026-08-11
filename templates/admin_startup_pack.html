@@ -1,10 +1,10 @@
 {% extends 'dashboard/base.html' %}
-{% block title %}Startup Pack Submissions — {{ brand.name }} {{ brand.product }}{% endblock %}
+{% block title %}White-Label Brand Build Submissions — {{ brand.name }} {{ brand.product }}{% endblock %}
 {% block content %}
 
 <section class="page-header">
-  <h1>Startup Pack Submissions</h1>
-  <p>Review brand briefs, email founders, and deliver curated supplier / direction briefs.</p>
+  <h1>White-Label Brand Build Submissions</h1>
+  <p>Review brand briefs, email founders, and deliver US-based manufacturer matches / brand direction briefs.</p>
 </section>
 
 <div class="grid grid-2">
@@ -30,8 +30,8 @@
   <div class="card-head"><h3>Deliver Brief</h3></div>
   <div id="deliver-form" style="display:none;">
     <input id="target-merchant" type="hidden">
-    <label style="font-size:.75rem; color:var(--ink-3); font-weight:600;">Curated suppliers (JSON array)</label>
-    <textarea id="curated-suppliers" rows="4" style="width:100%; padding:10px; margin:6px 0 12px; border:1px solid var(--line); border-radius:8px; font-family:monospace; font-size:.75rem;">[{"name":"Printful","category":"Print-on-demand","note":"Start with t-shirts/hoodies, order branded samples."}]</textarea>
+    <label style="font-size:.75rem; color:var(--ink-3); font-weight:600;">US-based manufacturer matches (JSON array)</label>
+    <textarea id="curated-suppliers" rows="4" style="width:100%; padding:10px; margin:6px 0 12px; border:1px solid var(--line); border-radius:8px; font-family:monospace; font-size:.75rem;">[{"name":"Bella+Canvas / Printful","category":"US on-demand fulfillment","note":"Start with premium apparel, order branded neck-label samples."}]</textarea>
     <label style="font-size:.75rem; color:var(--ink-3); font-weight:600;">Written brief</label>
     <textarea id="brief-text" rows="4" style="width:100%; padding:10px; margin:6px 0 12px; border:1px solid var(--line); border-radius:8px;"></textarea>
     <label style="font-size:.75rem; color:var(--ink-3); font-weight:600;">Next steps</label>

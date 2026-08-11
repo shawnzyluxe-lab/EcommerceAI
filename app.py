@@ -1954,7 +1954,7 @@ def api_startup_pack_intake():
         project_dict = startup_pack.project_to_dict(project)
 
         email_html = f"""
-        <h3>New Startup Pack Intake</h3>
+        <h3>New White-Label Brand Build Intake</h3>
         <p><strong>Merchant:</strong> {merchant.get('name') or merchant['id']} ({merchant.get('email') or 'no email'})</p>
         <ul>
           <li><strong>Brand name:</strong> {project.brand_name or '-'}</li>
@@ -1963,13 +1963,13 @@ def api_startup_pack_intake():
           <li><strong>Monthly ad budget:</strong> ${project.monthly_ad_budget or 0:,.2f}</li>
           <li><strong>Design vibe:</strong> {project.design_vibe or '-'}</li>
           <li><strong>Has domain:</strong> {'Yes' if project.has_domain else 'No'}</li>
-          <li><strong>Sample product:</strong> {project.sample_product or '-'}</li>
+          <li><strong>First product idea:</strong> {project.sample_product or '-'}</li>
         </ul>
-        <p>Reply to the merchant directly from this email to deliver the Startup Pack brief.</p>
+        <p>Reply to the merchant directly from this email to deliver the white-label brand brief with US-based manufacturer matches.</p>
         """
         email_sent = dispatch_external_email(
             recipient=MERCHANT_EMAIL,
-            subject=f"Startup Pack intake: {project.brand_name or merchant['id']}",
+            subject=f"White-label brand intake: {project.brand_name or merchant['id']}",
             html_body=email_html,
         )
         return jsonify({**project_dict, "email_sent": email_sent}), 200
