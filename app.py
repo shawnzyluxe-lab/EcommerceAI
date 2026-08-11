@@ -523,7 +523,7 @@ with app.app_context():
     # Seed / refresh multi-tenant merchant profiles first (other tables FK to it)
     temp_password = os.environ.get("TEMP_ACCOUNTS_PASSWORD") or (SITE_WALL_PASSWORD if SITE_WALL_PASSWORD else "IfxSVNs4iAs")
     temp_accounts = [
-        ("merchant_shawn_01", "Shawnzyluxe Pro", "shawn@shawnzyluxe.com", "Enterprise AI Tier"),
+        ("merchant_shawn_01", "Shawnzyluxe Pro", "shawn@shawnzyluxe.com", "Beta Tier"),
         ("merchant_admin_temp", "Temporary Admin", "admin@shawnzyluxe.com", "Enterprise AI Tier"),
         ("merchant_engineer_temp", "Temporary Engineer", "engineer@shawnzyluxe.com", "Pro Tier"),
     ]
@@ -532,7 +532,9 @@ with app.app_context():
         if p:
             p.business_name = name
             p.admin_email = email
-            p.account_tier = tier
+            # Preserve tiers set by live Stripe webhooks (anything above Basic).
+            if not p.account_tier or p.account_tier == "Basic Tier":
+                p.account_tier = tier
             p.password_hash = generate_password_hash(temp_password, method="pbkdf2:sha256")
         else:
             db.session.add(MerchantProfile(merchant_id=mid, business_name=name, admin_email=email, account_tier=tier, password_hash=generate_password_hash(temp_password, method="pbkdf2:sha256")))
