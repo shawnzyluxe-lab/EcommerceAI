@@ -1,0 +1,210 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Prometheus OS — Beta Access</title>
+  <style>
+    :root {
+      --bg: #050505;
+      --card: #0f0f0f;
+      --ink: #f5f5f5;
+      --muted: #888;
+      --line: #222;
+      --accent: #d4af37;
+      --accent-2: #a78bfa;
+      --danger: #ef4444;
+      --success: #22c55e;
+    }
+    * { box-sizing: border-box; }
+    html, body {
+      margin: 0;
+      background: var(--bg);
+      color: var(--ink);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 2rem 1rem;
+    }
+    .container { width: 100%; max-width: 760px; }
+    .eyebrow {
+      text-transform: uppercase;
+      letter-spacing: 0.14em;
+      font-size: .75rem;
+      color: var(--muted);
+      margin-bottom: .6rem;
+      text-align: center;
+    }
+    h1 {
+      font-size: clamp(2rem, 6vw, 3.2rem);
+      font-weight: 800;
+      letter-spacing: -0.03em;
+      text-align: center;
+      margin: 0 0 .5rem;
+      background: linear-gradient(90deg, #fff, #a8a8a8);
+      -webkit-background-clip: text;
+      background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+    .sub {
+      text-align: center;
+      color: var(--muted);
+      margin-bottom: 2rem;
+      font-size: 1rem;
+    }
+    .plans { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 1rem; margin-bottom: 1.5rem; }
+    .plan {
+      border: 1px solid var(--line);
+      border-radius: 16px;
+      padding: 1.4rem;
+      cursor: pointer;
+      transition: border-color .15s, transform .1s;
+      background: var(--card);
+    }
+    .plan:hover { border-color: #333; }
+    .plan.selected { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent); }
+    .plan h3 { margin: 0 0 .25rem; font-size: 1.1rem; }
+    .plan .price { font-size: 1.9rem; font-weight: 800; margin: .8rem 0 .3rem; }
+    .plan .price span { font-size: .9rem; color: var(--muted); font-weight: 500; }
+    .plan ul { margin: .8rem 0 0; padding-left: 1.1rem; color: #bbb; font-size: .9rem; line-height: 1.5; }
+    .form {
+      background: var(--card);
+      border: 1px solid var(--line);
+      border-radius: 16px;
+      padding: 1.4rem;
+    }
+    .field { margin-bottom: 1rem; }
+    label { display: block; font-size: .8rem; color: var(--muted); margin-bottom: .35rem; text-transform: uppercase; letter-spacing: .08em; }
+    input, button {
+      width: 100%;
+      padding: .85rem 1rem;
+      border-radius: 10px;
+      border: 1px solid var(--line);
+      background: #050505;
+      color: var(--ink);
+      font-size: .95rem;
+    }
+    input:focus { outline: none; border-color: var(--accent); }
+    .checkbox { display: flex; align-items: center; gap: .6rem; margin-bottom: 1rem; }
+    .checkbox input { width: auto; }
+    .checkbox label { margin: 0; text-transform: none; letter-spacing: 0; font-size: .9rem; color: var(--ink); }
+    button {
+      background: var(--accent);
+      color: #050505;
+      border: none;
+      font-weight: 800;
+      cursor: pointer;
+      transition: opacity .15s;
+    }
+    button:hover { opacity: .9; }
+    button:disabled { opacity: .5; cursor: not-allowed; }
+    .message { margin-top: 1rem; text-align: center; font-size: .9rem; min-height: 1.2rem; }
+    .message.error { color: var(--danger); }
+    .message.success { color: var(--success); }
+    .muted { color: var(--muted); font-size: .8rem; text-align: center; margin-top: 1rem; }
+    .muted a { color: var(--accent-2); text-decoration: none; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="eyebrow">Shawnzyluxe presents Prometheus OS</div>
+    <h1>Join the Beta</h1>
+    <p class="sub">Real-time profit. Multi-channel ops. AI COO. One subscription.</p>
+
+    <div class="plans" id="plans">
+      <div class="plan selected" data-plan="beta" data-addon="false">
+        <h3>Beta Plan</h3>
+        <div class="price">${{ price_beta }}<span>/mo</span></div>
+        <div style="color:var(--muted);font-size:.85rem">Everything you need to launch.</div>
+        <ul>
+          <li>Shopify + TikTok Shop + Amazon sync</li>
+          <li>Real-time Profit Feed</li>
+          <li>AI COO alerts & actions</li>
+          <li>Discord/SMS alert matrix</li>
+        </ul>
+      </div>
+      <div class="plan" data-plan="beta" data-addon="true">
+        <h3>Beta + Startup Pack</h3>
+        <div class="price">${{ price_beta + price_addon }}<span>/mo + setup</span></div>
+        <div style="color:var(--muted);font-size:.85rem">We build your store with you.</div>
+        <ul>
+          <li>All Beta Plan features</li>
+          <li>Store setup + landing page build</li>
+          <li>Trending products weekly</li>
+          <li>Curated dropshipper directory</li>
+        </ul>
+      </div>
+    </div>
+
+    <form class="form" id="checkout-form">
+      <div class="field">
+        <label for="email">Business email</label>
+        <input type="email" id="email" name="email" required placeholder="you@store.com">
+      </div>
+      <div class="field">
+        <label for="business_name">Business name</label>
+        <input type="text" id="business_name" name="business_name" placeholder="My Brand">
+      </div>
+      <div class="field">
+        <label for="password">Create password</label>
+        <input type="password" id="password" name="password" required minlength="8" placeholder="••••••••">
+      </div>
+      <div class="checkbox">
+        <input type="checkbox" id="include_startup_addon" name="include_startup_addon">
+        <label for="include_startup_addon">Include $99 Startup Add-on</label>
+      </div>
+      <button type="submit" id="submit-btn">Start Beta Subscription</button>
+      <div class="message" id="message"></div>
+      <div class="muted">Already have an account? <a href="/">Log in</a></div>
+    </form>
+  </div>
+
+  <script>
+    const plans = document.querySelectorAll('.plan');
+    const addonBox = document.getElementById('include_startup_addon');
+    plans.forEach(p => p.addEventListener('click', () => {
+      plans.forEach(x => x.classList.remove('selected'));
+      p.classList.add('selected');
+      addonBox.checked = p.dataset.addon === 'true';
+    }));
+    addonBox.addEventListener('change', () => {
+      plans.forEach(p => p.classList.toggle('selected', p.dataset.addon === String(addonBox.checked)));
+    });
+
+    document.getElementById('checkout-form').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const btn = document.getElementById('submit-btn');
+      const msg = document.getElementById('message');
+      btn.disabled = true;
+      msg.textContent = '';
+      msg.className = 'message';
+      try {
+        const res = await fetch('/api/v1/stripe/create-checkout', {
+          method: 'POST',
+          headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify({
+            email: document.getElementById('email').value,
+            business_name: document.getElementById('business_name').value,
+            password: document.getElementById('password').value,
+            include_startup_addon: addonBox.checked,
+          })
+        });
+        const data = await res.json();
+        if (res.ok && data.url) {
+          msg.textContent = 'Redirecting to secure checkout...';
+          msg.className = 'message success';
+          window.location.href = data.url;
+        } else {
+          throw new Error(data.detail || 'Checkout failed');
+        }
+      } catch (err) {
+        msg.textContent = err.message;
+        msg.className = 'message error';
+        btn.disabled = false;
+      }
+    });
+  </script>
+</body>
+</html>

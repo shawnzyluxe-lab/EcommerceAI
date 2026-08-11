@@ -40,6 +40,7 @@ load_dotenv()
 
 from models import db, Tenant, ConnectedChannel, ActiveSession, BusinessMetric, CommerceChannel, MerchantChannel, SupportMetric, MarketingStudio, PredictiveLogistics, OutboundTransmission, SaaSBilling, LocalProductCatalog, MerchantProfile, TenantOAuthToken, MerchantMetric, SystemExceptionLog, ProcessedWebhookEvent, AdSpendAnalytic, GeneratedPurchaseOrder, AIAgent, AgentMessage, MerchantDecisionLog, MagicLoginToken, TrendingProduct, ProductFinancialLedger, MerchantSetting, ProfitFeedOrder, AdSpendFeed
 import profit_feed
+import billing
 from dashboard_context import (
     context,
     COMMAND_RESPONSES,
@@ -465,7 +466,7 @@ def enforce_tier_limits(merchant_id, requested_feature):
 def site_wall_protect():
     if not site_wall_enabled():
         return None
-    if request.endpoint in ('home', 'site_login', 'site_logout', 'auth_login', 'auth_signup', 'auth_provision_node', 'shopify_orders_webhook', 'tiktok_orders_webhook', 'amazon_orders_webhook', 'stripe_billing_webhook', 'supplier_po_update', 'execute_mitigation', 'generate_magic_link', 'magic_login', 'register_merchant', 'shopify_oauth_callback', 'health_check', 'static'):
+    if request.endpoint in ('home', 'site_login', 'site_logout', 'subscribe', 'create_stripe_checkout', 'auth_login', 'auth_signup', 'auth_provision_node', 'shopify_orders_webhook', 'tiktok_orders_webhook', 'amazon_orders_webhook', 'stripe_billing_webhook', 'supplier_po_update', 'execute_mitigation', 'generate_magic_link', 'magic_login', 'register_merchant', 'shopify_oauth_callback', 'health_check', 'static'):
         return None
     if site_wall_authenticated():
         return None
@@ -492,7 +493,10 @@ TWILIO_FROM_NUMBER = os.environ.get("TWILIO_FROM_NUMBER", "")
 MERCHANT_PHONE = os.environ.get("MERCHANT_PHONE", "")
 
 STRIPE_SECRET_KEY = os.environ.get("STRIPE_SECRET_KEY", "")
+STRIPE_PUBLISHABLE_KEY = os.environ.get("STRIPE_PUBLISHABLE_KEY", "")
 STRIPE_WEBHOOK_SECRET = os.environ.get("STRIPE_WEBHOOK_SECRET", "")
+STRIPE_PRICE_BETA_MONTHLY = os.environ.get("STRIPE_PRICE_BETA_MONTHLY", "")
+STRIPE_PRICE_STARTUP_ADDON = os.environ.get("STRIPE_PRICE_STARTUP_ADDON", "")
 SHOPIFY_STORE_URL = os.environ.get("SHOPIFY_STORE_URL", "")
 SHOPIFY_ACCESS_TOKEN = os.environ.get("SHOPIFY_ACCESS_TOKEN", "")
 SHOPIFY_CLIENT_ID = os.environ.get("SHOPIFY_CLIENT_ID", "")
@@ -1102,6 +1106,15 @@ def home():
     if site_wall_authenticated():
         return redirect(url_for('dashboard'))
     return render_template('index.html', error=bool(request.args.get('error')), oauth_sync=request.args.get('oauth_sync'), recaptcha_site_key=RECAPTCHA_SITE_KEY)
+
+
+@app.route('/subscribe')
+def subscribe():
+    """Public beta subscription landing page."""
+    host = request.host.split(':')[0].lower()
+    if host in ('shawnzyluxe.com', 'www.shawnzyluxe.com'):
+        return render_template('coming_soon.html')
+    return render_template('subscribe.html', stripe_publishable_key=STRIPE_PUBLISHABLE_KEY, price_beta=249, price_addon=99)
 
 
 @app.route('/dashboard')
@@ -1839,6 +1852,72 @@ def ad_spend_feed():
         return jsonify({"detail": "Failed to record ad spend."}), 500
 
 
+@app.route('/api/v1/stripe/create-checkout', methods=['POST'])
+def create_stripe_checkout():
+    """Create a Stripe Checkout session for the beta plan plus optional startup add-on."""
+    data = request.get_json(silent=True) or request.form or {}
+    email = (data.get("email") or "").strip().lower()
+    business_name = (data.get("business_name") or "").strip() or email
+    password = data.get("password", "")
+    include_startup_addon = bool(data.get("include_startup_addon"))
+
+    if not email or not password or len(password) < 8:
+        return jsonify({"detail": "A valid email and a password of at least 8 characters are required."}), 400
+
+    # Find or provision the merchant account so the webhook can upgrade it.
+    profile = MerchantProfile.query.filter_by(admin_email=email).first()
+    if profile:
+        merchant_id = profile.merchant_id
+    else:
+        merchant_id = f"tenant_{uuid.uuid4().hex[:8]}"
+        from werkzeug.security import generate_password_hash
+        db.session.add(MerchantProfile(
+            merchant_id=merchant_id,
+            business_name=business_name,
+            admin_email=email,
+            account_tier="Basic Tier",
+            password_hash=generate_password_hash(password, method="pbkdf2:sha256"),
+        ))
+        db.session.add(SaaSBilling(
+            merchant_id=merchant_id,
+            current_plan="Basic Tier",
+            metered_usage_units=0,
+            accrued_invoice_value=0.0,
+        ))
+        db.session.commit()
+
+    try:
+        success_url = url_for('dashboard', _external=True, _scheme='https') + '?checkout=success'
+        cancel_url = url_for('subscribe', _external=True, _scheme='https') + '?canceled=1'
+        session_url, session_id, customer_id = billing.create_checkout_session(
+            merchant_id,
+            email,
+            business_name,
+            include_startup_addon=include_startup_addon,
+            success_url=success_url,
+            cancel_url=cancel_url,
+        )
+        return jsonify({"url": session_url, "session_id": session_id, "customer_id": customer_id}), 200
+    except Exception as e:
+        logger.error(f"[Stripe Checkout] Failed: {e}")
+        return jsonify({"detail": "Unable to start checkout session."}), 500
+
+
+@app.route('/api/v1/stripe/customer-portal', methods=['POST'])
+def stripe_customer_portal():
+    """Return a Stripe Billing Portal session for the authenticated merchant."""
+    merchant = get_merchant_context()
+    if not merchant:
+        return jsonify({"error": "No merchant context"}), 403
+    try:
+        return_url = url_for('dashboard_page', page='billing', _external=True, _scheme='https')
+        url = billing.create_customer_portal_session(merchant["id"], return_url=return_url)
+        return jsonify({"url": url}), 200
+    except Exception as e:
+        logger.error(f"[Stripe Portal] Failed: {e}")
+        return jsonify({"detail": "Unable to open billing portal."}), 500
+
+
 @app.route('/api/v1/fulfillment/tracking-injection', methods=['POST'])
 @require_roles([UserRole.ADMIN, UserRole.ENGINEER])
 def tracking_injection():
@@ -2174,33 +2253,52 @@ def amazon_orders_webhook():
 
 @app.route('/api/v1/webhooks/stripe-billing', methods=['POST'])
 def stripe_billing_webhook():
-    """Process Stripe checkout/subscription events to upgrade merchant tier live."""
+    """Verify and process Stripe checkout/subscription events to upgrade merchant tier live."""
     sig_header = request.headers.get("Stripe-Signature")
     if not sig_header:
         logger.warning("Dropped Stripe frame: missing signature.")
         return jsonify({"error": "Unauthorized"}), 400
 
     try:
-        payload = request.get_json() or {}
-        event_type = payload.get("type")
+        payload = request.get_data(as_text=True)
+        event = billing.handle_webhook(payload, sig_header, STRIPE_WEBHOOK_SECRET)
+        event_type = event.get("type")
 
         if event_type in ("checkout.session.completed", "customer.subscription.updated"):
-            session_obj = payload.get("data", {}).get("object", {})
+            session_obj = event.get("data", {}).get("object", {})
             stripe_cust_id = session_obj.get("customer")
             metadata = session_obj.get("metadata", {})
             merchant_target = metadata.get("merchant_id", "merchant_shawn_01")
-            chosen_tier = metadata.get("selected_tier", "Pro Tier")
+            chosen_tier = metadata.get("selected_tier", "Beta Tier")
+            startup_addon = metadata.get("startup_addon") == "true"
 
             profile = MerchantProfile.query.get(merchant_target)
             if profile:
                 profile.account_tier = chosen_tier
-            billing = SaaSBilling.query.get(merchant_target)
-            if billing:
-                billing.current_plan = chosen_tier
-                billing.stripe_customer_id = stripe_cust_id
+            saas_billing = SaaSBilling.query.get(merchant_target)
+            if saas_billing:
+                saas_billing.current_plan = chosen_tier
+                saas_billing.stripe_customer_id = stripe_cust_id
+                # Persist the subscription ID if available.
+                subscription_id = session_obj.get("subscription")
+                if subscription_id:
+                    saas_billing.stripe_subscription_item_id = subscription_id
             db.session.commit()
-            logger.info(f"[Stripe Pipeline] Merchant {merchant_target} upgraded to {chosen_tier}")
+            logger.info(f"[Stripe Pipeline] Merchant {merchant_target} upgraded to {chosen_tier}; addon={startup_addon}")
             return jsonify({"status": "tier_synchronized"}), 200
+
+        if event_type == "customer.subscription.deleted":
+            sub_obj = event.get("data", {}).get("object", {})
+            customer_id = sub_obj.get("customer")
+            if customer_id:
+                saas_billing = SaaSBilling.query.filter_by(stripe_customer_id=customer_id).first()
+                if saas_billing:
+                    profile = MerchantProfile.query.get(saas_billing.merchant_id)
+                    if profile:
+                        profile.account_tier = "Basic Tier"
+                    saas_billing.current_plan = "Basic Tier"
+                    db.session.commit()
+            return jsonify({"status": "subscription_cancelled"}), 200
 
         return jsonify({"status": "unhandled_event_passed"}), 200
     except Exception as e:

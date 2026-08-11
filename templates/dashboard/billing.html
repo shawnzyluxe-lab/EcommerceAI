@@ -11,12 +11,13 @@
   <div class="card">
     <div class="card-head"><h3>Current Plan</h3></div>
     <div style="background: var(--ink); color: #fff; border-radius: var(--radius); padding: 18px; margin-bottom: 14px;">
-      <div style="font-size: 1.2rem; font-weight: 700; margin-bottom: 4px;">♛ {{ merchant.tier | default('Enterprise AI Tier') }}</div>
-      <div style="font-size: .85rem; color: #b7bdc9; margin-bottom: 14px;">Unlimited access to all AI commerce modules.</div>
-      <div style="font-size: 1.6rem; font-weight: 800; margin-bottom: 4px;">$499<span style="font-size: .85rem; color: #b7bdc9;">/mo</span></div>
-      <div style="font-size: .8rem; color: var(--gold);">Renews Aug 15, 2025</div>
+      <div style="font-size: 1.2rem; font-weight: 700; margin-bottom: 4px;">{{ merchant.tier | default('Basic Tier') }}</div>
+      <div id="plan-desc" style="font-size: .85rem; color: #b7bdc9; margin-bottom: 14px;">Prometheus OS beta access.</div>
+      <div style="font-size: 1.6rem; font-weight: 800; margin-bottom: 4px;">$249<span style="font-size: .85rem; color: #b7bdc9;">/mo</span></div>
+      <div id="renewal-date" style="font-size: .8rem; color: var(--gold);">Manage via Stripe</div>
     </div>
-    <button class="btn btn-primary" style="width: 100%;">Change plan</button>
+    <a href="/subscribe" class="btn btn-primary" style="width: 100%; display: block; text-align: center; margin-bottom: 8px;">Upgrade or change plan</a>
+    <button id="portal-btn" class="btn" style="width: 100%;">Manage billing & invoices</button>
   </div>
 
   <div class="card">
@@ -46,5 +47,26 @@
     </table>
   </div>
 </div>
+
+<script>
+  document.getElementById('portal-btn').addEventListener('click', async () => {
+    const btn = document.getElementById('portal-btn');
+    btn.disabled = true;
+    btn.textContent = 'Opening...';
+    try {
+      const res = await fetch('/api/v1/stripe/customer-portal', {method: 'POST'});
+      const data = await res.json();
+      if (res.ok && data.url) {
+        window.location.href = data.url;
+      } else {
+        throw new Error(data.detail || 'Could not open portal');
+      }
+    } catch (e) {
+      alert(e.message);
+      btn.disabled = false;
+      btn.textContent = 'Manage billing & invoices';
+    }
+  });
+</script>
 
 {% endblock %}
