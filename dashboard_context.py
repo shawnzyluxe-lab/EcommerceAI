@@ -6,12 +6,14 @@ replacing one function/constant and nothing else. Nothing here calls an external
 API: the numbers are illustrative sample data, clearly labelled in the UI.
 """
 
+import copy
 import os
 from datetime import datetime, timedelta, timezone
 
 from flask import Flask, render_template, request, jsonify
 from models import PredictiveLogistics
 import profit_feed
+import alert_matrix
 
 
 BRAND = {
@@ -472,10 +474,31 @@ def context(active_page=None, merchant=None, merchant_id=None):
     briefing = dict(BRIEFING)
     briefing["revenue"] = gross
     briefing["profit"] = net
+
+    # Live Alert Matrix — refresh and format open alerts for the merchant.
+    if merchant_id:
+        try:
+            alert_matrix.refresh_alerts(merchant_id)
+            live_alerts = [alert_matrix.alert_to_dict(a) for a in alert_matrix.get_alerts(merchant_id)]
+            fraud_alerts = [alert_matrix.fraud_alert_to_dict(a) for a in alert_matrix.get_fraud_alerts(merchant_id)]
+        except Exception:
+            live_alerts = ALERTS
+            fraud_alerts = FRAUD
+    else:
+        live_alerts = ALERTS
+        fraud_alerts = FRAUD
+
+    # Dynamic nav badge reflects open alert count.
+    nav_groups = copy.deepcopy(NAV_GROUPS)
+    for group in nav_groups:
+        for link in group["links"]:
+            if link.get("id") == "alerts":
+                link["badge"] = str(len(live_alerts))
+
     return {
         "brand": BRAND,
         "nav": NAV,
-        "nav_groups": NAV_GROUPS,
+        "nav_groups": nav_groups,
         "active_page": active_page or "overview",
         "merchant": merchant or {
             "name": "Shawnzyluxe",
@@ -487,7 +510,7 @@ def context(active_page=None, merchant=None, merchant_id=None):
         "channels": CHANNELS,
         "connected": [c for c in CHANNELS if c["state"] == "connected"],
         "briefing": briefing,
-        "alerts": ALERTS,
+        "alerts": live_alerts,
         "profit_rows": profit_rows,
         "gross": gross,
         "costs": costs,
@@ -499,7 +522,7 @@ def context(active_page=None, merchant=None, merchant_id=None):
         "forecasts": FORECASTS,
         "research": RESEARCH,
         "fulfillment": FULFILLMENT,
-        "fraud": FRAUD,
+        "fraud": fraud_alerts,
         "suppliers": SUPPLIERS,
         "studio": STUDIO,
         "support": SUPPORT,

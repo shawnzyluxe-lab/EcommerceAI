@@ -13,9 +13,9 @@
     <span class="spacer"></span>
     <span class="tag tag-red">1 blocked</span>
   </div>
-  <div style="display: flex; flex-direction: column; gap: 14px;">
+  <div style="display: flex; flex-direction: column; gap: 14px;" id="fraud-feed">
     {% for f in fraud %}
-    <div style="border: 1px solid var(--line); border-radius: 12px; padding: 14px;">
+    <div style="border: 1px solid var(--line); border-radius: 12px; padding: 14px;" class="fraud-item">
       <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
         <div style="display: flex; align-items: center; gap: 10px;">
           <span class="b mono" style="font-size: 1rem;">{{ f.order }}</span>
@@ -39,5 +39,42 @@
     {% endfor %}
   </div>
 </div>
+
+<script>
+async function refreshFraud() {
+  try {
+    const res = await fetch('/api/fraud');
+    if (!res.ok) return;
+    const data = await res.json();
+    const feed = document.getElementById('fraud-feed');
+    const tagClass = {block: 'tag-red', review: 'tag-amber', allow: 'tag-green'};
+    const barColor = s => s > 70 ? 'var(--red)' : s > 40 ? 'var(--amber)' : 'var(--green)';
+    feed.innerHTML = data.alerts.map(f => `
+      <div style="border: 1px solid var(--line); border-radius: 12px; padding: 14px;" class="fraud-item">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+          <div style="display: flex; align-items: center; gap: 10px;">
+            <span class="b mono" style="font-size: 1rem;">${f.order}</span>
+            <span class="tag ${tagClass[f.verdict] || 'tag-amber'}">${f.verdict.toUpperCase()}</span>
+          </div>
+          <div style="text-align: right;">
+            <div style="font-size: 1.4rem; font-weight: 800; color: var(--ink);">${f.score}</div>
+            <div style="font-size: .7rem; color: var(--ink-3);">risk score</div>
+          </div>
+        </div>
+        <div style="height: 7px; border-radius: 99px; background: var(--line-2); overflow: hidden; margin-bottom: 8px;">
+          <div style="height: 100%; border-radius: 99px; background: ${barColor(f.score)}; width: ${f.score}%;"></div>
+        </div>
+        <div style="font-size: .84rem; color: var(--ink-3); margin-bottom: 10px;">${f.reasons}</div>
+        <div style="display: flex; gap: 8px;">
+          <button class="btn" style="font-size: .75rem;">Approve</button>
+          <button class="btn" style="font-size: .75rem;">Review</button>
+          <button class="btn" style="font-size: .75rem; color: var(--red); border-color: var(--red-bg); background: var(--red-bg);">Block</button>
+        </div>
+      </div>
+    `).join('');
+  } catch (e) { console.error('fraud refresh', e); }
+}
+setInterval(refreshFraud, 60000);
+</script>
 
 {% endblock %}

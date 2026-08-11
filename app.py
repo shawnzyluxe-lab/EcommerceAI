@@ -38,9 +38,10 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-from models import db, Tenant, ConnectedChannel, ActiveSession, BusinessMetric, CommerceChannel, MerchantChannel, SupportMetric, MarketingStudio, PredictiveLogistics, OutboundTransmission, SaaSBilling, LocalProductCatalog, MerchantProfile, TenantOAuthToken, MerchantMetric, SystemExceptionLog, ProcessedWebhookEvent, AdSpendAnalytic, GeneratedPurchaseOrder, AIAgent, AgentMessage, MerchantDecisionLog, MagicLoginToken, TrendingProduct, ProductFinancialLedger, MerchantSetting, ProfitFeedOrder, AdSpendFeed
+from models import db, Tenant, ConnectedChannel, ActiveSession, BusinessMetric, CommerceChannel, MerchantChannel, SupportMetric, MarketingStudio, PredictiveLogistics, OutboundTransmission, SaaSBilling, LocalProductCatalog, MerchantProfile, TenantOAuthToken, MerchantMetric, SystemExceptionLog, ProcessedWebhookEvent, AdSpendAnalytic, GeneratedPurchaseOrder, AIAgent, AgentMessage, MerchantDecisionLog, MagicLoginToken, TrendingProduct, ProductFinancialLedger, MerchantSetting, ProfitFeedOrder, AdSpendFeed, Alert
 import profit_feed
 import billing as billing_module
+import alert_matrix
 from dashboard_context import (
     context,
     COMMAND_RESPONSES,
@@ -577,6 +578,10 @@ with app.app_context():
     # Seed the real-time Profit Feed with demo data if no orders exist yet.
     profit_feed.seed_demo_data("merchant_shawn_01")
     profit_feed.seed_demo_data("merchant_guest_02")
+
+    # Seed / refresh the Alert Matrix from latest data.
+    alert_matrix.seed_demo_alerts("merchant_shawn_01")
+    alert_matrix.refresh_alerts("merchant_shawn_01")
 
     # Seed or restore commerce channels
     if not CommerceChannel.query.first():
@@ -1507,6 +1512,82 @@ def api_kpis():
     merchant = get_merchant_context()
     merchant_id = merchant["id"] if merchant else "merchant_shawn_01"
     return jsonify(profit_feed.get_kpis(merchant_id))
+
+
+@app.route('/api/alerts')
+def api_alerts():
+    """Real-time Alert Matrix for the authenticated merchant."""
+    merchant = get_merchant_context()
+    if not merchant:
+        return jsonify({"error": "No merchant context"}), 403
+    try:
+        alert_matrix.refresh_alerts(merchant["id"])
+        rows = [alert_matrix.alert_to_dict(a) for a in alert_matrix.get_alerts(merchant["id"])]
+        return jsonify({"alerts": rows, "count": len(rows)}), 200
+    except Exception as e:
+        logger.error(f"[Alert Matrix] Failed: {e}")
+        return jsonify({"detail": "Unable to load alerts."}), 500
+
+
+@app.route('/api/fraud')
+def api_fraud():
+    """Real-time fraud/risk alerts for the authenticated merchant."""
+    merchant = get_merchant_context()
+    if not merchant:
+        return jsonify({"error": "No merchant context"}), 403
+    try:
+        alert_matrix.refresh_alerts(merchant["id"])
+        rows = [alert_matrix.fraud_alert_to_dict(a) for a in alert_matrix.get_fraud_alerts(merchant["id"])]
+        return jsonify({"alerts": rows, "count": len(rows)}), 200
+    except Exception as e:
+        logger.error(f"[Fraud Alerts] Failed: {e}")
+        return jsonify({"detail": "Unable to load fraud alerts."}), 500
+
+
+@app.route('/api/alerts/<int:alert_id>/resolve', methods=['POST'])
+def resolve_alert(alert_id):
+    """Resolve an alert."""
+    merchant = get_merchant_context()
+    if not merchant:
+        return jsonify({"error": "No merchant context"}), 403
+    alert = Alert.query.filter_by(id=alert_id, merchant_id=merchant["id"]).first()
+    if not alert:
+        return jsonify({"error": "Alert not found"}), 404
+    alert.status = "resolved"
+    alert.resolved_at = datetime.utcnow()
+    db.session.commit()
+    return jsonify({"status": "resolved"}), 200
+
+
+@app.route('/api/alerts/<int:alert_id>/snooze', methods=['POST'])
+def snooze_alert(alert_id):
+    """Snooze an alert for 24 hours."""
+    merchant = get_merchant_context()
+    if not merchant:
+        return jsonify({"error": "No merchant context"}), 403
+    alert = Alert.query.filter_by(id=alert_id, merchant_id=merchant["id"]).first()
+    if not alert:
+        return jsonify({"error": "Alert not found"}), 404
+    alert.status = "snoozed"
+    alert.resolved_at = datetime.utcnow() + timedelta(days=1)
+    db.session.commit()
+    return jsonify({"status": "snoozed", "until": alert.resolved_at.isoformat()}), 200
+
+
+@app.route('/api/alerts/<int:alert_id>/dispatch', methods=['POST'])
+def dispatch_alert(alert_id):
+    """Manually dispatch an alert to Discord/SMS."""
+    merchant = get_merchant_context()
+    if not merchant:
+        return jsonify({"error": "No merchant context"}), 403
+    alert = Alert.query.filter_by(id=alert_id, merchant_id=merchant["id"]).first()
+    if not alert:
+        return jsonify({"error": "Alert not found"}), 404
+    # Phone number can be provided in JSON or fetched from merchant settings.
+    phone = request.get_json(silent=True, force=True) or {}
+    to_number = phone.get("phone")
+    channels = alert_matrix.dispatch_alert(alert, to_number=to_number)
+    return jsonify({"dispatched": channels}), 200
 
 
 @app.route('/site-login', methods=['GET', 'POST'])

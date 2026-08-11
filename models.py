@@ -243,6 +243,21 @@ class MagicLoginToken(db.Model):
     is_used = db.Column(db.Integer, default=0)
 
 
+class Alert(db.Model):
+    __tablename__ = "alert_matrix_alerts"
+    id = db.Column(db.Integer, primary_key=True, autoincrement=True)
+    merchant_id = db.Column(db.String(100), db.ForeignKey("merchant_profiles.merchant_id"), nullable=False, index=True)
+    alert_type = db.Column(db.String(50), nullable=False, index=True)  # inventory_runout, low_inventory, fraud_risk, ad_spend
+    severity = db.Column(db.String(20), default="warn")  # crit, warn, good
+    title = db.Column(db.String(255), nullable=False)
+    detail = db.Column(db.Text)
+    source_id = db.Column(db.String(100), nullable=False)  # deterministic source for dedup
+    status = db.Column(db.String(20), default="open")  # open, snoozed, resolved
+    dispatched_to = db.Column(db.Text)  # JSON array of channel names
+    created_at = db.Column(db.DateTime, server_default=db.func.now())
+    resolved_at = db.Column(db.DateTime)
+
+
 class PredictiveLogistics(db.Model):
     __tablename__ = "predictive_logistics"
     id = db.Column(db.Integer, primary_key=True, autoincrement=True)

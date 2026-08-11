@@ -18,15 +18,27 @@
       <span class="chip">Good</span>
     </div>
   </div>
-  <div class="alert-feed">
+  <div class="alert-feed" id="alert-feed">
     {% for a in alerts %}
-    <div class="alert-item {{ a.level }}">
+    <div class="alert-item {{ a.level }}" data-id="{{ a.id }}">
       <div class="alert-bar"></div>
       <div class="alert-body">
         <div class="alert-title">{{ a.title }}</div>
         <div class="alert-detail">{{ a.detail }}</div>
         <div class="alert-actions">
-          {% for act in a.actions %}<button class="btn" style="padding: 5px 10px; font-size: .76rem;">{{ act }}</button>{% endfor %}
+          {% for act in a.actions %}
+            {% if act == 'Create PO' %}
+              <button class="btn" style="padding: 5px 10px; font-size: .76rem;" data-action="dispatch" data-id="{{ a.id }}">{{ act }}</button>
+            {% elif act == 'Review order' %}
+              <button class="btn" style="padding: 5px 10px; font-size: .76rem;" data-action="dispatch" data-id="{{ a.id }}">{{ act }}</button>
+            {% elif act == 'Snooze' %}
+              <button class="btn" style="padding: 5px 10px; font-size: .76rem;" data-action="snooze" data-id="{{ a.id }}">{{ act }}</button>
+            {% elif act == 'Resolve' %}
+              <button class="btn" style="padding: 5px 10px; font-size: .76rem;" data-action="resolve" data-id="{{ a.id }}">{{ act }}</button>
+            {% else %}
+              <button class="btn" style="padding: 5px 10px; font-size: .76rem;">{{ act }}</button>
+            {% endif %}
+          {% endfor %}
         </div>
       </div>
       <div class="alert-when">{{ a.when }}</div>
@@ -34,5 +46,75 @@
     {% endfor %}
   </div>
 </div>
+
+<script>
+async function refreshAlerts() {
+  try {
+    const res = await fetch('/api/alerts');
+    if (!res.ok) return;
+    const data = await res.json();
+    const feed = document.getElementById('alert-feed');
+    if (!data.alerts.length) {
+      feed.innerHTML = '<div style="padding:20px;color:var(--ink-3)">No open alerts.</div>';
+      return;
+    }
+    feed.innerHTML = data.alerts.map(a => {
+      const actions = (a.actions || []).map(act => {
+        let action = '';
+        if (['Create PO','Review order'].includes(act)) action = 'dispatch';
+        else if (act === 'Snooze') action = 'snooze';
+        else if (act === 'Resolve') action = 'resolve';
+        return `<button class="btn" style="padding: 5px 10px; font-size: .76rem;" ${action ? `data-action="${action}" data-id="${a.id}"` : ''}>${act}</button>`;
+      }).join('');
+      return `<div class="alert-item ${a.level}" data-id="${a.id}">
+        <div class="alert-bar"></div>
+        <div class="alert-body">
+          <div class="alert-title">${a.title}</div>
+          <div class="alert-detail">${a.detail}</div>
+          <div class="alert-actions">${actions}</div>
+        </div>
+        <div class="alert-when">${a.when}</div>
+      </div>`;
+    }).join('');
+    bindActions();
+    updateBadge(data.count);
+  } catch (e) { console.error('alert refresh', e); }
+}
+
+function updateBadge(count) {
+  document.querySelectorAll('.nav-badge').forEach(badge => {
+    badge.textContent = count;
+    badge.style.display = count > 0 ? 'inline-block' : 'none';
+  });
+}
+
+async function handleAction(btn) {
+  const id = btn.dataset.id;
+  const action = btn.dataset.action;
+  btn.disabled = true;
+  try {
+    const res = await fetch(`/api/alerts/${id}/${action}`, {method: 'POST'});
+    const data = await res.json();
+    if (res.ok) {
+      refreshAlerts();
+    } else {
+      alert(data.detail || 'Action failed');
+      btn.disabled = false;
+    }
+  } catch (e) {
+    alert('Network error');
+    btn.disabled = false;
+  }
+}
+
+function bindActions() {
+  document.querySelectorAll('#alert-feed [data-action]').forEach(btn => {
+    btn.onclick = () => handleAction(btn);
+  });
+}
+
+bindActions();
+setInterval(refreshAlerts, 60000);
+</script>
 
 {% endblock %}
