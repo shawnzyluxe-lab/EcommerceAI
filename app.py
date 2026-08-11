@@ -173,7 +173,7 @@ SESSION_MAX_AGE_HOURS = int(os.environ.get("SESSION_MAX_AGE_HOURS", "12"))
 
 BETA_MODE = os.environ.get("BETA_MODE", "false").lower() in ("true", "1", "yes")
 BETA_READY_DASHBOARD_PAGES = {
-    "overview", "alerts", "action-gate", "profit-engine", "billing", "startup-pack"
+    "overview", "alerts", "action-gate", "profit-engine", "billing", "startup-pack", "commerce-hub"
 }
 
 TIER_LIMITS = {

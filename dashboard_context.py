@@ -18,6 +18,21 @@ import action_gate
 import channels as channels_module
 
 
+def _greeting_for(merchant=None):
+    """Return a time-of-day greeting using the merchant's name."""
+    name = (merchant or {}).get("name", "there")
+    hour = datetime.now(timezone.utc).hour
+    if hour < 12:
+        salutation = "Good morning"
+    elif hour < 17:
+        salutation = "Good afternoon"
+    elif hour < 21:
+        salutation = "Good evening"
+    else:
+        salutation = "Good night"
+    return f"{salutation}, {name}."
+
+
 # Beta feature gating: when BETA_MODE=true, merchants only see beta-ready pages.
 # Admins and engineers can still see every page so development can continue.
 BETA_MODE = os.environ.get("BETA_MODE", "false").lower() in ("true", "1", "yes")
@@ -28,6 +43,7 @@ BETA_READY_PAGE_IDS = {
     "profit_engine",
     "billing",
     "startup_pack",
+    "commerce_hub",
 }
 
 
@@ -44,10 +60,10 @@ def _filter_nav_for_beta(nav_groups, user_role):
 
 
 BRAND = {
-    "name": "Shawnzyluxe",
-    "product": "Commerce AI",
-    "owner": "Shawn",
-    "domain": "shawnzyluxe.com",
+    "name": "Vantav",
+    "product": "Dashboard",
+    "owner": "there",
+    "domain": "your-store.com",
 }
 
 # --------------------------------------------------------------------------
@@ -548,14 +564,14 @@ def context(active_page=None, merchant=None, merchant_id=None):
         "nav_groups": nav_groups,
         "active_page": active_page or "overview",
         "merchant": merchant or {
-            "name": "Shawnzyluxe",
-            "email": "shawn@shawnzyluxe.com",
-            "tier": "Enterprise AI Tier",
+            "name": "Your store",
+            "email": "admin@example.com",
+            "tier": "Beta Plan",
             "sandbox_status": "approved",
             "live_access_enabled": True,
             "sandbox_expires_at": None,
         },
-        "coo": COO,
+        "coo": dict(COO, greeting=_greeting_for(merchant)),
         "suggestions": COMMAND_SUGGESTIONS,
         "channels": channel_data,
         "connected": [c for c in channel_data if c.get("state") == "connected"],
