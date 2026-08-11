@@ -390,20 +390,91 @@ NAV = [
     ("Mobile Copilot", "#mobile", False),
 ]
 
+# New commercial-grade page navigation (matches mockups)
+NAV_GROUPS = [
+    {
+        "label": "Workspace",
+        "links": [
+            {"id": "overview", "label": "Overview", "url": "/dashboard", "icon": "◈"},
+            {"id": "command_center", "label": "Command Center", "url": "/dashboard/command-center", "icon": "◉"},
+            {"id": "orders", "label": "Orders", "url": "/dashboard/orders", "icon": "◫", "badge": "24"},
+            {"id": "customers", "label": "Customers", "url": "/dashboard/customers", "icon": "○"},
+            {"id": "analytics", "label": "Analytics", "url": "/dashboard/analytics", "icon": "▤"},
+        ],
+    },
+    {
+        "label": "Commerce",
+        "links": [
+            {"id": "commerce_hub", "label": "Commerce Hub", "url": "/dashboard/commerce-hub", "icon": "☰"},
+            {"id": "products", "label": "Products", "url": "/dashboard/products", "icon": "□"},
+            {"id": "inventory", "label": "Inventory", "url": "/dashboard/inventory", "icon": "▣"},
+            {"id": "shipments", "label": "Shipments", "url": "/dashboard/shipments", "icon": "✈"},
+            {"id": "suppliers", "label": "Suppliers", "url": "/dashboard/suppliers", "icon": "▩"},
+            {"id": "returns", "label": "Returns", "url": "/dashboard/returns", "icon": "↩"},
+        ],
+    },
+    {
+        "label": "Intelligence",
+        "links": [
+            {"id": "alerts", "label": "Alerts", "url": "/dashboard/alerts", "icon": "⚠", "badge": str(len(ALERTS))},
+            {"id": "profit_engine", "label": "Profit Engine", "url": "/dashboard/profit-engine", "icon": "$"},
+            {"id": "predictions", "label": "Predictions", "url": "/dashboard/predictions", "icon": "◐"},
+            {"id": "product_research", "label": "Product Research", "url": "/dashboard/product-research", "icon": "◎"},
+            {"id": "fulfillment", "label": "Fulfillment", "url": "/dashboard/fulfillment", "icon": "⛟"},
+            {"id": "fraud", "label": "Fraud", "url": "/dashboard/fraud", "icon": "⚡"},
+        ],
+    },
+    {
+        "label": "Operations",
+        "links": [
+            {"id": "marketing", "label": "Marketing Studio", "url": "/dashboard/marketing", "icon": "✦"},
+            {"id": "discounts", "label": "Discounts", "url": "/dashboard/discounts", "icon": "%"},
+            {"id": "support", "label": "Support", "url": "/dashboard/support", "icon": "✉"},
+            {"id": "automations", "label": "Automations", "url": "/dashboard/automations", "icon": "⏵"},
+            {"id": "team_ai", "label": "Team AI", "url": "/dashboard/team-ai", "icon": "✦"},
+            {"id": "health_score", "label": "Health Score", "url": "/dashboard/health-score", "icon": "♥"},
+            {"id": "mobile_copilot", "label": "Mobile Copilot", "url": "/dashboard/mobile-copilot", "icon": "☎"},
+        ],
+    },
+    {
+        "label": "Store",
+        "links": [
+            {"id": "store_catalog", "label": "Store Catalog", "url": "/dashboard/store-catalog", "icon": "▤"},
+            {"id": "apps", "label": "Apps", "url": "/dashboard/apps", "icon": "◫"},
+            {"id": "themes", "label": "Themes", "url": "/dashboard/themes", "icon": "◉"},
+            {"id": "reports", "label": "Reports", "url": "/dashboard/reports", "icon": "▦"},
+            {"id": "billing", "label": "Billing", "url": "/dashboard/billing", "icon": "$"},
+            {"id": "integrations", "label": "Integrations", "url": "/dashboard/integrations", "icon": "∞"},
+            {"id": "settings", "label": "Settings", "url": "/dashboard/settings", "icon": "⚙"},
+        ],
+    },
+]
 
-def context():
+
+def context(active_page=None, merchant=None):
     now = datetime.now(timezone.utc)
     gross = sum(r["amount"] for r in PROFIT_BREAKDOWN if r["kind"] == "in")
     costs = -sum(r["amount"] for r in PROFIT_BREAKDOWN if r["kind"] == "out")
     net = gross - costs
+    # Always serve fresh headline numbers even if BRIEFING is mutated elsewhere.
+    briefing = dict(BRIEFING)
+    briefing["revenue"] = gross
+    briefing["profit"] = net
     return {
         "brand": BRAND,
         "nav": NAV,
+        "nav_groups": NAV_GROUPS,
+        "active_page": active_page or "overview",
+        "merchant": merchant or {
+            "name": "Shawnzyluxe",
+            "email": "shawn@shawnzyluxe.com",
+            "tier": "Enterprise AI Tier",
+        },
         "coo": COO,
         "suggestions": COMMAND_SUGGESTIONS,
         "channels": CHANNELS,
         "connected": [c for c in CHANNELS if c["state"] == "connected"],
-        "briefing": BRIEFING,
+        "briefing": briefing,
         "alerts": ALERTS,
         "profit_rows": PROFIT_BREAKDOWN,
         "gross": gross,

@@ -1093,11 +1093,44 @@ def home():
 
 @app.route('/dashboard')
 def dashboard():
-    ctx = context()
+    ctx = context(active_page='overview')
     merchant = get_merchant_context()
     if merchant:
         ctx["merchant"] = merchant
-    return render_template('dashboard.html', **ctx)
+    return render_template('dashboard/overview.html', **ctx)
+
+
+# Commercial-grade dashboard page routes
+def _dashboard_context(active_page):
+    ctx = context(active_page=active_page)
+    merchant = get_merchant_context()
+    if merchant:
+        ctx["merchant"] = merchant
+    return ctx
+
+
+@app.route('/dashboard/<page>')
+def dashboard_page(page):
+    active_page = page.replace('-', '_')
+    valid_pages = {
+        'overview', 'command-center', 'commerce-hub', 'alerts', 'profit-engine',
+        'predictions', 'product-research', 'fulfillment', 'fraud', 'suppliers',
+        'marketing', 'support', 'automations', 'team-ai', 'health-score',
+        'mobile-copilot', 'store-catalog', 'products', 'orders', 'customers',
+        'inventory', 'shipments', 'returns', 'analytics', 'discounts', 'apps',
+        'themes', 'reports', 'billing', 'integrations', 'settings'
+    }
+    if page not in valid_pages:
+        return redirect(url_for('dashboard'))
+    ctx = _dashboard_context(active_page)
+    template = 'dashboard/{}.html'.format(page.replace('-', '_'))
+    try:
+        return render_template(template, **ctx)
+    except Exception:
+        return render_template('dashboard/page.html', **ctx,
+                               page_title=active_page.replace('_', ' ').title(),
+                               page_description='This module is being rebuilt to the new commercial-grade standard.',
+                               page_content='')
 
 
 @app.route('/home')

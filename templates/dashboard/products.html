@@ -1,0 +1,73 @@
+{% extends 'dashboard/base.html' %}
+{% block title %}Products — {{ brand.name }} {{ brand.product }}{% endblock %}
+{% block content %}
+
+<section class="page-header">
+  <h1>Store Catalog</h1>
+  <p>Manage and sync your products across all sales channels.</p>
+</section>
+
+<div class="card">
+  <div class="card-head">
+    <h3>Products</h3>
+    <span class="spacer"></span>
+    <button class="btn btn-primary">+ Add Product</button>
+  </div>
+  <div style="display: flex; gap: 10px; margin-bottom: 14px; flex-wrap: wrap;">
+    <input type="text" placeholder="Search products, SKU, or tags…" class="btn" style="justify-content: flex-start; text-align: left; flex: 1; min-width: 200px;">
+    <button class="btn">Filters</button>
+    <button class="btn">Collections</button>
+    <button class="btn">More</button>
+  </div>
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr><th>Product</th><th>SKU</th><th class="num">Price</th><th class="num">Inventory</th><th>Channels</th><th>Status</th></tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td class="b">Prometheus Insulated Bottle</td>
+          <td class="mono">PRM-BTL-001</td>
+          <td class="num mono">$34.99</td>
+          <td class="num up">128 in stock</td>
+          <td><span class="tag tag-ghost">SH</span> <span class="tag tag-ghost">AZ</span> <span class="tag tag-ghost">TT</span></td>
+          <td><span class="tag tag-green">Active</span></td>
+        </tr>
+        <tr>
+          <td class="b">Prometheus Hoodie</td>
+          <td class="mono">PRM-HOD-002</td>
+          <td class="num mono">$59.99</td>
+          <td class="num up">64 in stock</td>
+          <td><span class="tag tag-ghost">SH</span> <span class="tag tag-ghost">AZ</span></td>
+          <td><span class="tag tag-green">Active</span></td>
+        </tr>
+        <tr>
+          <td class="b">Prometheus Snapback</td>
+          <td class="mono">PRM-HAT-003</td>
+          <td class="num mono">$29.99</td>
+          <td class="num up">210 in stock</td>
+          <td><span class="tag tag-ghost">SH</span> <span class="tag tag-ghost">TT</span></td>
+          <td><span class="tag tag-green">Active</span></td>
+        </tr>
+        <tr>
+          <td class="b">Prometheus Backpack</td>
+          <td class="mono">PRM-BAG-004</td>
+          <td class="num mono">$89.99</td>
+          <td class="num amber">39 in stock</td>
+          <td><span class="tag tag-ghost">SH</span> <span class="tag tag-ghost">AZ</span> <span class="tag tag-ghost">TT</span></td>
+          <td><span class="tag tag-amber">Low</span></td>
+        </tr>
+        <tr>
+          <td class="b">Prometheus Ceramic Mug</td>
+          <td class="mono">PRM-MUG-005</td>
+          <td class="num mono">$19.99</td>
+          <td class="num down">0 out of stock</td>
+          <td><span class="tag tag-ghost">SH</span> <span class="tag tag-ghost">AZ</span></td>
+          <td><span class="tag tag-red">Out</span></td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+{% endblock %}

@@ -1,0 +1,179 @@
+{% extends 'dashboard/base.html' %}
+{% block title %}Overview — {{ brand.name }} {{ brand.product }}{% endblock %}
+{% block content %}
+
+<section class="page-header">
+  <h1>Good morning, {{ brand.owner }}.</h1>
+  <p>Revenue is up <strong>18%</strong> this week. Top seller projected to sell out in <strong>4 days</strong>.</p>
+</section>
+
+<div class="kpi-grid">
+  <div class="card kpi-card">
+    <div class="kpi-label">Revenue today</div>
+    <div class="kpi-value">${{ '{:,.0f}'.format(briefing.revenue) }}</div>
+    <div class="kpi-delta up">▲ 18% vs last week</div>
+  </div>
+  <div class="card kpi-card">
+    <div class="kpi-label">True profit</div>
+    <div class="kpi-value">${{ '{:,.0f}'.format(briefing.profit) }}</div>
+    <div class="kpi-delta up">▲ 6% · {{ net_margin }}% margin</div>
+  </div>
+  <div class="card kpi-card">
+    <div class="kpi-label">Orders</div>
+    <div class="kpi-value">{{ briefing.orders }}</div>
+    <div class="kpi-delta flat">AOV ${{ '%.2f'|format(briefing.aov) }}</div>
+  </div>
+  <div class="card kpi-card">
+    <div class="kpi-label">Needs attention</div>
+    <div class="kpi-value">{{ briefing.delayed }}</div>
+    <div class="kpi-delta down">delayed shipments</div>
+  </div>
+</div>
+
+<div class="grid grid-2" style="margin-bottom: 24px;">
+  <div class="card">
+    <div class="card-head">
+      <span class="tag tag-blue">AI COO</span>
+      <span class="tag tag-ghost">Confidence {{ coo.confidence }}%</span>
+      <span class="spacer"></span>
+      <span style="font-size: .76rem; color: var(--ink-3);">{{ generated }}</span>
+    </div>
+    <h2 style="font-size: 1.25rem; margin-bottom: 10px;">{{ coo.greeting }}</h2>
+    <p style="color: var(--ink-2); margin-bottom: 16px; line-height: 1.6;">
+      {% for pre, num, post in coo.summary %}{{ pre }} <strong>{{ num }}</strong>{% if post %} {{ post }}{% endif %}. {% endfor %}
+      {{ coo.narrative }}
+    </p>
+    <div style="display: flex; flex-direction: column; gap: 8px; margin-bottom: 16px;">
+      {% for s in coo.plan %}
+      <div style="display: flex; gap: 10px; align-items: center; background: #fff; border: 1px solid var(--line); border-radius: 11px; padding: 10px 12px; font-size: .86rem;">
+        <span style="width: 20px; height: 20px; border-radius: 6px; background: var(--gold-bg); color: var(--amber); display: grid; place-items: center; font-size: .68rem; font-weight: 800; flex: none;">{{ s.n }}</span>
+        <span style="flex: 1;">{{ s.what }}</span>
+        <span class="tag {{ 'tag-green' if s.state == 'ready' else 'tag-amber' }}">{{ s.impact }}</span>
+      </div>
+      {% endfor %}
+    </div>
+    <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+      <button class="btn btn-primary">Run AI COO Analysis</button>
+      <button class="btn">Approve &amp; Execute</button>
+      <button class="btn">Modify</button>
+      <button class="btn btn-ghost">Dismiss</button>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-head">
+      <h3>AI Command Center</h3>
+      <p>Type or speak — the AI performs the work instead of just answering.</p>
+    </div>
+    <div class="command-box">
+      <div class="prompt">
+        <span style="color: var(--gold); font-size: 1rem;">◉</span>
+        <input placeholder="Ask anything, or tell it what to do…" autocomplete="off">
+        <button class="btn btn-primary">Run</button>
+      </div>
+      <div class="chips">
+        {% for s in suggestions %}<span class="chip">{{ s }}</span>{% endfor %}
+      </div>
+    </div>
+    <div class="card" style="margin-top: 14px; display: none;">
+      <span class="tag tag-blue">Answer</span>
+      <p style="margin-top: 8px;">AI response will appear here.</p>
+    </div>
+  </div>
+</div>
+
+<div class="grid grid-2" style="margin-bottom: 24px;">
+  <div class="card">
+    <div class="card-head">
+      <h3>Universal Commerce Hub</h3>
+      <p>One login. One dashboard. {{ connected|length }} of {{ channels|length }} channels connected.</p>
+      <span class="spacer"></span>
+      <a href="/dashboard/commerce-hub" class="btn btn-ghost">Manage</a>
+    </div>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>Channel</th><th class="num">Orders</th><th class="num">Revenue</th><th>Status</th></tr></thead>
+        <tbody>
+          {% for c in channels %}
+          <tr>
+            <td class="b">{{ c.name }}</td>
+            <td class="num mono">{{ c.orders }}</td>
+            <td class="num mono">${{ '{:,.2f}'.format(c.revenue) }}</td>
+            <td><span class="tag {{ 'tag-green' if c.state == 'connected' else 'tag-ghost' }}">{{ 'Live' if c.state == 'connected' else 'Connect' }}</span></td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-head">
+      <h3>Autonomous AI Manager</h3>
+      <p class="hint">Proactive — it tells you before you ask.</p>
+      <span class="spacer"></span>
+      <span class="tag tag-amber">{{ alerts|length }} open</span>
+    </div>
+    <div class="alert-feed">
+      {% for a in alerts[:3] %}
+      <div class="alert-item {{ a.level }}">
+        <div class="alert-bar"></div>
+        <div class="alert-body">
+          <div class="alert-title">{{ a.title }}</div>
+          <div class="alert-detail">{{ a.detail }}</div>
+          <div class="alert-actions">
+            {% for act in a.actions %}<button class="btn" style="padding: 5px 10px; font-size: .76rem;">{{ act }}</button>{% endfor %}
+          </div>
+        </div>
+        <div class="alert-when">{{ a.when }}</div>
+      </div>
+      {% endfor %}
+    </div>
+    <a href="/dashboard/alerts" class="btn" style="margin-top: 14px; width: 100%;">View all alerts</a>
+  </div>
+</div>
+
+<div class="card">
+  <div class="card-head">
+    <h3>AI Profit Engine</h3>
+    <p>Real profit, not revenue — every cost included, per order, in real time.</p>
+    <span class="spacer"></span>
+    <span class="tag tag-green">Live</span>
+  </div>
+  <div class="grid grid-2">
+    <div>
+      <h4 style="font-size: .95rem; margin-bottom: 12px;">Today's true margin</h4>
+      {% for r in profit_rows %}
+      <div style="display: flex; justify-content: space-between; padding: 6px 0; border-bottom: 1px dashed var(--line); font-size: .85rem;">
+        <span style="color: var(--ink-3);">{{ r.label }}</span>
+        <span class="mono {{ 'up' if r.kind == 'in' else 'down' }}" style="font-weight: 600;">
+          {{ '${:,.2f}'.format(r.amount) if r.kind == 'in' else '−${:,.2f}'.format(-r.amount) }}
+        </span>
+      </div>
+      {% endfor %}
+      <div style="display: flex; justify-content: space-between; padding-top: 12px; font-weight: 800;">
+        <span>Net profit</span><span class="mono">${{ '{:,.2f}'.format(net) }}</span>
+      </div>
+      <div style="font-size: .8rem; color: var(--ink-3); margin-top: 4px;">{{ net_margin }}% net margin after all costs</div>
+    </div>
+    <div class="table-wrap">
+      <h4 style="font-size: .95rem; margin-bottom: 12px;">Profit per order</h4>
+      <table>
+        <thead><tr><th>Order</th><th>Channel</th><th class="num">Revenue</th><th class="num">Profit</th><th>State</th></tr></thead>
+        <tbody>
+          {% for o in orders[:5] %}
+          <tr>
+            <td class="b mono">{{ o.id }}</td>
+            <td>{{ o.channel }}</td>
+            <td class="num mono">${{ '%.2f'|format(o.revenue) }}</td>
+            <td class="num mono {{ 'up' if o.profit > 0 else 'down' }}">${{ '%.2f'|format(o.profit) }}</td>
+            <td><span class="tag {{ {'shipped':'tag-green','delayed':'tag-amber','refunded':'tag-red','packed':'tag-blue'}[o.state] }}">{{ o.state }}</span></td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+{% endblock %}

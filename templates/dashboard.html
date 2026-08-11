@@ -385,7 +385,7 @@ body.sidebar-collapsed .shell { grid-template-columns: 60px 1fr; }
                 <tr>
                   <td class="b mono">{{ o.id }}</td>
                   <td>{{ o.channel }}</td>
-                  <td class="num">{{ o.items }}</td>
+                  <td class="num">{{ o['items'] }}</td>
                   <td class="num mono">${{ '%.2f'|format(o.revenue) }}</td>
                   <td class="num mono {{ 'up' if o.profit > 0 else 'down' }}" style="font-weight:600">${{ '%.2f'|format(o.profit) }}</td>
                   <td class="num mono">{{ o.margin }}%</td>

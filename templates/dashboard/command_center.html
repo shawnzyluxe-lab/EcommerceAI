@@ -1,0 +1,104 @@
+{% extends 'dashboard/base.html' %}
+{% block title %}Command Center — {{ brand.name }} {{ brand.product }}{% endblock %}
+{% block content %}
+
+<section class="page-header">
+  <h1>AI Command Center</h1>
+  <p>Type or speak — the AI performs the work instead of just answering.</p>
+</section>
+
+<div class="card">
+  <div class="command-box">
+    <div class="prompt">
+      <span style="color: var(--gold); font-size: 1rem;">◉</span>
+      <input id="cmd" placeholder="Ask anything, or tell it what to do…" autocomplete="off">
+      <button class="btn btn-primary" id="cmdgo">Run</button>
+    </div>
+    <div class="chips">
+      {% for s in suggestions %}<span class="chip js-chip">{{ s }}</span>{% endfor %}
+    </div>
+  </div>
+
+  <div class="card" id="cmdout" style="margin-top: 14px; display: none; background: var(--line-2);">
+    <span class="tag tag-blue">Answer</span>
+    <p id="cmdanswer" style="margin-top: 8px; color: var(--ink);"></p>
+    <div id="cmddid" class="chips" style="margin-top: 10px;"></div>
+  </div>
+</div>
+
+<div class="grid grid-2" style="margin-top: 24px;">
+  <div class="card">
+    <div class="card-head"><h3>Recent Commands</h3></div>
+    <div style="display: flex; flex-direction: column; gap: 8px;">
+      <div style="padding: 10px; border: 1px solid var(--line); border-radius: 10px; font-size: .85rem;">
+        <strong>"How did I do today?"</strong>
+        <div style="color: var(--ink-3); font-size: .75rem; margin-top: 4px;">Revenue $4,582 across 61 orders</div>
+      </div>
+      <div style="padding: 10px; border: 1px solid var(--line); border-radius: 10px; font-size: .85rem;">
+        <strong>"Why are sales down?"</strong>
+        <div style="color: var(--ink-3); font-size: .75rem; margin-top: 4px;">TikTok fell 22%, Shopify rose 31%</div>
+      </div>
+      <div style="padding: 10px; border: 1px solid var(--line); border-radius: 10px; font-size: .85rem;">
+        <strong>"Which products should I discontinue?"</strong>
+        <div style="color: var(--ink-3); font-size: .75rem; margin-top: 4px;">Chrome Tumbler and Linen Throw flagged</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-head"><h3>What the AI can do</h3></div>
+    <ul style="margin: 0; padding-left: 18px; color: var(--ink-2); font-size: .85rem; line-height: 1.8;">
+      <li>Read cross-channel revenue and true profit</li>
+      <li>Draft marketing copy, emails, and SMS campaigns</li>
+      <li>Identify delayed shipments and send refunds</li>
+      <li>Recommend supplier switches and reorder timing</li>
+      <li>Detect fraud risk and flag orders for review</li>
+    </ul>
+  </div>
+</div>
+
+<script>
+const out = document.getElementById('cmdout');
+const input = document.getElementById('cmd');
+const answer = document.getElementById('cmdanswer');
+const did = document.getElementById('cmddid');
+
+const responses = {
+  "how did i do today": {
+    answer: "Revenue $4,582 across 61 orders. Profit $1,394 (30.4% margin), up 6% on yesterday.",
+    did: ["Read 61 orders", "Recomputed margin", "Compared to 7-day mean"]
+  },
+  "why are sales down": {
+    answer: "Sales are not down overall — TikTok Shop fell 22% while Shopify rose 31%. TikTok CPM rose 41% after your top creative fatigued (frequency 4.8).",
+    did: ["Split revenue by channel", "Checked ad frequency", "Flagged creative fatigue"]
+  },
+  "which products should i discontinue": {
+    answer: "Two candidates: Chrome Tumbler 20oz (-4.1% net margin after refunds) and Linen Throw (sell-through 11% in 60 days, $1,840 tied up).",
+    did: ["Ranked by true margin", "Included refunds + storage", "Checked 60-day sell-through"]
+  },
+  "show delayed orders": {
+    answer: "3 orders past promised delivery: #1042 (6d, address mismatch), #1038 (5d, carrier delay), #1021 (5d, supplier backorder).",
+    did: ["Scanned open fulfillments", "Compared promise vs carrier ETA"]
+  },
+  "create a discount campaign": {
+    answer: "Drafted 'Weekend Lux 15' — 15% off 4 slow movers, capped at 200 redemptions, ends Sunday. Projected $1,180 revenue, $312 margin cost.",
+    did: ["Selected slow movers", "Modelled margin floor", "Prepared email + SMS copy"]
+  }
+};
+
+function run(q){
+  if(!q) return;
+  const key = q.toLowerCase().replace(/[?.!]$/,'').trim();
+  const hit = responses[key] || Object.entries(responses).find(([k])=>key.includes(k) || k.includes(key));
+  const payload = hit && hit[1] ? hit[1] : (hit || {answer: "Not wired yet — this endpoint returns canned answers until you connect a model.", did: []});
+  out.style.display = 'block';
+  answer.textContent = payload.answer;
+  did.innerHTML = (payload.did || []).map(s => `<span class="chip">${s}</span>`).join('');
+}
+
+document.getElementById('cmdgo').addEventListener('click', () => run(input.value));
+input.addEventListener('keydown', e => { if(e.key === 'Enter') run(input.value); });
+document.querySelectorAll('.js-chip').forEach(c => c.addEventListener('click', () => run(c.textContent.trim())));
+</script>
+
+{% endblock %}

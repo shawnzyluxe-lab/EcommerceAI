@@ -1,0 +1,50 @@
+{% extends 'dashboard/base.html' %}
+{% block title %}Product Research — {{ brand.name }} {{ brand.product }}{% endblock %}
+{% block content %}
+
+<section class="page-header">
+  <h1>AI Product Research</h1>
+  <p>Scans marketplaces and social trends for rising, declining, and high-margin opportunities.</p>
+</section>
+
+<div class="card" style="margin-bottom: 24px;">
+  <div class="card-head"><h3>Trending Products</h3><span class="spacer"></span><button class="btn btn-primary">Scrape Now</button></div>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Product</th><th>Signal</th><th class="num">Trend</th><th class="num">Margin</th><th>Competition</th><th>Source</th><th></th></tr></thead>
+      <tbody>
+        {% for r in research %}
+        <tr>
+          <td class="b">{{ r.product }}</td>
+          <td><span class="tag {{ {'Rising':'tag-green','Declining':'tag-red','Watch':'tag-amber'}[r.signal] }}">{{ r.signal }}</span></td>
+          <td class="num mono {{ 'up' if r.trend > 0 else 'down' }}">{{ '+' if r.trend > 0 }}{{ r.trend }}%</td>
+          <td class="num mono">{{ r.margin }}%</td>
+          <td>{{ r.competition }}</td>
+          <td style="color: var(--ink-3);">{{ r.source }}</td>
+          <td class="num"><button class="btn btn-primary" style="font-size: .72rem; padding: 4px 9px;">Add to Catalog</button></td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<div class="grid grid-3">
+  <div class="card kpi-card">
+    <div class="kpi-label">Active trends</div>
+    <div class="kpi-value">184</div>
+    <div class="kpi-delta up">▲ 23% this week</div>
+  </div>
+  <div class="card kpi-card">
+    <div class="kpi-label">Avg margin opportunity</div>
+    <div class="kpi-value">54%</div>
+    <div class="kpi-delta up">▲ 4.1% this week</div>
+  </div>
+  <div class="card kpi-card">
+    <div class="kpi-label">Watchlist items</div>
+    <div class="kpi-value">12</div>
+    <div class="kpi-delta flat">No change</div>
+  </div>
+</div>
+
+{% endblock %}

@@ -3,7 +3,11 @@ services:
     name: shawnzyluxe
     runtime: python
     buildCommand: pip install -r requirements.txt
-    startCommand: gunicorn -w 1 -b 0.0.0.0:$PORT app:app
+    startCommand: gunicorn -k eventlet -w 1 -b 0.0.0.0:$PORT app:app
+    healthCheckPath: /
+    domains:
+      - vantavcommerce.com
+      - www.vantavcommerce.com
     envVars:
       - key: PYTHON_VERSION
         value: 3.11.0
@@ -18,13 +22,13 @@ services:
       - key: SECRET_KEY
         generateValue: true
       - key: MASTER_ADMIN_EMAIL
-        value: shawn@shawnzyluxe.com
+        value: shawn@vantavcommerce.com
       - key: RECAPTCHA_SITE_KEY
         sync: false
       - key: RECAPTCHA_SECRET_KEY
         sync: false
       - key: ENGINEER_EMAIL
-        value: engineer@shawnzyluxe.com
+        value: engineer@vantavcommerce.com
       - key: TEMP_ACCOUNTS_PASSWORD
         sync: false
       - key: DATABASE_URL
@@ -66,4 +70,4 @@ services:
       - key: SHOPIFY_CLIENT_SECRET
         sync: false
       - key: OAUTH_REDIRECT_URI
-        value: https://shawnzyluxe.com
+        value: https://vantavcommerce.com

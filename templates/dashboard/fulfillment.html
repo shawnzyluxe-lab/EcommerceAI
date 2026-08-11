@@ -1,0 +1,50 @@
+{% extends 'dashboard/base.html' %}
+{% block title %}Fulfillment — {{ brand.name }} {{ brand.product }}{% endblock %}
+{% block content %}
+
+<section class="page-header">
+  <h1>AI Fulfillment</h1>
+  <p>Auto-routes to supplier, warehouse, and cheapest carrier.</p>
+</section>
+
+<div class="kpi-grid">
+  <div class="card kpi-card">
+    <div class="kpi-label">Routed today</div>
+    <div class="kpi-value">{{ fulfillment.routed_today }}</div>
+  </div>
+  <div class="card kpi-card">
+    <div class="kpi-label">Auto rate</div>
+    <div class="kpi-value">{{ fulfillment.auto_rate }}%</div>
+  </div>
+  <div class="card kpi-card">
+    <div class="kpi-label">Avg saved / order</div>
+    <div class="kpi-value">${{ '%.2f'|format(fulfillment.avg_saving) }}</div>
+  </div>
+  <div class="card kpi-card">
+    <div class="kpi-label">Carriers</div>
+    <div class="kpi-value">4</div>
+  </div>
+</div>
+
+<div class="card">
+  <div class="card-head"><h3>Shipments</h3></div>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Order</th><th>Supplier</th><th>Warehouse</th><th>Carrier</th><th class="num">Cost</th><th>Flag</th></tr></thead>
+      <tbody>
+        {% for f in fulfillment.rows %}
+        <tr>
+          <td class="b mono">{{ f.order }}</td>
+          <td>{{ f.supplier }}</td>
+          <td>{{ f.warehouse }}</td>
+          <td>{{ f.carrier }}</td>
+          <td class="num mono">${{ '%.2f'|format(f.cost) }}</td>
+          <td>{% if f.flag %}<span class="tag tag-amber">{{ f.flag }}</span>{% else %}<span class="tag tag-green">Clear</span>{% endif %}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+{% endblock %}
