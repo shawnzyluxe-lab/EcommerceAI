@@ -3380,6 +3380,7 @@ def trends_momentum():
 
 
 @app.route('/health', methods=['GET'])
+@limiter.exempt
 def health_check():
     """Sentry-style diagnostic: database and generated storage health."""
     health = {
