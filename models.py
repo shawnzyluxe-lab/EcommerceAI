@@ -48,6 +48,7 @@ class ActiveSession(db.Model):
     merchant_id = db.Column(db.String(100), db.ForeignKey("merchant_profiles.merchant_id"))
     role = db.Column(db.String(50), default="Merchant")
     created_at = db.Column(db.DateTime, server_default=db.func.now())
+    last_seen = db.Column(db.DateTime, server_default=db.func.now())
 
 
 class BusinessMetric(db.Model):

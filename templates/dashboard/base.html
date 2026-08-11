@@ -86,6 +86,20 @@
     document.getElementById('mobile-menu-btn')?.addEventListener('click', () => {
       document.getElementById('sidebar').classList.toggle('open');
     });
+
+    // Keep the session alive while the tab is open; redirect if it expires.
+    (function keepAlive() {
+      setInterval(async () => {
+        try {
+          const res = await fetch('/api/session/heartbeat', { method: 'POST', credentials: 'same-origin' });
+          if (res.status === 401) {
+            window.location.href = '/login?error=session_expired';
+          }
+        } catch (e) {
+          // network hiccup; do not redirect immediately
+        }
+      }, 5 * 60 * 1000); // every 5 minutes
+    })();
   </script>
   {% block scripts %}{% endblock %}
 </body>

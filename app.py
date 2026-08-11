@@ -32,7 +32,7 @@ logging.basicConfig(
 )
 logger = logging.getLogger("shawnzyluxe_core")
 from urllib.parse import urlencode
-from flask import Flask, render_template, request, redirect, url_for, session, flash, jsonify, send_file, make_response
+from flask import Flask, render_template, request, redirect, url_for, session, flash, jsonify, send_file, make_response, after_this_request
 from flask_sock import Sock
 from dotenv import load_dotenv
 
@@ -168,6 +168,8 @@ RECAPTCHA_SECRET_KEY = os.environ.get("RECAPTCHA_SECRET_KEY", "")
 RECAPTCHA_VERIFY_URL = "https://www.google.com/recaptcha/api/siteverify"
 SESSION_COOKIE_NAME = "aegis_session_token"
 SESSION_TIMEOUT_DAYS = int(os.environ.get("SESSION_TIMEOUT_DAYS", "7"))
+SESSION_IDLE_TIMEOUT_MINUTES = int(os.environ.get("SESSION_IDLE_TIMEOUT_MINUTES", "30"))
+SESSION_MAX_AGE_HOURS = int(os.environ.get("SESSION_MAX_AGE_HOURS", "12"))
 
 TIER_LIMITS = {
     "Basic Tier": {
@@ -438,14 +440,49 @@ def site_wall_enabled():
     return bool(SITE_WALL_PASSWORD)
 
 
-def site_wall_authenticated():
-    """Check whether the browser has a valid, non-expired session token."""
+def site_wall_authenticated(refresh=True):
+    """Check whether the browser has a valid, non-expired session token.
+
+    Enforces an absolute max age and an idle timeout. If refresh=True, touching a
+    protected route bumps the idle window and resets the cookie expiry.
+    """
     token = request.cookies.get(SESSION_COOKIE_NAME)
     if token is None:
         return False
     s = ActiveSession.query.get(token)
-    if not s or s.created_at < datetime.utcnow() - timedelta(days=SESSION_TIMEOUT_DAYS):
+    now = datetime.utcnow()
+    if not s:
         return False
+    # Absolute max age check
+    if s.created_at < now - timedelta(hours=SESSION_MAX_AGE_HOURS):
+        db.session.delete(s)
+        db.session.commit()
+        return False
+    # Idle timeout check
+    if s.last_seen and s.last_seen < now - timedelta(minutes=SESSION_IDLE_TIMEOUT_MINUTES):
+        db.session.delete(s)
+        db.session.commit()
+        return False
+    if refresh:
+        s.last_seen = now
+        db.session.commit()
+        # Refresh the cookie sliding window on protected activity.
+        if hasattr(request, "session_cookie_refreshed"):
+            pass
+        else:
+            request.session_cookie_refreshed = True
+            @after_this_request
+            def _refresh_cookie(response):
+                max_age = SESSION_IDLE_TIMEOUT_MINUTES * 60
+                response.set_cookie(
+                    SESSION_COOKIE_NAME,
+                    token,
+                    max_age=max_age,
+                    httponly=True,
+                    samesite='Lax',
+                    secure=app.config.get("SESSION_COOKIE_SECURE", os.environ.get("SESSION_COOKIE_SECURE", "true").lower() == "true"),
+                )
+                return response
     return True
 
 
@@ -507,7 +544,7 @@ def enforce_tier_limits(merchant_id, requested_feature):
 def site_wall_protect():
     if not site_wall_enabled():
         return None
-    if request.endpoint in ('home', 'login', 'site_login', 'site_logout', 'subscribe', 'thank_you', 'create_stripe_checkout', 'beta_apply', 'api_beta_apply', 'auth_login', 'auth_signup', 'auth_provision_node', 'shopify_orders_webhook', 'tiktok_orders_webhook', 'amazon_orders_webhook', 'stripe_billing_webhook', 'supplier_po_update', 'execute_mitigation', 'generate_magic_link', 'magic_login', 'register_merchant', 'shopify_oauth_callback', 'health_check', 'legal_terms', 'legal_privacy', 'legal_refund', 'static'):
+    if request.endpoint in ('home', 'login', 'site_login', 'site_logout', 'subscribe', 'thank_you', 'session_heartbeat', 'create_stripe_checkout', 'beta_apply', 'api_beta_apply', 'auth_login', 'auth_signup', 'auth_provision_node', 'shopify_orders_webhook', 'tiktok_orders_webhook', 'amazon_orders_webhook', 'stripe_billing_webhook', 'supplier_po_update', 'execute_mitigation', 'generate_magic_link', 'magic_login', 'register_merchant', 'shopify_oauth_callback', 'health_check', 'legal_terms', 'legal_privacy', 'legal_refund', 'static'):
         return None
     if site_wall_authenticated():
         return None
@@ -2018,13 +2055,14 @@ def site_login():
         if hmac.compare_digest(submitted, SITE_WALL_PASSWORD):
             token = secrets.token_urlsafe(32)
             default_merchant = "merchant_shawn_01"
-            db.session.add(ActiveSession(token=token, merchant_id=default_merchant, role=UserRole.ADMIN.value, created_at=datetime.utcnow()))
+            now = datetime.utcnow()
+            db.session.add(ActiveSession(token=token, merchant_id=default_merchant, role=UserRole.ADMIN.value, created_at=now, last_seen=now))
             db.session.commit()
             response = redirect(url_for('home'))
             response.set_cookie(
                 SESSION_COOKIE_NAME,
                 token,
-                max_age=SESSION_TIMEOUT_DAYS * 86400,
+                max_age=SESSION_IDLE_TIMEOUT_MINUTES * 60,
                 httponly=True,
                 samesite='Lax',
                 secure=app.config.get("SESSION_COOKIE_SECURE", os.environ.get("SESSION_COOKIE_SECURE", "true").lower() == "true"),
@@ -2043,6 +2081,14 @@ def site_logout():
     response = redirect(url_for('home'))
     response.delete_cookie(SESSION_COOKIE_NAME)
     return response
+
+
+@app.route('/api/session/heartbeat', methods=['POST'])
+def session_heartbeat():
+    """Keep session alive while the user is active; return remaining seconds."""
+    if not site_wall_authenticated(refresh=True):
+        return jsonify({"valid": False, "detail": "Session expired or invalid"}), 401
+    return jsonify({"valid": True, "expires_in": SESSION_IDLE_TIMEOUT_MINUTES * 60}), 200
 
 
 @app.route('/api/v1/auth/login', methods=['POST'])

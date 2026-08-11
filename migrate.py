@@ -109,6 +109,21 @@ def run_migrations():
             except Exception as e:
                 print(f"[migrate] {wl_col} add skipped: {e}")
 
+        # Session tracking for idle / absolute timeouts.
+        conn.execute(text("""
+            CREATE TABLE IF NOT EXISTS active_sessions (
+                token VARCHAR(255) PRIMARY KEY,
+                merchant_id VARCHAR(100),
+                role VARCHAR(50) DEFAULT 'Merchant',
+                created_at TIMESTAMP DEFAULT NOW(),
+                last_seen TIMESTAMP DEFAULT NOW()
+            )
+        """))
+        try:
+            conn.execute(text("ALTER TABLE active_sessions ADD COLUMN IF NOT EXISTS last_seen TIMESTAMP DEFAULT NOW()"))
+        except Exception as e:
+            print(f"[migrate] active_sessions.last_seen add skipped: {e}")
+
         # Create the beta waitlist applications table if missing.
         conn.execute(text("""
             CREATE TABLE IF NOT EXISTS beta_waitlist_applications (
