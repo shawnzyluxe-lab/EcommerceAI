@@ -1,0 +1,155 @@
+{% extends 'dashboard/base.html' %}
+{% block title %}Startup Pack Submissions — {{ brand.name }} {{ brand.product }}{% endblock %}
+{% block content %}
+
+<section class="page-header">
+  <h1>Startup Pack Submissions</h1>
+  <p>Review brand briefs, email founders, and deliver curated supplier / direction briefs.</p>
+</section>
+
+<div class="grid grid-2">
+  <div class="card" style="grid-column: 1 / -1;">
+    <div class="card-head" style="display:flex; justify-content:space-between; align-items:center;">
+      <h3>Pending Briefs</h3>
+      <button class="btn" style="font-size:.75rem;" onclick="loadSubmissions()">Refresh</button>
+    </div>
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr><th>Merchant</th><th>Brand</th><th>Niche</th><th>Budget</th><th>Domain?</th><th>Submitted</th><th>Actions</th></tr>
+        </thead>
+        <tbody id="pending-body">
+          <tr><td colspan="7" style="text-align:center; color:#888;">Loading...</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<div class="card" style="margin-top:24px;">
+  <div class="card-head"><h3>Deliver Brief</h3></div>
+  <div id="deliver-form" style="display:none;">
+    <input id="target-merchant" type="hidden">
+    <label style="font-size:.75rem; color:var(--ink-3); font-weight:600;">Curated suppliers (JSON array)</label>
+    <textarea id="curated-suppliers" rows="4" style="width:100%; padding:10px; margin:6px 0 12px; border:1px solid var(--line); border-radius:8px; font-family:monospace; font-size:.75rem;">[{"name":"Printful","category":"Print-on-demand","note":"Start with t-shirts/hoodies, order branded samples."}]</textarea>
+    <label style="font-size:.75rem; color:var(--ink-3); font-weight:600;">Written brief</label>
+    <textarea id="brief-text" rows="4" style="width:100%; padding:10px; margin:6px 0 12px; border:1px solid var(--line); border-radius:8px;"></textarea>
+    <label style="font-size:.75rem; color:var(--ink-3); font-weight:600;">Next steps</label>
+    <textarea id="next-steps-text" rows="3" style="width:100%; padding:10px; margin:6px 0 12px; border:1px solid var(--line); border-radius:8px;"></textarea>
+    <label style="font-size:.75rem; color:var(--ink-3); font-weight:600;">Admin notes (not shown to merchant)</label>
+    <textarea id="admin-notes" rows="2" style="width:100%; padding:10px; margin:6px 0 12px; border:1px solid var(--line); border-radius:8px;"></textarea>
+    <button class="btn btn-primary" onclick="deliverBrief()">Deliver Brief</button>
+    <div id="deliver-message" style="margin-top:10px; font-size:.8rem;"></div>
+  </div>
+</div>
+
+<div class="card" style="margin-top:24px;">
+  <div class="card-head"><h3>Delivered Briefs</h3></div>
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr><th>Merchant</th><th>Brand</th><th>Status</th><th>Delivered</th></tr>
+      </thead>
+      <tbody id="delivered-body">
+        <tr><td colspan="4" style="text-align:center; color:#888;">Loading...</td></tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<script>
+let currentMerchantId = null;
+
+async function loadSubmissions() {
+  const res = await fetch('/api/admin/startup-pack/submissions');
+  const data = await res.json();
+  const pending = document.getElementById('pending-body');
+  pending.innerHTML = '';
+  if (!data.pending || data.pending.length === 0) {
+    pending.innerHTML = '<tr><td colspan="7" style="text-align:center; color:#888;">No pending briefs.</td></tr>';
+  } else {
+    for (const p of data.pending) {
+      const tr = document.createElement('tr');
+      tr.innerHTML = `
+        <td>${p.merchant_id}</td>
+        <td>${p.brand_name || '-'}</td>
+        <td>${p.niche || '-'}</td>
+        <td>$${p.monthly_ad_budget || 0}</td>
+        <td>${p.has_domain ? 'Yes' : 'No'}</td>
+        <td>${new Date(p.created_at).toLocaleString()}</td>
+        <td><button class="btn" style="font-size:.7rem;" onclick="prepareDeliver('${p.merchant_id}', '${(p.brand_name||'').replace(/'/g,'\\\'')}')">Deliver</button></td>
+      `;
+      pending.appendChild(tr);
+    }
+  }
+  const delivered = document.getElementById('delivered-body');
+  delivered.innerHTML = '';
+  if (!data.delivered || data.delivered.length === 0) {
+    delivered.innerHTML = '<tr><td colspan="4" style="text-align:center; color:#888;">No delivered briefs.</td></tr>';
+  } else {
+    for (const p of data.delivered) {
+      const tr = document.createElement('tr');
+      tr.innerHTML = `
+        <td>${p.merchant_id}</td>
+        <td>${p.brand_name || '-'}</td>
+        <td>${p.status}</td>
+        <td>${new Date(p.updated_at).toLocaleString()}</td>
+      `;
+      delivered.appendChild(tr);
+    }
+  }
+}
+
+function prepareDeliver(merchantId, brandName) {
+  currentMerchantId = merchantId;
+  document.getElementById('target-merchant').value = merchantId;
+  document.getElementById('brief-text').value = `Startup Pack brief for ${brandName || 'your brand'}:
+
+`;
+  document.getElementById('next-steps-text').value = '';
+  document.getElementById('deliver-form').style.display = 'block';
+  document.getElementById('deliver-form').scrollIntoView({behavior:'smooth'});
+}
+
+async function deliverBrief() {
+  const msg = document.getElementById('deliver-message');
+  msg.textContent = '';
+  let suppliers = [];
+  try {
+    suppliers = JSON.parse(document.getElementById('curated-suppliers').value || '[]');
+  } catch (e) {
+    msg.textContent = 'Suppliers JSON is invalid.';
+    msg.style.color = 'var(--red)';
+    return;
+  }
+  const payload = {
+    brief: document.getElementById('brief-text').value,
+    curated_suppliers: suppliers,
+    next_steps: document.getElementById('next-steps-text').value,
+    admin_notes: document.getElementById('admin-notes').value,
+  };
+  try {
+    const res = await fetch('/api/admin/startup-pack/' + currentMerchantId + '/brief', {
+      method: 'POST',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify(payload),
+    });
+    const data = await res.json();
+    if (res.ok) {
+      msg.textContent = 'Brief delivered.';
+      msg.style.color = 'var(--green)';
+      loadSubmissions();
+    } else {
+      msg.textContent = data.detail || 'Failed';
+      msg.style.color = 'var(--red)';
+    }
+  } catch (e) {
+    msg.textContent = e.message;
+    msg.style.color = 'var(--red)';
+  }
+}
+
+loadSubmissions();
+</script>
+
+{% endblock %}

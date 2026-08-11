@@ -1,75 +1,8 @@
-"""Startup Pack intake — brand builder, US supplier directory, and 1-year launch checklist."""
+"""Startup Pack intake — concierge model. Merchant submits a brief; admin delivers curated suppliers and direction."""
 import json
 from typing import Dict, Any, List
 
 from models import db, StartupPackProject
-
-
-US_SUPPLIERS = [
-    {
-        "name": "Printful",
-        "location": "California / North Carolina",
-        "category": "Print-on-demand",
-        "sample": True,
-        "branding": True,
-        "no_inventory": True,
-        "note": "Best for apparel, home goods, and accessories. Ships US in 2-5 days.",
-    },
-    {
-        "name": "Printify",
-        "location": "Network / US print providers",
-        "category": "Print-on-demand",
-        "sample": True,
-        "branding": True,
-        "no_inventory": True,
-        "note": "Wide product catalog; competitive margins with US print nodes.",
-    },
-    {
-        "name": "SPOD (Spreadshirt)",
-        "location": "North Carolina",
-        "category": "Print-on-demand",
-        "sample": True,
-        "branding": True,
-        "no_inventory": True,
-        "note": "Fast US fulfillment, strong streetwear/merch quality.",
-    },
-    {
-        "name": "Apliiq",
-        "location": "California",
-        "category": "Custom apparel (cut & sew)",
-        "sample": True,
-        "branding": True,
-        "no_inventory": True,
-        "note": "Best for fashion-forward Gen Z apparel with labels and patches.",
-    },
-    {
-        "name": "T-Pop",
-        "location": "France / EU focus",
-        "category": "Print-on-demand",
-        "sample": True,
-        "branding": True,
-        "no_inventory": True,
-        "note": "Strong eco/sustainable branding; EU shipping.",
-    },
-    {
-        "name": "Gooten",
-        "location": "US / global",
-        "category": "Print-on-demand",
-        "sample": True,
-        "branding": False,
-        "no_inventory": True,
-        "note": "Good for mugs, phone cases, home decor testing.",
-    },
-    {
-        "name": "Oberlo / DSers alternatives",
-        "location": "US suppliers only",
-        "category": "Dropship directory",
-        "sample": False,
-        "branding": False,
-        "no_inventory": True,
-        "note": "Use only for trending product validation; prioritize US shipping.",
-    },
-]
 
 
 def _default_checklist(brand_name: str, niche: str) -> List[Dict[str, Any]]:
@@ -89,24 +22,13 @@ def _default_checklist(brand_name: str, niche: str) -> List[Dict[str, Any]]:
     ]
 
 
-def _filter_suppliers(niche: str, design_vibe: str) -> List[Dict[str, Any]]:
-    niche = (niche or "").lower()
-    if any(k in niche for k in ("apparel", "fashion", "streetwear", "clothing", "merch")):
-        return [s for s in US_SUPPLIERS if s["name"] in ("Printful", "Apliiq", "SPOD")]
-    if any(k in niche for k in ("home", "decor", "mug", "phone", "accessory")):
-        return [s for s in US_SUPPLIERS if s["name"] in ("Printful", "Printify", "Gooten")]
-    if any(k in niche for k in ("eco", "sustainable", "green")):
-        return [s for s in US_SUPPLIERS if s["name"] in ("T-Pop", "Printful", "Printify")]
-    return US_SUPPLIERS[:5]
-
-
 def get_project(merchant_id: str) -> StartupPackProject:
     project = StartupPackProject.query.filter_by(merchant_id=merchant_id).first()
     if not project:
         project = StartupPackProject(
             merchant_id=merchant_id,
+            status="intake",
             checklist=json.dumps(_default_checklist("", "")),
-            suppliers=json.dumps(US_SUPPLIERS[:3]),
         )
         db.session.add(project)
         db.session.commit()
@@ -125,14 +47,36 @@ def save_intake(merchant_id: str, data: Dict[str, Any]) -> StartupPackProject:
     project.design_vibe = data.get("design_vibe", project.design_vibe)
     project.has_domain = bool(data.get("has_domain", project.has_domain))
     project.sample_product = data.get("sample_product", project.sample_product)
-    project.status = "in_progress"
+    project.status = "pending_brief"
 
     brand = project.brand_name or "your brand"
     niche = project.niche or "your niche"
     project.checklist = json.dumps(_default_checklist(brand, niche))
-    project.suppliers = json.dumps(_filter_suppliers(niche, project.design_vibe or ""))
     db.session.commit()
     return project
+
+
+def deliver_brief(merchant_id: str, brief: str, curated_suppliers: List[Dict[str, Any]], next_steps: str, admin_notes: str = "") -> StartupPackProject:
+    project = get_project(merchant_id)
+    project.brief = brief
+    project.curated_suppliers = json.dumps(curated_suppliers)
+    project.next_steps = next_steps
+    project.admin_notes = admin_notes
+    project.status = "delivered"
+    db.session.commit()
+    return project
+
+
+def list_pending_briefs() -> List[StartupPackProject]:
+    return StartupPackProject.query.filter(
+        StartupPackProject.status.in_(["intake", "pending_brief"])
+    ).order_by(StartupPackProject.created_at.desc()).all()
+
+
+def list_delivered_briefs() -> List[StartupPackProject]:
+    return StartupPackProject.query.filter(
+        StartupPackProject.status.in_(["delivered", "in_progress", "launched"])
+    ).order_by(StartupPackProject.updated_at.desc()).all()
 
 
 def complete_item(merchant_id: str, item_id: str) -> StartupPackProject:
@@ -142,6 +86,13 @@ def complete_item(merchant_id: str, item_id: str) -> StartupPackProject:
         if item.get("id") == item_id:
             item["done"] = not item.get("done", False)
     project.checklist = json.dumps(checklist)
+    db.session.commit()
+    return project
+
+
+def mark_status(merchant_id: str, status: str) -> StartupPackProject:
+    project = get_project(merchant_id)
+    project.status = status
     db.session.commit()
     return project
 
@@ -158,12 +109,11 @@ def project_to_dict(project: StartupPackProject) -> Dict[str, Any]:
         "has_domain": project.has_domain,
         "sample_product": project.sample_product,
         "status": project.status,
+        "brief": project.brief,
+        "curated_suppliers": json.loads(project.curated_suppliers or "[]"),
+        "next_steps": project.next_steps,
+        "admin_notes": project.admin_notes,
         "checklist": json.loads(project.checklist or "[]"),
-        "suppliers": json.loads(project.suppliers or "[]"),
         "created_at": project.created_at.isoformat() if project.created_at else None,
         "updated_at": project.updated_at.isoformat() if project.updated_at else None,
     }
-
-
-def get_suppliers(niche: str = "", design_vibe: str = "") -> List[Dict[str, Any]]:
-    return _filter_suppliers(niche, design_vibe)

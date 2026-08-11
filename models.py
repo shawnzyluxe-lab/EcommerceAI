@@ -172,9 +172,13 @@ class StartupPackProject(db.Model):
     design_vibe = db.Column(db.String(100))
     has_domain = db.Column(db.Boolean, default=False)
     sample_product = db.Column(db.String(255))
-    status = db.Column(db.String(50), default="intake")  # intake, in_progress, launched
+    status = db.Column(db.String(50), default="intake")  # intake, pending_brief, delivered, in_progress, launched
+    brief = db.Column(db.Text)
+    curated_suppliers = db.Column(db.Text)  # JSON list set by admin
+    next_steps = db.Column(db.Text)
+    admin_notes = db.Column(db.Text)
     checklist = db.Column(db.Text)  # JSON list
-    suppliers = db.Column(db.Text)  # JSON list
+    suppliers = db.Column(db.Text)  # legacy / deprecated
     created_at = db.Column(db.DateTime, server_default=db.func.now())
     updated_at = db.Column(db.DateTime, onupdate=db.func.now())
 

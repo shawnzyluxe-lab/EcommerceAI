@@ -1816,14 +1816,35 @@ def api_startup_pack():
 @app.route('/api/v1/startup-pack/intake', methods=['POST'])
 @require_roles([UserRole.ADMIN, UserRole.MERCHANT, UserRole.ENGINEER])
 def api_startup_pack_intake():
-    """Save Startup Pack intake answers and generate checklist + suppliers."""
+    """Save Startup Pack concierge intake and email the founder a notification."""
     merchant = get_merchant_context()
     if not merchant:
         return jsonify({"error": "No merchant context"}), 403
     data = request.get_json(silent=True) or {}
     try:
         project = startup_pack.save_intake(merchant["id"], data)
-        return jsonify(startup_pack.project_to_dict(project)), 200
+        project_dict = startup_pack.project_to_dict(project)
+
+        email_html = f"""
+        <h3>New Startup Pack Intake</h3>
+        <p><strong>Merchant:</strong> {merchant.get('name') or merchant['id']} ({merchant.get('email') or 'no email'})</p>
+        <ul>
+          <li><strong>Brand name:</strong> {project.brand_name or '-'}</li>
+          <li><strong>Niche:</strong> {project.niche or '-'}</li>
+          <li><strong>Target audience:</strong> {project.target_audience or '-'}</li>
+          <li><strong>Monthly ad budget:</strong> ${project.monthly_ad_budget or 0:,.2f}</li>
+          <li><strong>Design vibe:</strong> {project.design_vibe or '-'}</li>
+          <li><strong>Has domain:</strong> {'Yes' if project.has_domain else 'No'}</li>
+          <li><strong>Sample product:</strong> {project.sample_product or '-'}</li>
+        </ul>
+        <p>Reply to the merchant directly from this email to deliver the Startup Pack brief.</p>
+        """
+        email_sent = dispatch_external_email(
+            recipient=MERCHANT_EMAIL,
+            subject=f"Startup Pack intake: {project.brand_name or merchant['id']}",
+            html_body=email_html,
+        )
+        return jsonify({**project_dict, "email_sent": email_sent}), 200
     except Exception as e:
         logger.error(f"[Startup Pack] Intake failed: {e}")
         return jsonify({"detail": "Could not save intake."}), 500
@@ -1841,6 +1862,52 @@ def api_startup_pack_check_item(item_id):
         return jsonify(startup_pack.project_to_dict(project)), 200
     except Exception as e:
         logger.error(f"[Startup Pack] Checklist update failed: {e}")
+        return jsonify({"detail": str(e)}), 400
+
+
+# ============================================================
+# ADMIN: STARTUP PACK SUBMISSIONS
+# ============================================================
+
+@app.route('/admin/startup-pack', methods=['GET'])
+@require_roles([UserRole.ADMIN])
+def admin_startup_pack():
+    """Admin review page for Startup Pack concierge submissions."""
+    merchant = get_merchant_context()
+    merchant_id = merchant["id"] if merchant else None
+    ctx = context(active_page='admin_startup_pack', merchant=merchant, merchant_id=merchant_id)
+    return render_template('admin_startup_pack.html', **ctx)
+
+
+@app.route('/api/admin/startup-pack/submissions', methods=['GET'])
+@require_roles([UserRole.ADMIN])
+def api_admin_startup_pack_submissions():
+    """List all Startup Pack submissions for admin review."""
+    try:
+        pending = [startup_pack.project_to_dict(p) for p in startup_pack.list_pending_briefs()]
+        delivered = [startup_pack.project_to_dict(p) for p in startup_pack.list_delivered_briefs()]
+        return jsonify({"pending": pending, "delivered": delivered}), 200
+    except Exception as e:
+        logger.error(f"[Admin Startup Pack] Failed: {e}")
+        return jsonify({"detail": "Could not load submissions."}), 500
+
+
+@app.route('/api/admin/startup-pack/<merchant_id>/brief', methods=['POST'])
+@require_roles([UserRole.ADMIN])
+def api_admin_deliver_startup_brief(merchant_id):
+    """Admin delivers a curated Startup Pack brief with optional supplier recommendations."""
+    data = request.get_json(silent=True) or {}
+    try:
+        project = startup_pack.deliver_brief(
+            merchant_id=merchant_id,
+            brief=data.get("brief", ""),
+            curated_suppliers=data.get("curated_suppliers", []),
+            next_steps=data.get("next_steps", ""),
+            admin_notes=data.get("admin_notes", ""),
+        )
+        return jsonify(startup_pack.project_to_dict(project)), 200
+    except Exception as e:
+        logger.error(f"[Admin Startup Pack] Deliver brief failed: {e}")
         return jsonify({"detail": str(e)}), 400
 
 

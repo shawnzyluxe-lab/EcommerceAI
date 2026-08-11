@@ -4,12 +4,12 @@
 
 <section class="page-header">
   <h1>Startup Pack</h1>
-  <p>Brand creation, US supplier matching, and a 1-year launch checklist.</p>
+  <p>Submit your brand brief. Our team reviews it and emails you curated suppliers, direction, and a 1-year launch plan within 24–48 hours.</p>
 </section>
 
 <div class="grid grid-2">
   <div class="card" id="intake-card">
-    <div class="card-head"><h3>Brand Intake</h3></div>
+    <div class="card-head"><h3>Brand Brief</h3></div>
     <form id="intake-form" onsubmit="saveIntake(event)">
       <label style="font-size:.75rem; color:var(--ink-3); font-weight:600;">Brand name</label>
       <input id="brand_name" type="text" placeholder="Luxe Sleep Co." style="width:100%; padding:10px; margin:6px 0 12px; border:1px solid var(--line); border-radius:8px; background:#fff;">
@@ -52,15 +52,24 @@
       <label style="font-size:.75rem; color:var(--ink-3); font-weight:600;">First sample product idea</label>
       <input id="sample_product" type="text" placeholder="Satin sleep set, 20oz tumbler, etc." style="width:100%; padding:10px; margin:6px 0 12px; border:1px solid var(--line); border-radius:8px; background:#fff;">
 
-      <button class="btn btn-primary" style="width:100%;" type="submit">Save &amp; Build Plan</button>
+      <button class="btn btn-primary" style="width:100%;" type="submit">Submit Brief</button>
     </form>
     <div id="intake-message" style="margin-top:10px; font-size:.8rem;"></div>
   </div>
 
-  <div class="card">
-    <div class="card-head"><h3>Matched US Suppliers</h3></div>
-    <div id="supplier-list" style="padding:0 0 12px 0;">
-      <div style="padding:16px; color:var(--ink-3);">Save the intake form to see supplier recommendations.</div>
+  <div class="card" id="brief-card" style="display:none;">
+    <div class="card-head"><h3>Your Startup Pack Brief</h3></div>
+    <div id="brief-content" style="padding:8px 0; line-height:1.7;">
+      <div id="pending-notice" style="display:none; padding:20px; background:var(--gold-bg); border-radius:12px; color:var(--amber); font-weight:600;">
+        Brief submitted. We are reviewing it and will email your curated supplier list and launch plan within 24–48 hours.
+      </div>
+      <div id="delivered-notice" style="display:none;">
+        <div id="delivered-brief" style="margin-bottom:16px;"></div>
+        <h4 style="font-size:.9rem; margin:16px 0 8px;">Curated suppliers</h4>
+        <div id="curated-suppliers"></div>
+        <h4 style="font-size:.9rem; margin:16px 0 8px;">Next steps</h4>
+        <div id="next-steps" style="color:var(--ink-3); font-size:.85rem;"></div>
+      </div>
     </div>
   </div>
 </div>
@@ -72,7 +81,7 @@
     <span id="checklist-progress" class="chip" style="background:var(--gold-bg); color:var(--amber); border-color:rgba(212,175,55,.25);">0%</span>
   </div>
   <div id="checklist" style="padding:8px 0;">
-    <div style="padding:16px; color:var(--ink-3);">Save the intake form to generate your checklist.</div>
+    <div style="padding:16px; color:var(--ink-3);">Submit your brief above to unlock your personalized checklist.</div>
   </div>
 </div>
 
@@ -95,20 +104,30 @@ function renderStartupPack(data) {
   document.getElementById('has_domain').value = data.has_domain ? 'true' : 'false';
   document.getElementById('sample_product').value = data.sample_product || '';
 
-  const supplierList = document.getElementById('supplier-list');
-  if (data.suppliers && data.suppliers.length) {
-    supplierList.innerHTML = data.suppliers.map(s => `
-      <div style="border-bottom:1px solid var(--line-2); padding:14px;">
-        <div style="font-weight:600; font-size:.9rem;">${s.name} <span style="font-weight:400; color:var(--ink-3);">— ${s.category}</span></div>
-        <div style="font-size:.75rem; color:var(--ink-3); margin-top:4px;">${s.location}</div>
-        <div style="font-size:.8rem; color:var(--ink-3); margin-top:6px;">${s.note}</div>
-        <div style="margin-top:8px; font-size:.7rem;">
-          ${s.sample ? '<span class="chip" style="background:var(--green-bg); color:var(--green);">Samples</span>' : ''}
-          ${s.branding ? '<span class="chip" style="background:var(--gold-bg); color:var(--amber);">Branding</span>' : ''}
-          ${s.no_inventory ? '<span class="chip" style="background:#eef; color:#4a5c6a;">No Inventory</span>' : ''}
+  const briefCard = document.getElementById('brief-card');
+  const pending = document.getElementById('pending-notice');
+  const delivered = document.getElementById('delivered-notice');
+
+  if (data.status === 'intake') {
+    briefCard.style.display = 'none';
+  } else {
+    briefCard.style.display = 'block';
+    if (data.status === 'pending_brief') {
+      pending.style.display = 'block';
+      delivered.style.display = 'none';
+    } else {
+      pending.style.display = 'none';
+      delivered.style.display = 'block';
+      document.getElementById('delivered-brief').innerHTML = data.brief ? `<div style="white-space:pre-line;">${data.brief}</div>` : '<em>No written brief yet.</em>';
+      const suppliers = data.curated_suppliers || [];
+      document.getElementById('curated-suppliers').innerHTML = suppliers.length ? suppliers.map(s => `
+        <div style="border:1px solid var(--line); border-radius:8px; padding:12px; margin-bottom:10px;">
+          <div style="font-weight:600;">${s.name} <span style="font-weight:400; color:var(--ink-3);">— ${s.category || ''}</span></div>
+          <div style="font-size:.75rem; color:var(--ink-3);">${s.note || ''}</div>
         </div>
-      </div>
-    `).join('');
+      `).join('') : '<em>Supplier recommendations will appear here once your brief is delivered.</em>';
+      document.getElementById('next-steps').innerHTML = data.next_steps ? data.next_steps.replace(/\n/g, '<br>') : 'Check your email for next steps.';
+    }
   }
 
   const checklist = document.getElementById('checklist');
@@ -143,7 +162,7 @@ async function saveIntake(e) {
     const res = await fetch('/api/v1/startup-pack/intake', {method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify(payload)});
     const data = await res.json();
     if (res.ok) {
-      msg.textContent = 'Plan saved and checklist generated.';
+      msg.textContent = 'Brief submitted. We will email you within 24–48 hours.';
       msg.style.color = 'var(--green)';
       renderStartupPack(data);
     } else {

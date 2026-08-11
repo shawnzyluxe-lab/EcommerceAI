@@ -87,12 +87,21 @@ def run_migrations():
                 has_domain BOOLEAN DEFAULT FALSE,
                 sample_product VARCHAR(255),
                 status VARCHAR(50) DEFAULT 'intake',
+                brief TEXT,
+                curated_suppliers TEXT,
+                next_steps TEXT,
+                admin_notes TEXT,
                 checklist TEXT,
                 suppliers TEXT,
                 created_at TIMESTAMP DEFAULT NOW(),
                 updated_at TIMESTAMP DEFAULT NOW()
             )
         """))
+        for col in ['brief', 'curated_suppliers', 'next_steps', 'admin_notes']:
+            try:
+                conn.execute(text(f"ALTER TABLE startup_pack_projects ADD COLUMN IF NOT EXISTS {col} TEXT"))
+            except Exception as e:
+                print(f"[migrate] {col} add skipped: {e}")
 
         # Create the beta waitlist applications table if missing.
         conn.execute(text("""
