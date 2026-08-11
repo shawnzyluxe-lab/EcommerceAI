@@ -73,6 +73,7 @@ def create_checkout_session(merchant_id, email, name, include_startup_addon=Fals
     params = {
         "customer": customer_id,
         "mode": "subscription",
+        "payment_method_types": ["card"],
         "line_items": line_items,
         "metadata": {
             "merchant_id": merchant_id,
@@ -89,6 +90,7 @@ def create_checkout_session(merchant_id, email, name, include_startup_addon=Fals
         "success_url": success_url or "https://vantavcommerce.com/dashboard/billing?checkout=success",
         "cancel_url": cancel_url or "https://vantavcommerce.com/subscribe?canceled=1",
         "automatic_tax": {"enabled": False},
+        "managed_payments": {"enabled": False},
     }
     if add_invoice_items:
         params["add_invoice_items"] = add_invoice_items
