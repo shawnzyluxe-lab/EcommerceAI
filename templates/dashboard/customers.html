@@ -1,0 +1,32 @@
+{% extends 'dashboard/base.html' %}
+{% block title %}Customers — {{ brand.name }} {{ brand.product }}{% endblock %}
+{% block content %}
+
+<section class="page-header">
+  <h1>Customers</h1>
+  <p>Segment, analyze, and engage your customer base across every channel.</p>
+</section>
+
+<div class="kpi-grid">
+  <div class="card kpi-card"><div class="kpi-label">Total customers</div><div class="kpi-value">8,750</div><div class="kpi-delta up">▲ 5.2% vs last 30 days</div></div>
+  <div class="card kpi-card"><div class="kpi-label">Repeat rate</div><div class="kpi-value">23%</div><div class="kpi-delta up">▲ 1.8% vs last 30 days</div></div>
+  <div class="card kpi-card"><div class="kpi-label">Avg LTV</div><div class="kpi-value">$284</div><div class="kpi-delta up">▲ 4.1% vs last 30 days</div></div>
+  <div class="card kpi-card"><div class="kpi-label">NPS</div><div class="kpi-value">42</div><div class="kpi-delta flat">No change</div></div>
+</div>
+
+<div class="card">
+  <div class="card-head"><h3>Customer List</h3><span class="spacer"></span><button class="btn btn-primary">Export</button></div>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Customer</th><th>Email</th><th>Orders</th><th>LTV</th><th>Segment</th><th>Last order</th></tr></thead>
+      <tbody>
+        <tr><td class="b">Sophia Martinez</td><td>sophia.martinez@email.com</td><td class="num">12</td><td class="num mono">$1,248.00</td><td><span class="tag tag-green">VIP</span></td><td>Jun 12, 2025</td></tr>
+        <tr><td class="b">Ethan Johnson</td><td>ethan.johnson@email.com</td><td class="num">8</td><td class="num mono">$742.50</td><td><span class="tag tag-blue">Loyal</span></td><td>Jun 10, 2025</td></tr>
+        <tr><td class="b">Olivia Brown</td><td>olivia.brown@email.com</td><td class="num">5</td><td class="num mono">$328.40</td><td><span class="tag tag-amber">At risk</span></td><td>Jun 11, 2025</td></tr>
+        <tr><td class="b">Liam Wilson</td><td>liam.wilson@email.com</td><td class="num">3</td><td class="num mono">$195.20</td><td><span class="tag tag-ghost">New</span></td><td>Jun 8, 2025</td></tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+{% endblock %}

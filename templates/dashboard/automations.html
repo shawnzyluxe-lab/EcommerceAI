@@ -1,0 +1,62 @@
+{% extends 'dashboard/base.html' %}
+{% block title %}Automations — {{ brand.name }} {{ brand.product }}{% endblock %}
+{% block content %}
+
+<section class="page-header">
+  <h1>AI Automation Builder</h1>
+  <p>Describe it in plain English — it builds the workflow.</p>
+</section>
+
+<div class="card" style="margin-bottom: 24px;">
+  <div class="card-head"><h3>Build your automation</h3></div>
+  <div style="display: flex; align-items: center; gap: 16px; flex-wrap: wrap;">
+    <div style="flex: 1; min-width: 220px;">
+      <div style="font-size: .75rem; font-weight: 700; color: var(--ink-3); text-transform: uppercase; margin-bottom: 6px;">Trigger</div>
+      <select class="btn" style="width: 100%; justify-content: flex-start;"><option>When this event happens</option></select>
+    </div>
+    <div style="color: var(--ink-3);">→</div>
+    <div style="flex: 1; min-width: 220px;">
+      <div style="font-size: .75rem; font-weight: 700; color: var(--ink-3); text-transform: uppercase; margin-bottom: 6px;">Condition</div>
+      <select class="btn" style="width: 100%; justify-content: flex-start;"><option>If these conditions are met</option></select>
+    </div>
+    <div style="color: var(--ink-3);">→</div>
+    <div style="flex: 1; min-width: 220px;">
+      <div style="font-size: .75rem; font-weight: 700; color: var(--ink-3); text-transform: uppercase; margin-bottom: 6px;">Action</div>
+      <select class="btn" style="width: 100%; justify-content: flex-start;"><option>Then perform this action</option></select>
+    </div>
+  </div>
+</div>
+
+<div class="card">
+  <div class="card-head">
+    <h3>All Automations</h3>
+    <span class="spacer"></span>
+    <div class="chips" style="margin: 0;">
+      <span class="chip" style="background: var(--gold-bg); color: var(--amber);">All 12</span>
+      <span class="chip">Active 8</span>
+      <span class="chip">Inactive 4</span>
+    </div>
+  </div>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Automation</th><th>Status</th><th class="num">Runs (30 days)</th><th>Actions</th></tr></thead>
+      <tbody>
+        {% for a in automations %}
+        <tr>
+          <td class="b">{{ a.text }}</td>
+          <td>
+            <label style="display: inline-flex; align-items: center; gap: 8px; cursor: pointer;">
+              <input type="checkbox" {{ 'checked' if a.state == 'active' else '' }} style="accent-color: var(--gold);">
+              <span class="tag {{ 'tag-green' if a.state == 'active' else 'tag-ghost' }}">{{ a.state | title }}</span>
+            </label>
+          </td>
+          <td class="num mono">{{ a.runs }}</td>
+          <td><button class="btn" style="font-size: .72rem; padding: 4px 8px;">Edit</button> <button class="btn" style="font-size: .72rem; padding: 4px 8px;">Delete</button></td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+{% endblock %}

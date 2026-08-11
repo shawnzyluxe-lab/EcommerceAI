@@ -1,0 +1,42 @@
+{% extends 'dashboard/base.html' %}
+{% block title %}Discounts — {{ brand.name }} {{ brand.product }}{% endblock %}
+{% block content %}
+
+<section class="page-header">
+  <h1>Discounts</h1>
+  <p>Create and manage coupons, automatic discounts, and flash sales.</p>
+</section>
+
+<div class="card" style="margin-bottom: 24px;">
+  <div class="card-head"><h3>Create Discount</h3></div>
+  <div style="display: flex; gap: 12px; flex-wrap: wrap; align-items: flex-end;">
+    <div style="flex: 1; min-width: 180px;">
+      <label style="font-size: .75rem; color: var(--ink-3); font-weight: 600;">Code</label>
+      <input type="text" value="LUXE15" style="width: 100%; padding: 10px; border: 1px solid var(--line); border-radius: 8px; margin-top: 6px;">
+    </div>
+    <div style="flex: 1; min-width: 180px;">
+      <label style="font-size: .75rem; color: var(--ink-3); font-weight: 600;">Type</label>
+      <select style="width: 100%; padding: 10px; border: 1px solid var(--line); border-radius: 8px; margin-top: 6px;"><option>Percentage off</option><option>Fixed amount</option><option>Free shipping</option></select>
+    </div>
+    <div style="flex: 1; min-width: 100px;">
+      <label style="font-size: .75rem; color: var(--ink-3); font-weight: 600;">Value</label>
+      <input type="text" value="15" style="width: 100%; padding: 10px; border: 1px solid var(--line); border-radius: 8px; margin-top: 6px;">
+    </div>
+    <button class="btn btn-primary">Create</button>
+  </div>
+</div>
+
+<div class="card">
+  <div class="card-head"><h3>Active Discounts</h3></div>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Code</th><th>Type</th><th class="num">Value</th><th class="num">Uses</th><th class="num">Revenue</th><th>Status</th></tr></thead>
+      <tbody>
+        <tr><td class="b">LUXE15</td><td>Percentage off</td><td class="num">15%</td><td class="num">284</td><td class="num mono">$12,450</td><td><span class="tag tag-green">Active</span></td></tr>
+        <tr><td class="b">FLASH20</td><td>Percentage off</td><td class="num">20%</td><td class="num">89</td><td class="num mono">$3,820</td><td><span class="tag tag-amber">Scheduled</span></td></tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+{% endblock %}

@@ -1,0 +1,38 @@
+{% extends 'dashboard/base.html' %}
+{% block title %}Alerts — {{ brand.name }} {{ brand.product }}{% endblock %}
+{% block content %}
+
+<section class="page-header">
+  <h1>Autonomous AI Manager</h1>
+  <p>Proactive alerts — it tells you before you ask.</p>
+</section>
+
+<div class="card">
+  <div class="card-head">
+    <h3>All Alerts</h3>
+    <span class="spacer"></span>
+    <div class="chips" style="margin: 0;">
+      <span class="chip" style="background: var(--gold-bg); color: var(--amber); border-color: rgba(212,175,55,.25);">All</span>
+      <span class="chip">Critical</span>
+      <span class="chip">Warning</span>
+      <span class="chip">Good</span>
+    </div>
+  </div>
+  <div class="alert-feed">
+    {% for a in alerts %}
+    <div class="alert-item {{ a.level }}">
+      <div class="alert-bar"></div>
+      <div class="alert-body">
+        <div class="alert-title">{{ a.title }}</div>
+        <div class="alert-detail">{{ a.detail }}</div>
+        <div class="alert-actions">
+          {% for act in a.actions %}<button class="btn" style="padding: 5px 10px; font-size: .76rem;">{{ act }}</button>{% endfor %}
+        </div>
+      </div>
+      <div class="alert-when">{{ a.when }}</div>
+    </div>
+    {% endfor %}
+  </div>
+</div>
+
+{% endblock %}

@@ -1,0 +1,50 @@
+{% extends 'dashboard/base.html' %}
+{% block title %}Billing — {{ brand.name }} {{ brand.product }}{% endblock %}
+{% block content %}
+
+<section class="page-header">
+  <h1>Billing</h1>
+  <p>Manage your subscription, invoices, and payment methods.</p>
+</section>
+
+<div class="grid grid-2">
+  <div class="card">
+    <div class="card-head"><h3>Current Plan</h3></div>
+    <div style="background: var(--ink); color: #fff; border-radius: var(--radius); padding: 18px; margin-bottom: 14px;">
+      <div style="font-size: 1.2rem; font-weight: 700; margin-bottom: 4px;">♛ {{ merchant.tier | default('Enterprise AI Tier') }}</div>
+      <div style="font-size: .85rem; color: #b7bdc9; margin-bottom: 14px;">Unlimited access to all AI commerce modules.</div>
+      <div style="font-size: 1.6rem; font-weight: 800; margin-bottom: 4px;">$499<span style="font-size: .85rem; color: #b7bdc9;">/mo</span></div>
+      <div style="font-size: .8rem; color: var(--gold);">Renews Aug 15, 2025</div>
+    </div>
+    <button class="btn btn-primary" style="width: 100%;">Change plan</button>
+  </div>
+
+  <div class="card">
+    <div class="card-head"><h3>Usage this cycle</h3></div>
+    {% for label, used, limit in [['Orders', 12450, 100000], ['Products', 1250, 10000], ['Customers', 8750, 100000], ['Storage', 45.6, 500]] %}
+    <div style="margin-bottom: 14px;">
+      <div style="display: flex; justify-content: space-between; font-size: .85rem; margin-bottom: 5px;">
+        <span>{{ label }}</span><span>{{ used }} / {{ limit }}</span>
+      </div>
+      <div style="height: 7px; border-radius: 99px; background: var(--line-2); overflow: hidden;">
+        <div style="height: 100%; border-radius: 99px; background: var(--gold); width: {{ (used / limit * 100) | round(1) }}%;"></div>
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+</div>
+
+<div class="card">
+  <div class="card-head"><h3>Invoices</h3></div>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Invoice</th><th>Date</th><th class="num">Amount</th><th>Status</th><th></th></tr></thead>
+      <tbody>
+        <tr><td class="b">INV-2025-07</td><td>Jul 15, 2025</td><td class="num mono">$499.00</td><td><span class="tag tag-green">Paid</span></td><td class="num"><button class="btn" style="font-size: .75rem;">Download</button></td></tr>
+        <tr><td class="b">INV-2025-06</td><td>Jun 15, 2025</td><td class="num mono">$499.00</td><td><span class="tag tag-green">Paid</span></td><td class="num"><button class="btn" style="font-size: .75rem;">Download</button></td></tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+{% endblock %}
