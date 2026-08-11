@@ -1091,6 +1091,9 @@ def storefront(query, variables=None):
 
 @app.route('/')
 def home():
+    host = request.host.split(':')[0].lower()
+    if host in ('shawnzyluxe.com', 'www.shawnzyluxe.com'):
+        return render_template('coming_soon.html')
     if site_wall_authenticated():
         return redirect(url_for('dashboard'))
     return render_template('index.html', error=bool(request.args.get('error')), oauth_sync=request.args.get('oauth_sync'), recaptcha_site_key=RECAPTCHA_SITE_KEY)
