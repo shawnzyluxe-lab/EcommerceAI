@@ -14,6 +14,31 @@ PRICE_BETA_MONTHLY = os.environ.get("STRIPE_PRICE_BETA_MONTHLY", "")
 PRICE_BETA_STARTUP = os.environ.get("STRIPE_PRICE_BETA_STARTUP", "")
 PRICE_STARTUP_ADDON = os.environ.get("STRIPE_PRICE_STARTUP_ADDON", "")
 
+# Add-on price IDs (created 2026-08-11)
+PRICE_CUSTOM_BRAND_BUILD_SETUP = os.environ.get("STRIPE_PRICE_CUSTOM_BRAND_BUILD_SETUP", "")
+PRICE_CUSTOM_BRAND_BUILD_MONTHLY = os.environ.get("STRIPE_PRICE_CUSTOM_BRAND_BUILD_MONTHLY", "")
+PRICE_SEO_SETUP = os.environ.get("STRIPE_PRICE_SEO_SETUP", "")
+PRICE_SEO_MONTHLY = os.environ.get("STRIPE_PRICE_SEO_MONTHLY", "")
+PRICE_EMAIL_SETUP = os.environ.get("STRIPE_PRICE_EMAIL_SETUP", "")
+PRICE_CURATED_AD_PLAN_MONTHLY = os.environ.get("STRIPE_PRICE_CURATED_AD_PLAN_MONTHLY", "")
+
+ADDON_PRICE_MAP = {
+    "custom_brand_build": {
+        "setup": PRICE_CUSTOM_BRAND_BUILD_SETUP,
+        "monthly": PRICE_CUSTOM_BRAND_BUILD_MONTHLY,
+    },
+    "seo": {
+        "setup": PRICE_SEO_SETUP,
+        "monthly": PRICE_SEO_MONTHLY,
+    },
+    "email_setup": {
+        "setup": PRICE_EMAIL_SETUP,
+    },
+    "curated_ad_plan": {
+        "monthly": PRICE_CURATED_AD_PLAN_MONTHLY,
+    },
+}
+
 
 def _ensure_configured():
     if not stripe.api_key:
