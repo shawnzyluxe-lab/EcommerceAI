@@ -15,6 +15,7 @@ from models import PredictiveLogistics
 import profit_feed
 import alert_matrix
 import action_gate
+import channels as channels_module
 
 
 BRAND = {
@@ -507,6 +508,12 @@ def context(active_page=None, merchant=None, merchant_id=None):
         except Exception:
             pass
 
+    # Channel list from persistent connections.
+    try:
+        channel_data = channels_module.list_channels(merchant_id) if merchant_id else CHANNELS
+    except Exception:
+        channel_data = CHANNELS
+
     return {
         "brand": BRAND,
         "nav": NAV,
@@ -522,8 +529,8 @@ def context(active_page=None, merchant=None, merchant_id=None):
         },
         "coo": COO,
         "suggestions": COMMAND_SUGGESTIONS,
-        "channels": CHANNELS,
-        "connected": [c for c in CHANNELS if c["state"] == "connected"],
+        "channels": channel_data,
+        "connected": [c for c in channel_data if c.get("state") == "connected"],
         "briefing": briefing,
         "alerts": live_alerts,
         "profit_rows": profit_rows,

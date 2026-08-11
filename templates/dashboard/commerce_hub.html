@@ -4,41 +4,42 @@
 
 <section class="page-header">
   <h1>Universal Commerce Hub</h1>
-  <p>Connect and control Shopify, Amazon, TikTok Shop, eBay, WooCommerce, Walmart, and BigCommerce from one page.</p>
+  <p>Connect Shopify, TikTok Shop, Amazon, and other channels. Live webhooks feed the Profit Feed, Alert Matrix, and Action Gate.</p>
 </section>
 
 <div class="card" style="margin-bottom: 24px;">
   <div class="card-head">
     <h3>Connect a Store</h3>
     <span class="spacer"></span>
-    <button class="btn btn-primary" onclick="document.getElementById('connect-panel').scrollIntoView({behavior:'smooth'})">Master Sync</button>
+    <span id="sync-status" style="font-size:.8rem; color:var(--ink-3);"></span>
   </div>
-  <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 12px;">
+  <div id="channel-grid" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 12px; padding: 16px 0;">
     {% for ch in channels %}
-    <div style="border: 1px solid var(--line); border-radius: 12px; padding: 16px; text-align: center;">
+    <div data-platform="{{ ch.platform }}" style="border: 1px solid var(--line); border-radius: 12px; padding: 16px; text-align: center;">
       <div style="width: 40px; height: 40px; border-radius: 8px; background: {{ ch.color }}; color: #fff; display: grid; place-items: center; font-weight: 800; margin: 0 auto 8px; font-size: .8rem;">{{ ch.abbr }}</div>
       <div style="font-weight: 600; font-size: .85rem;">{{ ch.name }}</div>
-      <button class="btn" style="margin-top: 10px; width: 100%; font-size: .72rem; padding: 5px 8px;">{{ 'Connected' if ch.state == 'connected' else 'Connect' }}</button>
+      <div style="font-size:.7rem; color:var(--ink-3); margin:4px 0;">{{ ch.state }}</div>
+      <button class="btn" style="margin-top: 10px; width: 100%; font-size: .72rem; padding: 5px 8px;" onclick="openConnectModal('{{ ch.platform }}')">{{ 'Manage' if ch.state == 'connected' else 'Connect' }}</button>
     </div>
     {% endfor %}
   </div>
 </div>
 
-<div class="grid grid-2" id="connect-panel">
+<div class="grid grid-2">
   <div class="card">
     <div class="card-head"><h3>Connected Stores</h3></div>
-    <div class="table-wrap">
+    <div class="table-wrap" id="connected-stores">
       <table>
         <thead><tr><th>Store</th><th>Status</th><th class="num">Pending</th><th>Last Sync</th><th>Actions</th></tr></thead>
         <tbody>
           {% for c in channels %}
           {% if c.state == 'connected' %}
-          <tr>
+          <tr data-row-platform="{{ c.platform }}">
             <td class="b">{{ c.name }}</td>
             <td><span class="tag tag-green">Live</span></td>
             <td class="num">{{ c.orders }}</td>
             <td>{{ c.sync }}</td>
-            <td><button class="btn" style="font-size: .72rem; padding: 4px 8px;">Sync</button></td>
+            <td><button class="btn" style="font-size: .72rem; padding: 4px 8px;" onclick="disconnectChannel('{{ c.platform }}')">Disconnect</button></td>
           </tr>
           {% endif %}
           {% endfor %}
@@ -47,14 +48,151 @@
     </div>
   </div>
 
-  <div class="card">
-    <div class="card-head"><h3>Link External Storefront</h3></div>
-    <label style="font-size: .75rem; color: var(--ink-3); font-weight: 600;">Store domain</label>
-    <input type="text" placeholder="store.myshopify.com" style="width: 100%; padding: 10px; margin: 6px 0 12px; border: 1px solid var(--line); border-radius: 8px; background: #fff;">
-    <label style="font-size: .75rem; color: var(--ink-3); font-weight: 600;">Access token</label>
-    <input type="password" placeholder="shpat_…" style="width: 100%; padding: 10px; margin: 6px 0 12px; border: 1px solid var(--line); border-radius: 8px; background: #fff;">
-    <button class="btn btn-primary" style="width: 100%;">Encrypt &amp; Save Connection</button>
+  <div class="card" id="connect-panel">
+    <div class="card-head"><h3>Connect Manually</h3></div>
+    <form id="connect-form" onsubmit="submitConnect(event)">
+      <label style="font-size: .75rem; color: var(--ink-3); font-weight: 600;">Platform</label>
+      <select id="platform" style="width: 100%; padding: 10px; margin: 6px 0 12px; border: 1px solid var(--line); border-radius: 8px; background: #fff;" onchange="toggleFields()">
+        <option value="shopify">Shopify</option>
+        <option value="tiktok">TikTok Shop</option>
+        <option value="amazon">Amazon SP-API</option>
+      </select>
+
+      <div id="shopify-fields">
+        <label style="font-size: .75rem; color: var(--ink-3); font-weight: 600;">Store domain</label>
+        <input id="shopify-shop" type="text" placeholder="store.myshopify.com" style="width: 100%; padding: 10px; margin: 6px 0 12px; border: 1px solid var(--line); border-radius: 8px; background: #fff;">
+        <label style="font-size: .75rem; color: var(--ink-3); font-weight: 600;">Access token</label>
+        <input id="shopify-token" type="password" placeholder="shpat_…" style="width: 100%; padding: 10px; margin: 6px 0 12px; border: 1px solid var(--line); border-radius: 8px; background: #fff;">
+      </div>
+
+      <div id="tiktok-fields" style="display:none;">
+        <label style="font-size: .75rem; color: var(--ink-3); font-weight: 600;">Seller ID</label>
+        <input id="tiktok-seller" type="text" style="width: 100%; padding: 10px; margin: 6px 0 12px; border: 1px solid var(--line); border-radius: 8px; background: #fff;">
+        <label style="font-size: .75rem; color: var(--ink-3); font-weight: 600;">App key</label>
+        <input id="tiktok-key" type="text" style="width: 100%; padding: 10px; margin: 6px 0 12px; border: 1px solid var(--line); border-radius: 8px; background: #fff;">
+        <label style="font-size: .75rem; color: var(--ink-3); font-weight: 600;">App secret</label>
+        <input id="tiktok-secret" type="password" style="width: 100%; padding: 10px; margin: 6px 0 12px; border: 1px solid var(--line); border-radius: 8px; background: #fff;">
+      </div>
+
+      <div id="amazon-fields" style="display:none;">
+        <label style="font-size: .75rem; color: var(--ink-3); font-weight: 600;">Seller ID</label>
+        <input id="amazon-seller" type="text" style="width: 100%; padding: 10px; margin: 6px 0 12px; border: 1px solid var(--line); border-radius: 8px; background: #fff;">
+        <label style="font-size: .75rem; color: var(--ink-3); font-weight: 600;">AWS Access Key</label>
+        <input id="amazon-access" type="text" style="width: 100%; padding: 10px; margin: 6px 0 12px; border: 1px solid var(--line); border-radius: 8px; background: #fff;">
+        <label style="font-size: .75rem; color: var(--ink-3); font-weight: 600;">AWS Secret Key</label>
+        <input id="amazon-secret" type="password" style="width: 100%; padding: 10px; margin: 6px 0 12px; border: 1px solid var(--line); border-radius: 8px; background: #fff;">
+        <label style="font-size: .75rem; color: var(--ink-3); font-weight: 600;">Region</label>
+        <input id="amazon-region" type="text" placeholder="us-east-1" style="width: 100%; padding: 10px; margin: 6px 0 12px; border: 1px solid var(--line); border-radius: 8px; background: #fff;">
+      </div>
+
+      <button class="btn btn-primary" style="width: 100%;" type="submit">Encrypt &amp; Save Connection</button>
+    </form>
+    <div id="form-message" style="margin-top:10px; font-size:.8rem;"></div>
   </div>
 </div>
+
+<div class="card" style="margin-top:24px;">
+  <div class="card-head"><h3>Webhook URLs</h3></div>
+  <div style="padding:0 16px 16px;">
+    <p style="font-size:.8rem; color:var(--ink-3); margin-bottom:12px;">Paste these endpoints into your channel developer settings. Add <code>?merchant_id=YOUR_MERCHANT_ID</code> to each URL.</p>
+    <ul style="font-size:.8rem; line-height:1.8; color:var(--ink); list-style:none; padding:0;">
+      <li><strong>Shopify:</strong> <code>https://vantavcommerce.com/api/v1/webhooks/shopify-orders?merchant_id={{ merchant.id }}</code></li>
+      <li><strong>TikTok:</strong> <code>https://vantavcommerce.com/api/v1/webhooks/tiktok-orders?merchant_id={{ merchant.id }}</code></li>
+      <li><strong>Amazon:</strong> <code>https://vantavcommerce.com/api/v1/webhooks/amazon-orders?merchant_id={{ merchant.id }}</code></li>
+    </ul>
+  </div>
+</div>
+
+<script>
+function toggleFields() {
+  const p = document.getElementById('platform').value;
+  document.getElementById('shopify-fields').style.display = p === 'shopify' ? 'block' : 'none';
+  document.getElementById('tiktok-fields').style.display = p === 'tiktok' ? 'block' : 'none';
+  document.getElementById('amazon-fields').style.display = p === 'amazon' ? 'block' : 'none';
+}
+
+function openConnectModal(platform) {
+  document.getElementById('platform').value = platform;
+  toggleFields();
+  document.getElementById('connect-panel').scrollIntoView({behavior: 'smooth'});
+}
+
+async function submitConnect(e) {
+  e.preventDefault();
+  const platform = document.getElementById('platform').value;
+  const msg = document.getElementById('form-message');
+  msg.textContent = '';
+  let body = {};
+  let url = '/api/v1/channels/' + platform;
+  if (platform === 'shopify') {
+    body = {shop: document.getElementById('shopify-shop').value, access_token: document.getElementById('shopify-token').value};
+  } else if (platform === 'tiktok') {
+    body = {seller_id: document.getElementById('tiktok-seller').value, app_key: document.getElementById('tiktok-key').value, app_secret: document.getElementById('tiktok-secret').value};
+  } else if (platform === 'amazon') {
+    body = {seller_id: document.getElementById('amazon-seller').value, access_key: document.getElementById('amazon-access').value, secret_key: document.getElementById('amazon-secret').value, region: document.getElementById('amazon-region').value};
+  }
+  try {
+    const res = await fetch(url, {method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify(body)});
+    const data = await res.json();
+    if (res.ok) {
+      msg.textContent = 'Connected successfully.';
+      msg.style.color = 'var(--green)';
+      loadChannels();
+    } else {
+      msg.textContent = data.detail || 'Failed';
+      msg.style.color = 'var(--red)';
+    }
+  } catch (e) {
+    msg.textContent = e.message;
+    msg.style.color = 'var(--red)';
+  }
+}
+
+async function disconnectChannel(platform) {
+  if (!confirm('Disconnect ' + platform + '?')) return;
+  const res = await fetch('/api/v1/channels/' + platform + '/disconnect', {method: 'POST'});
+  if (res.ok) loadChannels();
+}
+
+async function loadChannels() {
+  try {
+    const res = await fetch('/api/v1/channels');
+    if (!res.ok) return;
+    const data = await res.json();
+    renderChannels(data.channels);
+  } catch (e) { console.error(e); }
+}
+
+function renderChannels(channels) {
+  const grid = document.getElementById('channel-grid');
+  grid.innerHTML = channels.map(c => `
+    <div data-platform="${c.platform}" style="border: 1px solid var(--line); border-radius: 12px; padding: 16px; text-align: center;">
+      <div style="width: 40px; height: 40px; border-radius: 8px; background: ${c.color}; color: #fff; display: grid; place-items: center; font-weight: 800; margin: 0 auto 8px; font-size: .8rem;">${c.abbr}</div>
+      <div style="font-weight: 600; font-size: .85rem;">${c.name}</div>
+      <div style="font-size:.7rem; color:var(--ink-3); margin:4px 0;">${c.state}</div>
+      <button class="btn" style="margin-top: 10px; width: 100%; font-size: .72rem; padding: 5px 8px;" onclick="openConnectModal('${c.platform}')">${c.state === 'connected' ? 'Manage' : 'Connect'}</button>
+    </div>
+  `).join('');
+
+  const tbody = document.querySelector('#connected-stores tbody');
+  const connected = channels.filter(c => c.state === 'connected');
+  if (tbody) {
+    tbody.innerHTML = connected.map(c => `
+      <tr data-row-platform="${c.platform}">
+        <td class="b">${c.name}</td>
+        <td><span class="tag tag-green">Live</span></td>
+        <td class="num">${c.orders}</td>
+        <td>${c.sync}</td>
+        <td><button class="btn" style="font-size: .72rem; padding: 4px 8px;" onclick="disconnectChannel('${c.platform}')">Disconnect</button></td>
+      </tr>
+    `).join('');
+  }
+
+  const status = document.getElementById('sync-status');
+  status.textContent = 'Last refresh: ' + new Date().toLocaleTimeString();
+}
+
+setInterval(loadChannels, 30000);
+</script>
 
 {% endblock %}

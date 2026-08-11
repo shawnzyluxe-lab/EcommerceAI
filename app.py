@@ -44,6 +44,7 @@ import billing as billing_module
 import alert_matrix
 import vetted_operator
 import action_gate
+import channels as channels_module
 import migrate as migrate_module
 from dashboard_context import (
     context,
@@ -160,6 +161,22 @@ TIER_LIMITS = {
         "sync_frequency_seconds": 900,
         "advanced_automation": False,
         "features_allowed": ["shopify", "support"],
+    },
+    "Beta Tier": {
+        "monthly_order_limit": 5000,
+        "max_monthly_operations": 5000,
+        "max_store_connections": 999999,
+        "sync_frequency_seconds": 300,
+        "advanced_automation": True,
+        "features_allowed": ["shopify", "tiktok", "amazon", "support", "marketing"],
+    },
+    "Beta + Startup Pack": {
+        "monthly_order_limit": 5000,
+        "max_monthly_operations": 5000,
+        "max_store_connections": 999999,
+        "sync_frequency_seconds": 300,
+        "advanced_automation": True,
+        "features_allowed": ["shopify", "tiktok", "amazon", "support", "marketing"],
     },
     "Pro Tier": {
         "monthly_order_limit": 5000,
@@ -1680,6 +1697,102 @@ def api_modify_action(action_id):
         return jsonify({"detail": str(e)}), 400
 
 
+# ============================================================
+# CHANNEL CONNECTIONS
+# ============================================================
+
+@app.route('/api/v1/channels', methods=['GET'])
+@require_roles([UserRole.ADMIN, UserRole.MERCHANT, UserRole.ENGINEER])
+def api_channels():
+    """List merchant channel connections."""
+    merchant = get_merchant_context()
+    if not merchant:
+        return jsonify({"error": "No merchant context"}), 403
+    try:
+        return jsonify({"channels": channels_module.list_channels(merchant["id"])}), 200
+    except Exception as e:
+        logger.error(f"[Channels] List failed: {e}")
+        return jsonify({"detail": "Could not load channels."}), 500
+
+
+@app.route('/api/v1/channels/shopify', methods=['POST'])
+@require_roles([UserRole.ADMIN, UserRole.MERCHANT, UserRole.ENGINEER])
+def api_connect_shopify():
+    """Manually connect a Shopify store with an access token."""
+    merchant = get_merchant_context()
+    if not merchant:
+        return jsonify({"error": "No merchant context"}), 403
+    data = request.get_json(silent=True) or {}
+    shop = (data.get("shop") or "").strip().lower()
+    token = (data.get("access_token") or "").strip()
+    if not shop or not token:
+        return jsonify({"detail": "shop and access_token required"}), 400
+    try:
+        channels_module.connect_shopify(merchant["id"], shop, token)
+        return jsonify({"status": "connected", "platform": "shopify", "domain": shop}), 200
+    except Exception as e:
+        logger.error(f"[Channels] Shopify connect failed: {e}")
+        return jsonify({"detail": str(e)}), 400
+
+
+@app.route('/api/v1/channels/tiktok', methods=['POST'])
+@require_roles([UserRole.ADMIN, UserRole.MERCHANT, UserRole.ENGINEER])
+def api_connect_tiktok():
+    """Connect a TikTok Shop with app credentials."""
+    merchant = get_merchant_context()
+    if not merchant:
+        return jsonify({"error": "No merchant context"}), 403
+    data = request.get_json(silent=True) or {}
+    seller_id = (data.get("seller_id") or "").strip()
+    app_key = (data.get("app_key") or "").strip()
+    app_secret = (data.get("app_secret") or "").strip()
+    if not seller_id or not app_key or not app_secret:
+        return jsonify({"detail": "seller_id, app_key, and app_secret required"}), 400
+    try:
+        channels_module.connect_tiktok(merchant["id"], seller_id, app_key, app_secret)
+        return jsonify({"status": "connected", "platform": "tiktok"}), 200
+    except Exception as e:
+        logger.error(f"[Channels] TikTok connect failed: {e}")
+        return jsonify({"detail": str(e)}), 400
+
+
+@app.route('/api/v1/channels/amazon', methods=['POST'])
+@require_roles([UserRole.ADMIN, UserRole.MERCHANT, UserRole.ENGINEER])
+def api_connect_amazon():
+    """Connect an Amazon Seller Central account with SP-API credentials."""
+    merchant = get_merchant_context()
+    if not merchant:
+        return jsonify({"error": "No merchant context"}), 403
+    data = request.get_json(silent=True) or {}
+    seller_id = (data.get("seller_id") or "").strip()
+    access_key = (data.get("access_key") or "").strip()
+    secret_key = (data.get("secret_key") or "").strip()
+    region = (data.get("region") or "").strip().lower()
+    if not seller_id or not access_key or not secret_key or not region:
+        return jsonify({"detail": "seller_id, access_key, secret_key, and region required"}), 400
+    try:
+        channels_module.connect_amazon(merchant["id"], seller_id, access_key, secret_key, region)
+        return jsonify({"status": "connected", "platform": "amazon"}), 200
+    except Exception as e:
+        logger.error(f"[Channels] Amazon connect failed: {e}")
+        return jsonify({"detail": str(e)}), 400
+
+
+@app.route('/api/v1/channels/<platform>/disconnect', methods=['POST'])
+@require_roles([UserRole.ADMIN, UserRole.MERCHANT, UserRole.ENGINEER])
+def api_disconnect_channel(platform):
+    """Disconnect a merchant channel."""
+    merchant = get_merchant_context()
+    if not merchant:
+        return jsonify({"error": "No merchant context"}), 403
+    try:
+        channels_module.disconnect(merchant["id"], platform)
+        return jsonify({"status": "disconnected", "platform": platform}), 200
+    except Exception as e:
+        logger.error(f"[Channels] Disconnect failed: {e}")
+        return jsonify({"detail": str(e)}), 400
+
+
 @app.route('/site-login', methods=['GET', 'POST'])
 def site_login():
     if not site_wall_enabled():
@@ -3179,44 +3292,24 @@ def shopify_oauth_connect():
 
 @app.route('/api/v1/auth/shopify/callback')
 def shopify_oauth_callback():
-    """Step 2: Capture OAuth code and store tenant access token."""
+    """Step 2: Exchange Shopify OAuth code and persist the connection."""
     code = request.args.get("code")
-    shop = request.args.get("shop")
-    hmac_param = request.args.get("hmac")
-    timestamp = request.args.get("timestamp")
-    active_merchant = "merchant_shawn_01"
+    shop = request.args.get("shop", "").strip().lower()
+    merchant = get_merchant_context()
+    merchant_id = merchant["id"] if merchant else "merchant_shawn_01"
 
+    if not shop or not re.match(r'^[a-zA-Z0-9\-]+\.myshopify\.com$', shop):
+        return jsonify({"success": False, "error": "Invalid shop domain"}), 400
     if not SHOPIFY_CLIENT_ID or not SHOPIFY_CLIENT_SECRET:
         return jsonify({"success": False, "error": "OAuth credentials not configured"}), 400
 
-    exchange_url = f"https://{shop}/admin/oauth/access_token"
-    payload = {
-        "client_id": SHOPIFY_CLIENT_ID,
-        "client_secret": SHOPIFY_CLIENT_SECRET,
-        "code": code,
-    }
-
     try:
-        # Live token exchange (uncomment when credentials are valid)
-        # r = requests.post(exchange_url, json=payload, timeout=8)
-        # res_data = r.json()
-        # token = res_data.get("access_token")
-
-        # Simulated token exchange for layout testing
-        token = f"shpat_live_token_{secrets.token_hex(8)}"
-        scopes_confirmed = "read_products,write_products,read_orders"
-
-        db.session.merge(TenantOAuthToken(
-            shop_domain=shop,
-            merchant_id=active_merchant,
-            platform_id="shopify",
-            access_token_encrypted=token,
-            scope_permissions=scopes_confirmed,
-        ))
-        db.session.commit()
-        return redirect("/?oauth_sync=success")
+        result = channels_module.shopify_oauth_exchange(shop, code, SHOPIFY_CLIENT_ID, SHOPIFY_CLIENT_SECRET)
+        channels_module.connect_shopify(merchant_id, shop, result["access_token"])
+        return redirect("/dashboard/commerce-hub?oauth_sync=success")
     except Exception as e:
-        return jsonify({"success": False, "error": f"OAuth handshake stall: {e}"}), 500
+        logger.error(f"[Shopify OAuth] {e}")
+        return redirect("/dashboard/commerce-hub?oauth_sync=error")
 
 
 @app.route('/login')

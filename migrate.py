@@ -51,6 +51,29 @@ def run_migrations():
             )
         """))
 
+        # Create merchant channel and OAuth token tables if missing.
+        conn.execute(text("""
+            CREATE TABLE IF NOT EXISTS merchant_channels (
+                id SERIAL PRIMARY KEY,
+                merchant_id VARCHAR(100) REFERENCES merchant_profiles(merchant_id),
+                channel_id VARCHAR(100) NOT NULL,
+                pending_orders INTEGER DEFAULT 0,
+                conversion_rate REAL DEFAULT 0.0,
+                UNIQUE (merchant_id, channel_id)
+            )
+        """))
+
+        conn.execute(text("""
+            CREATE TABLE IF NOT EXISTS tenant_oauth_tokens (
+                shop_domain VARCHAR(255) PRIMARY KEY,
+                merchant_id VARCHAR(100) REFERENCES merchant_profiles(merchant_id),
+                platform_id VARCHAR(50),
+                access_token_encrypted TEXT,
+                scope_permissions TEXT,
+                updated_at TIMESTAMP DEFAULT NOW()
+            )
+        """))
+
         # Create the beta waitlist applications table if missing.
         conn.execute(text("""
             CREATE TABLE IF NOT EXISTS beta_waitlist_applications (
