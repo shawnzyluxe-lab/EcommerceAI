@@ -9,6 +9,10 @@ def run_migrations():
     if not raw_url:
         print("DATABASE_URL not set; skipping migrations.")
         return
+    if raw_url.startswith("sqlite"):
+        # SQLite tables are created fresh by db.create_all() in development.
+        print("SQLite detected; skipping raw migrations.")
+        return
     if raw_url.startswith("postgresql://"):
         url = "postgresql+psycopg" + raw_url[len("postgresql"):]
     elif raw_url.startswith("postgres://"):

@@ -43,6 +43,7 @@ import profit_feed
 import billing as billing_module
 import alert_matrix
 import vetted_operator
+import migrate as migrate_module
 from dashboard_context import (
     context,
     COMMAND_RESPONSES,
@@ -519,6 +520,11 @@ GRAPHQL_URL = f"https://{SHOPIFY_DOMAIN}/api/2024-07/graphql.json" if SHOPIFY_DO
 CUSTOMER_ACCOUNT_BASE = f"https://shopify.com/{SHOPIFY_DOMAIN.split('.')[0]}" if SHOPIFY_DOMAIN else None
 
 with app.app_context():
+    # Bring existing Postgres schemas forward for new columns/tables before create_all.
+    try:
+        migrate_module.run_migrations()
+    except Exception as e:
+        app.logger.warning(f"Startup migration helper failed: {e}")
     db.create_all()
 
     # Clean expired sessions
