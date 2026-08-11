@@ -280,9 +280,9 @@ def seed_demo_data(merchant_id="merchant_shawn_01"):
 
     # Seed ad spend for the demo merchant.
     if not AdSpendFeed.query.filter_by(merchant_id=merchant_id).first():
-        record_ad_spend(merchant_id, "meta", 285.40, 42)
-        record_ad_spend(merchant_id, "tiktok", 412.00, 67)
-        record_ad_spend(merchant_id, "amazon", 120.50, 11)
+        record_ad_spend(merchant_id, "meta", 80.00, 24)
+        record_ad_spend(merchant_id, "tiktok", 120.00, 38)
+        record_ad_spend(merchant_id, "amazon", 40.00, 7)
 
     logger.info(f"[PROFIT FEED] Seeded demo data for {merchant_id}")
     return True
