@@ -38,13 +38,14 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-from models import db, Tenant, ConnectedChannel, ActiveSession, BusinessMetric, CommerceChannel, MerchantChannel, SupportMetric, MarketingStudio, PredictiveLogistics, OutboundTransmission, SaaSBilling, LocalProductCatalog, MerchantProfile, TenantOAuthToken, MerchantMetric, SystemExceptionLog, ProcessedWebhookEvent, AdSpendAnalytic, GeneratedPurchaseOrder, AIAgent, AgentMessage, MerchantDecisionLog, MagicLoginToken, TrendingProduct, ProductFinancialLedger, MerchantSetting, ProfitFeedOrder, AdSpendFeed, Alert, BetaWaitlistApplication, PendingAction
+from models import db, Tenant, ConnectedChannel, ActiveSession, BusinessMetric, CommerceChannel, MerchantChannel, SupportMetric, MarketingStudio, PredictiveLogistics, OutboundTransmission, SaaSBilling, LocalProductCatalog, MerchantProfile, TenantOAuthToken, MerchantMetric, SystemExceptionLog, ProcessedWebhookEvent, AdSpendAnalytic, GeneratedPurchaseOrder, AIAgent, AgentMessage, MerchantDecisionLog, MagicLoginToken, TrendingProduct, ProductFinancialLedger, MerchantSetting, ProfitFeedOrder, AdSpendFeed, Alert, BetaWaitlistApplication, PendingAction, StartupPackProject
 import profit_feed
 import billing as billing_module
 import alert_matrix
 import vetted_operator
 import action_gate
 import channels as channels_module
+import startup_pack
 import migrate as migrate_module
 from dashboard_context import (
     context,
@@ -1184,7 +1185,7 @@ def _dashboard_context(active_page):
 def dashboard_page(page):
     active_page = page.replace('-', '_')
     valid_pages = {
-        'overview', 'command-center', 'commerce-hub', 'alerts', 'action-gate', 'profit-engine',
+        'overview', 'command-center', 'commerce-hub', 'alerts', 'action-gate', 'profit-engine', 'startup-pack',
         'predictions', 'product-research', 'fulfillment', 'fraud', 'suppliers',
         'marketing', 'support', 'automations', 'team-ai', 'health-score',
         'mobile-copilot', 'store-catalog', 'products', 'orders', 'customers',
@@ -1790,6 +1791,56 @@ def api_disconnect_channel(platform):
         return jsonify({"status": "disconnected", "platform": platform}), 200
     except Exception as e:
         logger.error(f"[Channels] Disconnect failed: {e}")
+        return jsonify({"detail": str(e)}), 400
+
+
+# ============================================================
+# STARTUP PACK
+# ============================================================
+
+@app.route('/api/v1/startup-pack', methods=['GET'])
+@require_roles([UserRole.ADMIN, UserRole.MERCHANT, UserRole.ENGINEER])
+def api_startup_pack():
+    """Return the merchant's Startup Pack project."""
+    merchant = get_merchant_context()
+    if not merchant:
+        return jsonify({"error": "No merchant context"}), 403
+    try:
+        project = startup_pack.get_project(merchant["id"])
+        return jsonify(startup_pack.project_to_dict(project)), 200
+    except Exception as e:
+        logger.error(f"[Startup Pack] Get failed: {e}")
+        return jsonify({"detail": "Could not load project."}), 500
+
+
+@app.route('/api/v1/startup-pack/intake', methods=['POST'])
+@require_roles([UserRole.ADMIN, UserRole.MERCHANT, UserRole.ENGINEER])
+def api_startup_pack_intake():
+    """Save Startup Pack intake answers and generate checklist + suppliers."""
+    merchant = get_merchant_context()
+    if not merchant:
+        return jsonify({"error": "No merchant context"}), 403
+    data = request.get_json(silent=True) or {}
+    try:
+        project = startup_pack.save_intake(merchant["id"], data)
+        return jsonify(startup_pack.project_to_dict(project)), 200
+    except Exception as e:
+        logger.error(f"[Startup Pack] Intake failed: {e}")
+        return jsonify({"detail": "Could not save intake."}), 500
+
+
+@app.route('/api/v1/startup-pack/checklist/<item_id>', methods=['POST'])
+@require_roles([UserRole.ADMIN, UserRole.MERCHANT, UserRole.ENGINEER])
+def api_startup_pack_check_item(item_id):
+    """Toggle a checklist item complete/incomplete."""
+    merchant = get_merchant_context()
+    if not merchant:
+        return jsonify({"error": "No merchant context"}), 403
+    try:
+        project = startup_pack.complete_item(merchant["id"], item_id)
+        return jsonify(startup_pack.project_to_dict(project)), 200
+    except Exception as e:
+        logger.error(f"[Startup Pack] Checklist update failed: {e}")
         return jsonify({"detail": str(e)}), 400
 
 

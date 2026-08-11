@@ -161,6 +161,24 @@ class PendingAction(db.Model):
     result_summary = db.Column(db.Text)
 
 
+class StartupPackProject(db.Model):
+    __tablename__ = "startup_pack_projects"
+    id = db.Column(db.Integer, primary_key=True, autoincrement=True)
+    merchant_id = db.Column(db.String(100), db.ForeignKey("merchant_profiles.merchant_id"), nullable=False, unique=True, index=True)
+    brand_name = db.Column(db.String(255))
+    niche = db.Column(db.String(100))
+    target_audience = db.Column(db.String(255))
+    monthly_ad_budget = db.Column(db.REAL)
+    design_vibe = db.Column(db.String(100))
+    has_domain = db.Column(db.Boolean, default=False)
+    sample_product = db.Column(db.String(255))
+    status = db.Column(db.String(50), default="intake")  # intake, in_progress, launched
+    checklist = db.Column(db.Text)  # JSON list
+    suppliers = db.Column(db.Text)  # JSON list
+    created_at = db.Column(db.DateTime, server_default=db.func.now())
+    updated_at = db.Column(db.DateTime, onupdate=db.func.now())
+
+
 class BetaWaitlistApplication(db.Model):
     __tablename__ = "beta_waitlist_applications"
     id = db.Column(db.Integer, primary_key=True, autoincrement=True)

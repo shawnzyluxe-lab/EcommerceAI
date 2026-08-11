@@ -74,6 +74,26 @@ def run_migrations():
             )
         """))
 
+        # Create the startup pack projects table if missing.
+        conn.execute(text("""
+            CREATE TABLE IF NOT EXISTS startup_pack_projects (
+                id SERIAL PRIMARY KEY,
+                merchant_id VARCHAR(100) NOT NULL UNIQUE REFERENCES merchant_profiles(merchant_id),
+                brand_name VARCHAR(255),
+                niche VARCHAR(100),
+                target_audience VARCHAR(255),
+                monthly_ad_budget REAL,
+                design_vibe VARCHAR(100),
+                has_domain BOOLEAN DEFAULT FALSE,
+                sample_product VARCHAR(255),
+                status VARCHAR(50) DEFAULT 'intake',
+                checklist TEXT,
+                suppliers TEXT,
+                created_at TIMESTAMP DEFAULT NOW(),
+                updated_at TIMESTAMP DEFAULT NOW()
+            )
+        """))
+
         # Create the beta waitlist applications table if missing.
         conn.execute(text("""
             CREATE TABLE IF NOT EXISTS beta_waitlist_applications (

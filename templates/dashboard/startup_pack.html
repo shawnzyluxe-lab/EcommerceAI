@@ -1,0 +1,172 @@
+{% extends 'dashboard/base.html' %}
+{% block title %}Startup Pack — {{ brand.name }} {{ brand.product }}{% endblock %}
+{% block content %}
+
+<section class="page-header">
+  <h1>Startup Pack</h1>
+  <p>Brand creation, US supplier matching, and a 1-year launch checklist.</p>
+</section>
+
+<div class="grid grid-2">
+  <div class="card" id="intake-card">
+    <div class="card-head"><h3>Brand Intake</h3></div>
+    <form id="intake-form" onsubmit="saveIntake(event)">
+      <label style="font-size:.75rem; color:var(--ink-3); font-weight:600;">Brand name</label>
+      <input id="brand_name" type="text" placeholder="Luxe Sleep Co." style="width:100%; padding:10px; margin:6px 0 12px; border:1px solid var(--line); border-radius:8px; background:#fff;">
+
+      <label style="font-size:.75rem; color:var(--ink-3); font-weight:600;">Niche / category</label>
+      <select id="niche" style="width:100%; padding:10px; margin:6px 0 12px; border:1px solid var(--line); border-radius:8px; background:#fff;">
+        <option value="">Select a niche</option>
+        <option value="apparel">Apparel / Streetwear</option>
+        <option value="home_decor">Home Decor / Accessories</option>
+        <option value="beauty">Beauty / Skincare</option>
+        <option value="fitness">Fitness / Wellness</option>
+        <option value="pet">Pet Products</option>
+        <option value="tech_accessories">Tech Accessories</option>
+        <option value="sustainable">Sustainable / Eco</option>
+        <option value="other">Other</option>
+      </select>
+
+      <label style="font-size:.75rem; color:var(--ink-3); font-weight:600;">Target audience</label>
+      <input id="target_audience" type="text" placeholder="Gen Z women, 18-30, US" style="width:100%; padding:10px; margin:6px 0 12px; border:1px solid var(--line); border-radius:8px; background:#fff;">
+
+      <label style="font-size:.75rem; color:var(--ink-3); font-weight:600;">Monthly ad budget</label>
+      <input id="monthly_ad_budget" type="number" placeholder="500" style="width:100%; padding:10px; margin:6px 0 12px; border:1px solid var(--line); border-radius:8px; background:#fff;">
+
+      <label style="font-size:.75rem; color:var(--ink-3); font-weight:600;">Design vibe</label>
+      <select id="design_vibe" style="width:100%; padding:10px; margin:6px 0 12px; border:1px solid var(--line); border-radius:8px; background:#fff;">
+        <option value="">Select a vibe</option>
+        <option value="minimal">Clean / Minimal</option>
+        <option value="bold">Bold / Streetwear</option>
+        <option value="luxury">Luxury / Premium</option>
+        <option value="playful">Playful / Colorful</option>
+        <option value="sustainable">Eco / Sustainable</option>
+      </select>
+
+      <label style="font-size:.75rem; color:var(--ink-3); font-weight:600;">Do you already own a domain?</label>
+      <select id="has_domain" style="width:100%; padding:10px; margin:6px 0 12px; border:1px solid var(--line); border-radius:8px; background:#fff;">
+        <option value="false">No</option>
+        <option value="true">Yes</option>
+      </select>
+
+      <label style="font-size:.75rem; color:var(--ink-3); font-weight:600;">First sample product idea</label>
+      <input id="sample_product" type="text" placeholder="Satin sleep set, 20oz tumbler, etc." style="width:100%; padding:10px; margin:6px 0 12px; border:1px solid var(--line); border-radius:8px; background:#fff;">
+
+      <button class="btn btn-primary" style="width:100%;" type="submit">Save &amp; Build Plan</button>
+    </form>
+    <div id="intake-message" style="margin-top:10px; font-size:.8rem;"></div>
+  </div>
+
+  <div class="card">
+    <div class="card-head"><h3>Matched US Suppliers</h3></div>
+    <div id="supplier-list" style="padding:0 0 12px 0;">
+      <div style="padding:16px; color:var(--ink-3);">Save the intake form to see supplier recommendations.</div>
+    </div>
+  </div>
+</div>
+
+<div class="card" style="margin-top:24px;">
+  <div class="card-head">
+    <h3>1-Year Launch Checklist</h3>
+    <span class="spacer"></span>
+    <span id="checklist-progress" class="chip" style="background:var(--gold-bg); color:var(--amber); border-color:rgba(212,175,55,.25);">0%</span>
+  </div>
+  <div id="checklist" style="padding:8px 0;">
+    <div style="padding:16px; color:var(--ink-3);">Save the intake form to generate your checklist.</div>
+  </div>
+</div>
+
+<script>
+async function loadStartupPack() {
+  try {
+    const res = await fetch('/api/v1/startup-pack');
+    if (!res.ok) return;
+    const data = await res.json();
+    renderStartupPack(data);
+  } catch (e) { console.error(e); }
+}
+
+function renderStartupPack(data) {
+  document.getElementById('brand_name').value = data.brand_name || '';
+  document.getElementById('niche').value = data.niche || '';
+  document.getElementById('target_audience').value = data.target_audience || '';
+  document.getElementById('monthly_ad_budget').value = data.monthly_ad_budget || '';
+  document.getElementById('design_vibe').value = data.design_vibe || '';
+  document.getElementById('has_domain').value = data.has_domain ? 'true' : 'false';
+  document.getElementById('sample_product').value = data.sample_product || '';
+
+  const supplierList = document.getElementById('supplier-list');
+  if (data.suppliers && data.suppliers.length) {
+    supplierList.innerHTML = data.suppliers.map(s => `
+      <div style="border-bottom:1px solid var(--line-2); padding:14px;">
+        <div style="font-weight:600; font-size:.9rem;">${s.name} <span style="font-weight:400; color:var(--ink-3);">— ${s.category}</span></div>
+        <div style="font-size:.75rem; color:var(--ink-3); margin-top:4px;">${s.location}</div>
+        <div style="font-size:.8rem; color:var(--ink-3); margin-top:6px;">${s.note}</div>
+        <div style="margin-top:8px; font-size:.7rem;">
+          ${s.sample ? '<span class="chip" style="background:var(--green-bg); color:var(--green);">Samples</span>' : ''}
+          ${s.branding ? '<span class="chip" style="background:var(--gold-bg); color:var(--amber);">Branding</span>' : ''}
+          ${s.no_inventory ? '<span class="chip" style="background:#eef; color:#4a5c6a;">No Inventory</span>' : ''}
+        </div>
+      </div>
+    `).join('');
+  }
+
+  const checklist = document.getElementById('checklist');
+  const items = data.checklist || [];
+  if (items.length) {
+    const done = items.filter(i => i.done).length;
+    const pct = Math.round((done / items.length) * 100);
+    document.getElementById('checklist-progress').textContent = pct + '%';
+    checklist.innerHTML = items.map(item => `
+      <div style="display:flex; align-items:center; gap:10px; padding:12px 16px; border-bottom:1px solid var(--line-2);">
+        <input type="checkbox" ${item.done ? 'checked' : ''} onchange="toggleChecklist('${item.id}')" style="width:18px; height:18px; accent-color:var(--green);">
+        <span style="${item.done ? 'text-decoration:line-through; color:var(--ink-3);' : ''}">${item.title}</span>
+      </div>
+    `).join('');
+  }
+}
+
+async function saveIntake(e) {
+  e.preventDefault();
+  const msg = document.getElementById('intake-message');
+  msg.textContent = '';
+  const payload = {
+    brand_name: document.getElementById('brand_name').value,
+    niche: document.getElementById('niche').value,
+    target_audience: document.getElementById('target_audience').value,
+    monthly_ad_budget: document.getElementById('monthly_ad_budget').value,
+    design_vibe: document.getElementById('design_vibe').value,
+    has_domain: document.getElementById('has_domain').value === 'true',
+    sample_product: document.getElementById('sample_product').value,
+  };
+  try {
+    const res = await fetch('/api/v1/startup-pack/intake', {method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify(payload)});
+    const data = await res.json();
+    if (res.ok) {
+      msg.textContent = 'Plan saved and checklist generated.';
+      msg.style.color = 'var(--green)';
+      renderStartupPack(data);
+    } else {
+      msg.textContent = data.detail || 'Failed';
+      msg.style.color = 'var(--red)';
+    }
+  } catch (e) {
+    msg.textContent = e.message;
+    msg.style.color = 'var(--red)';
+  }
+}
+
+async function toggleChecklist(item_id) {
+  try {
+    const res = await fetch('/api/v1/startup-pack/checklist/' + item_id, {method: 'POST'});
+    if (!res.ok) return;
+    const data = await res.json();
+    renderStartupPack(data);
+  } catch (e) { console.error(e); }
+}
+
+loadStartupPack();
+setInterval(loadStartupPack, 60000);
+</script>
+
+{% endblock %}
