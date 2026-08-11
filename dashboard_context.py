@@ -18,6 +18,31 @@ import action_gate
 import channels as channels_module
 
 
+# Beta feature gating: when BETA_MODE=true, merchants only see beta-ready pages.
+# Admins and engineers can still see every page so development can continue.
+BETA_MODE = os.environ.get("BETA_MODE", "false").lower() in ("true", "1", "yes")
+BETA_READY_PAGE_IDS = {
+    "overview",
+    "alerts",
+    "action_gate",
+    "profit_engine",
+    "billing",
+    "startup_pack",
+}
+
+
+def _filter_nav_for_beta(nav_groups, user_role):
+    """Return a copy of nav_groups with only beta-ready pages for merchants."""
+    if not BETA_MODE or user_role in ("Admin", "Engineer"):
+        return nav_groups
+    filtered = []
+    for group in nav_groups:
+        links = [link for link in group["links"] if link.get("id") in BETA_READY_PAGE_IDS]
+        if links:
+            filtered.append({**group, "links": links})
+    return filtered
+
+
 BRAND = {
     "name": "Shawnzyluxe",
     "product": "Commerce AI",
@@ -460,6 +485,7 @@ NAV_GROUPS = [
 
 def context(active_page=None, merchant=None, merchant_id=None):
     now = datetime.now(timezone.utc)
+    user_role = (merchant or {}).get("role")
     # Use the real-time Profit Feed when a merchant is identified, otherwise fall
     # back to the static sample data so the dashboard still renders.
     feed = profit_feed.get_profit_breakdown(merchant_id) if merchant_id else None
@@ -498,6 +524,7 @@ def context(active_page=None, merchant=None, merchant_id=None):
         for link in group["links"]:
             if link.get("id") == "alerts":
                 link["badge"] = str(len(live_alerts))
+    nav_groups = _filter_nav_for_beta(nav_groups, user_role)
 
     # Action Gate: draft approvals from open alerts.
     pending_actions = []

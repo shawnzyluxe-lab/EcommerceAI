@@ -171,6 +171,11 @@ SESSION_TIMEOUT_DAYS = int(os.environ.get("SESSION_TIMEOUT_DAYS", "7"))
 SESSION_IDLE_TIMEOUT_MINUTES = int(os.environ.get("SESSION_IDLE_TIMEOUT_MINUTES", "30"))
 SESSION_MAX_AGE_HOURS = int(os.environ.get("SESSION_MAX_AGE_HOURS", "12"))
 
+BETA_MODE = os.environ.get("BETA_MODE", "false").lower() in ("true", "1", "yes")
+BETA_READY_DASHBOARD_PAGES = {
+    "overview", "alerts", "action-gate", "profit-engine", "billing", "startup-pack"
+}
+
 TIER_LIMITS = {
     "Basic Tier": {
         "monthly_order_limit": 500,
@@ -505,6 +510,7 @@ def get_merchant_context():
         "sandbox_status": profile.sandbox_status or "pending",
         "live_access_enabled": bool(profile.live_access_enabled),
         "sandbox_expires_at": profile.sandbox_expires_at.isoformat() if profile.sandbox_expires_at else None,
+        "role": s.role,
     }
 
 
@@ -1328,6 +1334,12 @@ def dashboard_page(page):
     }
     if page not in valid_pages:
         return redirect(url_for('dashboard'))
+    # Beta gating: merchants can only reach beta-ready pages.
+    if BETA_MODE:
+        s = get_current_user()
+        if not s or s.role not in (UserRole.ADMIN.value, UserRole.ENGINEER.value):
+            if page not in BETA_READY_DASHBOARD_PAGES:
+                return redirect(url_for('dashboard'))
     ctx = _dashboard_context(active_page)
     template = 'dashboard/{}.html'.format(page.replace('-', '_'))
     try:
