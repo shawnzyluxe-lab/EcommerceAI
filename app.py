@@ -1165,6 +1165,21 @@ def subscribe():
     return render_template('subscribe.html', stripe_publishable_key=STRIPE_PUBLISHABLE_KEY, price_beta=249, price_beta_startup=348, price_addon=99)
 
 
+@app.route('/terms')
+def legal_terms():
+    return render_template('terms.html')
+
+
+@app.route('/privacy')
+def legal_privacy():
+    return render_template('privacy.html')
+
+
+@app.route('/refund')
+def legal_refund():
+    return render_template('refund.html')
+
+
 @app.route('/dashboard')
 def dashboard():
     merchant = get_merchant_context()
