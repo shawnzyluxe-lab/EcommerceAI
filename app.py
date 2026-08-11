@@ -492,7 +492,7 @@ def enforce_tier_limits(merchant_id, requested_feature):
 def site_wall_protect():
     if not site_wall_enabled():
         return None
-    if request.endpoint in ('home', 'site_login', 'site_logout', 'subscribe', 'create_stripe_checkout', 'beta_apply', 'api_beta_apply', 'auth_login', 'auth_signup', 'auth_provision_node', 'shopify_orders_webhook', 'tiktok_orders_webhook', 'amazon_orders_webhook', 'stripe_billing_webhook', 'supplier_po_update', 'execute_mitigation', 'generate_magic_link', 'magic_login', 'register_merchant', 'shopify_oauth_callback', 'health_check', 'static'):
+    if request.endpoint in ('home', 'site_login', 'site_logout', 'subscribe', 'create_stripe_checkout', 'beta_apply', 'api_beta_apply', 'auth_login', 'auth_signup', 'auth_provision_node', 'shopify_orders_webhook', 'tiktok_orders_webhook', 'amazon_orders_webhook', 'stripe_billing_webhook', 'supplier_po_update', 'execute_mitigation', 'generate_magic_link', 'magic_login', 'register_merchant', 'shopify_oauth_callback', 'health_check', 'legal_terms', 'legal_privacy', 'legal_refund', 'static'):
         return None
     if site_wall_authenticated():
         return None
