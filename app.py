@@ -533,7 +533,12 @@ with app.app_context():
             db.session.add(MerchantProfile(merchant_id=mid, business_name=name, admin_email=email, account_tier=tier, password_hash=generate_password_hash(temp_password, method="pbkdf2:sha256")))
     if not MerchantProfile.query.get("merchant_guest_02"):
         db.session.add(MerchantProfile(merchant_id="merchant_guest_02", business_name="Alpha Storefronts", admin_email="guest@alpha.com", account_tier="Pro Tier", password_hash=""))
+    db.session.commit()
+
+    # Seed FK-dependent merchant data now that profiles exist
+    if not MerchantMetric.query.filter_by(merchant_id="merchant_shawn_01").first():
         db.session.add(MerchantMetric(merchant_id="merchant_shawn_01", total_unified_balance=20560.00, true_net_profit=1394.00, gross_revenue=4582.00, ai_briefing="System initialized for Shawnzyluxe multi-tenant parameters."))
+    if not MerchantMetric.query.filter_by(merchant_id="merchant_guest_02").first():
         db.session.add(MerchantMetric(merchant_id="merchant_guest_02", total_unified_balance=1240.00, true_net_profit=410.00, gross_revenue=890.00, ai_briefing="System initialized for guest merchant clusters."))
     if not MerchantChannel.query.filter_by(merchant_id="merchant_shawn_01").first():
         db.session.add(MerchantChannel(merchant_id="merchant_shawn_01", channel_id="shopify", pending_orders=12, conversion_rate=3.4))
