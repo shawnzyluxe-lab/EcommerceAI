@@ -3629,6 +3629,7 @@ def api_beta_apply():
     ad_channels = ", ".join(data.get("ad_channels") or []) if isinstance(data.get("ad_channels"), list) else (data.get("ad_channels") or "")
     bottleneck = (data.get("bottleneck") or "").strip()
     selected_plan = (data.get("selected_plan") or "").strip()
+    ad_plan_addon = bool(data.get("ad_plan_addon", False))
 
     if not email or "@" not in email:
         return jsonify({"detail": "A valid business email is required."}), 400
@@ -3642,9 +3643,12 @@ def api_beta_apply():
             ad_channels=ad_channels,
             bottleneck=bottleneck,
             selected_plan=selected_plan,
+            ad_plan_addon=ad_plan_addon,
         )
         try:
             plan_label = "Beta + Startup Pack" if selected_plan == "beta_startup" else ("Beta Plan" if selected_plan == "beta_plan" else selected_plan)
+            if app.ad_plan_addon:
+                plan_label += " + Curated Ad Plan"
             _notify_team_new_waitlist(app, plan_label)
             _confirm_waitlist_to_applicant(app, plan_label)
         except Exception as notify_err:

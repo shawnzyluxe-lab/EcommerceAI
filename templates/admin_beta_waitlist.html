@@ -21,10 +21,10 @@
   <div class="table-wrap">
     <table>
       <thead>
-        <tr><th>Email</th><th>Business</th><th>Revenue</th><th>Ad Spend</th><th>Channels</th><th>Plan</th><th>Bottleneck</th><th>Status</th><th>Actions</th></tr>
+        <tr><th>Email</th><th>Business</th><th>Revenue</th><th>Ad Spend</th><th>Channels</th><th>Plan</th><th>Ad Plan</th><th>Bottleneck</th><th>Status</th><th>Actions</th></tr>
       </thead>
       <tbody id="apps-body">
-        <tr><td colspan="9" style="text-align:center; color:#888;">Loading...</td></tr>
+        <tr><td colspan="10" style="text-align:center; color:#888;">Loading...</td></tr>
       </tbody>
     </table>
   </div>
@@ -39,7 +39,7 @@ async function loadApps(status='') {
   const tbody = document.getElementById('apps-body');
   tbody.innerHTML = '';
   if (!data.applications || data.applications.length === 0) {
-    tbody.innerHTML = '<tr><td colspan="9" style="text-align:center; color:#888;">No applications found.</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="10" style="text-align:center; color:#888;">No applications found.</td></tr>';
     return;
   }
   const planLabel = p => p === 'beta_startup' ? 'Startup Pack' : p === 'beta_plan' ? 'Beta' : (p || '-');
@@ -52,6 +52,7 @@ async function loadApps(status='') {
       <td>${app.monthly_ad_spend || '-'}</td>
       <td>${app.ad_channels || '-'}</td>
       <td>${planLabel(app.selected_plan)}</td>
+      <td>${app.ad_plan_addon ? 'Yes (+$99/mo)' : '-'}</td>
       <td style="max-width:260px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;" title="${(app.bottleneck || '').replace(/"/g, '&quot;')}">${app.bottleneck || '-'}</td>
       <td><span class="tag ${app.status === 'approved' ? 'tag-green' : app.status === 'sandbox' ? 'tag-amber' : app.status === 'rejected' ? 'tag-red' : 'tag-blue'}">${app.status}</span></td>
       <td>

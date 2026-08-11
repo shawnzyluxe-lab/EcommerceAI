@@ -18,7 +18,8 @@ def _now():
 
 
 def submit_application(email: str, business_name: str = "", monthly_volume: str = "",
-                       monthly_ad_spend: str = "", ad_channels: str = "", bottleneck: str = "", selected_plan: str = "") -> BetaWaitlistApplication:
+                       monthly_ad_spend: str = "", ad_channels: str = "", bottleneck: str = "", selected_plan: str = "",
+                       ad_plan_addon: bool = False) -> BetaWaitlistApplication:
     """Create or update a beta waitlist application."""
     email = (email or "").strip().lower()
     if not email:
@@ -32,6 +33,8 @@ def submit_application(email: str, business_name: str = "", monthly_volume: str 
         app.ad_channels = ad_channels or app.ad_channels
         app.bottleneck = bottleneck or app.bottleneck
         app.selected_plan = selected_plan or app.selected_plan
+        if ad_plan_addon is not None:
+            app.ad_plan_addon = ad_plan_addon
     else:
         app = BetaWaitlistApplication(
             email=email,
@@ -41,6 +44,7 @@ def submit_application(email: str, business_name: str = "", monthly_volume: str 
             ad_channels=ad_channels,
             bottleneck=bottleneck,
             selected_plan=selected_plan,
+            ad_plan_addon=bool(ad_plan_addon),
             status="pending",
         )
         db.session.add(app)
@@ -201,6 +205,7 @@ def application_to_dict(app: BetaWaitlistApplication) -> Dict[str, Any]:
         "ad_channels": app.ad_channels,
         "bottleneck": app.bottleneck,
         "selected_plan": app.selected_plan,
+        "ad_plan_addon": bool(app.ad_plan_addon),
         "status": app.status,
         "merchant_id": app.merchant_id,
         "notes": app.notes,

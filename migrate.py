@@ -108,6 +108,10 @@ def run_migrations():
                 conn.execute(text(f"ALTER TABLE beta_waitlist_applications ADD COLUMN IF NOT EXISTS {wl_col} VARCHAR(100)"))
             except Exception as e:
                 print(f"[migrate] {wl_col} add skipped: {e}")
+        try:
+            conn.execute(text("ALTER TABLE beta_waitlist_applications ADD COLUMN IF NOT EXISTS ad_plan_addon BOOLEAN DEFAULT FALSE"))
+        except Exception as e:
+            print(f"[migrate] ad_plan_addon add skipped: {e}")
 
         # Session tracking for idle / absolute timeouts.
         conn.execute(text("""
@@ -135,6 +139,7 @@ def run_migrations():
                 ad_channels VARCHAR(255),
                 bottleneck TEXT,
                 selected_plan VARCHAR(100),
+                ad_plan_addon BOOLEAN DEFAULT FALSE,
                 status VARCHAR(50) DEFAULT 'pending',
                 merchant_id VARCHAR(100) REFERENCES merchant_profiles(merchant_id),
                 notes TEXT,

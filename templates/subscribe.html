@@ -72,6 +72,8 @@
       border-color: var(--accent);
       box-shadow: 0 0 0 1px var(--accent), 0 12px 40px rgba(212,175,55,.12);
     }
+    .plan.add-on { border-style: dashed; opacity: .9; }
+    .plan.add-on.selected { border-style: solid; opacity: 1; }
     .plan .badge {
       display: inline-block;
       font-size: .65rem;
@@ -191,12 +193,23 @@
         </ul>
         <p style="font-size:.75rem; color:var(--muted); margin-top:.75rem; margin-bottom:0;">You own the brand, customer, and storefront. You pay for your own samples and inventory.</p>
       </div>
+      <div class="plan add-on" id="plan-addon" onclick="toggleAdPlan()">
+        <span class="badge">Optional Add-on</span>
+        <h3>Curated Ad Plan</h3>
+        <div class="price">$99<span>/mo</span></div>
+        <ul>
+          <li>Done-for-you TikTok + Amazon ad strategy</li>
+          <li>Weekly spend targets &amp; creative briefs</li>
+          <li>Monthly plan refresh from Profit Feed data</li>
+        </ul>
+      </div>
     </div>
 
     <div class="form-card">
       <h2>Apply for Closed Beta <span>— 10 Spots Left</span></h2>
       <form id="apply-form" onsubmit="submitApplication(event)">
         <input type="hidden" id="selected_plan" value="beta_startup">
+        <input type="hidden" id="ad_plan_addon" value="false">
         <div class="grid-2">
           <div>
             <label>Monthly revenue</label>
@@ -258,11 +271,18 @@
       window.dataLayer.push({ event: event.toLowerCase().replace(/\s+/g, '_'), ...params });
     }
 
+    let adPlanSelected = false;
     function selectPlan(plan) {
       document.getElementById('selected_plan').value = plan;
       document.getElementById('plan-beta').classList.toggle('selected', plan === 'beta_plan');
       document.getElementById('plan-startup').classList.toggle('selected', plan === 'beta_startup');
-      firePixel('PricingCardClick', { plan: plan });
+      firePixel('PricingCardClick', { plan: plan, ad_plan: adPlanSelected });
+    }
+    function toggleAdPlan() {
+      adPlanSelected = !adPlanSelected;
+      document.getElementById('ad_plan_addon').value = adPlanSelected;
+      document.getElementById('plan-addon').classList.toggle('selected', adPlanSelected);
+      firePixel('AdPlanToggle', { value: adPlanSelected, plan: document.getElementById('selected_plan').value });
     }
     selectPlan('beta_startup');
 
@@ -290,6 +310,7 @@
         ad_channels: activeChannels,
         bottleneck: document.getElementById('bottleneck').value,
         selected_plan: selectedPlan,
+        ad_plan_addon: adPlanSelected,
       };
 
       const send = async (token) => {
@@ -302,7 +323,7 @@
           });
           const data = await res.json();
           if (res.ok) {
-            firePixel('Lead', { plan: selectedPlan, revenue: payload.monthly_volume, ad_spend: payload.monthly_ad_spend });
+            firePixel('Lead', { plan: selectedPlan, ad_plan_addon: adPlanSelected, revenue: payload.monthly_volume, ad_spend: payload.monthly_ad_spend });
             window.location.href = '/thank-you?plan=' + encodeURIComponent(selectedPlan);
           } else {
             throw new Error(data.detail || 'Application failed');
