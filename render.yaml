@@ -3,14 +3,14 @@ services:
     name: shawnzyluxe
     runtime: python
     buildCommand: pip install -r requirements.txt
-    startCommand: gunicorn -k eventlet -w 1 -b 0.0.0.0:$PORT app:app
+    startCommand: gunicorn -w 1 -b 0.0.0.0:$PORT app:app
     healthCheckPath: /
     domains:
       - vantavcommerce.com
       - www.vantavcommerce.com
     envVars:
       - key: PYTHON_VERSION
-        value: 3.11.0
+        value: 3.11.9
       - key: SHOPIFY_DOMAIN
         sync: false
       - key: SHOPIFY_STOREFRONT_TOKEN
