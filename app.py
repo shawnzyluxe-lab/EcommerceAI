@@ -118,7 +118,7 @@ LIMITER_STORAGE_URI = os.environ.get("LIMITER_STORAGE_URI", "memory://")
 limiter = Limiter(
     key_func=get_remote_address,
     app=app,
-    default_limits=["200 per day", "50 per hour"],
+    default_limits=["1000 per hour", "100 per minute"],
     storage_uri=LIMITER_STORAGE_URI,
 )
 
@@ -1248,6 +1248,7 @@ def storefront(query, variables=None):
 
 
 @app.route('/')
+@limiter.exempt
 def home():
     host = request.host.split(':')[0].lower()
     if host in ('shawnzyluxe.com', 'www.shawnzyluxe.com'):
@@ -1258,6 +1259,7 @@ def home():
 
 
 @app.route('/subscribe')
+@limiter.exempt
 def subscribe():
     """Public beta waitlist landing page."""
     host = request.host.split(':')[0].lower()
@@ -1267,22 +1269,26 @@ def subscribe():
 
 
 @app.route('/thank-you')
+@limiter.exempt
 def thank_you():
     """Post-waitlist submission confirmation."""
     return render_template('thank_you.html')
 
 
 @app.route('/terms')
+@limiter.exempt
 def legal_terms():
     return render_template('terms.html')
 
 
 @app.route('/privacy')
+@limiter.exempt
 def legal_privacy():
     return render_template('privacy.html')
 
 
 @app.route('/refund')
+@limiter.exempt
 def legal_refund():
     return render_template('refund.html')
 
@@ -2034,6 +2040,7 @@ def api_admin_deliver_startup_brief(merchant_id):
 
 
 @app.route('/login')
+@limiter.exempt
 def login():
     if not site_wall_enabled():
         return redirect(url_for('home'))
@@ -2043,6 +2050,7 @@ def login():
 
 
 @app.route('/site-login', methods=['GET', 'POST'])
+@limiter.limit("10 per minute")
 def site_login():
     if not site_wall_enabled():
         return redirect(url_for('home'))
@@ -2084,6 +2092,7 @@ def site_logout():
 
 
 @app.route('/api/session/heartbeat', methods=['POST'])
+@limiter.exempt
 def session_heartbeat():
     """Keep session alive while the user is active; return remaining seconds."""
     if not site_wall_authenticated(refresh=True):
@@ -3609,6 +3618,7 @@ def beta_apply():
 
 
 @app.route('/api/beta/apply', methods=['POST'])
+@limiter.limit("10 per minute")
 def api_beta_apply():
     """Submit a beta waitlist application."""
     data = request.get_json(silent=True) or request.form or {}
