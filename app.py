@@ -38,7 +38,8 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-from models import db, Tenant, ConnectedChannel, ActiveSession, BusinessMetric, CommerceChannel, MerchantChannel, SupportMetric, MarketingStudio, PredictiveLogistics, OutboundTransmission, SaaSBilling, LocalProductCatalog, MerchantProfile, TenantOAuthToken, MerchantMetric, SystemExceptionLog, ProcessedWebhookEvent, AdSpendAnalytic, GeneratedPurchaseOrder, AIAgent, AgentMessage, MerchantDecisionLog, MagicLoginToken, TrendingProduct, ProductFinancialLedger, MerchantSetting
+from models import db, Tenant, ConnectedChannel, ActiveSession, BusinessMetric, CommerceChannel, MerchantChannel, SupportMetric, MarketingStudio, PredictiveLogistics, OutboundTransmission, SaaSBilling, LocalProductCatalog, MerchantProfile, TenantOAuthToken, MerchantMetric, SystemExceptionLog, ProcessedWebhookEvent, AdSpendAnalytic, GeneratedPurchaseOrder, AIAgent, AgentMessage, MerchantDecisionLog, MagicLoginToken, TrendingProduct, ProductFinancialLedger, MerchantSetting, ProfitFeedOrder, AdSpendFeed
+import profit_feed
 from dashboard_context import (
     context,
     COMMAND_RESPONSES,
@@ -566,6 +567,10 @@ with app.app_context():
         COO["narrative"] = latest.ai_briefing
         BRIEFING["revenue"] = latest.gross_revenue
         BRIEFING["profit"] = latest.true_net_profit
+
+    # Seed the real-time Profit Feed with demo data if no orders exist yet.
+    profit_feed.seed_demo_data("merchant_shawn_01")
+    profit_feed.seed_demo_data("merchant_guest_02")
 
     # Seed or restore commerce channels
     if not CommerceChannel.query.first():
@@ -1101,19 +1106,17 @@ def home():
 
 @app.route('/dashboard')
 def dashboard():
-    ctx = context(active_page='overview')
     merchant = get_merchant_context()
-    if merchant:
-        ctx["merchant"] = merchant
+    merchant_id = merchant["id"] if merchant else None
+    ctx = context(active_page='overview', merchant=merchant, merchant_id=merchant_id)
     return render_template('dashboard/overview.html', **ctx)
 
 
 # Commercial-grade dashboard page routes
 def _dashboard_context(active_page):
-    ctx = context(active_page=active_page)
     merchant = get_merchant_context()
-    if merchant:
-        ctx["merchant"] = merchant
+    merchant_id = merchant["id"] if merchant else None
+    ctx = context(active_page=active_page, merchant=merchant, merchant_id=merchant_id)
     return ctx
 
 
@@ -1455,29 +1458,40 @@ def telemetry(ws):
 
 @app.route('/api/orders')
 def api_orders():
-    """Return recent orders with computed margin."""
+    """Return recent orders with computed margin from the Profit Feed."""
+    merchant = get_merchant_context()
+    merchant_id = merchant["id"] if merchant else "merchant_shawn_01"
+    orders = profit_feed.get_recent_orders(merchant_id)
+    breakdown = profit_feed.get_profit_breakdown(merchant_id)
     return jsonify({
-        "orders": RECENT_ORDERS,
-        "count": len(RECENT_ORDERS),
-        "revenue": BRIEFING["revenue"],
-        "profit": BRIEFING["profit"],
+        "orders": orders,
+        "count": len(orders),
+        "revenue": breakdown["gross_revenue"],
+        "profit": breakdown["net_profit"],
     })
 
 
 @app.route('/api/profit/breakdown')
 def api_profit_breakdown():
-    """Calculate and return the profit breakdown."""
-    gross = sum(r["amount"] for r in PROFIT_BREAKDOWN if r["kind"] == "in")
-    costs = -sum(r["amount"] for r in PROFIT_BREAKDOWN if r["kind"] == "out")
-    net = gross - costs
-    margin = round(net / gross * 100, 1) if gross else 0.0
+    """Calculate and return the profit breakdown from the Profit Feed."""
+    merchant = get_merchant_context()
+    merchant_id = merchant["id"] if merchant else "merchant_shawn_01"
+    breakdown = profit_feed.get_profit_breakdown(merchant_id)
     return jsonify({
-        "gross_revenue": round(gross, 2),
-        "total_costs": round(costs, 2),
-        "net_profit": round(net, 2),
-        "net_margin": margin,
-        "rows": PROFIT_BREAKDOWN,
+        "gross_revenue": breakdown["gross_revenue"],
+        "total_costs": breakdown["total_costs"],
+        "net_profit": breakdown["net_profit"],
+        "net_margin": breakdown["net_margin"],
+        "rows": breakdown["profit_rows"],
     })
+
+
+@app.route('/api/kpis')
+def api_kpis():
+    """Real-time profit KPI feed for the dashboard and external consumers."""
+    merchant = get_merchant_context()
+    merchant_id = merchant["id"] if merchant else "merchant_shawn_01"
+    return jsonify(profit_feed.get_kpis(merchant_id))
 
 
 @app.route('/site-login', methods=['GET', 'POST'])
@@ -1800,6 +1814,31 @@ def profit_ledger():
     } for e in entries]), 200
 
 
+@app.route('/api/v1/ad-spend', methods=['POST'])
+@require_roles([UserRole.ADMIN, UserRole.ENGINEER, UserRole.MERCHANT])
+def ad_spend_feed():
+    """Ingest ad spend for a platform into the real-time Profit Feed."""
+    merchant = get_merchant_context()
+    if not merchant:
+        return jsonify({"error": "No merchant context"}), 403
+    data = request.get_json(silent=True) or {}
+    platform = data.get("platform") or data.get("platform_source")
+    amount = data.get("amount")
+    if not platform or amount is None:
+        return jsonify({"detail": "platform and amount are required."}), 400
+    try:
+        spend = profit_feed.record_ad_spend(
+            merchant["id"],
+            platform,
+            float(amount),
+            conversion_count=data.get("conversions") or data.get("conversion_count") or 0,
+        )
+        return jsonify({"status": "recorded", "id": spend.id, "amount": spend.amount}), 201
+    except Exception as e:
+        logger.error(f"[AD SPEND FEED] Failed: {e}")
+        return jsonify({"detail": "Failed to record ad spend."}), 500
+
+
 @app.route('/api/v1/fulfillment/tracking-injection', methods=['POST'])
 @require_roles([UserRole.ADMIN, UserRole.ENGINEER])
 def tracking_injection():
@@ -1963,6 +2002,19 @@ def shopify_orders_webhook():
 
         order_value = float(payload.get("total_price", 0.00))
 
+        # Feed the real-time Profit Feed for this channel order.
+        line_items = payload.get("line_items") or payload.get("lineItems") or []
+        order_ref = str(payload.get("name") or payload.get("order_number") or event_id)
+        profit_feed.record_order(
+            merchant_id=merchant_target,
+            channel="shopify",
+            order_id=order_ref,
+            gross_revenue=order_value,
+            items=len(line_items) if isinstance(line_items, list) else 1,
+            state="shipped" if payload.get("fulfillment_status") != "cancelled" else "cancelled",
+            refund_amount=abs(float(payload.get("total_refund_amount", 0.0) or 0.0)),
+        )
+
         latest = BusinessMetric.query.order_by(BusinessMetric.id.desc()).first()
         if not latest:
             return jsonify({"status": "rejected", "reason": "No baseline metrics"}), 400
@@ -2069,6 +2121,16 @@ def tiktok_orders_webhook():
     try:
         created = process_idempotent_channel_event(event_id, merchant_target, "tiktok", order_price)
         db.session.commit()
+        # Feed the real-time Profit Feed for TikTok Shop.
+        skus = raw.get("skus") or raw.get("items") or []
+        profit_feed.record_order(
+            merchant_id=merchant_target,
+            channel="tiktok",
+            order_id=str(raw.get("order_id") or event_id),
+            gross_revenue=order_price,
+            items=len(skus) if isinstance(skus, list) else 1,
+            state="shipped" if raw.get("status") != "CANCELLED" else "cancelled",
+        )
         # Trigger real-time multi-channel routing pipeline in the background
         run_async_task(lambda: asyncio.run(process_incoming_order_event(raw)))
         return jsonify({"status": "synchronized" if created else "ignored"}), 200
@@ -2093,6 +2155,16 @@ def amazon_orders_webhook():
     try:
         created = process_idempotent_channel_event(event_id, merchant_target, "amazon", order_price)
         db.session.commit()
+        # Feed the real-time Profit Feed for Amazon.
+        items = payload.get("NumberOfItemsShipped") or payload.get("items") or []
+        profit_feed.record_order(
+            merchant_id=merchant_target,
+            channel="amazon",
+            order_id=str(payload.get("AmazonOrderId") or payload.get("order_id") or event_id),
+            gross_revenue=order_price,
+            items=int(items) if isinstance(items, (int, float, str)) and str(items).isdigit() else (len(items) if isinstance(items, list) else 1),
+            state="shipped" if payload.get("OrderStatus") != "Canceled" else "cancelled",
+        )
         return jsonify({"status": "synchronized" if created else "ignored"}), 200
     except Exception as e:
         log_system_exception("AMAZON_WEBHOOK", "CRITICAL", str(e))

@@ -11,6 +11,7 @@ from datetime import datetime, timedelta, timezone
 
 from flask import Flask, render_template, request, jsonify
 from models import PredictiveLogistics
+import profit_feed
 
 
 BRAND = {
@@ -451,11 +452,22 @@ NAV_GROUPS = [
 ]
 
 
-def context(active_page=None, merchant=None):
+def context(active_page=None, merchant=None, merchant_id=None):
     now = datetime.now(timezone.utc)
-    gross = sum(r["amount"] for r in PROFIT_BREAKDOWN if r["kind"] == "in")
-    costs = -sum(r["amount"] for r in PROFIT_BREAKDOWN if r["kind"] == "out")
-    net = gross - costs
+    # Use the real-time Profit Feed when a merchant is identified, otherwise fall
+    # back to the static sample data so the dashboard still renders.
+    feed = profit_feed.get_profit_breakdown(merchant_id) if merchant_id else None
+    orders = profit_feed.get_recent_orders(merchant_id) if merchant_id else RECENT_ORDERS
+    if feed is None:
+        gross = sum(r["amount"] for r in PROFIT_BREAKDOWN if r["kind"] == "in")
+        costs = -sum(r["amount"] for r in PROFIT_BREAKDOWN if r["kind"] == "out")
+        net = gross - costs
+        profit_rows = PROFIT_BREAKDOWN
+    else:
+        gross = feed["gross_revenue"]
+        costs = feed["total_costs"]
+        net = feed["net_profit"]
+        profit_rows = feed["profit_rows"]
     # Always serve fresh headline numbers even if BRIEFING is mutated elsewhere.
     briefing = dict(BRIEFING)
     briefing["revenue"] = gross
@@ -476,12 +488,12 @@ def context(active_page=None, merchant=None):
         "connected": [c for c in CHANNELS if c["state"] == "connected"],
         "briefing": briefing,
         "alerts": ALERTS,
-        "profit_rows": PROFIT_BREAKDOWN,
+        "profit_rows": profit_rows,
         "gross": gross,
         "costs": costs,
         "net": net,
         "net_margin": round(net / gross * 100, 1) if gross else 0.0,
-        "orders": RECENT_ORDERS,
+        "orders": orders,
         "series": SALES_SERIES,
         "series_max": max(p["value"] for p in SALES_SERIES),
         "forecasts": FORECASTS,

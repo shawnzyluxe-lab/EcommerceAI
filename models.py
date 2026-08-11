@@ -290,3 +290,31 @@ class MerchantSetting(db.Model):
     setting_value = db.Column(db.Text)
     updated_at = db.Column(db.DateTime, server_default=db.func.now(), onupdate=db.func.now())
     __table_args__ = (db.PrimaryKeyConstraint('merchant_id', 'setting_key'),)
+
+
+class ProfitFeedOrder(db.Model):
+    __tablename__ = "profit_feed_orders"
+    id = db.Column(db.Integer, primary_key=True, autoincrement=True)
+    merchant_id = db.Column(db.String(100), db.ForeignKey("merchant_profiles.merchant_id"), nullable=False, index=True)
+    order_id = db.Column(db.String(100), nullable=False, unique=True)
+    channel = db.Column(db.String(50), nullable=False)  # shopify, tiktok, amazon, etsy, ebay, etc.
+    items = db.Column(db.Integer, default=1)
+    gross_revenue = db.Column(db.REAL, nullable=False, default=0.0)
+    marketplace_fees = db.Column(db.REAL, nullable=False, default=0.0)
+    cost_of_goods_sold = db.Column(db.REAL, nullable=False, default=0.0)
+    shipping_costs = db.Column(db.REAL, nullable=False, default=0.0)
+    ad_spend_attributed = db.Column(db.REAL, nullable=False, default=0.0)
+    refund_amount = db.Column(db.REAL, nullable=False, default=0.0)
+    net_profit = db.Column(db.REAL, nullable=False, default=0.0)
+    state = db.Column(db.String(50), default="shipped")  # shipped, delayed, refunded, packed, cancelled
+    recorded_at = db.Column(db.DateTime, server_default=db.func.now())
+
+
+class AdSpendFeed(db.Model):
+    __tablename__ = "ad_spend_feed"
+    id = db.Column(db.Integer, primary_key=True, autoincrement=True)
+    merchant_id = db.Column(db.String(100), db.ForeignKey("merchant_profiles.merchant_id"), nullable=False, index=True)
+    platform_source = db.Column(db.String(100), nullable=False)  # meta, tiktok, google, shopify, amazon
+    amount = db.Column(db.REAL, nullable=False, default=0.0)
+    conversion_count = db.Column(db.Integer, default=0)
+    recorded_at = db.Column(db.DateTime, server_default=db.func.now())
