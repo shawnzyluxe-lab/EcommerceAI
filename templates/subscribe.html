@@ -116,6 +116,26 @@
     }
     input:focus, select:focus { outline: none; border-color: var(--accent); }
     input::placeholder { color: #555; }
+    .channel-chips { display: flex; flex-wrap: wrap; gap: .5rem; margin-bottom: 1rem; }
+    .channel-chips label {
+      display: flex;
+      align-items: center;
+      gap: .4rem;
+      padding: .55rem .85rem;
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      background: #0f0f0f;
+      color: var(--ink);
+      font-size: .8rem;
+      text-transform: none;
+      letter-spacing: 0;
+      cursor: pointer;
+      margin: 0;
+      transition: border-color .2s, background .2s;
+    }
+    .channel-chips label:hover { border-color: var(--accent); }
+    .channel-chips input[type="checkbox"] { position: absolute; opacity: 0; }
+    .channel-chips label:has(input:checked) { border-color: var(--accent); background: rgba(212,175,55,.12); color: var(--ink); }
     button {
       width: 100%;
       padding: 1rem;
@@ -172,8 +192,6 @@
       <h2>Apply for Closed Beta <span>— 10 Spots Left</span></h2>
       <form id="apply-form" onsubmit="submitApplication(event)">
         <input type="hidden" id="selected_plan" value="beta_startup">
-        <label>Business email</label>
-        <input id="email" type="email" placeholder="you@yourbrand.com" required>
         <div class="grid-2">
           <div>
             <label>Monthly revenue</label>
@@ -187,7 +205,7 @@
           </div>
           <div>
             <label>Monthly ad spend</label>
-            <select id="ad_spend" required>
+            <select id="monthly_ad_spend" required>
               <option value="">Select range</option>
               <option value="$0 - $2,000">$0 - $2,000</option>
               <option value="$2,000 - $10,000">$2,000 - $10,000</option>
@@ -196,24 +214,24 @@
             </select>
           </div>
         </div>
-        <div class="grid-2">
-          <div>
-            <label>Active channels</label>
-            <input id="ad_channels" type="text" placeholder="e.g. Shopify, TikTok, Amazon" required>
-          </div>
-          <div>
-            <label>Biggest bottleneck right now</label>
-            <select id="bottleneck" required>
-              <option value="">Select one</option>
-              <option value="I don't know my true profit per order">I don't know my true profit per order</option>
-              <option value="Too many spreadsheets/manual work">Too many spreadsheets/manual work</option>
-              <option value="Ad spend is eating margin">Ad spend is eating margin</option>
-              <option value="Scaling to TikTok/Amazon">Scaling to TikTok/Amazon</option>
-              <option value="Inventory/supplier issues">Inventory/supplier issues</option>
-              <option value="Other">Other</option>
-            </select>
-          </div>
+        <label>Active channels</label>
+        <div class="channel-chips">
+          <label><input type="checkbox" name="active_channels" value="Shopify"> Shopify</label>
+          <label><input type="checkbox" name="active_channels" value="TikTok Shop"> TikTok Shop</label>
+          <label><input type="checkbox" name="active_channels" value="Amazon"> Amazon</label>
+          <label><input type="checkbox" name="active_channels" value="eBay"> eBay</label>
         </div>
+        <label>Biggest bottleneck right now</label>
+        <select id="bottleneck" required>
+          <option value="">Select one</option>
+          <option value="I can't see true profit across channels">I can't see true profit across channels</option>
+          <option value="Ad spend is eating margin and I don't know where">Ad spend is eating margin and I don't know where</option>
+          <option value="Refunds / chargebacks are spiking">Refunds / chargebacks are spiking</option>
+          <option value="Inventory runs out before I notice">Inventory runs out before I notice</option>
+          <option value="I want to launch but don't know where to start">I want to launch but don't know where to start</option>
+        </select>
+        <label>Email</label>
+        <input id="email" type="email" placeholder="you@yourbrand.com" required>
         <button type="submit" id="submit-btn">Apply for Closed Beta — 10 Spots Left</button>
         <div id="form-message" class="message"></div>
       </form>
@@ -243,11 +261,19 @@
       msg.textContent = '';
       btn.disabled = true;
 
+      const activeChannels = Array.from(document.querySelectorAll('input[name="active_channels"]:checked')).map(cb => cb.value);
+      if (activeChannels.length === 0) {
+        msg.textContent = 'Select at least one active channel.';
+        msg.className = 'message error';
+        btn.disabled = false;
+        return;
+      }
       const payload = {
         email: document.getElementById('email').value,
         business_name: '',
         monthly_volume: document.getElementById('monthly_volume').value,
-        ad_channels: document.getElementById('ad_channels').value + (document.getElementById('ad_spend').value ? ' | Ad spend: ' + document.getElementById('ad_spend').value : ''),
+        monthly_ad_spend: document.getElementById('monthly_ad_spend').value,
+        ad_channels: activeChannels,
         bottleneck: document.getElementById('bottleneck').value,
         selected_plan: document.getElementById('selected_plan').value,
       };

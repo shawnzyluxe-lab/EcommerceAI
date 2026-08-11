@@ -3505,6 +3505,7 @@ def api_beta_apply():
     email = (data.get("email") or "").strip().lower()
     business_name = (data.get("business_name") or "").strip()
     monthly_volume = (data.get("monthly_volume") or "").strip()
+    monthly_ad_spend = (data.get("monthly_ad_spend") or "").strip()
     ad_channels = ", ".join(data.get("ad_channels") or []) if isinstance(data.get("ad_channels"), list) else (data.get("ad_channels") or "")
     bottleneck = (data.get("bottleneck") or "").strip()
     selected_plan = (data.get("selected_plan") or "").strip()
@@ -3517,6 +3518,7 @@ def api_beta_apply():
             email=email,
             business_name=business_name,
             monthly_volume=monthly_volume,
+            monthly_ad_spend=monthly_ad_spend,
             ad_channels=ad_channels,
             bottleneck=bottleneck,
             selected_plan=selected_plan,

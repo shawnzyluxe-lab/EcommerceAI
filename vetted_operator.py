@@ -18,7 +18,7 @@ def _now():
 
 
 def submit_application(email: str, business_name: str = "", monthly_volume: str = "",
-                       ad_channels: str = "", bottleneck: str = "", selected_plan: str = "") -> BetaWaitlistApplication:
+                       monthly_ad_spend: str = "", ad_channels: str = "", bottleneck: str = "", selected_plan: str = "") -> BetaWaitlistApplication:
     """Create or update a beta waitlist application."""
     email = (email or "").strip().lower()
     if not email:
@@ -28,6 +28,7 @@ def submit_application(email: str, business_name: str = "", monthly_volume: str 
     if app:
         app.business_name = business_name or app.business_name
         app.monthly_volume = monthly_volume or app.monthly_volume
+        app.monthly_ad_spend = monthly_ad_spend or app.monthly_ad_spend
         app.ad_channels = ad_channels or app.ad_channels
         app.bottleneck = bottleneck or app.bottleneck
         app.selected_plan = selected_plan or app.selected_plan
@@ -36,6 +37,7 @@ def submit_application(email: str, business_name: str = "", monthly_volume: str 
             email=email,
             business_name=business_name,
             monthly_volume=monthly_volume,
+            monthly_ad_spend=monthly_ad_spend,
             ad_channels=ad_channels,
             bottleneck=bottleneck,
             selected_plan=selected_plan,
@@ -195,6 +197,7 @@ def application_to_dict(app: BetaWaitlistApplication) -> Dict[str, Any]:
         "email": app.email,
         "business_name": app.business_name,
         "monthly_volume": app.monthly_volume,
+        "monthly_ad_spend": app.monthly_ad_spend,
         "ad_channels": app.ad_channels,
         "bottleneck": app.bottleneck,
         "selected_plan": app.selected_plan,

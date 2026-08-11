@@ -189,7 +189,8 @@ class BetaWaitlistApplication(db.Model):
     email = db.Column(db.String(255), unique=True, nullable=False, index=True)
     business_name = db.Column(db.String(255))
     monthly_volume = db.Column(db.String(100))
-    ad_channels = db.Column(db.String(255))  # comma-separated list (Meta, TikTok, Google, Amazon)
+    monthly_ad_spend = db.Column(db.String(100))
+    ad_channels = db.Column(db.String(255))  # comma-separated list (Shopify, TikTok Shop, Amazon, eBay)
     bottleneck = db.Column(db.Text)
     selected_plan = db.Column(db.String(100))  # beta_plan, beta_startup
     status = db.Column(db.String(50), default="pending")  # pending, sandbox, approved, rejected

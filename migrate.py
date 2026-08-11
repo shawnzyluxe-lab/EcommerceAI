@@ -103,10 +103,11 @@ def run_migrations():
             except Exception as e:
                 print(f"[migrate] {col} add skipped: {e}")
 
-        try:
-            conn.execute(text("ALTER TABLE beta_waitlist_applications ADD COLUMN IF NOT EXISTS selected_plan VARCHAR(100)"))
-        except Exception as e:
-            print(f"[migrate] selected_plan add skipped: {e}")
+        for wl_col in ['selected_plan', 'monthly_ad_spend']:
+            try:
+                conn.execute(text(f"ALTER TABLE beta_waitlist_applications ADD COLUMN IF NOT EXISTS {wl_col} VARCHAR(100)"))
+            except Exception as e:
+                print(f"[migrate] {wl_col} add skipped: {e}")
 
         # Create the beta waitlist applications table if missing.
         conn.execute(text("""
@@ -115,6 +116,7 @@ def run_migrations():
                 email VARCHAR(255) NOT NULL UNIQUE,
                 business_name VARCHAR(255),
                 monthly_volume VARCHAR(100),
+                monthly_ad_spend VARCHAR(100),
                 ad_channels VARCHAR(255),
                 bottleneck TEXT,
                 selected_plan VARCHAR(100),
