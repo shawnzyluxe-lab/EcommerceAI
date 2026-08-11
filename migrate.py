@@ -103,6 +103,11 @@ def run_migrations():
             except Exception as e:
                 print(f"[migrate] {col} add skipped: {e}")
 
+        try:
+            conn.execute(text("ALTER TABLE beta_waitlist_applications ADD COLUMN IF NOT EXISTS selected_plan VARCHAR(100)"))
+        except Exception as e:
+            print(f"[migrate] selected_plan add skipped: {e}")
+
         # Create the beta waitlist applications table if missing.
         conn.execute(text("""
             CREATE TABLE IF NOT EXISTS beta_waitlist_applications (
@@ -112,6 +117,7 @@ def run_migrations():
                 monthly_volume VARCHAR(100),
                 ad_channels VARCHAR(255),
                 bottleneck TEXT,
+                selected_plan VARCHAR(100),
                 status VARCHAR(50) DEFAULT 'pending',
                 merchant_id VARCHAR(100) REFERENCES merchant_profiles(merchant_id),
                 notes TEXT,

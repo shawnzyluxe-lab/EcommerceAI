@@ -191,6 +191,7 @@ class BetaWaitlistApplication(db.Model):
     monthly_volume = db.Column(db.String(100))
     ad_channels = db.Column(db.String(255))  # comma-separated list (Meta, TikTok, Google, Amazon)
     bottleneck = db.Column(db.Text)
+    selected_plan = db.Column(db.String(100))  # beta_plan, beta_startup
     status = db.Column(db.String(50), default="pending")  # pending, sandbox, approved, rejected
     merchant_id = db.Column(db.String(100), db.ForeignKey("merchant_profiles.merchant_id"), nullable=True)
     notes = db.Column(db.Text)

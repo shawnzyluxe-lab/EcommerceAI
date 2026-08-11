@@ -1173,11 +1173,11 @@ def home():
 
 @app.route('/subscribe')
 def subscribe():
-    """Public beta subscription landing page."""
+    """Public beta waitlist landing page."""
     host = request.host.split(':')[0].lower()
     if host in ('shawnzyluxe.com', 'www.shawnzyluxe.com'):
         return render_template('coming_soon.html')
-    return render_template('subscribe.html', stripe_publishable_key=STRIPE_PUBLISHABLE_KEY, price_beta=249, price_beta_startup=348, price_addon=99)
+    return render_template('subscribe.html', recaptcha_site_key=RECAPTCHA_SITE_KEY)
 
 
 @app.route('/terms')
@@ -3500,6 +3500,7 @@ def api_beta_apply():
     monthly_volume = (data.get("monthly_volume") or "").strip()
     ad_channels = ", ".join(data.get("ad_channels") or []) if isinstance(data.get("ad_channels"), list) else (data.get("ad_channels") or "")
     bottleneck = (data.get("bottleneck") or "").strip()
+    selected_plan = (data.get("selected_plan") or "").strip()
 
     if not email or "@" not in email:
         return jsonify({"detail": "A valid business email is required."}), 400
@@ -3511,6 +3512,7 @@ def api_beta_apply():
             monthly_volume=monthly_volume,
             ad_channels=ad_channels,
             bottleneck=bottleneck,
+            selected_plan=selected_plan,
         )
         return jsonify({"status": "received", "id": app.id, "email": app.email}), 201
     except Exception as e:
