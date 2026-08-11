@@ -69,6 +69,7 @@ def _create_merchant_for_application(app: BetaWaitlistApplication, tier: str = "
         account_tier=tier,
     )
     db.session.add(profile)
+    db.session.flush()
 
     # Seed minimal merchant metrics so the dashboard is not empty.
     db.session.add(MerchantMetric(
