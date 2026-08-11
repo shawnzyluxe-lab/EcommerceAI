@@ -35,7 +35,7 @@
 
       <div class="sidebar-footer">
         <div class="plan-card">
-          <div class="plan-icon">{% if merchant.tier == 'Enterprise AI Tier' %}♛{% else %}★{% endif %}</div>
+          <div class="plan-icon">{% if merchant.tier and 'Enterprise' in merchant.tier %}♛{% else %}★{% endif %}</div>
           <div class="plan-name">{{ merchant.tier | default('Enterprise Plan') }}</div>
           <div class="plan-note">Unlimited access</div>
           <a href="/dashboard/billing" class="plan-link">View Plan</a>

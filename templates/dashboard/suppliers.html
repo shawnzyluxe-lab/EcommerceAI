@@ -4,7 +4,7 @@
 
 <section class="page-header">
   <h1>Supply Chain Intelligence</h1>
-  <p>Compare and select the best suppliers using real-time data and AI insights.</p>
+  <p>Compare and select the best suppliers using real-time data and insights.</p>
 </section>
 
 <div class="grid grid-2" style="margin-bottom: 24px;">
@@ -26,7 +26,7 @@
                 <div style="height: 100%; border-radius: 99px; background: {% if s.reliability > 85 %}var(--green){% else %}var(--amber){% endif %}; width: {{ s.reliability }}%;"></div>
               </div>
             </td>
-            <td class="num">{% if s.pick %}<span class="tag tag-green">AI pick</span>{% else %}<button class="btn" style="font-size: .72rem; padding: 4px 9px;">Switch</button>{% endif %}</td>
+            <td class="num">{% if s.pick %}<span class="tag tag-green">Top pick</span>{% else %}<button class="btn" style="font-size: .72rem; padding: 4px 9px;">Switch</button>{% endif %}</td>
           </tr>
           {% endfor %}
         </tbody>

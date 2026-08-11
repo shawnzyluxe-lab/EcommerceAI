@@ -143,7 +143,7 @@ CHANNELS = [
 ]
 
 # --------------------------------------------------------------------------
-# AI Business Advisor — morning briefing
+# Business Advisor — morning briefing
 # --------------------------------------------------------------------------
 
 BRIEFING = {
@@ -158,7 +158,7 @@ BRIEFING = {
 }
 
 # --------------------------------------------------------------------------
-# Autonomous AI Manager — proactive alerts
+# Alerts — proactive notifications
 # --------------------------------------------------------------------------
 
 ALERTS = [
@@ -170,7 +170,7 @@ ALERTS = [
 ]
 
 # --------------------------------------------------------------------------
-# AI Profit Engine — true profit per order
+# Profit Engine — true profit per order
 # --------------------------------------------------------------------------
 
 PROFIT_BREAKDOWN = [
@@ -215,7 +215,7 @@ FORECASTS = [
 ]
 
 # --------------------------------------------------------------------------
-# AI Product Research
+# Product Research
 # --------------------------------------------------------------------------
 
 RESEARCH = [
@@ -226,7 +226,7 @@ RESEARCH = [
 ]
 
 # --------------------------------------------------------------------------
-# AI Fulfillment
+# Fulfillment
 # --------------------------------------------------------------------------
 
 FULFILLMENT = {
@@ -242,7 +242,7 @@ FULFILLMENT = {
 }
 
 # --------------------------------------------------------------------------
-# AI Fraud Detection
+# Fraud Detection
 # --------------------------------------------------------------------------
 
 FRAUD = [
@@ -262,7 +262,7 @@ SUPPLIERS = [
 ]
 
 # --------------------------------------------------------------------------
-# AI Marketing Studio
+# Marketing Studio
 # --------------------------------------------------------------------------
 
 STUDIO = [
@@ -275,7 +275,7 @@ STUDIO = [
 ]
 
 # --------------------------------------------------------------------------
-# AI Customer Support
+# Customer Support
 # --------------------------------------------------------------------------
 
 SUPPORT = {
@@ -337,19 +337,19 @@ def predictive_context():
     return DEFAULT_PREDICTIVE
 
 STRIPE = {
-    "plan": "Enterprise AI Tier",
+    "plan": "Enterprise Plan",
     "usage": 4820,
     "invoice": 241.00,
 }
 
 CATALOG = {
-    "title": "Shawnzyluxe Luxury Hoodie",
+    "title": "Premium Sample Product",
     "sku": "SZL-VAR-A",
     "price": 145.00,
 }
 
 # --------------------------------------------------------------------------
-# AI Automation Builder
+# Automation Builder
 # --------------------------------------------------------------------------
 
 AUTOMATIONS = [
@@ -360,16 +360,16 @@ AUTOMATIONS = [
 ]
 
 # --------------------------------------------------------------------------
-# Team AI
+# Team
 # --------------------------------------------------------------------------
 
 SPECIALISTS = [
-    {"name": "Marketing AI", "status": "Rewriting 5 TikTok hooks", "state": "working"},
-    {"name": "Inventory AI", "status": "2 stockouts predicted", "state": "attention"},
-    {"name": "Finance AI", "status": "Margin recomputed · 30.4%", "state": "idle"},
-    {"name": "Logistics AI", "status": "58 orders routed today", "state": "working"},
-    {"name": "Support AI", "status": "78% auto-resolved", "state": "working"},
-    {"name": "Analytics AI", "status": "Forecast refreshed 06:10", "state": "idle"},
+    {"name": "Marketing", "status": "Rewriting 5 TikTok hooks", "state": "working"},
+    {"name": "Inventory", "status": "2 stockouts predicted", "state": "attention"},
+    {"name": "Finance", "status": "Margin recomputed · 30.4%", "state": "idle"},
+    {"name": "Logistics", "status": "58 orders routed today", "state": "working"},
+    {"name": "Support", "status": "78% auto-resolved", "state": "working"},
+    {"name": "Analytics", "status": "Forecast refreshed 06:10", "state": "idle"},
 ]
 
 # --------------------------------------------------------------------------
@@ -431,7 +431,7 @@ NAV = [
     ("Marketing Studio", "#studio", False),
     ("Support", "#support", False),
     ("Automations", "#automations", False),
-    ("Team AI", "#team", False),
+    ("Team", "#team", False),
     ("Health Score", "#health", False),
     ("Mobile Assistant", "#mobile", False),
 ]
@@ -478,7 +478,7 @@ NAV_GROUPS = [
             {"id": "discounts", "label": "Discounts", "url": "/dashboard/discounts", "icon": "%"},
             {"id": "support", "label": "Support", "url": "/dashboard/support", "icon": "✉"},
             {"id": "automations", "label": "Automations", "url": "/dashboard/automations", "icon": "⏵"},
-            {"id": "team_ai", "label": "Team AI", "url": "/dashboard/team-ai", "icon": "✦"},
+            {"id": "team_ai", "label": "Team", "url": "/dashboard/team-ai", "icon": "✦"},
             {"id": "health_score", "label": "Health Score", "url": "/dashboard/health-score", "icon": "♥"},
             {"id": "mobile_copilot", "label": "Mobile Assistant", "url": "/dashboard/mobile-copilot", "icon": "☎"},
         ],

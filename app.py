@@ -502,9 +502,10 @@ def get_merchant_context():
     profile = MerchantProfile.query.get(s.merchant_id)
     if not profile:
         return None
+    tier = (profile.account_tier or "Basic Tier").replace("AI Tier", "Plan").replace("AI", "").strip()
     return {
         "id": s.merchant_id,
-        "tier": profile.account_tier or "Basic Tier",
+        "tier": tier,
         "name": profile.business_name,
         "email": profile.admin_email,
         "sandbox_status": profile.sandbox_status or "pending",
