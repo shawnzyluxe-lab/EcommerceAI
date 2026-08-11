@@ -507,11 +507,11 @@ def enforce_tier_limits(merchant_id, requested_feature):
 def site_wall_protect():
     if not site_wall_enabled():
         return None
-    if request.endpoint in ('home', 'site_login', 'site_logout', 'subscribe', 'create_stripe_checkout', 'beta_apply', 'api_beta_apply', 'auth_login', 'auth_signup', 'auth_provision_node', 'shopify_orders_webhook', 'tiktok_orders_webhook', 'amazon_orders_webhook', 'stripe_billing_webhook', 'supplier_po_update', 'execute_mitigation', 'generate_magic_link', 'magic_login', 'register_merchant', 'shopify_oauth_callback', 'health_check', 'legal_terms', 'legal_privacy', 'legal_refund', 'static'):
+    if request.endpoint in ('home', 'login', 'site_login', 'site_logout', 'subscribe', 'thank_you', 'create_stripe_checkout', 'beta_apply', 'api_beta_apply', 'auth_login', 'auth_signup', 'auth_provision_node', 'shopify_orders_webhook', 'tiktok_orders_webhook', 'amazon_orders_webhook', 'stripe_billing_webhook', 'supplier_po_update', 'execute_mitigation', 'generate_magic_link', 'magic_login', 'register_merchant', 'shopify_oauth_callback', 'health_check', 'legal_terms', 'legal_privacy', 'legal_refund', 'static'):
         return None
     if site_wall_authenticated():
         return None
-    return redirect(url_for('home'))
+    return redirect(url_for('login'))
 
 
 # ============================================================
@@ -973,7 +973,7 @@ def dispatch_external_email(recipient, subject, html_body):
                 f"https://api.mailgun.net/v3/{MAILGUN_DOMAIN}/messages",
                 auth=("api", MAILGUN_API_KEY),
                 data={
-                    "from": f"Shawnzyluxe AI <postmaster@{MAILGUN_DOMAIN}>",
+                    "from": f"Prometheus OS <postmaster@{MAILGUN_DOMAIN}>",
                     "to": recipient,
                     "subject": subject,
                     "html": html_body,
@@ -995,7 +995,7 @@ def dispatch_external_email(recipient, subject, html_body):
     try:
         msg = MIMEMultipart("alternative")
         msg["Subject"] = subject
-        msg["From"] = f"Shawnzyluxe AI <{SMTP_USERNAME}>"
+        msg["From"] = f"Prometheus OS <{SMTP_USERNAME}>"
         msg["To"] = recipient
         msg.attach(MIMEText(html_body, "html"))
 
@@ -1024,6 +1024,55 @@ def dispatch_sms(to_number, body):
     except Exception as e:
         log_transmission("SMS_BLAST", to_number, "FAILED_ROUTING", str(e))
         return False
+
+
+def _post_crm_webhook(payload: dict):
+    """Forward waitlist payload to an external CRM/webhook (Zapier/Make/Notion)."""
+    url = os.environ.get("CRM_WEBHOOK_URL", "")
+    if not url:
+        return
+    try:
+        requests.post(url, json=payload, timeout=10)
+    except Exception as e:
+        logger.warning(f"[CRM Webhook] Failed: {e}")
+
+
+def _notify_team_new_waitlist(app, plan_label: str):
+    """Email the founder/team and push to CRM when a new beta application arrives."""
+    team_email = os.environ.get("MERCHANT_EMAIL", "support@vantavcommerce.com")
+    summary = (
+        f"<h3>New Beta Waitlist Application</h3>"
+        f"<p><b>Email:</b> {app.email}</p>"
+        f"<p><b>Plan:</b> {plan_label}</p>"
+        f"<p><b>Monthly Revenue:</b> {app.monthly_volume or '-'}</p>"
+        f"<p><b>Monthly Ad Spend:</b> {app.monthly_ad_spend or '-'}</p>"
+        f"<p><b>Active Channels:</b> {app.ad_channels or '-'}</p>"
+        f"<p><b>Bottleneck:</b> {app.bottleneck or '-'}</p>"
+        f"<p><a href='https://vantavcommerce.com/admin/beta-waitlist'>Review in admin</a></p>"
+    )
+    dispatch_external_email(team_email, f"New Beta Application: {app.email}", summary)
+    _post_crm_webhook({
+        "event": "beta_waitlist_submitted",
+        "email": app.email,
+        "plan": plan_label,
+        "monthly_volume": app.monthly_volume,
+        "monthly_ad_spend": app.monthly_ad_spend,
+        "ad_channels": app.ad_channels,
+        "bottleneck": app.bottleneck,
+        "status": app.status,
+        "created_at": app.created_at.isoformat() if app.created_at else None,
+    })
+
+
+def _confirm_waitlist_to_applicant(app, plan_label: str):
+    """Send a confirmation email to the applicant."""
+    body = (
+        f"<h2>You're on the Prometheus OS beta waitlist</h2>"
+        f"<p>Thanks for applying for the <b>{plan_label}</b>. We review every application and will email you within 48 hours if you're selected.</p>"
+        f"<p>In the meantime, you can join our community or book a short onboarding call.</p>"
+        f"<p>- The Vantav Team</p>"
+    )
+    dispatch_external_email(app.email, "Prometheus OS Beta — Application Received", body)
 
 
 def generate_and_send_supplier_po(sku, units_required):
@@ -1168,7 +1217,7 @@ def home():
         return render_template('coming_soon.html')
     if site_wall_authenticated():
         return redirect(url_for('dashboard'))
-    return render_template('index.html', error=bool(request.args.get('error')), oauth_sync=request.args.get('oauth_sync'), recaptcha_site_key=RECAPTCHA_SITE_KEY)
+    return redirect(url_for('subscribe'))
 
 
 @app.route('/subscribe')
@@ -1177,7 +1226,13 @@ def subscribe():
     host = request.host.split(':')[0].lower()
     if host in ('shawnzyluxe.com', 'www.shawnzyluxe.com'):
         return render_template('coming_soon.html')
-    return render_template('subscribe.html', recaptcha_site_key=RECAPTCHA_SITE_KEY)
+    return render_template('subscribe.html', recaptcha_site_key=RECAPTCHA_SITE_KEY, meta_pixel_id=os.environ.get('META_PIXEL_ID', ''), tiktok_pixel_id=os.environ.get('TIKTOK_PIXEL_ID', ''), gtm_id=os.environ.get('GTM_ID', ''))
+
+
+@app.route('/thank-you')
+def thank_you():
+    """Post-waitlist submission confirmation."""
+    return render_template('thank_you.html')
 
 
 @app.route('/terms')
@@ -1941,6 +1996,15 @@ def api_admin_deliver_startup_brief(merchant_id):
         return jsonify({"detail": str(e)}), 400
 
 
+@app.route('/login')
+def login():
+    if not site_wall_enabled():
+        return redirect(url_for('home'))
+    if site_wall_authenticated():
+        return redirect(url_for('home'))
+    return render_template('index.html', error=bool(request.args.get('error')), oauth_sync=request.args.get('oauth_sync'), recaptcha_site_key=RECAPTCHA_SITE_KEY)
+
+
 @app.route('/site-login', methods=['GET', 'POST'])
 def site_login():
     if not site_wall_enabled():
@@ -1967,7 +2031,7 @@ def site_login():
             )
             return response
         error = True
-    return redirect(url_for('home', error=1)) if error else redirect(url_for('home'))
+    return redirect(url_for('login', error=1)) if error else redirect(url_for('login'))
 
 
 @app.route('/site-logout')
@@ -3468,15 +3532,15 @@ def shopify_oauth_callback():
         return redirect("/dashboard/commerce-hub?oauth_sync=error")
 
 
-@app.route('/login')
-def login():
+@app.route('/account/login')
+def customer_login():
     return render_template('login.html', domain=SHOPIFY_DOMAIN)
 
 
 @app.route('/account')
 def account():
     if 'customer_access_token' not in session:
-        return redirect(url_for('login'))
+        return redirect(url_for('customer_login'))
     return render_template('account.html', customer=session.get('customer'))
 
 
@@ -3523,6 +3587,12 @@ def api_beta_apply():
             bottleneck=bottleneck,
             selected_plan=selected_plan,
         )
+        try:
+            plan_label = "Beta + Startup Pack" if selected_plan == "beta_startup" else ("Beta Plan" if selected_plan == "beta_plan" else selected_plan)
+            _notify_team_new_waitlist(app, plan_label)
+            _confirm_waitlist_to_applicant(app, plan_label)
+        except Exception as notify_err:
+            logger.warning(f"[Beta Apply] CRM/notify hook failed: {notify_err}")
         return jsonify({"status": "received", "id": app.id, "email": app.email}), 201
     except Exception as e:
         logger.error(f"[Beta Apply] Failed: {e}")
