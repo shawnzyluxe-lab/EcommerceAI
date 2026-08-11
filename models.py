@@ -145,6 +145,22 @@ class MerchantProfile(db.Model):
     created_at = db.Column(db.DateTime, server_default=db.func.now())
 
 
+class PendingAction(db.Model):
+    __tablename__ = "pending_actions"
+    id = db.Column(db.Integer, primary_key=True, autoincrement=True)
+    merchant_id = db.Column(db.String(100), db.ForeignKey("merchant_profiles.merchant_id"), nullable=False, index=True)
+    alert_id = db.Column(db.Integer, db.ForeignKey("alert_matrix_alerts.id"), nullable=True)
+    action_type = db.Column(db.String(50), nullable=False)  # reorder, refund, ad_adjust, reroute
+    title = db.Column(db.String(255), nullable=False)
+    detail = db.Column(db.Text)
+    payload = db.Column(db.Text)  # JSON blob for action parameters
+    status = db.Column(db.String(50), default="pending")  # pending, approved, denied, executed
+    created_at = db.Column(db.DateTime, server_default=db.func.now())
+    decided_at = db.Column(db.DateTime)
+    decision_by = db.Column(db.String(100))
+    result_summary = db.Column(db.Text)
+
+
 class BetaWaitlistApplication(db.Model):
     __tablename__ = "beta_waitlist_applications"
     id = db.Column(db.Integer, primary_key=True, autoincrement=True)

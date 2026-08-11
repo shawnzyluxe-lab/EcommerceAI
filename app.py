@@ -38,11 +38,12 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-from models import db, Tenant, ConnectedChannel, ActiveSession, BusinessMetric, CommerceChannel, MerchantChannel, SupportMetric, MarketingStudio, PredictiveLogistics, OutboundTransmission, SaaSBilling, LocalProductCatalog, MerchantProfile, TenantOAuthToken, MerchantMetric, SystemExceptionLog, ProcessedWebhookEvent, AdSpendAnalytic, GeneratedPurchaseOrder, AIAgent, AgentMessage, MerchantDecisionLog, MagicLoginToken, TrendingProduct, ProductFinancialLedger, MerchantSetting, ProfitFeedOrder, AdSpendFeed, Alert, BetaWaitlistApplication
+from models import db, Tenant, ConnectedChannel, ActiveSession, BusinessMetric, CommerceChannel, MerchantChannel, SupportMetric, MarketingStudio, PredictiveLogistics, OutboundTransmission, SaaSBilling, LocalProductCatalog, MerchantProfile, TenantOAuthToken, MerchantMetric, SystemExceptionLog, ProcessedWebhookEvent, AdSpendAnalytic, GeneratedPurchaseOrder, AIAgent, AgentMessage, MerchantDecisionLog, MagicLoginToken, TrendingProduct, ProductFinancialLedger, MerchantSetting, ProfitFeedOrder, AdSpendFeed, Alert, BetaWaitlistApplication, PendingAction
 import profit_feed
 import billing as billing_module
 import alert_matrix
 import vetted_operator
+import action_gate
 import migrate as migrate_module
 from dashboard_context import (
     context,
@@ -1166,7 +1167,7 @@ def _dashboard_context(active_page):
 def dashboard_page(page):
     active_page = page.replace('-', '_')
     valid_pages = {
-        'overview', 'command-center', 'commerce-hub', 'alerts', 'profit-engine',
+        'overview', 'command-center', 'commerce-hub', 'alerts', 'action-gate', 'profit-engine',
         'predictions', 'product-research', 'fulfillment', 'fraud', 'suppliers',
         'marketing', 'support', 'automations', 'team-ai', 'health-score',
         'mobile-copilot', 'store-catalog', 'products', 'orders', 'customers',
@@ -1610,6 +1611,73 @@ def dispatch_alert(alert_id):
     to_number = phone.get("phone")
     channels = alert_matrix.dispatch_alert(alert, to_number=to_number)
     return jsonify({"dispatched": channels}), 200
+
+
+# ============================================================
+# ACTION GATE
+# ============================================================
+
+@app.route('/api/actions', methods=['GET'])
+@require_roles([UserRole.ADMIN, UserRole.MERCHANT, UserRole.ENGINEER])
+def api_actions():
+    """Return pending Action Gate approvals and recent history."""
+    merchant = get_merchant_context()
+    if not merchant:
+        return jsonify({"error": "No merchant context"}), 403
+    try:
+        pending = [action_gate.action_to_dict(a) for a in action_gate.list_pending_actions(merchant["id"])]
+        history = [action_gate.action_to_dict(a) for a in action_gate.list_action_history(merchant["id"])]
+        return jsonify({"pending": pending, "history": history}), 200
+    except Exception as e:
+        logger.error(f"[Action Gate] List failed: {e}")
+        return jsonify({"detail": "Could not load actions."}), 500
+
+
+@app.route('/api/actions/<int:action_id>/approve', methods=['POST'])
+@require_roles([UserRole.ADMIN, UserRole.MERCHANT, UserRole.ENGINEER])
+def api_approve_action(action_id):
+    """Approve and execute a pending Action Gate action."""
+    merchant = get_merchant_context()
+    if not merchant:
+        return jsonify({"error": "No merchant context"}), 403
+    try:
+        result = action_gate.approve_action(action_id, merchant["id"], decided_by=merchant["id"])
+        return jsonify(result), 200
+    except Exception as e:
+        logger.error(f"[Action Gate] Approve failed: {e}")
+        return jsonify({"detail": str(e)}), 400
+
+
+@app.route('/api/actions/<int:action_id>/deny', methods=['POST'])
+@require_roles([UserRole.ADMIN, UserRole.MERCHANT, UserRole.ENGINEER])
+def api_deny_action(action_id):
+    """Deny a pending Action Gate action."""
+    merchant = get_merchant_context()
+    if not merchant:
+        return jsonify({"error": "No merchant context"}), 403
+    data = request.get_json(silent=True) or {}
+    try:
+        result = action_gate.deny_action(action_id, merchant["id"], reason=data.get("reason", ""), decided_by=merchant["id"])
+        return jsonify(result), 200
+    except Exception as e:
+        logger.error(f"[Action Gate] Deny failed: {e}")
+        return jsonify({"detail": str(e)}), 400
+
+
+@app.route('/api/actions/<int:action_id>/modify', methods=['POST'])
+@require_roles([UserRole.ADMIN, UserRole.MERCHANT, UserRole.ENGINEER])
+def api_modify_action(action_id):
+    """Modify payload of a pending Action Gate action."""
+    merchant = get_merchant_context()
+    if not merchant:
+        return jsonify({"error": "No merchant context"}), 403
+    data = request.get_json(silent=True) or {}
+    try:
+        result = action_gate.modify_action(action_id, merchant["id"], payload_updates=data.get("payload", {}))
+        return jsonify(result), 200
+    except Exception as e:
+        logger.error(f"[Action Gate] Modify failed: {e}")
+        return jsonify({"detail": str(e)}), 400
 
 
 @app.route('/site-login', methods=['GET', 'POST'])

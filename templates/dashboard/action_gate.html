@@ -1,0 +1,174 @@
+{% extends 'dashboard/base.html' %}
+{% block title %}Action Gate — {{ brand.name }} {{ brand.product }}{% endblock %}
+{% block content %}
+
+<section class="page-header">
+  <h1>Action Gate</h1>
+  <p>AI-drafted moves that need your approval before they execute.</p>
+</section>
+
+<div class="card">
+  <div class="card-head">
+    <h3>Pending Approvals</h3>
+    <span class="spacer"></span>
+    <span class="chip" style="background: var(--gold-bg); color: var(--amber); border-color: rgba(212,175,55,.25);">Live</span>
+  </div>
+  <div id="action-feed" class="alert-feed">
+    {% for action in pending_actions %}
+    <div class="alert-item warn" data-id="{{ action.id }}">
+      <div class="alert-bar"></div>
+      <div class="alert-body" style="flex:1;">
+        <div class="alert-title">{{ action.title }}</div>
+        <div class="alert-detail">{{ action.detail }}</div>
+        <div class="alert-detail" style="font-size:.8rem; color:var(--ink-3);">
+          {% for k, v in action.payload.items() %}
+            <span style="margin-right:12px;"><strong>{{ k }}:</strong> {{ v }}</span>
+          {% endfor %}
+        </div>
+      </div>
+      <div class="alert-actions" style="align-items:center; gap:6px;">
+        <button class="btn btn-primary" style="padding: 5px 12px; font-size: .76rem;" onclick="approveAction({{ action.id }})">Approve</button>
+        <button class="btn" style="padding: 5px 12px; font-size: .76rem;" onclick="modifyAction({{ action.id }})">Modify</button>
+        <button class="btn" style="padding: 5px 12px; font-size: .76rem; background:var(--red-bg); color:var(--red);" onclick="denyAction({{ action.id }})">Deny</button>
+      </div>
+    </div>
+    {% else %}
+    <div style="padding:24px; color:var(--ink-3);">No pending actions. You're all caught up.</div>
+    {% endfor %}
+  </div>
+</div>
+
+<div class="card" style="margin-top:24px;">
+  <div class="card-head">
+    <h3>Recent Decisions</h3>
+  </div>
+  <div id="action-history">
+    {% if action_history %}
+    <table style="width:100%; border-collapse:collapse;">
+      <thead>
+        <tr style="text-align:left; border-bottom:1px solid var(--line);">
+          <th style="padding:10px;">Action</th>
+          <th style="padding:10px;">Type</th>
+          <th style="padding:10px;">Status</th>
+          <th style="padding:10px;">Result</th>
+          <th style="padding:10px;">When</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for h in action_history %}
+        <tr style="border-bottom:1px solid var(--line-2);">
+          <td style="padding:10px;">{{ h.title }}</td>
+          <td style="padding:10px;">{{ h.action_type }}</td>
+          <td style="padding:10px;"><span class="tag {{ 'tag-green' if h.status == 'approved' else 'tag-red' }}">{{ h.status }}</span></td>
+          <td style="padding:10px; color:var(--ink-3);">{{ h.result_summary or '-' }}</td>
+          <td style="padding:10px; color:var(--ink-3); font-size:.8rem;">{{ h.decided_at or h.created_at }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    {% else %}
+    <div style="padding:24px; color:var(--ink-3);">No decisions yet.</div>
+    {% endif %}
+  </div>
+</div>
+
+<div id="message" style="margin-top:16px; font-size:.9rem;"></div>
+
+<script>
+async function loadActions() {
+  try {
+    const res = await fetch('/api/actions');
+    if (!res.ok) return;
+    const data = await res.json();
+    renderActions(data.pending, data.history);
+  } catch (e) {
+    console.error(e);
+  }
+}
+
+function renderActions(pending, history) {
+  const feed = document.getElementById('action-feed');
+  if (!pending.length) {
+    feed.innerHTML = '<div style="padding:24px; color:var(--ink-3);">No pending actions. You\'re all caught up.</div>';
+  } else {
+    feed.innerHTML = pending.map(a => `
+      <div class="alert-item warn" data-id="${a.id}">
+        <div class="alert-bar"></div>
+        <div class="alert-body" style="flex:1;">
+          <div class="alert-title">${a.title}</div>
+          <div class="alert-detail">${a.detail || ''}</div>
+          <div class="alert-detail" style="font-size:.8rem; color:var(--ink-3);">
+            ${Object.entries(a.payload || {}).map(([k,v]) => `<span style="margin-right:12px;"><strong>${k}:</strong> ${v}</span>`).join('')}
+          </div>
+        </div>
+        <div class="alert-actions" style="align-items:center; gap:6px;">
+          <button class="btn btn-primary" style="padding:5px 12px;font-size:.76rem;" onclick="approveAction(${a.id})">Approve</button>
+          <button class="btn" style="padding:5px 12px;font-size:.76rem;" onclick="modifyAction(${a.id})">Modify</button>
+          <button class="btn" style="padding:5px 12px;font-size:.76rem;background:var(--red-bg);color:var(--red);" onclick="denyAction(${a.id})">Deny</button>
+        </div>
+      </div>
+    `).join('');
+  }
+
+  const histBox = document.getElementById('action-history');
+  if (!history.length) {
+    histBox.innerHTML = '<div style="padding:24px; color:var(--ink-3);">No decisions yet.</div>';
+    return;
+  }
+  histBox.innerHTML = `<table style="width:100%; border-collapse:collapse;">
+    <thead><tr style="text-align:left;border-bottom:1px solid var(--line);">
+      <th style="padding:10px;">Action</th><th style="padding:10px;">Type</th><th style="padding:10px;">Status</th>
+      <th style="padding:10px;">Result</th><th style="padding:10px;">When</th>
+    </tr></thead>
+    <tbody>${history.map(h => `
+      <tr style="border-bottom:1px solid var(--line-2);">
+        <td style="padding:10px;">${h.title}</td>
+        <td style="padding:10px;">${h.action_type}</td>
+        <td style="padding:10px;"><span class="tag ${h.status === 'approved' ? 'tag-green' : 'tag-red'}">${h.status}</span></td>
+        <td style="padding:10px; color:var(--ink-3);">${h.result_summary || '-'}</td>
+        <td style="padding:10px; color:var(--ink-3); font-size:.8rem;">${h.decided_at || h.created_at}</td>
+      </tr>
+    `).join('')}</tbody>
+  </table>`;
+}
+
+async function approveAction(id) {
+  await callAction(`/api/actions/${id}/approve`, 'approved');
+}
+
+async function denyAction(id) {
+  await callAction(`/api/actions/${id}/deny`, 'denied');
+}
+
+async function modifyAction(id) {
+  const qty = prompt('New quantity? (leave blank for no change)');
+  if (qty === null) return;
+  const payload = {};
+  if (qty !== '') payload.quantity = parseInt(qty, 10);
+  await callAction(`/api/actions/${id}/modify`, 'modified', {payload});
+}
+
+async function callAction(url, verb, body={}) {
+  const msg = document.getElementById('message');
+  msg.textContent = '';
+  try {
+    const res = await fetch(url, {method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify(body)});
+    const data = await res.json();
+    if (res.ok) {
+      msg.textContent = `Action ${verb}.`;
+      msg.style.color = 'var(--green)';
+      loadActions();
+    } else {
+      msg.textContent = data.detail || 'Failed';
+      msg.style.color = 'var(--red)';
+    }
+  } catch (e) {
+    msg.textContent = e.message;
+    msg.style.color = 'var(--red)';
+  }
+}
+
+setInterval(loadActions, 60000);
+</script>
+
+{% endblock %}

@@ -33,6 +33,24 @@ def run_migrations():
             conn.execute(text(f"ALTER TABLE merchant_profiles ADD COLUMN IF NOT EXISTS {col} {typ}"))
             print(f"Ensured merchant_profiles.{col}")
 
+        # Create the pending actions table if missing.
+        conn.execute(text("""
+            CREATE TABLE IF NOT EXISTS pending_actions (
+                id SERIAL PRIMARY KEY,
+                merchant_id VARCHAR(100) NOT NULL REFERENCES merchant_profiles(merchant_id),
+                alert_id INTEGER REFERENCES alert_matrix_alerts(id),
+                action_type VARCHAR(50) NOT NULL,
+                title VARCHAR(255) NOT NULL,
+                detail TEXT,
+                payload TEXT,
+                status VARCHAR(50) DEFAULT 'pending',
+                created_at TIMESTAMP DEFAULT NOW(),
+                decided_at TIMESTAMP,
+                decision_by VARCHAR(100),
+                result_summary TEXT
+            )
+        """))
+
         # Create the beta waitlist applications table if missing.
         conn.execute(text("""
             CREATE TABLE IF NOT EXISTS beta_waitlist_applications (

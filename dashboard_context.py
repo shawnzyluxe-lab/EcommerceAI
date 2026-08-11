@@ -14,6 +14,7 @@ from flask import Flask, render_template, request, jsonify
 from models import PredictiveLogistics
 import profit_feed
 import alert_matrix
+import action_gate
 
 
 BRAND = {
@@ -420,6 +421,7 @@ NAV_GROUPS = [
         "label": "Intelligence",
         "links": [
             {"id": "alerts", "label": "Alerts", "url": "/dashboard/alerts", "icon": "⚠", "badge": str(len(ALERTS))},
+            {"id": "action_gate", "label": "Action Gate", "url": "/dashboard/action-gate", "icon": "✓"},
             {"id": "profit_engine", "label": "Profit Engine", "url": "/dashboard/profit-engine", "icon": "$"},
             {"id": "predictions", "label": "Predictions", "url": "/dashboard/predictions", "icon": "◐"},
             {"id": "product_research", "label": "Product Research", "url": "/dashboard/product-research", "icon": "◎"},
@@ -495,6 +497,16 @@ def context(active_page=None, merchant=None, merchant_id=None):
             if link.get("id") == "alerts":
                 link["badge"] = str(len(live_alerts))
 
+    # Action Gate: draft approvals from open alerts.
+    pending_actions = []
+    action_history = []
+    if merchant_id and (active_page == "action_gate" or active_page is None):
+        try:
+            pending_actions = [action_gate.action_to_dict(a) for a in action_gate.list_pending_actions(merchant_id)]
+            action_history = [action_gate.action_to_dict(a) for a in action_gate.list_action_history(merchant_id)]
+        except Exception:
+            pass
+
     return {
         "brand": BRAND,
         "nav": NAV,
@@ -538,6 +550,8 @@ def context(active_page=None, merchant=None, merchant_id=None):
         "health": HEALTH,
         "global_tools": GLOBAL_TOOLS,
         "mobile_actions": MOBILE_ACTIONS,
+        "pending_actions": pending_actions,
+        "action_history": action_history,
         "generated": now.strftime("%A, %d %b %Y · %H:%M UTC"),
     }
 
