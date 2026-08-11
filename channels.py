@@ -7,7 +7,7 @@ from typing import Dict, Any, List, Optional
 
 import requests
 
-from models import db, MerchantChannel, TenantOAuthToken, CommerceChannel
+from models import db, MerchantChannel, TenantOAuthToken, CommerceChannel, ProfitFeedOrder
 
 
 def _encode_token(raw: str) -> str:
@@ -43,6 +43,15 @@ def list_channels(merchant_id: str) -> List[Dict[str, Any]]:
     connected = {mc.channel_id: mc for mc in MerchantChannel.query.filter_by(merchant_id=merchant_id).all()}
     tokens = {t.platform_id: t for t in TenantOAuthToken.query.filter_by(merchant_id=merchant_id).all()}
 
+    # Aggregate recent revenue per channel so dashboard tables can render c.revenue.
+    from sqlalchemy import func
+    revenue_rows = dict(
+        ProfitFeedOrder.query.filter_by(merchant_id=merchant_id)
+        .with_entities(ProfitFeedOrder.channel, func.coalesce(func.sum(ProfitFeedOrder.gross_revenue), 0.0))
+        .group_by(ProfitFeedOrder.channel)
+        .all()
+    )
+
     channels = []
     for platform in ["shopify", "tiktok", "amazon", "ebay", "walmart", "bigcommerce", "woocommerce"]:
         cc = CommerceChannel.query.get(platform)
@@ -56,6 +65,7 @@ def list_channels(merchant_id: str) -> List[Dict[str, Any]]:
             "color": _platform_color(platform),
             "state": state,
             "orders": mc.pending_orders if mc else 0,
+            "revenue": float(revenue_rows.get(platform, 0.0)),
             "conversion_rate": mc.conversion_rate if mc else 0.0,
             "sync": "Never" if state == "disconnected" else (token.updated_at.isoformat() if token else "now"),
         })
