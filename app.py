@@ -2060,11 +2060,9 @@ def api_admin_deliver_startup_brief(merchant_id):
 @app.route('/login')
 @limiter.exempt
 def login():
-    if not site_wall_enabled():
-        return redirect(url_for('home'))
     if site_wall_authenticated():
         return redirect(url_for('home'))
-    return render_template('index.html', error=bool(request.args.get('error')), oauth_sync=request.args.get('oauth_sync'), recaptcha_site_key=RECAPTCHA_SITE_KEY)
+    return render_template('beta_login.html', error=request.args.get('error') or '', recaptcha_site_key=RECAPTCHA_SITE_KEY)
 
 
 @app.route('/site-login', methods=['GET', 'POST'])
