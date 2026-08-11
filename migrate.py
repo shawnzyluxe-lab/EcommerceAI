@@ -112,6 +112,10 @@ def run_migrations():
             conn.execute(text("ALTER TABLE beta_waitlist_applications ADD COLUMN IF NOT EXISTS ad_plan_addon BOOLEAN DEFAULT FALSE"))
         except Exception as e:
             print(f"[migrate] ad_plan_addon add skipped: {e}")
+        try:
+            conn.execute(text("ALTER TABLE beta_waitlist_applications ADD COLUMN IF NOT EXISTS add_ons JSONB DEFAULT '[]'"))
+        except Exception as e:
+            print(f"[migrate] add_ons add skipped: {e}")
 
         # Session tracking for idle / absolute timeouts.
         conn.execute(text("""
@@ -140,6 +144,7 @@ def run_migrations():
                 bottleneck TEXT,
                 selected_plan VARCHAR(100),
                 ad_plan_addon BOOLEAN DEFAULT FALSE,
+                add_ons JSONB DEFAULT '[]',
                 status VARCHAR(50) DEFAULT 'pending',
                 merchant_id VARCHAR(100) REFERENCES merchant_profiles(merchant_id),
                 notes TEXT,

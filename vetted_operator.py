@@ -19,11 +19,18 @@ def _now():
 
 def submit_application(email: str, business_name: str = "", monthly_volume: str = "",
                        monthly_ad_spend: str = "", ad_channels: str = "", bottleneck: str = "", selected_plan: str = "",
-                       ad_plan_addon: bool = False) -> BetaWaitlistApplication:
+                       ad_plan_addon: bool = False, add_ons: Optional[List[str]] = None) -> BetaWaitlistApplication:
     """Create or update a beta waitlist application."""
     email = (email or "").strip().lower()
     if not email:
         raise ValueError("Email is required")
+
+    add_ons = list(add_ons or [])
+    # Legacy ad_plan_addon field syncs with the add_ons list.
+    if ad_plan_addon and 'curated_ad_plan' not in add_ons:
+        add_ons.append('curated_ad_plan')
+    if 'curated_ad_plan' in add_ons:
+        ad_plan_addon = True
 
     app = BetaWaitlistApplication.query.filter_by(email=email).first()
     if app:
@@ -33,6 +40,8 @@ def submit_application(email: str, business_name: str = "", monthly_volume: str 
         app.ad_channels = ad_channels or app.ad_channels
         app.bottleneck = bottleneck or app.bottleneck
         app.selected_plan = selected_plan or app.selected_plan
+        if add_ons:
+            app.add_ons = add_ons
         if ad_plan_addon is not None:
             app.ad_plan_addon = ad_plan_addon
     else:
@@ -45,6 +54,7 @@ def submit_application(email: str, business_name: str = "", monthly_volume: str 
             bottleneck=bottleneck,
             selected_plan=selected_plan,
             ad_plan_addon=bool(ad_plan_addon),
+            add_ons=add_ons,
             status="pending",
         )
         db.session.add(app)
@@ -206,6 +216,7 @@ def application_to_dict(app: BetaWaitlistApplication) -> Dict[str, Any]:
         "bottleneck": app.bottleneck,
         "selected_plan": app.selected_plan,
         "ad_plan_addon": bool(app.ad_plan_addon),
+        "add_ons": app.add_ons or [],
         "status": app.status,
         "merchant_id": app.merchant_id,
         "notes": app.notes,

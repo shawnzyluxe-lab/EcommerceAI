@@ -170,8 +170,8 @@
     <p class="sub">Launch your brand with US-based manufacturing, custom packaging, and an AI assistant that manages profit across channels. One subscription.</p>
 
     <div class="plans">
-      <div class="plan" id="plan-beta" onclick="selectPlan('beta_plan')">
-        <span class="badge">Beta Plan</span>
+      <div class="plan selected" id="plan-beta">
+        <span class="badge">Base Plan</span>
         <h3>Beta Plan</h3>
         <div class="price">$249<span>/mo</span></div>
         <ul>
@@ -181,20 +181,19 @@
           <li>Discord/SMS alert matrix</li>
         </ul>
       </div>
-      <div class="plan" id="plan-startup" onclick="selectPlan('beta_startup')">
-        <span class="badge">Most Popular</span>
-        <h3>Beta + Startup Pack</h3>
-        <div class="price">$348<span>/mo + setup</span></div>
+      <div class="plan add-on" id="addon-brand" onclick="toggleAddon('custom_brand_build', 'addon-brand')">
+        <span class="badge">Add-on</span>
+        <h3>Custom Brand Build</h3>
+        <div class="price">$149<span> setup</span></div>
         <ul>
-          <li>All Beta Plan features</li>
-          <li>Custom branded product build + packaging</li>
           <li>US-based manufacturer match (FDA-approved facilities)</li>
+          <li>Custom packaging &amp; branded products</li>
           <li>1-year product curation + launch guidance</li>
         </ul>
         <p style="font-size:.75rem; color:var(--muted); margin-top:.75rem; margin-bottom:0;">You own the brand, customer, and storefront. You pay for your own samples and inventory.</p>
       </div>
-      <div class="plan add-on" id="plan-addon" onclick="toggleAdPlan()">
-        <span class="badge">Optional Add-on</span>
+      <div class="plan add-on" id="addon-ad" onclick="toggleAddon('curated_ad_plan', 'addon-ad')">
+        <span class="badge">Add-on</span>
         <h3>Curated Ad Plan</h3>
         <div class="price">$99<span>/mo</span></div>
         <ul>
@@ -203,13 +202,33 @@
           <li>Monthly plan refresh from Profit Feed data</li>
         </ul>
       </div>
+      <div class="plan add-on" id="addon-seo" onclick="toggleAddon('seo', 'addon-seo')">
+        <span class="badge">Add-on</span>
+        <h3>SEO</h3>
+        <div class="price">$79<span>/mo</span></div>
+        <ul>
+          <li>On-page SEO for Shopify/TikTok/Amazon listings</li>
+          <li>Keyword targeting &amp; product descriptions</li>
+          <li>Monthly optimization report</li>
+        </ul>
+      </div>
+      <div class="plan add-on" id="addon-email" onclick="toggleAddon('email_setup', 'addon-email')">
+        <span class="badge">Add-on</span>
+        <h3>Email Setup</h3>
+        <div class="price">$49<span> setup</span></div>
+        <ul>
+          <li>Klaviyo / Mailgun account setup</li>
+          <li>3 automated flows (welcome, abandoned cart, win-back)</li>
+          <li>Brand-owned email list</li>
+        </ul>
+      </div>
     </div>
 
     <div class="form-card">
       <h2>Apply for Closed Beta <span>— 10 Spots Left</span></h2>
       <form id="apply-form" onsubmit="submitApplication(event)">
-        <input type="hidden" id="selected_plan" value="beta_startup">
-        <input type="hidden" id="ad_plan_addon" value="false">
+        <input type="hidden" id="selected_plan" value="beta_plan">
+        <input type="hidden" id="add_ons" value="[]">
         <div class="grid-2">
           <div>
             <label>Monthly revenue</label>
@@ -271,20 +290,19 @@
       window.dataLayer.push({ event: event.toLowerCase().replace(/\s+/g, '_'), ...params });
     }
 
-    let adPlanSelected = false;
-    function selectPlan(plan) {
-      document.getElementById('selected_plan').value = plan;
-      document.getElementById('plan-beta').classList.toggle('selected', plan === 'beta_plan');
-      document.getElementById('plan-startup').classList.toggle('selected', plan === 'beta_startup');
-      firePixel('PricingCardClick', { plan: plan, ad_plan: adPlanSelected });
+    const selectedAddOns = new Set();
+    function toggleAddon(id, elementId) {
+      const el = document.getElementById(elementId);
+      if (selectedAddOns.has(id)) {
+        selectedAddOns.delete(id);
+        el.classList.remove('selected');
+      } else {
+        selectedAddOns.add(id);
+        el.classList.add('selected');
+      }
+      document.getElementById('add_ons').value = JSON.stringify(Array.from(selectedAddOns));
+      firePixel('AddOnToggle', { add_on: id, selected: selectedAddOns.has(id), plan: document.getElementById('selected_plan').value });
     }
-    function toggleAdPlan() {
-      adPlanSelected = !adPlanSelected;
-      document.getElementById('ad_plan_addon').value = adPlanSelected;
-      document.getElementById('plan-addon').classList.toggle('selected', adPlanSelected);
-      firePixel('AdPlanToggle', { value: adPlanSelected, plan: document.getElementById('selected_plan').value });
-    }
-    selectPlan('beta_startup');
 
     async function submitApplication(e) {
       e.preventDefault();
@@ -302,6 +320,7 @@
         return;
       }
       const selectedPlan = document.getElementById('selected_plan').value;
+      const addOns = JSON.parse(document.getElementById('add_ons').value || '[]');
       const payload = {
         email: document.getElementById('email').value,
         business_name: '',
@@ -310,7 +329,7 @@
         ad_channels: activeChannels,
         bottleneck: document.getElementById('bottleneck').value,
         selected_plan: selectedPlan,
-        ad_plan_addon: adPlanSelected,
+        add_ons: addOns,
       };
 
       const send = async (token) => {
@@ -323,7 +342,7 @@
           });
           const data = await res.json();
           if (res.ok) {
-            firePixel('Lead', { plan: selectedPlan, ad_plan_addon: adPlanSelected, revenue: payload.monthly_volume, ad_spend: payload.monthly_ad_spend });
+            firePixel('Lead', { plan: selectedPlan, add_ons: addOns, revenue: payload.monthly_volume, ad_spend: payload.monthly_ad_spend });
             window.location.href = '/thank-you?plan=' + encodeURIComponent(selectedPlan);
           } else {
             throw new Error(data.detail || 'Application failed');

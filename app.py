@@ -3628,8 +3628,12 @@ def api_beta_apply():
     monthly_ad_spend = (data.get("monthly_ad_spend") or "").strip()
     ad_channels = ", ".join(data.get("ad_channels") or []) if isinstance(data.get("ad_channels"), list) else (data.get("ad_channels") or "")
     bottleneck = (data.get("bottleneck") or "").strip()
-    selected_plan = (data.get("selected_plan") or "").strip()
-    ad_plan_addon = bool(data.get("ad_plan_addon", False))
+    selected_plan = (data.get("selected_plan") or "beta_plan").strip()
+    add_ons = data.get("add_ons") if isinstance(data.get("add_ons"), list) else []
+    # Backwards-compatible support for legacy boolean.
+    if data.get("ad_plan_addon"):
+        if "curated_ad_plan" not in add_ons:
+            add_ons.append("curated_ad_plan")
 
     if not email or "@" not in email:
         return jsonify({"detail": "A valid business email is required."}), 400
@@ -3643,12 +3647,18 @@ def api_beta_apply():
             ad_channels=ad_channels,
             bottleneck=bottleneck,
             selected_plan=selected_plan,
-            ad_plan_addon=ad_plan_addon,
+            add_ons=add_ons,
         )
         try:
-            plan_label = "Beta + Startup Pack" if selected_plan == "beta_startup" else ("Beta Plan" if selected_plan == "beta_plan" else selected_plan)
-            if app.ad_plan_addon:
-                plan_label += " + Curated Ad Plan"
+            plan_label = "Beta Plan"
+            if app.add_ons:
+                addon_names = {
+                    "custom_brand_build": "Custom Brand Build",
+                    "curated_ad_plan": "Curated Ad Plan",
+                    "seo": "SEO",
+                    "email_setup": "Email Setup",
+                }
+                plan_label += " + " + ", ".join([addon_names.get(a, a) for a in app.add_ons])
             _notify_team_new_waitlist(app, plan_label)
             _confirm_waitlist_to_applicant(app, plan_label)
         except Exception as notify_err:
