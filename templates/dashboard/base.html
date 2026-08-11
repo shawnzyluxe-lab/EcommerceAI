@@ -53,7 +53,7 @@
     <div class="main-wrap">
       <header class="topbar">
         <button class="mobile-menu-btn" id="mobile-menu-btn" aria-label="Toggle menu">≡</button>
-        <div class="breadcrumb">{{ merchant.name | default('Your store') }} / {{ active_page | replace('_', ' ') | title }}</div>
+        <div class="breadcrumb">{{ merchant.name | default('Your store') }} / {{ active_page | replace('_ai', '') | replace('_', ' ') | title }}</div>
         <div class="topbar-actions">
           <div class="tier-badge" id="current-merchant-tier-badge">{{ merchant.tier | default('Enterprise Plan') }}</div>
           <button class="btn btn-ghost">Invite team</button>
