@@ -497,6 +497,7 @@ STRIPE_SECRET_KEY = os.environ.get("STRIPE_SECRET_KEY", "")
 STRIPE_PUBLISHABLE_KEY = os.environ.get("STRIPE_PUBLISHABLE_KEY", "")
 STRIPE_WEBHOOK_SECRET = os.environ.get("STRIPE_WEBHOOK_SECRET", "")
 STRIPE_PRICE_BETA_MONTHLY = os.environ.get("STRIPE_PRICE_BETA_MONTHLY", "")
+STRIPE_PRICE_BETA_STARTUP = os.environ.get("STRIPE_PRICE_BETA_STARTUP", "")
 STRIPE_PRICE_STARTUP_ADDON = os.environ.get("STRIPE_PRICE_STARTUP_ADDON", "")
 SHOPIFY_STORE_URL = os.environ.get("SHOPIFY_STORE_URL", "")
 SHOPIFY_ACCESS_TOKEN = os.environ.get("SHOPIFY_ACCESS_TOKEN", "")
@@ -1121,7 +1122,7 @@ def subscribe():
     host = request.host.split(':')[0].lower()
     if host in ('shawnzyluxe.com', 'www.shawnzyluxe.com'):
         return render_template('coming_soon.html')
-    return render_template('subscribe.html', stripe_publishable_key=STRIPE_PUBLISHABLE_KEY, price_beta=249, price_addon=99)
+    return render_template('subscribe.html', stripe_publishable_key=STRIPE_PUBLISHABLE_KEY, price_beta=249, price_beta_startup=348, price_addon=99)
 
 
 @app.route('/dashboard')
@@ -1943,6 +1944,7 @@ def create_stripe_checkout():
     business_name = (data.get("business_name") or "").strip() or email
     password = data.get("password", "")
     include_startup_addon = bool(data.get("include_startup_addon"))
+    plan = (data.get("plan") or "beta").lower().strip()
 
     if not email or not password or len(password) < 8:
         return jsonify({"detail": "A valid email and a password of at least 8 characters are required."}), 400
@@ -1977,6 +1979,7 @@ def create_stripe_checkout():
             email,
             business_name,
             include_startup_addon=include_startup_addon,
+            plan=plan,
             success_url=success_url,
             cancel_url=cancel_url,
         )

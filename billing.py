@@ -11,6 +11,7 @@ logger = logging.getLogger(__name__)
 stripe.api_key = os.environ.get("STRIPE_SECRET_KEY", "")
 STRIPE_PUBLISHABLE_KEY = os.environ.get("STRIPE_PUBLISHABLE_KEY", "")
 PRICE_BETA_MONTHLY = os.environ.get("STRIPE_PRICE_BETA_MONTHLY", "")
+PRICE_BETA_STARTUP = os.environ.get("STRIPE_PRICE_BETA_STARTUP", "")
 PRICE_STARTUP_ADDON = os.environ.get("STRIPE_PRICE_STARTUP_ADDON", "")
 
 
@@ -44,11 +45,24 @@ def get_or_create_customer(email, name, merchant_id):
         raise
 
 
-def create_checkout_session(merchant_id, email, name, include_startup_addon=False, success_url=None, cancel_url=None):
-    """Create a Stripe Checkout session for the beta subscription + optional add-on."""
+def create_checkout_session(merchant_id, email, name, include_startup_addon=False, plan="beta", success_url=None, cancel_url=None):
+    """Create a Stripe Checkout session for the beta or beta+startup plan."""
     _ensure_configured()
-    if not PRICE_BETA_MONTHLY:
-        raise RuntimeError("STRIPE_PRICE_BETA_MONTHLY is not configured")
+    selected_tier = "Beta Tier"
+    chosen_plan = plan.lower().strip()
+
+    if chosen_plan == "beta_startup":
+        if not PRICE_BETA_STARTUP:
+            raise RuntimeError("STRIPE_PRICE_BETA_STARTUP is not configured")
+        selected_tier = "Beta + Startup Pack"
+        line_items = [{"price": PRICE_BETA_STARTUP, "quantity": 1}]
+    else:
+        if not PRICE_BETA_MONTHLY:
+            raise RuntimeError("STRIPE_PRICE_BETA_MONTHLY is not configured")
+        selected_tier = "Beta Tier"
+        line_items = [{"price": PRICE_BETA_MONTHLY, "quantity": 1}]
+        if include_startup_addon and PRICE_STARTUP_ADDON:
+            line_items.append({"price": PRICE_STARTUP_ADDON, "quantity": 1})
 
     profile = MerchantProfile.query.get(merchant_id)
     if not profile:
@@ -62,12 +76,8 @@ def create_checkout_session(merchant_id, email, name, include_startup_addon=Fals
         billing = SaaSBilling(merchant_id=merchant_id)
         db.session.add(billing)
     billing.stripe_customer_id = customer_id
-    billing.current_plan = billing.current_plan or "Beta Tier"
+    billing.current_plan = selected_tier
     db.session.commit()
-
-    line_items = [{"price": PRICE_BETA_MONTHLY, "quantity": 1}]
-    if include_startup_addon and PRICE_STARTUP_ADDON:
-        line_items.append({"price": PRICE_STARTUP_ADDON, "quantity": 1})
 
     params = {
         "customer": customer_id,
@@ -76,13 +86,14 @@ def create_checkout_session(merchant_id, email, name, include_startup_addon=Fals
         "line_items": line_items,
         "metadata": {
             "merchant_id": merchant_id,
-            "selected_tier": "Beta Tier",
-            "startup_addon": str(include_startup_addon).lower(),
+            "selected_tier": selected_tier,
+            "startup_addon": str(chosen_plan == "beta_startup" or include_startup_addon).lower(),
+            "plan_choice": chosen_plan,
         },
         "subscription_data": {
             "metadata": {
                 "merchant_id": merchant_id,
-                "selected_tier": "Beta Tier",
+                "selected_tier": selected_tier,
             }
         },
         "allow_promotion_codes": True,

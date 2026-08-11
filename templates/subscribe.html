@@ -114,7 +114,7 @@
     <p class="sub">Real-time profit. Multi-channel ops. AI COO. One subscription.</p>
 
     <div class="plans" id="plans">
-      <div class="plan selected" data-plan="beta" data-addon="false">
+      <div class="plan selected" data-plan="beta">
         <h3>Beta Plan</h3>
         <div class="price">${{ price_beta }}<span>/mo</span></div>
         <div style="color:var(--muted);font-size:.85rem">Everything you need to launch.</div>
@@ -125,15 +125,16 @@
           <li>Discord/SMS alert matrix</li>
         </ul>
       </div>
-      <div class="plan" data-plan="beta" data-addon="true">
+      <div class="plan" data-plan="beta_startup">
         <h3>Beta + Startup Pack</h3>
-        <div class="price">${{ price_beta + price_addon }}<span>/mo + setup</span></div>
-        <div style="color:var(--muted);font-size:.85rem">We build your store with you.</div>
+        <div class="price">${{ price_beta_startup }}<span>/mo</span></div>
+        <div style="color:var(--muted);font-size:.85rem">We build your real brand with you.</div>
         <ul>
           <li>All Beta Plan features</li>
-          <li>Store setup + landing page build</li>
-          <li>Trending products weekly</li>
-          <li>Curated dropshipper directory</li>
+          <li>Brand name, logo & positioning guidance</li>
+          <li>US-based manufacturer / no-inventory supplier directory</li>
+          <li>Sample product with your branding</li>
+          <li>1-year launch guidance & action plan</li>
         </ul>
       </div>
     </div>
@@ -151,10 +152,6 @@
         <label for="password">Create password</label>
         <input type="password" id="password" name="password" required minlength="8" placeholder="••••••••">
       </div>
-      <div class="checkbox">
-        <input type="checkbox" id="include_startup_addon" name="include_startup_addon">
-        <label for="include_startup_addon">Include $99 Startup Add-on</label>
-      </div>
       <button type="submit" id="submit-btn">Start Beta Subscription</button>
       <div class="message" id="message"></div>
       <div class="muted">Already have an account? <a href="/">Log in</a></div>
@@ -163,15 +160,12 @@
 
   <script>
     const plans = document.querySelectorAll('.plan');
-    const addonBox = document.getElementById('include_startup_addon');
+    let selectedPlan = 'beta';
     plans.forEach(p => p.addEventListener('click', () => {
       plans.forEach(x => x.classList.remove('selected'));
       p.classList.add('selected');
-      addonBox.checked = p.dataset.addon === 'true';
+      selectedPlan = p.dataset.plan;
     }));
-    addonBox.addEventListener('change', () => {
-      plans.forEach(p => p.classList.toggle('selected', p.dataset.addon === String(addonBox.checked)));
-    });
 
     document.getElementById('checkout-form').addEventListener('submit', async (e) => {
       e.preventDefault();
@@ -188,7 +182,7 @@
             email: document.getElementById('email').value,
             business_name: document.getElementById('business_name').value,
             password: document.getElementById('password').value,
-            include_startup_addon: addonBox.checked,
+            plan: selectedPlan,
           })
         });
         const data = await res.json();
