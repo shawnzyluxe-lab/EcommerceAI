@@ -26,7 +26,7 @@ BRAND = {
 }
 
 # --------------------------------------------------------------------------
-# AI COO — the headline panel
+# Assistant headline panel
 # --------------------------------------------------------------------------
 
 COO = {
@@ -365,7 +365,7 @@ GLOBAL_TOOLS = [
 ]
 
 # --------------------------------------------------------------------------
-# Mobile AI Copilot
+# Mobile Assistant
 # --------------------------------------------------------------------------
 
 MOBILE_ACTIONS = [
@@ -392,7 +392,7 @@ NAV = [
     ("Automations", "#automations", False),
     ("Team AI", "#team", False),
     ("Health Score", "#health", False),
-    ("Mobile Copilot", "#mobile", False),
+    ("Mobile Assistant", "#mobile", False),
 ]
 
 # New commercial-grade page navigation (matches mockups)
@@ -439,7 +439,7 @@ NAV_GROUPS = [
             {"id": "automations", "label": "Automations", "url": "/dashboard/automations", "icon": "⏵"},
             {"id": "team_ai", "label": "Team AI", "url": "/dashboard/team-ai", "icon": "✦"},
             {"id": "health_score", "label": "Health Score", "url": "/dashboard/health-score", "icon": "♥"},
-            {"id": "mobile_copilot", "label": "Mobile Copilot", "url": "/dashboard/mobile-copilot", "icon": "☎"},
+            {"id": "mobile_copilot", "label": "Mobile Assistant", "url": "/dashboard/mobile-copilot", "icon": "☎"},
         ],
     },
     {

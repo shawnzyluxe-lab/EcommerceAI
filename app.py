@@ -740,15 +740,15 @@ with app.app_context():
     if not GeneratedPurchaseOrder.query.first():
         db.session.add(GeneratedPurchaseOrder(po_reference="PO-SZL-A8F2", merchant_id="merchant_shawn_01", variant_sku="SZL-VAR-B", units_ordered=450, fulfillment_status="PENDING"))
     if not AIAgent.query.first():
-        db.session.add(AIAgent(agent_id="agent_logistics", merchant_id="merchant_shawn_01", agent_name="Logistics AI Specialist", agent_role="Logistics AI", status="IDLE_MONITORING", last_action="Scanned catalog inventories for stockout drops."))
-        db.session.add(AIAgent(agent_id="agent_finance", merchant_id="merchant_shawn_01", agent_name="Finance AI Auditor", agent_role="Finance AI", status="IDLE_MONITORING", last_action="Audited ad returns against gross revenue."))
-        db.session.add(AIAgent(agent_id="agent_marketing", merchant_id="merchant_shawn_01", agent_name="Marketing Studio Agent", agent_role="Marketing AI", status="IDLE_MONITORING", last_action="Standing by for plain text creative instructions."))
-        db.session.add(AIAgent(agent_id="agent_support", merchant_id="merchant_shawn_01", agent_name="Support Sentiments Agent", agent_role="Support AI", status="IDLE_MONITORING", last_action="Monitoring cross-channel customer ticket feeds."))
+        db.session.add(AIAgent(agent_id="agent_logistics", merchant_id="merchant_shawn_01", agent_name="Operations Analyst", agent_role="Operations", status="IDLE_MONITORING", last_action="Reviewed inventory levels and flagged restock needs."))
+        db.session.add(AIAgent(agent_id="agent_finance", merchant_id="merchant_shawn_01", agent_name="Finance Analyst", agent_role="Finance", status="IDLE_MONITORING", last_action="Checked cash flow and ad budget headroom."))
+        db.session.add(AIAgent(agent_id="agent_marketing", merchant_id="merchant_shawn_01", agent_name="Marketing Analyst", agent_role="Marketing", status="IDLE_MONITORING", last_action="Standing by for campaign instructions."))
+        db.session.add(AIAgent(agent_id="agent_support", merchant_id="merchant_shawn_01", agent_name="Support Analyst", agent_role="Support", status="IDLE_MONITORING", last_action="Monitoring customer ticket trends across channels."))
     if not AgentMessage.query.first():
         db.session.add(AgentMessage(sender_agent="agent_logistics", recipient_agent="agent_finance", merchant_id="merchant_shawn_01",
                                     payload="Alert: SKU SZL-VAR-B inventory velocity tracking indicates total stockout threat in 96 hours.", action_taken="stockout_alert"))
         db.session.add(AgentMessage(sender_agent="agent_finance", recipient_agent="agent_marketing", merchant_id="merchant_shawn_01",
-                                    payload="Cash flow check verified. Confirmed $1,320 available budget cushion. Approved reorder transaction. Marketing AI, adjust TikTok spend parameters.", action_taken="cash_approved"))
+                                    payload="Cash flow check verified. Confirmed $1,320 available budget cushion. Approved reorder transaction. Adjust TikTok spend parameters.", action_taken="cash_approved"))
         db.session.add(AgentMessage(sender_agent="agent_marketing", recipient_agent="agent_logistics", merchant_id="merchant_shawn_01",
                                     payload="Acknowledged. Suppressing high-velocity TikTok promo ad arrays temporarily. Supplier C Purchase Order generated.", action_taken="ad_adjusted"))
     db.session.commit()
@@ -873,23 +873,23 @@ def run_multi_agent_collaboration(merchant_id, trigger):
 
             payload = json.dumps({"alert": "INVENTORY_CRISIS", "target_sku": pl.variant_sku, "time_horizon_days": pl.days_remaining})
             logistics.status = "ALERT_DISPATCHED"
-            logistics.last_action = f"Flagged structural stockout on {pl.variant_sku}"
+            logistics.last_action = f"Flagged restock need for {pl.variant_sku}"
             logistics.queued_payload = payload
-            actions.append({"agent": "agent_logistics", "action": logistics.last_action})
+            actions.append({"agent": "Operations", "action": logistics.last_action})
 
-            # Finance AI reads logistics payload, checks ad headroom
+            # Finance checks budget headroom
             tiktok = AdSpendAnalytic.query.filter(AdSpendAnalytic.platform_source.ilike("%tiktok%")).first()
             available_leverage = (tiktok.budget_allocated - tiktok.current_spend) if tiktok else 0
             finance.status = "PROCESSING_COMPLETE"
-            finance.last_action = "Coordinated cash allocation with Logistics AI"
-            actions.append({"agent": "agent_finance", "action": finance.last_action})
+            finance.last_action = "Coordinated cash allocation with Operations"
+            actions.append({"agent": "Finance", "action": finance.last_action})
 
             marketing.status = "QUEUED_ADJUSTMENT"
             marketing.last_action = f"Trimming TikTok spend to protect {pl.variant_sku} conversion velocity"
-            actions.append({"agent": "agent_marketing", "action": marketing.last_action})
+            actions.append({"agent": "Marketing", "action": marketing.last_action})
 
             # Write cross-department briefing
-            brief = f"Multi-Agent Orchestration Active: Logistics AI identified {pl.variant_sku} stockout threat. Finance AI confirmed ${available_leverage:.2f} budget headroom. AI Assistant queued an automated reorder and suggests trimming TikTok spend temporarily."
+            brief = f"Assistant update: Operations flagged a {pl.variant_sku} stockout threat. Finance confirmed ${available_leverage:.2f} budget headroom. An automated reorder was drafted and TikTok spend should be trimmed temporarily."
             latest = BusinessMetric.query.filter_by(merchant_id=merchant_id).order_by(BusinessMetric.id.desc()).first()
             if latest:
                 latest.ai_briefing = brief
@@ -3034,7 +3034,7 @@ def compile_executive_digest():
     <div class="metric-box"><div>True Net Profit</div><div class="val">${profit:,.2f}</div></div>
     <div class="metric-box"><div>Gross Revenue</div><div class="val">${revenue:,.2f}</div></div>
   </div>
-  <h3>AI Assistant Algorithmic Summary</h3>
+  <h3>Assistant Summary</h3>
   <div class="briefing-box">{briefing}</div>
 </body>
 </html>"""
@@ -3082,7 +3082,7 @@ def telemetry_poll():
                 })()
 
         brief = (latest.ai_briefing or "").lower()
-        show_mitigation = any(k in brief for k in ("stalled", "delayed", "shortage", "orchestration active", "inventory crisis"))
+        show_mitigation = any(k in brief for k in ("stalled", "delayed", "shortage", "stockout", "inventory crisis", "reorder"))
 
         support = SupportMetric.query.order_by(SupportMetric.id.desc()).first()
         mktg = MarketingStudio.query.order_by(MarketingStudio.id.desc()).first()
@@ -3091,6 +3091,13 @@ def telemetry_poll():
         ads = AdSpendAnalytic.query.filter_by(merchant_id=merchant["id"]).all()
         agents = AIAgent.query.filter_by(merchant_id=merchant["id"]).order_by(AIAgent.agent_id).all()
         messages = AgentMessage.query.filter_by(merchant_id=merchant["id"]).order_by(AgentMessage.id.desc()).limit(4).all()
+
+        AGENT_DISPLAY_NAME = {
+            "agent_logistics": "Operations",
+            "agent_finance": "Finance",
+            "agent_marketing": "Marketing",
+            "agent_support": "Support",
+        }
 
         return jsonify({
             "success": True,
@@ -3106,7 +3113,7 @@ def telemetry_poll():
                 for a in ads
             ],
             "inter_agent_stream": [
-                {"sender": m.sender_agent, "text": m.payload}
+                {"sender": AGENT_DISPLAY_NAME.get(m.sender_agent, "Assistant"), "text": m.payload}
                 for m in reversed(messages)
             ],
             "metrics": {
@@ -3135,7 +3142,7 @@ def telemetry_poll():
             },
             "agents_pool": [
                 {
-                    "name": a.agent_name,
+                    "name": AGENT_DISPLAY_NAME.get(a.agent_id, a.agent_name or "Assistant"),
                     "status": a.status,
                     "last_action": a.last_action,
                 }
