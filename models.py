@@ -136,7 +136,28 @@ class MerchantProfile(db.Model):
     admin_email = db.Column(db.String(255), unique=True)
     password_hash = db.Column(db.String(255))
     account_tier = db.Column(db.String(50), default="Basic Tier")
+    # Vetted Operator sandbox lifecycle
+    sandbox_status = db.Column(db.String(50), default="pending")  # pending, sandbox, approved, rejected
+    sandbox_started_at = db.Column(db.DateTime)
+    sandbox_expires_at = db.Column(db.DateTime)
+    live_access_enabled = db.Column(db.Integer, default=0)  # 0 = false, 1 = true
+    approved_at = db.Column(db.DateTime)
     created_at = db.Column(db.DateTime, server_default=db.func.now())
+
+
+class BetaWaitlistApplication(db.Model):
+    __tablename__ = "beta_waitlist_applications"
+    id = db.Column(db.Integer, primary_key=True, autoincrement=True)
+    email = db.Column(db.String(255), unique=True, nullable=False, index=True)
+    business_name = db.Column(db.String(255))
+    monthly_volume = db.Column(db.String(100))
+    ad_channels = db.Column(db.String(255))  # comma-separated list (Meta, TikTok, Google, Amazon)
+    bottleneck = db.Column(db.Text)
+    status = db.Column(db.String(50), default="pending")  # pending, sandbox, approved, rejected
+    merchant_id = db.Column(db.String(100), db.ForeignKey("merchant_profiles.merchant_id"), nullable=True)
+    notes = db.Column(db.Text)
+    created_at = db.Column(db.DateTime, server_default=db.func.now())
+    reviewed_at = db.Column(db.DateTime)
 
 
 class TenantOAuthToken(db.Model):

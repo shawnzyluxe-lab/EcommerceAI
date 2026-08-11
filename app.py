@@ -38,10 +38,11 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-from models import db, Tenant, ConnectedChannel, ActiveSession, BusinessMetric, CommerceChannel, MerchantChannel, SupportMetric, MarketingStudio, PredictiveLogistics, OutboundTransmission, SaaSBilling, LocalProductCatalog, MerchantProfile, TenantOAuthToken, MerchantMetric, SystemExceptionLog, ProcessedWebhookEvent, AdSpendAnalytic, GeneratedPurchaseOrder, AIAgent, AgentMessage, MerchantDecisionLog, MagicLoginToken, TrendingProduct, ProductFinancialLedger, MerchantSetting, ProfitFeedOrder, AdSpendFeed, Alert
+from models import db, Tenant, ConnectedChannel, ActiveSession, BusinessMetric, CommerceChannel, MerchantChannel, SupportMetric, MarketingStudio, PredictiveLogistics, OutboundTransmission, SaaSBilling, LocalProductCatalog, MerchantProfile, TenantOAuthToken, MerchantMetric, SystemExceptionLog, ProcessedWebhookEvent, AdSpendAnalytic, GeneratedPurchaseOrder, AIAgent, AgentMessage, MerchantDecisionLog, MagicLoginToken, TrendingProduct, ProductFinancialLedger, MerchantSetting, ProfitFeedOrder, AdSpendFeed, Alert, BetaWaitlistApplication
 import profit_feed
 import billing as billing_module
 import alert_matrix
+import vetted_operator
 from dashboard_context import (
     context,
     COMMAND_RESPONSES,
@@ -428,6 +429,10 @@ def get_merchant_context():
         "id": s.merchant_id,
         "tier": profile.account_tier or "Basic Tier",
         "name": profile.business_name,
+        "email": profile.admin_email,
+        "sandbox_status": profile.sandbox_status or "pending",
+        "live_access_enabled": bool(profile.live_access_enabled),
+        "sandbox_expires_at": profile.sandbox_expires_at.isoformat() if profile.sandbox_expires_at else None,
     }
 
 
@@ -467,7 +472,7 @@ def enforce_tier_limits(merchant_id, requested_feature):
 def site_wall_protect():
     if not site_wall_enabled():
         return None
-    if request.endpoint in ('home', 'site_login', 'site_logout', 'subscribe', 'create_stripe_checkout', 'auth_login', 'auth_signup', 'auth_provision_node', 'shopify_orders_webhook', 'tiktok_orders_webhook', 'amazon_orders_webhook', 'stripe_billing_webhook', 'supplier_po_update', 'execute_mitigation', 'generate_magic_link', 'magic_login', 'register_merchant', 'shopify_oauth_callback', 'health_check', 'static'):
+    if request.endpoint in ('home', 'site_login', 'site_logout', 'subscribe', 'create_stripe_checkout', 'beta_apply', 'api_beta_apply', 'auth_login', 'auth_signup', 'auth_provision_node', 'shopify_orders_webhook', 'tiktok_orders_webhook', 'amazon_orders_webhook', 'stripe_billing_webhook', 'supplier_po_update', 'execute_mitigation', 'generate_magic_link', 'magic_login', 'register_merchant', 'shopify_oauth_callback', 'health_check', 'static'):
         return None
     if site_wall_authenticated():
         return None
@@ -538,10 +543,20 @@ with app.app_context():
             if not p.account_tier or p.account_tier == "Basic Tier":
                 p.account_tier = tier
             p.password_hash = generate_password_hash(temp_password, method="pbkdf2:sha256")
+            p.sandbox_status = "approved"
+            p.live_access_enabled = 1
         else:
-            db.session.add(MerchantProfile(merchant_id=mid, business_name=name, admin_email=email, account_tier=tier, password_hash=generate_password_hash(temp_password, method="pbkdf2:sha256")))
+            db.session.add(MerchantProfile(
+                merchant_id=mid,
+                business_name=name,
+                admin_email=email,
+                account_tier=tier,
+                password_hash=generate_password_hash(temp_password, method="pbkdf2:sha256"),
+                sandbox_status="approved",
+                live_access_enabled=1,
+            ))
     if not MerchantProfile.query.get("merchant_guest_02"):
-        db.session.add(MerchantProfile(merchant_id="merchant_guest_02", business_name="Alpha Storefronts", admin_email="guest@alpha.com", account_tier="Pro Tier", password_hash=""))
+        db.session.add(MerchantProfile(merchant_id="merchant_guest_02", business_name="Alpha Storefronts", admin_email="guest@alpha.com", account_tier="Pro Tier", password_hash="", sandbox_status="approved", live_access_enabled=1))
     db.session.commit()
 
     # Seed FK-dependent merchant data now that profiles exist
@@ -1613,7 +1628,7 @@ def site_login():
                 max_age=SESSION_TIMEOUT_DAYS * 86400,
                 httponly=True,
                 samesite='Lax',
-                secure=True,
+                secure=app.config.get("SESSION_COOKIE_SECURE", os.environ.get("SESSION_COOKIE_SECURE", "true").lower() == "true"),
             )
             return response
         error = True
@@ -1962,6 +1977,8 @@ def create_stripe_checkout():
             admin_email=email,
             account_tier="Basic Tier",
             password_hash=generate_password_hash(password, method="pbkdf2:sha256"),
+            sandbox_status="pending",
+            live_access_enabled=0,
         ))
         db.session.add(SaaSBilling(
             merchant_id=merchant_id,
@@ -2361,6 +2378,10 @@ def stripe_billing_webhook():
             profile = MerchantProfile.query.get(merchant_target)
             if profile:
                 profile.account_tier = chosen_tier
+                # Paid subscribers bypass the waitlist sandbox and get live access.
+                profile.sandbox_status = "approved"
+                profile.live_access_enabled = 1
+                profile.approved_at = datetime.utcnow()
             saas_billing = SaaSBilling.query.get(merchant_target)
             if saas_billing:
                 saas_billing.current_plan = chosen_tier
@@ -3141,6 +3162,114 @@ def logout():
     session.pop('customer_access_token', None)
     session.pop('customer', None)
     return redirect(url_for('home'))
+
+
+# ============================================================
+# VETTED OPERATOR INTAKE + SANDBOX
+# ============================================================
+
+@app.route('/beta', methods=['GET'])
+@app.route('/beta/apply', methods=['GET'])
+def beta_apply():
+    """Public beta application waitlist page."""
+    return render_template('beta_apply.html')
+
+
+@app.route('/api/beta/apply', methods=['POST'])
+def api_beta_apply():
+    """Submit a beta waitlist application."""
+    data = request.get_json(silent=True) or request.form or {}
+    email = (data.get("email") or "").strip().lower()
+    business_name = (data.get("business_name") or "").strip()
+    monthly_volume = (data.get("monthly_volume") or "").strip()
+    ad_channels = ", ".join(data.get("ad_channels") or []) if isinstance(data.get("ad_channels"), list) else (data.get("ad_channels") or "")
+    bottleneck = (data.get("bottleneck") or "").strip()
+
+    if not email or "@" not in email:
+        return jsonify({"detail": "A valid business email is required."}), 400
+
+    try:
+        app = vetted_operator.submit_application(
+            email=email,
+            business_name=business_name,
+            monthly_volume=monthly_volume,
+            ad_channels=ad_channels,
+            bottleneck=bottleneck,
+        )
+        return jsonify({"status": "received", "id": app.id, "email": app.email}), 201
+    except Exception as e:
+        logger.error(f"[Beta Apply] Failed: {e}")
+        return jsonify({"detail": "Could not submit application."}), 500
+
+
+@app.route('/admin/beta-waitlist', methods=['GET'])
+@require_roles([UserRole.ADMIN])
+def admin_beta_waitlist():
+    """Admin review page for beta applications."""
+    return render_template('admin_beta_waitlist.html')
+
+
+@app.route('/api/admin/beta-applications', methods=['GET'])
+@require_roles([UserRole.ADMIN])
+def api_admin_beta_applications():
+    """List beta waitlist applications for admin review."""
+    status = request.args.get("status")
+    try:
+        apps = vetted_operator.list_applications(status=status)
+        return jsonify({"applications": [vetted_operator.application_to_dict(a) for a in apps]}), 200
+    except Exception as e:
+        logger.error(f"[Admin Waitlist] Failed: {e}")
+        return jsonify({"detail": "Could not list applications."}), 500
+
+
+@app.route('/api/admin/beta-applications/<int:app_id>/sandbox', methods=['POST'])
+@require_roles([UserRole.ADMIN])
+def api_admin_approve_sandbox(app_id):
+    """Approve an application into the 48-hour sandbox."""
+    try:
+        result = vetted_operator.approve_to_sandbox(app_id)
+        return jsonify({"status": "sandbox", **result}), 200
+    except Exception as e:
+        logger.error(f"[Approve Sandbox] Failed: {e}")
+        return jsonify({"detail": str(e)}), 400
+
+
+@app.route('/api/admin/beta-applications/<int:app_id>/live', methods=['POST'])
+@require_roles([UserRole.ADMIN])
+def api_admin_approve_live(app_id):
+    """Grant live marketplace access to a sandbox merchant."""
+    try:
+        app = BetaWaitlistApplication.query.get_or_404(app_id)
+        if app.merchant_id:
+            vetted_operator.approve_to_live(app.merchant_id)
+            return jsonify({"status": "live", "merchant_id": app.merchant_id}), 200
+        return jsonify({"detail": "Application has no linked merchant."}), 400
+    except Exception as e:
+        logger.error(f"[Approve Live] Failed: {e}")
+        return jsonify({"detail": str(e)}), 400
+
+
+@app.route('/api/admin/beta-applications/<int:app_id>/reject', methods=['POST'])
+@require_roles([UserRole.ADMIN])
+def api_admin_reject(app_id):
+    """Reject a beta application."""
+    data = request.get_json(silent=True) or {}
+    try:
+        vetted_operator.reject_application(app_id, notes=data.get("notes", ""))
+        return jsonify({"status": "rejected"}), 200
+    except Exception as e:
+        logger.error(f"[Reject Application] Failed: {e}")
+        return jsonify({"detail": str(e)}), 400
+
+
+@app.route('/api/merchant/live-access-check', methods=['GET'])
+def api_live_access_check():
+    """Check whether the current merchant can connect live marketplace credentials."""
+    merchant = get_merchant_context()
+    if not merchant:
+        return jsonify({"error": "No merchant context"}), 403
+    result = vetted_operator.gate_check(merchant["id"], request.args.get("feature", "live_sync"))
+    return jsonify(result), 200
 
 
 if __name__ == '__main__':

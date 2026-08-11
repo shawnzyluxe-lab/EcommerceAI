@@ -64,6 +64,19 @@
       </header>
 
       <main class="main-content">
+        {% if merchant.sandbox_status == 'sandbox' %}
+        <div style="background: #fffbeb; border: 1px solid #f59e0b; color: #92400e; padding: 12px 18px; border-radius: 10px; margin-bottom: 18px; font-size: .9rem;">
+          <strong>Sandbox mode active.</strong> You're exploring Prometheus OS with simulated data. Live marketplace connections are disabled {% if merchant.sandbox_expires_at %}until {{ merchant.sandbox_expires_at }}{% endif %}. <a href="/dashboard/billing" style="color:#92400e; text-decoration: underline; font-weight: 600;">Request live access</a> when ready.
+        </div>
+        {% elif merchant.sandbox_status == 'pending' %}
+        <div style="background: #eff6ff; border: 1px solid #3b82f6; color: #1e40af; padding: 12px 18px; border-radius: 10px; margin-bottom: 18px; font-size: .9rem;">
+          <strong>Account pending approval.</strong> Your beta application is under review. Live features are disabled until an admin approves your account.
+        </div>
+        {% elif merchant.sandbox_status == 'rejected' %}
+        <div style="background: #fef2f2; border: 1px solid #ef4444; color: #991b1b; padding: 12px 18px; border-radius: 10px; margin-bottom: 18px; font-size: .9rem;">
+          <strong>Application not approved.</strong> This account does not have access to live marketplace features.
+        </div>
+        {% endif %}
         {% block content %}{% endblock %}
       </main>
     </div>

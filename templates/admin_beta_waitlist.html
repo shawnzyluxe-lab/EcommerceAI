@@ -1,0 +1,93 @@
+{% extends 'dashboard/base.html' %}
+{% block title %}Beta Waitlist — {{ brand.name }} {{ brand.product }}{% endblock %}
+{% block content %}
+
+<section class="page-header">
+  <h1>Beta Waitlist</h1>
+  <p>Review and approve vetted operators for the Prometheus OS beta.</p>
+</section>
+
+<div class="card">
+  <div class="card-head" style="display:flex; justify-content:space-between; align-items:center;">
+    <h3>Applications</h3>
+    <div>
+      <button class="btn" style="font-size:.75rem;" onclick="loadApps('pending')">Pending</button>
+      <button class="btn" style="font-size:.75rem;" onclick="loadApps('sandbox')">Sandbox</button>
+      <button class="btn" style="font-size:.75rem;" onclick="loadApps('approved')">Approved</button>
+      <button class="btn" style="font-size:.75rem;" onclick="loadApps('rejected')">Rejected</button>
+      <button class="btn" style="font-size:.75rem;" onclick="loadApps('')">All</button>
+    </div>
+  </div>
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr><th>Email</th><th>Business</th><th>Volume</th><th>Channels</th><th>Bottleneck</th><th>Status</th><th>Actions</th></tr>
+      </thead>
+      <tbody id="apps-body">
+        <tr><td colspan="7" style="text-align:center; color:#888;">Loading...</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <pre id="result-box" style="display:none; background:#0f0f0f; border:1px solid var(--line); border-radius:8px; padding:12px; font-size:.8rem; margin-top:12px;"></pre>
+</div>
+
+<script>
+async function loadApps(status='') {
+  const url = status ? `/api/admin/beta-applications?status=${encodeURIComponent(status)}` : '/api/admin/beta-applications';
+  const res = await fetch(url);
+  const data = await res.json();
+  const tbody = document.getElementById('apps-body');
+  tbody.innerHTML = '';
+  if (!data.applications || data.applications.length === 0) {
+    tbody.innerHTML = '<tr><td colspan="7" style="text-align:center; color:#888;">No applications found.</td></tr>';
+    return;
+  }
+  for (const app of data.applications) {
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td class="b">${app.email}</td>
+      <td>${app.business_name || '-'}</td>
+      <td>${app.monthly_volume || '-'}</td>
+      <td>${app.ad_channels || '-'}</td>
+      <td style="max-width:260px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;" title="${(app.bottleneck || '').replace(/"/g, '&quot;')}">${app.bottleneck || '-'}</td>
+      <td><span class="tag ${app.status === 'approved' ? 'tag-green' : app.status === 'sandbox' ? 'tag-amber' : app.status === 'rejected' ? 'tag-red' : 'tag-blue'}">${app.status}</span></td>
+      <td>
+        ${app.status === 'pending' ? `<button class="btn" style="font-size:.7rem; margin-right:4px;" onclick="approveSandbox(${app.id})">Sandbox</button><button class="btn" style="font-size:.7rem;" onclick="rejectApp(${app.id})">Reject</button>` : ''}
+        ${app.status === 'sandbox' ? `<button class="btn" style="font-size:.7rem;" onclick="approveLive(${app.id})">Live</button>` : ''}
+      </td>
+    `;
+    tbody.appendChild(tr);
+  }
+}
+
+async function approveSandbox(id) {
+  const res = await fetch(`/api/admin/beta-applications/${id}/sandbox`, {method: 'POST'});
+  const data = await res.json();
+  showResult(res.ok ? `Sandbox approved.\nMerchant ID: ${data.merchant_id}\nEmail: ${data.email}\nTemp password: ${data.temp_password || '(existing)'}\nExpires: ${data.sandbox_expires_at}` : data.detail);
+  loadApps();
+}
+
+async function approveLive(id) {
+  const res = await fetch(`/api/admin/beta-applications/${id}/live`, {method: 'POST'});
+  const data = await res.json();
+  showResult(res.ok ? `Live access granted.\nMerchant ID: ${data.merchant_id}` : data.detail);
+  loadApps();
+}
+
+async function rejectApp(id) {
+  const res = await fetch(`/api/admin/beta-applications/${id}/reject`, {method: 'POST'});
+  const data = await res.json();
+  showResult(res.ok ? 'Application rejected.' : data.detail);
+  loadApps();
+}
+
+function showResult(text) {
+  const box = document.getElementById('result-box');
+  box.textContent = text;
+  box.style.display = 'block';
+}
+
+loadApps();
+</script>
+
+{% endblock %}
