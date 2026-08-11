@@ -3212,7 +3212,10 @@ def api_beta_apply():
 @require_roles([UserRole.ADMIN])
 def admin_beta_waitlist():
     """Admin review page for beta applications."""
-    return render_template('admin_beta_waitlist.html')
+    merchant = get_merchant_context()
+    merchant_id = merchant["id"] if merchant else None
+    ctx = context(active_page='admin_beta_waitlist', merchant=merchant, merchant_id=merchant_id)
+    return render_template('admin_beta_waitlist.html', **ctx)
 
 
 @app.route('/api/admin/beta-applications', methods=['GET'])
