@@ -40,7 +40,7 @@ load_dotenv()
 
 from models import db, Tenant, ConnectedChannel, ActiveSession, BusinessMetric, CommerceChannel, MerchantChannel, SupportMetric, MarketingStudio, PredictiveLogistics, OutboundTransmission, SaaSBilling, LocalProductCatalog, MerchantProfile, TenantOAuthToken, MerchantMetric, SystemExceptionLog, ProcessedWebhookEvent, AdSpendAnalytic, GeneratedPurchaseOrder, AIAgent, AgentMessage, MerchantDecisionLog, MagicLoginToken, TrendingProduct, ProductFinancialLedger, MerchantSetting, ProfitFeedOrder, AdSpendFeed
 import profit_feed
-import billing
+import billing as billing_module
 from dashboard_context import (
     context,
     COMMAND_RESPONSES,
@@ -1889,7 +1889,7 @@ def create_stripe_checkout():
     try:
         success_url = url_for('dashboard', _external=True, _scheme='https') + '?checkout=success'
         cancel_url = url_for('subscribe', _external=True, _scheme='https') + '?canceled=1'
-        session_url, session_id, customer_id = billing.create_checkout_session(
+        session_url, session_id, customer_id = billing_module.create_checkout_session(
             merchant_id,
             email,
             business_name,
@@ -1911,7 +1911,7 @@ def stripe_customer_portal():
         return jsonify({"error": "No merchant context"}), 403
     try:
         return_url = url_for('dashboard_page', page='billing', _external=True, _scheme='https')
-        url = billing.create_customer_portal_session(merchant["id"], return_url=return_url)
+        url = billing_module.create_customer_portal_session(merchant["id"], return_url=return_url)
         return jsonify({"url": url}), 200
     except Exception as e:
         logger.error(f"[Stripe Portal] Failed: {e}")
@@ -2261,7 +2261,7 @@ def stripe_billing_webhook():
 
     try:
         payload = request.get_data(as_text=True)
-        event = billing.handle_webhook(payload, sig_header, STRIPE_WEBHOOK_SECRET)
+        event = billing_module.handle_webhook(payload, sig_header, STRIPE_WEBHOOK_SECRET)
         event_type = event.get("type")
 
         if event_type in ("checkout.session.completed", "customer.subscription.updated"):
