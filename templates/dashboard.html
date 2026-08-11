@@ -143,10 +143,10 @@ body.sidebar-collapsed .shell { grid-template-columns: 60px 1fr; }
 
     <div class="wrap">
 
-      <!-- ---------- AI COO ---------- -->
+      <!-- ---------- AI assistant ---------- -->
       <section class="coo">
         <div class="card-head" style="margin-bottom:10px">
-          <span class="tag blue">AI COO</span>
+          <span class="tag blue">AI assistant</span>
           <span class="tag ghost">Confidence {{ coo.confidence }}%</span>
           <span class="spacer"></span>
           <span class="crumb" style="font-size:.76rem;color:var(--ink-3)">{{ generated }}</span>
@@ -173,12 +173,12 @@ body.sidebar-collapsed .shell { grid-template-columns: 60px 1fr; }
           {% endfor %}
         </div>
         <div class="approve">
-          <button class="btn blue" onclick="executeContextualAIAnalysis()">Run AI COO Analysis</button>
+          <button class="btn blue" onclick="executeContextualAIAnalysis()">Run AI assistant Analysis</button>
           <button class="btn blue" onclick="executeLearnedMitigationMoat('INVENTORY_SHORTAGE','APPROVED','Supplier C')">Approve &amp; Execute</button>
           <button class="btn" onclick="executeLearnedMitigationMoat('INVENTORY_SHORTAGE','MODIFIED','Supplier C')">Modify</button>
           <button class="btn">Dismiss</button>
         </div>
-        <pre id="ai-output" style="margin-top:12px; padding:12px; background:#0b1020; color:#d4e3ff; border-radius:10px; font-size:12px; white-space:pre-wrap; min-height:60px;">AI COO standing by.</pre>
+        <pre id="ai-output" style="margin-top:12px; padding:12px; background:#0b1020; color:#d4e3ff; border-radius:10px; font-size:12px; white-space:pre-wrap; min-height:60px;">AI assistant standing by.</pre>
       </section>
 
       <!-- ---------- Team AI Orchestration Loop ---------- -->
@@ -872,7 +872,7 @@ body.sidebar-collapsed .shell { grid-template-columns: 60px 1fr; }
     <section class="section" id="settings">
       <div class="section-head">
         <h2>⚙️ System Settings</h2>
-        <p>Platform operations, channel tokens, and AI COO permissions.</p>
+        <p>Platform operations, channel tokens, and AI assistant permissions.</p>
       </div>
       <div style="background:var(--card); padding:25px; border:1px solid #262636; border-radius:6px; margin-bottom:20px;">
         <h5 style="margin-top:0; color:#fff;">1. Storefront Channel API Tokens</h5>
@@ -894,10 +894,10 @@ body.sidebar-collapsed .shell { grid-template-columns: 60px 1fr; }
       </div>
 
       <div style="background:var(--card); padding:25px; border:1px solid #262636; border-radius:6px;">
-        <h5 style="margin-top:0; color:#fff;">3. Internal AI COO Engine Permissions</h5>
+        <h5 style="margin-top:0; color:#fff;">3. Internal AI assistant Engine Permissions</h5>
         <label style="display:flex; align-items:center; cursor:pointer; font-size:14px;">
           <input type="checkbox" id="coo-auto-reorder" checked style="margin-right:10px;">
-          Allow AI COO to autonomously draft purchase orders when inventory running low
+          Allow AI assistant to autonomously draft purchase orders when inventory running low
         </label>
       </div>
 
@@ -1211,7 +1211,7 @@ async function commitCredentialsToVault() {
 
 async function executeContextualAIAnalysis() {
   const aiOutputBox = document.getElementById('ai-output');
-  aiOutputBox.innerText = "AI COO is analyzing real-time workspace pipelines...";
+  aiOutputBox.innerText = "AI assistant is analyzing real-time workspace pipelines...";
 
   const payload = {
     tenant_id: "tenant_current",
@@ -1230,7 +1230,7 @@ async function executeContextualAIAnalysis() {
     const data = await response.json();
     aiOutputBox.innerText = data.executive_summary;
   } catch (error) {
-    aiOutputBox.innerText = "AI COO Error: " + error.message;
+    aiOutputBox.innerText = "AI assistant Error: " + error.message;
   }
 }
 

@@ -889,7 +889,7 @@ def run_multi_agent_collaboration(merchant_id, trigger):
             actions.append({"agent": "agent_marketing", "action": marketing.last_action})
 
             # Write cross-department briefing
-            brief = f"Multi-Agent Orchestration Active: Logistics AI identified {pl.variant_sku} stockout threat. Finance AI confirmed ${available_leverage:.2f} budget headroom. AI COO queued an automated reorder and suggests trimming TikTok spend temporarily."
+            brief = f"Multi-Agent Orchestration Active: Logistics AI identified {pl.variant_sku} stockout threat. Finance AI confirmed ${available_leverage:.2f} budget headroom. AI Assistant queued an automated reorder and suggests trimming TikTok spend temporarily."
             latest = BusinessMetric.query.filter_by(merchant_id=merchant_id).order_by(BusinessMetric.id.desc()).first()
             if latest:
                 latest.ai_briefing = brief
@@ -2382,7 +2382,7 @@ def tracking_injection():
 @app.route('/api/v1/ai-coo/execute-analysis', methods=['POST'])
 @require_roles([UserRole.ADMIN, UserRole.ENGINEER, UserRole.MERCHANT])
 def ai_coo_execute():
-    """Unified AI COO analysis endpoint combining DB state and screen context."""
+    """Unified AI Assistant analysis endpoint combining DB state and screen context."""
     payload = request.get_json(silent=True) or {}
     merchant = get_merchant_context()
     tenant_id = (merchant.get("id") if merchant else "") or payload.get("tenant_id", "")
@@ -2422,7 +2422,7 @@ def ai_coo_execute():
 @app.route('/api/v1/settings/update', methods=['POST'])
 @require_roles([UserRole.ADMIN, UserRole.MERCHANT])
 def update_tenant_settings():
-    """Secure settings storage: channel tokens and AI COO permissions."""
+    """Secure settings storage: channel tokens and AI Assistant permissions."""
     merchant = get_merchant_context()
     if not merchant:
         return jsonify({"detail": "No merchant context."}), 403
@@ -3034,7 +3034,7 @@ def compile_executive_digest():
     <div class="metric-box"><div>True Net Profit</div><div class="val">${profit:,.2f}</div></div>
     <div class="metric-box"><div>Gross Revenue</div><div class="val">${revenue:,.2f}</div></div>
   </div>
-  <h3>AI COO Algorithmic Summary</h3>
+  <h3>AI Assistant Algorithmic Summary</h3>
   <div class="briefing-box">{briefing}</div>
 </body>
 </html>"""
