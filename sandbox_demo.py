@@ -1,6 +1,15 @@
 """Demo data seeding for sandbox merchants."""
 import json
-from models import db, BusinessMetric, StartupPackProject
+from models import (
+    db,
+    BusinessMetric,
+    StartupPackProject,
+    ProfitFeedOrder,
+    AdSpendFeed,
+    Alert,
+    MerchantChannel,
+    TenantOAuthToken,
+)
 import profit_feed
 import alert_matrix
 import action_gate
@@ -71,15 +80,26 @@ def _seed_demo_startup_pack(merchant_id, business_name):
     db.session.commit()
 
 
-def seed_sandbox_demo(merchant_id, business_name=""):
+def _clear_demo_data(merchant_id):
+    """Remove any previously seeded demo data for this merchant."""
+    ProfitFeedOrder.query.filter_by(merchant_id=merchant_id).delete()
+    AdSpendFeed.query.filter_by(merchant_id=merchant_id).delete()
+    Alert.query.filter_by(merchant_id=merchant_id).delete()
+    MerchantChannel.query.filter_by(merchant_id=merchant_id).delete()
+    TenantOAuthToken.query.filter_by(merchant_id=merchant_id).delete()
+    StartupPackProject.query.filter_by(merchant_id=merchant_id).delete()
+    db.session.commit()
+
+
+def seed_sandbox_demo(merchant_id, business_name="", force=False):
     """Populate a sandbox merchant with realistic demo data.
 
-    Safe to call multiple times: returns False if data already exists.
+    Safe to call multiple times: returns False if data already exists unless force=True.
     """
-    from models import ProfitFeedOrder
-
     if ProfitFeedOrder.query.filter_by(merchant_id=merchant_id).first():
-        return False
+        if not force:
+            return False
+        _clear_demo_data(merchant_id)
 
     suffix = _order_suffix(merchant_id)
     for i, (channel, items, gross, state) in enumerate(DEMO_ORDERS):

@@ -3810,7 +3810,8 @@ def api_admin_seed_sandbox_demo(merchant_id):
     """Generate or refresh demo data for a sandbox merchant."""
     try:
         profile = MerchantProfile.query.get_or_404(merchant_id)
-        seeded = sandbox_demo.seed_sandbox_demo(merchant_id, profile.business_name or "")
+        force = request.args.get("force", "false").lower() == "true"
+        seeded = sandbox_demo.seed_sandbox_demo(merchant_id, profile.business_name or "", force=force)
         return jsonify({"merchant_id": merchant_id, "seeded": seeded}), 200
     except Exception as e:
         logger.error(f"[Seed Sandbox Demo] Failed: {e}")
