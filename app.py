@@ -4123,6 +4123,52 @@ def api_admin_approve_live(app_id):
         return jsonify({"detail": str(e)}), 400
 
 
+@app.route('/api/admin/beta-applications/<int:app_id>/checkout', methods=['POST'])
+@require_roles([UserRole.ADMIN])
+def api_admin_send_checkout(app_id):
+    """Create a Stripe checkout link for a sandbox/approved applicant and email it."""
+    try:
+        app = BetaWaitlistApplication.query.get_or_404(app_id)
+        if app.status not in ('sandbox', 'approved'):
+            return jsonify({"detail": "Application must be in sandbox or approved status."}), 400
+        if not app.merchant_id:
+            return jsonify({"detail": "No merchant linked. Approve to sandbox first."}), 400
+        profile = MerchantProfile.query.get(app.merchant_id)
+        if not profile:
+            return jsonify({"detail": "Merchant profile not found."}), 400
+
+        plan = (app.selected_plan or "beta").lower().strip()
+        include_startup_addon = "beta_startup" in plan or bool(app.ad_plan_addon)
+
+        session_url, session_id, customer_id = billing_module.create_checkout_session(
+            merchant_id=profile.merchant_id,
+            email=profile.admin_email or app.email,
+            name=profile.business_name or app.business_name or app.email,
+            include_startup_addon=include_startup_addon,
+            plan=plan,
+        )
+
+        email_sent = False
+        if profile.admin_email:
+            body = f"""
+            <p>Hi {profile.business_name or 'there'},</p>
+            <p>Your Vantav beta access is ready. Complete payment below to unlock live marketplace connections and remove the 48-hour sandbox limit:</p>
+            <p><a href="{session_url}" style="display:inline-block;padding:10px 18px;background:#d4af37;color:#000;border-radius:8px;text-decoration:none;font-weight:700;">Complete Payment</a></p>
+            <p>— Vantav Team</p>
+            """
+            email_sent = dispatch_external_email(profile.admin_email, "Complete Your Vantav Beta Setup", body)
+
+        return jsonify({
+            "status": "checkout_created",
+            "checkout_url": session_url,
+            "session_id": session_id,
+            "email_sent": email_sent,
+        }), 200
+    except Exception as e:
+        logger.error(f"[Admin Checkout] Failed for {app_id}: {e}")
+        return jsonify({"detail": str(e)}), 400
+
+
 @app.route('/api/admin/beta-applications/<int:app_id>/reject', methods=['POST'])
 @require_roles([UserRole.ADMIN])
 def api_admin_reject(app_id):

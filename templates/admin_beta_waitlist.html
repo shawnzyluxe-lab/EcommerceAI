@@ -64,7 +64,8 @@ async function loadApps(status='') {
       <td><span class="tag ${app.status === 'approved' ? 'tag-green' : app.status === 'sandbox' ? 'tag-amber' : app.status === 'rejected' ? 'tag-red' : 'tag-blue'}">${app.status}</span></td>
       <td>
         ${app.status === 'pending' ? `<button class="btn" style="font-size:.7rem; margin-right:4px;" onclick="approveSandbox(${app.id})">Sandbox</button><button class="btn" style="font-size:.7rem;" onclick="rejectApp(${app.id})">Reject</button>` : ''}
-        ${app.status === 'sandbox' ? `<button class="btn" style="font-size:.7rem;" onclick="approveLive(${app.id})">Live</button>` : ''}
+        ${app.status === 'sandbox' ? `<button class="btn" style="font-size:.7rem; margin-right:4px;" onclick="approveLive(${app.id})">Live</button><button class="btn" style="font-size:.7rem;" onclick="sendCheckout(${app.id})">Checkout</button>` : ''}
+        ${app.status === 'approved' ? `<button class="btn" style="font-size:.7rem;" onclick="sendCheckout(${app.id})">Checkout</button>` : ''}
       </td>
     `;
     tbody.appendChild(tr);
@@ -102,6 +103,22 @@ async function rejectApp(id) {
   const res = await fetch(`/api/admin/beta-applications/${id}/reject`, {method: 'POST'});
   const data = await res.json();
   showResult(res.ok ? 'Application rejected.' : data.detail);
+  loadApps();
+}
+
+async function sendCheckout(id) {
+  const res = await fetch(`/api/admin/beta-applications/${id}/checkout`, {method: 'POST'});
+  const data = await res.json();
+  if (res.ok) {
+    const lines = [
+      `Checkout created ${data.email_sent ? 'and emailed.' : '(email dispatch failed — copy link below).'}`,
+      `Checkout URL: ${data.checkout_url}`,
+      `Session ID: ${data.session_id}`,
+    ];
+    showResult(lines.join('\n'));
+  } else {
+    showResult(data.detail || 'Checkout failed.');
+  }
   loadApps();
 }
 
