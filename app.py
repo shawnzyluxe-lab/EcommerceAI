@@ -61,6 +61,7 @@ import vetted_operator
 import action_gate
 import channels as channels_module
 import startup_pack
+import sandbox_demo
 import migrate as migrate_module
 from dashboard_context import (
     context,
@@ -3752,6 +3753,9 @@ def api_admin_approve_sandbox(app_id):
         expires_at_str = result["sandbox_expires_at"]
         expires_at = datetime.fromisoformat(expires_at_str)
 
+        app_obj = BetaWaitlistApplication.query.get_or_404(app_id)
+        sandbox_demo.seed_sandbox_demo(merchant_id, app_obj.business_name or "")
+
         # One-time magic login link that lives as long as the sandbox window.
         magic_token = secrets.token_urlsafe(32)
         db.session.add(MagicLoginToken(
@@ -3797,6 +3801,19 @@ def api_admin_approve_sandbox(app_id):
         }), 200
     except Exception as e:
         logger.error(f"[Approve Sandbox] Failed: {e}")
+        return jsonify({"detail": str(e)}), 400
+
+
+@app.route('/api/admin/seed-sandbox-demo/<merchant_id>', methods=['POST'])
+@require_roles([UserRole.ADMIN])
+def api_admin_seed_sandbox_demo(merchant_id):
+    """Generate or refresh demo data for a sandbox merchant."""
+    try:
+        profile = MerchantProfile.query.get_or_404(merchant_id)
+        seeded = sandbox_demo.seed_sandbox_demo(merchant_id, profile.business_name or "")
+        return jsonify({"merchant_id": merchant_id, "seeded": seeded}), 200
+    except Exception as e:
+        logger.error(f"[Seed Sandbox Demo] Failed: {e}")
         return jsonify({"detail": str(e)}), 400
 
 

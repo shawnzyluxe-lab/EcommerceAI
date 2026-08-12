@@ -21,7 +21,11 @@
       <div style="font-size:.7rem; color:var(--ink-3); margin:4px 0;">{{ ch.state }}</div>
       {% if ch.platform in ('shopify','tiktok','amazon') %}
         {% if merchant.sandbox_status == 'sandbox' %}
-        <span class="tag tag-ghost" style="margin-top: 10px; display: inline-block;">Disabled in sandbox</span>
+          {% if ch.state == 'connected' %}
+          <span class="tag tag-green" style="margin-top: 10px; display: inline-block;">Connected (demo)</span>
+          {% else %}
+          <span class="tag tag-ghost" style="margin-top: 10px; display: inline-block;">Disabled in sandbox</span>
+          {% endif %}
         {% else %}
         <button class="btn" style="margin-top: 10px; width: 100%; font-size: .72rem; padding: 5px 8px;" onclick="openConnectModal('{{ ch.platform }}')">{{ 'Manage' if ch.state == 'connected' else 'Connect' }}</button>
         {% endif %}
@@ -95,7 +99,7 @@
 
       <button class="btn btn-primary" style="width: 100%;" type="submit" {% if merchant.sandbox_status == 'sandbox' %}disabled{% endif %}>{% if merchant.sandbox_status == 'sandbox' %}Live connect disabled in sandbox{% else %}Encrypt &amp; Save Connection{% endif %}</button>
       {% if merchant.sandbox_status == 'sandbox' %}
-      <p style="font-size:.75rem; color:var(--ink-3); margin-top:8px;">Marketplace connections are disabled while your 48-hour sandbox is active. Request live access to connect real stores.</p>
+      <p style="font-size:.75rem; color:var(--ink-3); margin-top:8px;">Simulated demo channels are already connected for your 48-hour sandbox. Request live access to connect your real stores.</p>
       {% endif %}
     </form>
     <div id="form-message" style="margin-top:10px; font-size:.8rem;"></div>
@@ -193,8 +197,10 @@ function renderChannels(channels) {
     let action;
     if (!isBeta) {
       action = '<span class="tag tag-ghost" style="margin-top: 10px; display: inline-block;">Not available in beta</span>';
-    } else if (SANDBOX) {
+    } else if (SANDBOX && c.state !== 'connected') {
       action = '<span class="tag tag-ghost" style="margin-top: 10px; display: inline-block;">Disabled in sandbox</span>';
+    } else if (c.state === 'connected') {
+      action = `<span class="tag tag-green" style="margin-top: 10px; display: inline-block;">${SANDBOX ? 'Connected (demo)' : 'Connected'}</span>`;
     } else {
       action = `<button class="btn" style="margin-top: 10px; width: 100%; font-size: .72rem; padding: 5px 8px;" onclick="openConnectModal('${c.platform}')">${c.state === 'connected' ? 'Manage' : 'Connect'}</button>`;
     }
