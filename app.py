@@ -69,7 +69,6 @@ import sandbox_demo
 import migrate as migrate_module
 from dashboard_context import (
     context,
-    COMMAND_RESPONSES,
     RECENT_ORDERS,
     PROFIT_BREAKDOWN,
     BRIEFING,
@@ -179,7 +178,7 @@ SESSION_MAX_AGE_HOURS = int(os.environ.get("SESSION_MAX_AGE_HOURS", "12"))
 BETA_MODE = os.environ.get("BETA_MODE", "false").lower() in ("true", "1", "yes")
 BETA_READY_DASHBOARD_PAGES = {
     "overview", "alerts", "action-gate", "profit-engine", "billing", "startup-pack", "commerce-hub",
-    "tiktok-studio",
+    "tiktok-studio", "command-center",
 }
 
 TIER_LIMITS = {
@@ -1371,21 +1370,22 @@ def home_page():
 
 
 @app.route('/api/command', methods=['POST'])
+@require_roles([UserRole.ADMIN, UserRole.MERCHANT, UserRole.ENGINEER])
 def api_command():
-    q = (request.json or {}).get("q", "").strip().lower().rstrip("?.!")
-    hit = COMMAND_RESPONSES.get(q)
-    if not hit:
-        for key, value in COMMAND_RESPONSES.items():
-            if key in q or q in key:
-                hit = value
-                break
-    if not hit:
-        return jsonify({
-            "answer": "Not wired yet — this endpoint returns canned answers until you connect a model.",
-            "did": [],
-            "stub": True,
-        })
-    return jsonify({**hit, "stub": True})
+    """Natural-language assistant endpoint with live data, memory, and tools."""
+    merchant = get_merchant_context()
+    if not merchant:
+        return jsonify({"error": "No merchant context"}), 403
+    data = request.get_json(silent=True) or {}
+    q = data.get("q", "").strip()
+    if not q:
+        return jsonify({"answer": "What would you like to know?", "did": []}), 200
+    try:
+        result = assistant_engine.chat(merchant["id"], q)
+        return jsonify(result)
+    except Exception as e:
+        logger.error(f"[Assistant] api_command failed: {e}")
+        return jsonify({"answer": "I had trouble processing that. Try again or contact support.", "did": []}), 500
 
 
 def process_command(cmd_text):
@@ -2190,6 +2190,32 @@ def api_tiktok_studio_briefs():
     except Exception as e:
         logger.error(f"[TikTok Studio] Brief save failed: {e}")
         return jsonify({"detail": str(e)}), 400
+
+
+@app.route('/api/v1/assistant/proactive', methods=['POST'])
+@require_roles([UserRole.ADMIN, UserRole.MERCHANT, UserRole.ENGINEER])
+def api_assistant_proactive():
+    """Run the proactive agent and create recommended actions."""
+    merchant = get_merchant_context()
+    if not merchant:
+        return jsonify({"error": "No merchant context"}), 403
+    try:
+        actions = assistant_engine.run_proactive(merchant["id"])
+        return jsonify({"created": actions}), 200
+    except Exception as e:
+        logger.error(f"[Assistant] Proactive run failed: {e}")
+        return jsonify({"detail": str(e)}), 500
+
+
+@app.route('/api/v1/assistant/thread', methods=['DELETE'])
+@require_roles([UserRole.ADMIN, UserRole.MERCHANT, UserRole.ENGINEER])
+def api_assistant_clear_thread():
+    """Clear the merchant assistant conversation memory."""
+    merchant = get_merchant_context()
+    if not merchant:
+        return jsonify({"error": "No merchant context"}), 403
+    assistant_engine.clear_thread(merchant["id"])
+    return jsonify({"cleared": True}), 200
 
 
 @app.route('/api/v1/tiktok-studio/posts', methods=['POST'])

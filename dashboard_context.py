@@ -45,6 +45,7 @@ BETA_READY_PAGE_IDS = {
     "startup_pack",
     "commerce_hub",
     "tiktok_studio",
+    "command_center",
 }
 
 
@@ -420,7 +421,7 @@ MOBILE_ACTIONS = [
 NAV = [
     ("Home", "/home", False),
     ("Overview", "#top", True),
-    ("Command Center", "#command", False),
+    ("Assistant", "#command", False),
     ("Commerce Hub", "#channels", False),
     ("Alerts", "#alerts", False),
     ("Profit Engine", "#profit", False),
@@ -443,7 +444,7 @@ NAV_GROUPS = [
         "label": "Workspace",
         "links": [
             {"id": "overview", "label": "Overview", "url": "/dashboard", "icon": "◈"},
-            {"id": "command_center", "label": "Command Center", "url": "/dashboard/command-center", "icon": "◉"},
+            {"id": "command_center", "label": "Assistant", "url": "/dashboard/command-center", "icon": "◉"},
             {"id": "orders", "label": "Orders", "url": "/dashboard/orders", "icon": "◫", "badge": "24"},
             {"id": "customers", "label": "Customers", "url": "/dashboard/customers", "icon": "○"},
             {"id": "analytics", "label": "Analytics", "url": "/dashboard/analytics", "icon": "▤"},
