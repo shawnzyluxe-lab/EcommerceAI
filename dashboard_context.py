@@ -436,7 +436,7 @@ NAV = [
     ("Assistant", "#command", False),
     ("Commerce Hub", "#channels", False),
     ("Alerts", "#alerts", False),
-    ("Profit Engine", "#profit", False),
+    ("Profit Dashboard", "#profit", False),
     ("Predictions", "#predict", False),
     ("Product Research", "#research", False),
     ("Fulfillment", "#fulfillment", False),
@@ -478,7 +478,7 @@ NAV_GROUPS = [
         "links": [
             {"id": "alerts", "label": "Alerts", "url": "/dashboard/alerts", "icon": "⚠", "badge": str(len(ALERTS))},
             {"id": "action_gate", "label": "Action Gate", "url": "/dashboard/action-gate", "icon": "✓"},
-            {"id": "profit_engine", "label": "Profit Engine", "url": "/dashboard/profit-engine", "icon": "$"},
+            {"id": "profit_engine", "label": "Profit Dashboard", "url": "/dashboard/profit-engine", "icon": "$"},
             {"id": "predictions", "label": "Predictions", "url": "/dashboard/predictions", "icon": "◐"},
             {"id": "product_research", "label": "Product Research", "url": "/dashboard/product-research", "icon": "◎"},
             {"id": "fulfillment", "label": "Fulfillment", "url": "/dashboard/fulfillment", "icon": "⛟"},
