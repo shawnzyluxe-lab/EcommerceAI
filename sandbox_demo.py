@@ -43,6 +43,8 @@ def _order_suffix(merchant_id):
 
 def _seed_demo_channels(merchant_id):
     """Connect simulated demo channels for the sandbox merchant."""
+    from models import MerchantChannel
+
     suffix = _order_suffix(merchant_id)
     channels_module.connect_shopify(
         merchant_id,
@@ -62,6 +64,15 @@ def _seed_demo_channels(merchant_id):
         "demo_secret_key",
         "us-east-1",
     )
+
+    # Set realistic demo pending-order counts on each channel.
+    demo_orders = {"shopify": 12, "tiktok": 7, "amazon": 4}
+    for platform, count in demo_orders.items():
+        mc = MerchantChannel.query.filter_by(merchant_id=merchant_id, channel_id=platform).first()
+        if mc:
+            mc.pending_orders = count
+            mc.conversion_rate = 3.5
+    db.session.commit()
 
 
 def _seed_demo_startup_pack(merchant_id, business_name):

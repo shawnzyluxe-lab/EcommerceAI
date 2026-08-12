@@ -48,10 +48,12 @@
           {% if c.state == 'connected' %}
           <tr data-row-platform="{{ c.platform }}">
             <td class="b">{{ c.name }}</td>
-            <td><span class="tag tag-green">Live</span></td>
+            <td><span class="tag tag-green">{{ 'Demo' if merchant.sandbox_status == 'sandbox' else 'Live' }}</span></td>
             <td class="num">{{ c.orders }}</td>
             <td>{{ c.sync }}</td>
+            {% if merchant.sandbox_status != 'sandbox' %}
             <td><button class="btn" style="font-size: .72rem; padding: 4px 8px;" onclick="disconnectChannel('{{ c.platform }}')">Disconnect</button></td>
+            {% endif %}
           </tr>
           {% endif %}
           {% endfor %}
@@ -219,10 +221,10 @@ function renderChannels(channels) {
     tbody.innerHTML = connected.map(c => `
       <tr data-row-platform="${c.platform}">
         <td class="b">${c.name}</td>
-        <td><span class="tag tag-green">Live</span></td>
+        <td><span class="tag tag-green">${SANDBOX ? 'Demo' : 'Live'}</span></td>
         <td class="num">${c.orders}</td>
         <td>${c.sync}</td>
-        <td><button class="btn" style="font-size: .72rem; padding: 4px 8px;" onclick="disconnectChannel('${c.platform}')">Disconnect</button></td>
+        ${SANDBOX ? '' : `<td><button class="btn" style="font-size: .72rem; padding: 4px 8px;" onclick="disconnectChannel('${c.platform}')">Disconnect</button></td>`}
       </tr>
     `).join('');
   }
