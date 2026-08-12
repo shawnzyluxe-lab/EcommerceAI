@@ -1,0 +1,271 @@
+{% extends 'dashboard/base.html' %}
+{% block title %}TikTok Studio — {{ brand.name }}{% endblock %}
+{% block content %}
+
+<section class="page-header">
+  <h1>TikTok Demand Studio</h1>
+  <p>Plan, launch, and measure TikTok content that drives orders and profit.</p>
+</section>
+
+<div class="card" style="margin-bottom: 24px;">
+  <div class="card-head" style="justify-content: space-between;">
+    <h3>Weekly Content Plan</h3>
+    <button class="btn" onclick="generatePlan()">Generate This Week's Plan</button>
+  </div>
+  <div id="weekly-plan" style="padding: 16px;">
+    <p style="font-size:.8rem; color:var(--ink-3);">Loading…</p>
+  </div>
+</div>
+
+<div class="grid grid-2" style="margin-bottom: 24px;">
+  <div class="card">
+    <div class="card-head"><h3>Hook Generator</h3></div>
+    <div style="padding: 0 16px 16px;">
+      <label style="font-size:.75rem; color:var(--ink-3); font-weight:600;">Product or benefit</label>
+      <input id="hook-input" type="text" placeholder="e.g., a heatless silk hair curler" style="width:100%; padding:10px; margin:6px 0 12px; border:1px solid var(--line); border-radius:8px; background:#fff;">
+      <button class="btn" onclick="generateHooks()">Generate hooks</button>
+      <ul id="hook-list" style="margin-top:14px; padding-left:18px; font-size:.85rem; line-height:1.6; color:var(--ink);"></ul>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-head"><h3>Creator Brief Builder</h3></div>
+    <div style="padding: 0 16px 16px;">
+      <label style="font-size:.75rem; color:var(--ink-3); font-weight:600;">Product angle</label>
+      <input id="brief-angle" type="text" placeholder="e.g., solves a daily problem" style="width:100%; padding:10px; margin:6px 0 10px; border:1px solid var(--line); border-radius:8px; background:#fff;">
+      <label style="font-size:.75rem; color:var(--ink-3); font-weight:600;">Target creator niche</label>
+      <input id="brief-niche" type="text" placeholder="e.g., skincare, fitness, mom life" style="width:100%; padding:10px; margin:6px 0 10px; border:1px solid var(--line); border-radius:8px; background:#fff;">
+      <label style="font-size:.75rem; color:var(--ink-3); font-weight:600;">CTA</label>
+      <input id="brief-cta" type="text" placeholder="e.g., Shop now, Link in bio" style="width:100%; padding:10px; margin:6px 0 12px; border:1px solid var(--line); border-radius:8px; background:#fff;">
+      <button class="btn btn-primary" style="width:100%;" onclick="saveBrief()">Create brief</button>
+      <div id="briefs-list" style="margin-top:14px; font-size:.8rem;"></div>
+    </div>
+  </div>
+</div>
+
+<div class="grid grid-3" style="margin-bottom: 24px;">
+  <div class="card">
+    <div class="card-head"><h3>Trending Sounds</h3></div>
+    <div id="trending-sounds" style="padding: 0 16px 16px; font-size:.85rem;"></div>
+  </div>
+  <div class="card">
+    <div class="card-head"><h3>Trending Hashtags</h3></div>
+    <div id="trending-hashtags" style="padding: 0 16px 16px; font-size:.85rem;"></div>
+  </div>
+  <div class="card">
+    <div class="card-head"><h3>Demand Performance</h3></div>
+    <div style="padding: 0 16px 16px;">
+      <div style="display:flex; gap:24px; margin-bottom:12px; font-size:.9rem;">
+        <div><span class="num" style="font-size:1.1rem; font-weight:700;" id="perf-views">—</span><br><span style="font-size:.7rem; color:var(--ink-3);">Views</span></div>
+        <div><span class="num" style="font-size:1.1rem; font-weight:700;" id="perf-revenue">—</span><br><span style="font-size:.7rem; color:var(--ink-3);">Revenue</span></div>
+      </div>
+      <svg id="perf-chart" viewBox="0 0 300 100" style="width:100%; height:120px; overflow:visible;"></svg>
+    </div>
+  </div>
+</div>
+
+<div class="card">
+  <div class="card-head"><h3>Post Queue</h3></div>
+  <div style="padding: 0 16px 16px;">
+    <div style="display:grid; grid-template-columns: 2fr 1fr 1fr; gap:10px; font-size:.75rem; color:var(--ink-3); padding-bottom:8px; border-bottom:1px solid var(--line); margin-bottom:8px;">
+      <div>Caption</div>
+      <div>Scheduled</div>
+      <div>Platform</div>
+    </div>
+    <div id="post-queue" style="font-size:.85rem;"></div>
+    <div style="margin-top:16px; border-top:1px solid var(--line); padding-top:12px;">
+      <label style="font-size:.75rem; color:var(--ink-3); font-weight:600;">Add to queue</label>
+      <input id="post-caption" type="text" placeholder="Caption preview..." style="width:100%; padding:10px; margin:6px 0 10px; border:1px solid var(--line); border-radius:8px; background:#fff;">
+      <div style="display:flex; gap:10px;">
+        <input id="post-scheduled" type="datetime-local" style="flex:1; padding:10px; border:1px solid var(--line); border-radius:8px; background:#fff;">
+        <button class="btn" onclick="addPost()">Queue</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+let state = {};
+
+async function loadStudio() {
+  try {
+    const res = await fetch('/api/v1/tiktok-studio');
+    if (!res.ok) throw new Error('Failed to load');
+    state = await res.json();
+    renderAll();
+  } catch (e) {
+    console.error(e);
+  }
+}
+
+function renderAll() {
+  renderWeeklyPlan(state.weekly_plan || []);
+  renderTrending();
+  renderPerformance();
+  renderPostQueue();
+  renderBriefs();
+}
+
+function renderWeeklyPlan(plan) {
+  const el = document.getElementById('weekly-plan');
+  if (!plan.length) {
+    el.innerHTML = '<p style="font-size:.8rem; color:var(--ink-3);">No plan yet. Click "Generate This Week\'s Plan".</p>';
+    return;
+  }
+  el.innerHTML = `
+    <div style="display:grid; grid-template-columns: repeat(7, 1fr); gap:8px;">
+      ${plan.map(d => `
+        <div style="border:1px solid var(--line); border-radius:10px; padding:10px; text-align:center; background:${d.status==='Live' ? 'rgba(59,91,219,.08)' : '#fff'};">
+          <div style="font-size:.75rem; color:var(--ink-3); margin-bottom:4px;">${d.day}</div>
+          <div style="font-size:.65rem; color:var(--ink-3);">${d.date}</div>
+          <div style="font-size:.8rem; font-weight:600; margin:8px 0;">${d.status}</div>
+          <div style="font-size:.72rem; line-height:1.3; color:var(--ink-3); min-height:40px;">${d.hook}</div>
+          <div style="font-size:.65rem; color:var(--ink-3); margin-top:6px;">${d.format}</div>
+        </div>
+      `).join('')}
+    </div>
+    <p style="font-size:.75rem; color:var(--ink-3); margin-top:10px;">${plan.filter(p => p.status === 'Scheduled').length} scheduled • ${plan.filter(p => p.status === 'Live').length} live • ${plan.filter(p => p.status === 'Draft').length} drafts</p>
+  `;
+}
+
+function renderTrending() {
+  const sounds = state.trending_sounds || [];
+  const hashtags = state.trending_hashtags || [];
+  document.getElementById('trending-sounds').innerHTML = sounds.length ? sounds.map(s => `
+    <div style="display:flex; justify-content:space-between; align-items:center; padding:8px 0; border-bottom:1px solid var(--line);">
+      <div>
+        <div style="font-weight:600; font-size:.8rem;">🎵 ${s.name}</div>
+        <div style="font-size:.7rem; color:var(--ink-3);">${s.videos} videos</div>
+      </div>
+      <div style="font-size:.75rem; color:var(--green); font-weight:600;">+${s.growth}%</div>
+    </div>
+  `).join('') : '<p style="font-size:.8rem; color:var(--ink-3);">No trending data.</p>';
+
+  document.getElementById('trending-hashtags').innerHTML = hashtags.length ? hashtags.map(h => `
+    <div style="display:flex; justify-content:space-between; align-items:center; padding:8px 0; border-bottom:1px solid var(--line);">
+      <div>
+        <div style="font-weight:600; font-size:.8rem;">${h.tag}</div>
+        <div style="font-size:.7rem; color:var(--ink-3);">${h.views || h.videos} views</div>
+      </div>
+      <div style="font-size:.75rem; color:var(--green); font-weight:600;">+${h.growth}%</div>
+    </div>
+  `).join('') : '<p style="font-size:.8rem; color:var(--ink-3);">No trending data.</p>';
+}
+
+function renderPerformance() {
+  const perf = state.performance || {};
+  document.getElementById('perf-views').textContent = perf.views || '—';
+  document.getElementById('perf-revenue').textContent = perf.revenue || '—';
+  const data = perf.chart || [];
+  if (!data.length) return;
+  const svg = document.getElementById('perf-chart');
+  const maxV = Math.max(...data.map(d => d.views));
+  const maxR = Math.max(...data.map(d => d.revenue));
+  const width = 300;
+  const height = 100;
+  const step = width / (data.length - 1);
+  const pointsV = data.map((d, i) => {
+    const x = i * step;
+    const y = height - (d.views / maxV) * (height - 10) - 5;
+    return `${x},${y}`;
+  }).join(' ');
+  const pointsR = data.map((d, i) => {
+    const x = i * step;
+    const y = height - (d.revenue / maxR) * (height - 10) - 5;
+    return `${x},${y}`;
+  }).join(' ');
+  svg.innerHTML = `
+    <polyline points="${pointsV}" fill="none" stroke="#3b5bdb" stroke-width="2" />
+    <polyline points="${pointsR}" fill="none" stroke="#34c759" stroke-width="2" />
+    ${data.map((d, i) => `<text x="${i * step}" y="${height + 14}" font-size="8" text-anchor="middle" fill="#6b7488">${d.day}</text>`).join('')}
+  `;
+}
+
+function renderPostQueue() {
+  const queue = state.post_queue || [];
+  const el = document.getElementById('post-queue');
+  el.innerHTML = queue.length ? queue.map(p => `
+    <div style="display:grid; grid-template-columns: 2fr 1fr 1fr; gap:10px; padding:8px 0; border-bottom:1px solid var(--line); font-size:.8rem;">
+      <div>${p.caption || 'Untitled'}</div>
+      <div>${p.scheduled_for ? new Date(p.scheduled_for).toLocaleString() : '—'}</div>
+      <div style="text-transform:capitalize;">${p.platform || 'tiktok'}</div>
+    </div>
+  `).join('') : '<p style="font-size:.8rem; color:var(--ink-3);">No posts queued.</p>';
+}
+
+function renderBriefs() {
+  const briefs = (state.briefs || []).slice(-3).reverse();
+  const el = document.getElementById('briefs-list');
+  if (!briefs.length) {
+    el.innerHTML = '';
+    return;
+  }
+  el.innerHTML = briefs.map(b => `
+    <div style="padding:8px; border:1px solid var(--line); border-radius:8px; margin-bottom:6px; background:#fff;">
+      <div style="font-weight:600; font-size:.8rem;">${b.product_angle}</div>
+      <div style="font-size:.72rem; color:var(--ink-3);">${b.niche} • CTA: ${b.cta}</div>
+    </div>
+  `).join('');
+}
+
+async function generatePlan() {
+  const product = prompt('Describe your product for the weekly plan:') || '';
+  const btn = document.querySelector('.page-header + .card button');
+  if (btn) btn.disabled = true;
+  try {
+    const res = await fetch('/api/v1/tiktok-studio/plan', {method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({product})});
+    const data = await res.json();
+    if (res.ok) {
+      state.weekly_plan = data.weekly_plan;
+      renderWeeklyPlan(state.weekly_plan);
+    }
+  } catch (e) { console.error(e); }
+  if (btn) btn.disabled = false;
+}
+
+async function generateHooks() {
+  const product = document.getElementById('hook-input').value;
+  const list = document.getElementById('hook-list');
+  list.innerHTML = '<li>Generating…</li>';
+  try {
+    const res = await fetch('/api/v1/tiktok-studio/hooks', {method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({product})});
+    const data = await res.json();
+    list.innerHTML = data.hooks.map(h => `<li style="margin-bottom:6px;">${h}</li>`).join('');
+  } catch (e) { list.innerHTML = '<li>Failed to generate hooks.</li>'; }
+}
+
+async function saveBrief() {
+  const angle = document.getElementById('brief-angle').value;
+  const niche = document.getElementById('brief-niche').value;
+  const cta = document.getElementById('brief-cta').value;
+  if (!angle || !niche || !cta) return alert('Fill all brief fields');
+  try {
+    const res = await fetch('/api/v1/tiktok-studio/briefs', {method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({product_angle: angle, niche, cta})});
+    if (!res.ok) throw new Error('Failed');
+    state.briefs = [...(state.briefs || []), (await res.json()).brief];
+    renderBriefs();
+    document.getElementById('brief-angle').value = '';
+    document.getElementById('brief-niche').value = '';
+    document.getElementById('brief-cta').value = '';
+  } catch (e) { alert('Could not save brief'); }
+}
+
+async function addPost() {
+  const caption = document.getElementById('post-caption').value;
+  const scheduled_for = document.getElementById('post-scheduled').value;
+  if (!caption) return alert('Enter a caption');
+  try {
+    const res = await fetch('/api/v1/tiktok-studio/posts', {method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({caption, scheduled_for})});
+    if (!res.ok) throw new Error('Failed');
+    const post = (await res.json()).post;
+    state.post_queue = [...(state.post_queue || []), post];
+    renderPostQueue();
+    document.getElementById('post-caption').value = '';
+    document.getElementById('post-scheduled').value = '';
+  } catch (e) { alert('Could not queue post'); }
+}
+
+loadStudio();
+</script>
+
+{% endblock %}

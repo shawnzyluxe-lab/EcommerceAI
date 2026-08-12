@@ -63,6 +63,7 @@ import channels as channels_module
 import shopify_sync
 import tiktok_sync
 import amazon_sync
+import tiktok_studio
 import startup_pack
 import sandbox_demo
 import migrate as migrate_module
@@ -177,7 +178,8 @@ SESSION_MAX_AGE_HOURS = int(os.environ.get("SESSION_MAX_AGE_HOURS", "12"))
 
 BETA_MODE = os.environ.get("BETA_MODE", "false").lower() in ("true", "1", "yes")
 BETA_READY_DASHBOARD_PAGES = {
-    "overview", "alerts", "action-gate", "profit-engine", "billing", "startup-pack", "commerce-hub"
+    "overview", "alerts", "action-gate", "profit-engine", "billing", "startup-pack", "commerce-hub",
+    "tiktok-studio",
 }
 
 TIER_LIMITS = {
@@ -1342,7 +1344,7 @@ def dashboard_page(page):
         'marketing', 'support', 'automations', 'team-ai', 'health-score',
         'mobile-copilot', 'store-catalog', 'products', 'orders', 'customers',
         'inventory', 'shipments', 'returns', 'analytics', 'discounts', 'apps',
-        'themes', 'reports', 'billing', 'integrations', 'settings'
+        'themes', 'reports', 'billing', 'integrations', 'settings', 'tiktok-studio'
     }
     if page not in valid_pages:
         return redirect(url_for('dashboard'))
@@ -2121,6 +2123,93 @@ def api_startup_pack():
     except Exception as e:
         logger.error(f"[Startup Pack] Get failed: {e}")
         return jsonify({"detail": "Could not load project."}), 500
+
+
+@app.route('/api/v1/tiktok-studio', methods=['GET'])
+@require_roles([UserRole.ADMIN, UserRole.MERCHANT, UserRole.ENGINEER])
+def api_tiktok_studio():
+    """Return the merchant's TikTok Demand Studio state."""
+    merchant = get_merchant_context()
+    if not merchant:
+        return jsonify({"error": "No merchant context"}), 403
+    try:
+        return jsonify(tiktok_studio.get_state(merchant["id"])), 200
+    except Exception as e:
+        logger.error(f"[TikTok Studio] Get failed: {e}")
+        return jsonify({"detail": "Could not load TikTok studio."}), 500
+
+
+@app.route('/api/v1/tiktok-studio/hooks', methods=['POST'])
+@require_roles([UserRole.ADMIN, UserRole.MERCHANT, UserRole.ENGINEER])
+def api_tiktok_studio_hooks():
+    """Generate TikTok hooks from a product description."""
+    merchant = get_merchant_context()
+    if not merchant:
+        return jsonify({"error": "No merchant context"}), 403
+    data = request.get_json(silent=True) or {}
+    try:
+        hooks = tiktok_studio.generate_hooks(data.get("product", ""))
+        return jsonify({"hooks": hooks}), 200
+    except Exception as e:
+        logger.error(f"[TikTok Studio] Hook generation failed: {e}")
+        return jsonify({"detail": str(e)}), 400
+
+
+@app.route('/api/v1/tiktok-studio/plan', methods=['POST'])
+@require_roles([UserRole.ADMIN, UserRole.MERCHANT, UserRole.ENGINEER])
+def api_tiktok_studio_plan():
+    """Generate a new weekly content plan."""
+    merchant = get_merchant_context()
+    if not merchant:
+        return jsonify({"error": "No merchant context"}), 403
+    data = request.get_json(silent=True) or {}
+    try:
+        plan = tiktok_studio.generate_weekly_plan(merchant["id"], data.get("product", ""))
+        return jsonify({"weekly_plan": plan}), 200
+    except Exception as e:
+        logger.error(f"[TikTok Studio] Plan generation failed: {e}")
+        return jsonify({"detail": str(e)}), 400
+
+
+@app.route('/api/v1/tiktok-studio/briefs', methods=['POST'])
+@require_roles([UserRole.ADMIN, UserRole.MERCHANT, UserRole.ENGINEER])
+def api_tiktok_studio_briefs():
+    """Save a creator brief."""
+    merchant = get_merchant_context()
+    if not merchant:
+        return jsonify({"error": "No merchant context"}), 403
+    data = request.get_json(silent=True) or {}
+    try:
+        brief = tiktok_studio.save_brief(
+            merchant["id"],
+            data.get("product_angle", ""),
+            data.get("niche", ""),
+            data.get("cta", ""),
+        )
+        return jsonify({"brief": brief}), 201
+    except Exception as e:
+        logger.error(f"[TikTok Studio] Brief save failed: {e}")
+        return jsonify({"detail": str(e)}), 400
+
+
+@app.route('/api/v1/tiktok-studio/posts', methods=['POST'])
+@require_roles([UserRole.ADMIN, UserRole.MERCHANT, UserRole.ENGINEER])
+def api_tiktok_studio_posts():
+    """Queue a TikTok post."""
+    merchant = get_merchant_context()
+    if not merchant:
+        return jsonify({"error": "No merchant context"}), 403
+    data = request.get_json(silent=True) or {}
+    try:
+        post = tiktok_studio.add_post(
+            merchant["id"],
+            data.get("caption", ""),
+            data.get("scheduled_for", ""),
+        )
+        return jsonify({"post": post}), 201
+    except Exception as e:
+        logger.error(f"[TikTok Studio] Post queue failed: {e}")
+        return jsonify({"detail": str(e)}), 400
 
 
 @app.route('/api/v1/startup-pack/intake', methods=['POST'])

@@ -44,6 +44,7 @@ BETA_READY_PAGE_IDS = {
     "billing",
     "startup_pack",
     "commerce_hub",
+    "tiktok_studio",
 }
 
 
@@ -474,6 +475,7 @@ NAV_GROUPS = [
     {
         "label": "Operations",
         "links": [
+            {"id": "tiktok_studio", "label": "TikTok Studio", "url": "/dashboard/tiktok-studio", "icon": "✦"},
             {"id": "marketing", "label": "Marketing Studio", "url": "/dashboard/marketing", "icon": "✦"},
             {"id": "discounts", "label": "Discounts", "url": "/dashboard/discounts", "icon": "%"},
             {"id": "support", "label": "Support", "url": "/dashboard/support", "icon": "✉"},
