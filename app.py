@@ -504,13 +504,22 @@ def get_merchant_context():
     if not token:
         return None
     s = ActiveSession.query.get(token)
+    now = datetime.utcnow()
     if not s or not s.merchant_id:
+        return None
+    # Enforce absolute and idle session lifetime for merchant sessions.
+    if s.created_at < now - timedelta(days=SESSION_TIMEOUT_DAYS):
+        db.session.delete(s)
+        db.session.commit()
+        return None
+    if s.last_seen and s.last_seen < now - timedelta(minutes=SESSION_IDLE_TIMEOUT_MINUTES):
+        db.session.delete(s)
+        db.session.commit()
         return None
     profile = MerchantProfile.query.get(s.merchant_id)
     if not profile:
         return None
     tier = (profile.account_tier or "Basic Tier").replace("AI Tier", "Plan").replace("AI", "").strip()
-    now = datetime.utcnow()
     sandbox_status = profile.sandbox_status or "pending"
     sandbox_expired = False
     if sandbox_status == "sandbox" and profile.sandbox_expires_at and profile.sandbox_expires_at <= now:
