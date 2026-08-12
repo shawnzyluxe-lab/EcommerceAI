@@ -174,7 +174,7 @@ RECAPTCHA_SECRET_KEY = os.environ.get("RECAPTCHA_SECRET_KEY", "")
 RECAPTCHA_VERIFY_URL = "https://www.google.com/recaptcha/api/siteverify"
 SESSION_COOKIE_NAME = "aegis_session_token"
 SESSION_TIMEOUT_DAYS = int(os.environ.get("SESSION_TIMEOUT_DAYS", "7"))
-SESSION_IDLE_TIMEOUT_MINUTES = int(os.environ.get("SESSION_IDLE_TIMEOUT_MINUTES", "30"))
+SESSION_IDLE_TIMEOUT_MINUTES = int(os.environ.get("SESSION_IDLE_TIMEOUT_MINUTES", "120"))
 SESSION_MAX_AGE_HOURS = int(os.environ.get("SESSION_MAX_AGE_HOURS", "12"))
 
 BETA_MODE = os.environ.get("BETA_MODE", "false").lower() in ("true", "1", "yes")
@@ -282,8 +282,18 @@ def get_current_user():
     if not token:
         return None
     s = ActiveSession.query.get(token)
-    if not s or s.created_at < datetime.utcnow() - timedelta(days=SESSION_TIMEOUT_DAYS):
+    if not s:
         return None
+    now = datetime.utcnow()
+    if s.created_at < now - timedelta(days=SESSION_TIMEOUT_DAYS):
+        return None
+    if s.last_seen and s.last_seen < now - timedelta(minutes=SESSION_IDLE_TIMEOUT_MINUTES):
+        db.session.delete(s)
+        db.session.commit()
+        return None
+    # Refresh idle timestamp on every authenticated request.
+    s.last_seen = now
+    db.session.commit()
     return s
 
 
@@ -516,6 +526,9 @@ def get_merchant_context():
         db.session.delete(s)
         db.session.commit()
         return None
+    # Keep the session alive while the merchant is active.
+    s.last_seen = now
+    db.session.commit()
     profile = MerchantProfile.query.get(s.merchant_id)
     if not profile:
         return None
@@ -2545,7 +2558,8 @@ def auth_login():
         assigned_role = UserRole.ENGINEER.value
     else:
         assigned_role = UserRole.MERCHANT.value
-    db.session.add(ActiveSession(token=session_token, merchant_id=profile.merchant_id, role=assigned_role, created_at=datetime.utcnow()))
+    now = datetime.utcnow()
+    db.session.add(ActiveSession(token=session_token, merchant_id=profile.merchant_id, role=assigned_role, created_at=now, last_seen=now))
     db.session.commit()
 
     response = make_response(jsonify({
@@ -2627,8 +2641,9 @@ def auth_signup():
         return jsonify({"detail": "Tenant provisioning failed. Please retry."}), 500
 
     # 4. Issue session cookie
+    now = datetime.utcnow()
     session_token = secrets.token_urlsafe(32)
-    db.session.add(ActiveSession(token=session_token, merchant_id=merchant_id, role=UserRole.MERCHANT.value, created_at=datetime.utcnow()))
+    db.session.add(ActiveSession(token=session_token, merchant_id=merchant_id, role=UserRole.MERCHANT.value, created_at=now, last_seen=now))
     db.session.commit()
 
     response = make_response(jsonify({
