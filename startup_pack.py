@@ -11,7 +11,7 @@ def _default_checklist(brand_name: str, niche: str) -> List[Dict[str, Any]]:
         {"id": "logo", "title": f"Create logo and visual identity for {brand_name or 'your brand'}", "done": False},
         {"id": "niche_validate", "title": f"Validate niche: {niche or 'chosen niche'} with 10 ideal-customer interviews", "done": False},
         {"id": "sample_order", "title": "Order samples with branding from chosen supplier", "done": False},
-        {"id": "store_build", "title": "Build Shopify store and connect to Prometheus OS", "done": False},
+        {"id": "store_build", "title": "Build Shopify store and connect to Vantav", "done": False},
         {"id": "product_listing", "title": "Launch first 5-10 product listings with profit-ready pricing", "done": False},
         {"id": "tiktok_content", "title": "Create TikTok account and post 3-5 organic videos", "done": False},
         {"id": "ad_launch", "title": "Launch first $20/day TikTok or Meta ad test", "done": False},

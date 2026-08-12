@@ -78,7 +78,7 @@ def _seed_demo_channels(merchant_id):
 def _seed_demo_startup_pack(merchant_id, business_name):
     """Pre-fill the Brand Build project with demo-ready sample data."""
     project = startup_pack.get_project(merchant_id)
-    brand = business_name if business_name and business_name != "New Storefront" else "Luxe Sleep Co."
+    brand = business_name if business_name and business_name not in ("New Storefront", "", " ") else "Luxe Sleep Co."
     project.brand_name = brand
     project.niche = "Premium Home & Sleep"
     project.target_audience = "Gen Z women 22-34, US, interest in wellness and self-care"
