@@ -106,13 +106,6 @@
       border: 1px solid var(--line); border-radius: 99px; padding: .35rem .85rem;
       font-size: .75rem; color: var(--muted); background: #0f0f0f;
     }
-    .demo { text-align: center; padding-bottom: 4rem; }
-    .video-wrap {
-      max-width: 720px; margin: 0 auto; border-radius: 16px; overflow: hidden;
-      border: 1px solid var(--line); background: var(--card);
-      box-shadow: 0 20px 60px rgba(0,0,0,.35);
-    }
-    .video-wrap video { width: 100%; display: block; }
     footer { border-top: 1px solid var(--line); padding: 1.5rem; text-align: center; color: var(--muted); font-size: .8rem; }
     @media (max-width: 600px) {
       .nav { display: none; }
@@ -125,7 +118,6 @@
       .ctas { flex-direction: column; align-items: stretch; }
       .ctas a { width: 100%; text-align: center; }
       h1 { font-size: 1.9rem; }
-      .demo { padding-bottom: 2.5rem; }
     }
   </style>
 </head>
@@ -158,18 +150,7 @@
       <p>Vantav connects your stores, calculates real-time net profit after fees, shipping, and ad spend, and alerts you to problems like ad spikes, refunds, and low stock.</p>
       <div class="ctas">
         <a href="/subscribe" class="btn-primary">Apply for Closed Beta</a>
-        <a href="#demo" class="btn-secondary">See how it works</a>
-      </div>
-    </section>
-
-    <section id="demo" class="wrap demo">
-      <h2 style="font-size: clamp(1.6rem, 4vw, 2.2rem); font-weight: 700; margin-bottom: .75rem;">See how Vantav works</h2>
-      <p style="color: var(--muted); max-width: 560px; margin: 0 auto 1.5rem; line-height: 1.6;">A quick walkthrough of your profit dashboard, channels, and assistant.</p>
-      <div class="video-wrap">
-        <video controls preload="metadata" playsinline>
-          <source src="{{ url_for('static', filename='videos/demo.mp4') }}" type="video/mp4">
-          Your browser does not support the video tag.
-        </video>
+        <a href="/demo" class="btn-secondary">See how it works</a>
       </div>
     </section>
 

@@ -61,3 +61,18 @@ xrandr --output VNC-0 --mode 1600x1200
 - Dashboard templates use dict objects. Jinja `{{ obj.items }}` resolves to the built-in dict method. Use `{{ obj['items'] }}` for keys that collide with dict methods (`items`, `keys`, `values`, `update`, `get`).
 - `dashboard_context.py` mutates `BRIEFING` from DB on startup. The `context()` function now returns a fresh copy so KPIs always match `PROFIT_BREAKDOWN`.
 - The `/dashboard/<page>` whitelist uses hyphenated slugs (`commerce-hub`, `profit-engine`, `health-score`). Links in templates should match the whitelist slugs, not the underscore template filenames.
+
+## Marketing demo recording
+
+- The live site (`https://vantavcommerce.com`) does **not** currently deploy `/demo` or the authenticated dashboard; record demos against `http://127.0.0.1:3000`.
+- Start the local server with a test reCAPTCHA key so sandbox logins work:
+  ```bash
+  env -u RECAPTCHA_SITE_KEY -u RECAPTCHA_SECRET_KEY \
+      RECAPTCHA_SITE_KEY="6LeIxAcTAAAAAJcZVRqyHh71UMIEGNQ_MXjiZKhI" \
+      RECAPTCHA_SECRET_KEY="" \
+      SESSION_COOKIE_SECURE=false \
+      .venv/bin/python app.py
+  ```
+- `verify_captcha_v3` returns `1.0` when `RECAPTCHA_SECRET_KEY` is empty, so the Google test key badge can be hidden via `document.querySelector('.grecaptcha-badge').style.display='none'` if it appears in the recording.
+- Seed `merchant_ivor_demo` (or another sandbox merchant) with `ivonderhaff@gmail.com` / `Pqk57Qa9Weo` and matching orders/channels before recording so the dashboard KPIs read `$4,582` revenue and `$1,394` net profit.
+- The `computer` `left_click` action may not register on page elements in this environment; use `Ctrl+L` address-bar navigation and `browser_console`/`Return` for form submission and in-page generators.

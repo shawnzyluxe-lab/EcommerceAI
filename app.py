@@ -1301,6 +1301,13 @@ def thank_you():
     return render_template('thank_you.html')
 
 
+@app.route('/demo')
+@limiter.exempt
+def demo():
+    """Public product demo video page."""
+    return render_template('demo.html')
+
+
 @app.route('/terms')
 @limiter.exempt
 def legal_terms():
