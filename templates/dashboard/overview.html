@@ -3,7 +3,7 @@
 {% block content %}
 
 <section class="page-header">
-  <h1>{{ coo.greeting }}</h1>
+  <h1><span class="js-greeting">{{ coo.greeting }}</span></h1>
   <p>Revenue is up <strong>18%</strong> this week. Top seller projected to sell out in <strong>4 days</strong>.</p>
 </section>
 
@@ -31,14 +31,14 @@
 </div>
 
 <div class="grid grid-2" style="margin-bottom: 24px;">
-  <div class="card">
+  <div class="card" id="assistant-card">
     <div class="card-head">
       <span class="tag tag-blue">Assistant</span>
       <span class="tag tag-ghost">Confidence {{ coo.confidence }}%</span>
       <span class="spacer"></span>
       <span style="font-size: .76rem; color: var(--ink-3);">{{ generated }}</span>
     </div>
-    <h2 style="font-size: 1.25rem; margin-bottom: 10px;">{{ coo.greeting }}</h2>
+    <h2 style="font-size: 1.25rem; margin-bottom: 10px;"><span class="js-greeting">{{ coo.greeting }}</span></h2>
     <p style="color: var(--ink-2); margin-bottom: 16px; line-height: 1.6;">
       {% for pre, num, post in coo.summary %}{{ pre }} <strong>{{ num }}</strong>{% if post %} {{ post }}{% endif %}. {% endfor %}
       {{ coo.narrative }}
@@ -53,10 +53,10 @@
       {% endfor %}
     </div>
     <div style="display: flex; gap: 8px; flex-wrap: wrap;">
-      <button class="btn btn-primary">Run Assistant Analysis</button>
-      <button class="btn">Approve &amp; Execute</button>
-      <button class="btn">Modify</button>
-      <button class="btn btn-ghost">Dismiss</button>
+      <button class="btn btn-primary" id="run-analysis-btn" onclick="runAssistantAnalysis()">Run Assistant Analysis</button>
+      <a href="/dashboard/action-gate" class="btn">Approve &amp; Execute</a>
+      <button class="btn" onclick="alert('Modify action flow coming in the next release.')">Modify</button>
+      <button class="btn btn-ghost" onclick="document.getElementById('assistant-card').style.display='none'">Dismiss</button>
     </div>
   </div>
 
@@ -176,4 +176,23 @@
   </div>
 </div>
 
+<script>
+async function runAssistantAnalysis() {
+  const btn = document.getElementById('run-analysis-btn');
+  if (btn) { btn.disabled = true; btn.textContent = 'Running…'; }
+  try {
+    const res = await fetch('/api/v1/assistant/proactive', {method: 'POST', credentials: 'same-origin'});
+    const data = await res.json();
+    if (res.ok) {
+      window.location.reload();
+    } else {
+      alert('Analysis failed: ' + (data.detail || 'unknown error'));
+    }
+  } catch (e) {
+    alert('Network error. Please try again.');
+  } finally {
+    if (btn) { btn.disabled = false; btn.textContent = 'Run Assistant Analysis'; }
+  }
+}
+</script>
 {% endblock %}

@@ -10,7 +10,7 @@
   <link rel="stylesheet" href="{{ url_for('static', filename='css/dashboard.css') }}">
   {% block head %}{% endblock %}
 </head>
-<body>
+<body data-merchant-name="{{ merchant.name | default('there') }}">
   <div class="app-shell">
     <aside class="sidebar" id="sidebar">
       <div class="brand">
@@ -40,12 +40,15 @@
           <div class="plan-note">Unlimited access</div>
           <a href="/dashboard/billing" class="plan-link">View Plan</a>
         </div>
-        <div class="user-row">
-          <div class="user-avatar">{{ (merchant.name | default('Admin'))[:2] | upper }}</div>
-          <div class="user-info">
-            <div class="user-name">{{ merchant.name | default('Admin User') }}</div>
-            <div class="user-email">{{ merchant.email | default('admin@example.com') }}</div>
+        <div class="user-row" style="justify-content: space-between;">
+          <div style="display: flex; align-items: center; gap: 10px;">
+            <div class="user-avatar">{{ (merchant.name | default('Admin'))[:2] | upper }}</div>
+            <div class="user-info">
+              <div class="user-name">{{ merchant.name | default('Admin User') }}</div>
+              <div class="user-email">{{ merchant.email | default('admin@example.com') }}</div>
+            </div>
           </div>
+          <a href="/site-logout" class="btn btn-ghost" style="font-size: .75rem; padding: 4px 8px;">Log out</a>
         </div>
       </div>
     </aside>
@@ -56,8 +59,8 @@
         <div class="breadcrumb">{{ merchant.name | default('Your store') }} / {{ active_page | replace('_ai', '') | replace('_', ' ') | title }}</div>
         <div class="topbar-actions">
           <div class="tier-badge" id="current-merchant-tier-badge">{{ merchant.tier | default('Enterprise Plan') }}</div>
-          <button class="btn btn-ghost">Invite team</button>
-          <button class="btn btn-primary">Connect a channel</button>
+          <a href="/dashboard/commerce-hub" class="btn btn-primary">Connect a channel</a>
+          <a href="/site-logout" class="btn btn-ghost">Log out</a>
           <div class="topbar-avatar">{{ (merchant.name | default('Admin'))[:2] | upper }}</div>
         </div>
       </header>
@@ -102,6 +105,33 @@
           // network hiccup; do not redirect immediately
         }
       }, 5 * 60 * 1000); // every 5 minutes
+    })();
+
+    // Sync merchant timezone from browser for accurate greetings and scheduling.
+    (function syncTimezone() {
+      try {
+        const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
+        if (!tz) return;
+        fetch('/api/v1/merchant/timezone', {
+          method: 'POST',
+          headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify({timezone: tz}),
+          credentials: 'same-origin'
+        });
+      } catch (e) {}
+    })();
+
+    // Update greeting elements to the merchant's local time on first paint.
+    (function updateGreeting() {
+      const name = document.body.dataset.merchantName || document.querySelector('[data-merchant-name]')?.dataset.merchantName || 'there';
+      const hour = new Date().getHours();
+      let salutation = 'Good morning';
+      if (hour < 5 || hour >= 22) salutation = 'Good night';
+      else if (hour >= 12 && hour < 17) salutation = 'Good afternoon';
+      else if (hour >= 17 && hour < 22) salutation = 'Good evening';
+      document.querySelectorAll('.js-greeting').forEach(el => {
+        el.textContent = `${salutation}, ${name}.`;
+      });
     })();
   </script>
   {% block scripts %}{% endblock %}

@@ -11,7 +11,7 @@ import os
 from datetime import datetime, timedelta, timezone
 
 from flask import Flask, render_template, request, jsonify
-from models import PredictiveLogistics
+from models import PredictiveLogistics, MerchantSetting
 import profit_feed
 import alert_matrix
 import action_gate
@@ -19,17 +19,29 @@ import channels as channels_module
 
 
 def _greeting_for(merchant=None):
-    """Return a time-of-day greeting using the merchant's name."""
+    """Return a time-of-day greeting using the merchant's name and timezone."""
+    from zoneinfo import ZoneInfo
+
     name = (merchant or {}).get("name", "there")
-    hour = datetime.now(timezone.utc).hour
-    if hour < 12:
+    merchant_id = (merchant or {}).get("id")
+    tz_name = "UTC"
+    if merchant_id:
+        tz = MerchantSetting.query.filter_by(merchant_id=merchant_id, setting_key="merchant_timezone").first()
+        if tz and tz.setting_value:
+            tz_name = tz.setting_value.strip()
+    try:
+        now = datetime.now(ZoneInfo(tz_name))
+    except Exception:
+        now = datetime.now(timezone.utc)
+    hour = now.hour
+    if hour < 5 or hour >= 22:
+        salutation = "Good night"
+    elif hour < 12:
         salutation = "Good morning"
     elif hour < 17:
         salutation = "Good afternoon"
-    elif hour < 21:
-        salutation = "Good evening"
     else:
-        salutation = "Good night"
+        salutation = "Good evening"
     return f"{salutation}, {name}."
 
 

@@ -74,9 +74,11 @@ def format_snapshot(snapshot: Dict[str, Any], max_lines: int = 80) -> str:
     parts.append(f"Tier: {snapshot['tier']} | Sandbox: {snapshot['sandbox_status']}")
 
     kpis = snapshot.get("kpis") or {}
+    def _fmt(val, unit=""):
+        return f"{val}{unit}" if val is not None else "—"
     parts.append(
-        f"KPIs: gross={kpis.get('gross_revenue','—')} net={kpis.get('true_net_profit','—')} "
-        f"margin={kpis.get('margin_pct','—')}% orders={kpis.get('total_orders','—')}"
+        f"KPIs: gross=${_fmt(kpis.get('gross_revenue'))} net=${_fmt(kpis.get('net_profit'))} "
+        f"margin={_fmt(kpis.get('net_margin'))}% orders={_fmt(kpis.get('orders'))}"
     )
 
     channels = snapshot.get("channels") or []

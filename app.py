@@ -64,6 +64,7 @@ import shopify_sync
 import tiktok_sync
 import amazon_sync
 import tiktok_studio
+import assistant_engine
 import startup_pack
 import sandbox_demo
 import migrate as migrate_module
@@ -2216,6 +2217,31 @@ def api_assistant_clear_thread():
         return jsonify({"error": "No merchant context"}), 403
     assistant_engine.clear_thread(merchant["id"])
     return jsonify({"cleared": True}), 200
+
+
+@app.route('/api/v1/merchant/timezone', methods=['POST'])
+@require_roles([UserRole.ADMIN, UserRole.MERCHANT, UserRole.ENGINEER])
+def api_merchant_timezone():
+    """Store the merchant's browser timezone for accurate greetings/scheduling."""
+    merchant = get_merchant_context()
+    if not merchant:
+        return jsonify({"error": "No merchant context"}), 403
+    data = request.get_json(silent=True) or {}
+    tz = (data.get("timezone") or "UTC").strip()
+    if not tz:
+        tz = "UTC"
+    try:
+        from zoneinfo import ZoneInfo
+        ZoneInfo(tz)
+    except Exception:
+        return jsonify({"error": "Invalid timezone"}), 400
+    setting = MerchantSetting.query.filter_by(merchant_id=merchant["id"], setting_key="merchant_timezone").first()
+    if not setting:
+        setting = MerchantSetting(merchant_id=merchant["id"], setting_key="merchant_timezone")
+        db.session.add(setting)
+    setting.setting_value = tz
+    db.session.commit()
+    return jsonify({"timezone": tz}), 200
 
 
 @app.route('/api/v1/tiktok-studio/posts', methods=['POST'])
