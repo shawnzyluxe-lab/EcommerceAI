@@ -45,10 +45,10 @@
     </p>
     <div style="display: flex; flex-direction: column; gap: 8px; margin-bottom: 16px;">
       {% for s in coo.plan %}
-      <div style="display: flex; gap: 10px; align-items: center; background: #fff; border: 1px solid var(--line); border-radius: 11px; padding: 10px 12px; font-size: .86rem;">
-        <span style="width: 20px; height: 20px; border-radius: 6px; background: var(--gold-bg); color: var(--amber); display: grid; place-items: center; font-size: .68rem; font-weight: 800; flex: none;">{{ s.n }}</span>
-        <span style="flex: 1;">{{ s.what }}</span>
-        <span class="tag {{ 'tag-green' if s.state == 'ready' else 'tag-amber' }}">{{ s.impact }}</span>
+      <div style="display: flex; gap: 10px; align-items: flex-start; flex-wrap: wrap; background: #fff; border: 1px solid var(--line); border-radius: 11px; padding: 10px 12px; font-size: .86rem;">
+        <span style="width: 20px; height: 20px; border-radius: 6px; background: var(--gold-bg); color: var(--amber); display: grid; place-items: center; font-size: .68rem; font-weight: 800; flex: none; margin-top: 1px;">{{ s.n }}</span>
+        <span style="flex: 1; min-width: 0; overflow-wrap: break-word;">{{ s.what }}</span>
+        <span class="tag {{ 'tag-green' if s.state == 'ready' else 'tag-amber' }}" style="flex: none;">{{ s.impact }}</span>
       </div>
       {% endfor %}
     </div>
@@ -66,10 +66,10 @@
       <p>Type or speak — your assistant performs the work instead of just answering.</p>
     </div>
     <div class="command-box">
-      <div class="prompt">
-        <span style="color: var(--gold); font-size: 1rem;">◉</span>
-        <input id="ov-cmd" placeholder="Ask anything, or tell it what to do…" autocomplete="off">
-        <button class="btn btn-primary" id="ov-cmdgo" onclick="runOverviewCommand()">Run</button>
+      <div class="prompt" style="flex-wrap: nowrap;">
+        <span style="color: var(--gold); font-size: 1rem; flex: none;">◉</span>
+        <input id="ov-cmd" placeholder="Ask anything, or tell it what to do…" autocomplete="off" style="min-width: 0;">
+        <button class="btn btn-primary" id="ov-cmdgo" onclick="runOverviewCommand()" style="flex: none;">Run</button>
       </div>
       <div class="chips">
         {% for s in suggestions %}<span class="chip ov-chip" style="cursor:pointer;">{{ s }}</span>{% endfor %}
