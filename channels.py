@@ -107,7 +107,14 @@ def connect_shopify(merchant_id: str, shop_domain: str, access_token: str) -> Di
     return {"platform": "shopify", "state": "connected", "domain": shop_domain}
 
 
-def connect_tiktok(merchant_id: str, seller_id: str, app_key: str, app_secret: str) -> Dict[str, Any]:
+def connect_tiktok(
+    merchant_id: str,
+    seller_id: str,
+    app_key: str,
+    app_secret: str,
+    access_token: str = "",
+    shop_cipher: str = "",
+) -> Dict[str, Any]:
     """Persist a TikTok Shop connection."""
     _ensure_commerce_channel("tiktok")
     account_id = f"tiktok:{seller_id}"
@@ -115,7 +122,14 @@ def connect_tiktok(merchant_id: str, seller_id: str, app_key: str, app_secret: s
     if not token:
         token = TenantOAuthToken(shop_domain=account_id, merchant_id=merchant_id, platform_id="tiktok")
         db.session.add(token)
-    token.access_token_encrypted = _encode_token(json.dumps({"app_key": app_key, "app_secret": app_secret, "seller_id": seller_id}))
+    token.access_token_encrypted = _encode_token(json.dumps({
+        "app_key": app_key,
+        "app_secret": app_secret,
+        "seller_id": seller_id,
+        "shop_id": seller_id,
+        "access_token": access_token,
+        "shop_cipher": shop_cipher,
+    }))
     token.scope_permissions = "shop.list,order.list,product.list"
     token.updated_at = datetime.utcnow()
 
@@ -127,7 +141,17 @@ def connect_tiktok(merchant_id: str, seller_id: str, app_key: str, app_secret: s
     return {"platform": "tiktok", "state": "connected", "seller_id": seller_id}
 
 
-def connect_amazon(merchant_id: str, seller_id: str, access_key: str, secret_key: str, region: str) -> Dict[str, Any]:
+def connect_amazon(
+    merchant_id: str,
+    seller_id: str,
+    access_key: str,
+    secret_key: str,
+    region: str,
+    refresh_token: str = "",
+    lwa_client_id: str = "",
+    lwa_client_secret: str = "",
+    role_arn: str = "",
+) -> Dict[str, Any]:
     """Persist an Amazon SP-API connection."""
     _ensure_commerce_channel("amazon")
     account_id = f"amazon:{region}:{seller_id}"
@@ -135,7 +159,16 @@ def connect_amazon(merchant_id: str, seller_id: str, access_key: str, secret_key
     if not token:
         token = TenantOAuthToken(shop_domain=account_id, merchant_id=merchant_id, platform_id="amazon")
         db.session.add(token)
-    token.access_token_encrypted = _encode_token(json.dumps({"access_key": access_key, "secret_key": secret_key, "region": region, "seller_id": seller_id}))
+    token.access_token_encrypted = _encode_token(json.dumps({
+        "access_key": access_key,
+        "secret_key": secret_key,
+        "region": region,
+        "seller_id": seller_id,
+        "refresh_token": refresh_token,
+        "lwa_client_id": lwa_client_id,
+        "lwa_client_secret": lwa_client_secret,
+        "role_arn": role_arn,
+    }))
     token.scope_permissions = "sellingpartnerapi::notifications"
     token.updated_at = datetime.utcnow()
 

@@ -61,6 +61,8 @@ import vetted_operator
 import action_gate
 import channels as channels_module
 import shopify_sync
+import tiktok_sync
+import amazon_sync
 import startup_pack
 import sandbox_demo
 import migrate as migrate_module
@@ -1897,7 +1899,7 @@ def api_connect_shopify():
 @app.route('/api/v1/channels/tiktok', methods=['POST'])
 @require_roles([UserRole.ADMIN, UserRole.MERCHANT, UserRole.ENGINEER])
 def api_connect_tiktok():
-    """Connect a TikTok Shop with app credentials."""
+    """Connect a TikTok Shop with app credentials and access token."""
     merchant = get_merchant_context()
     if not merchant:
         return jsonify({"error": "No merchant context"}), 403
@@ -1907,10 +1909,12 @@ def api_connect_tiktok():
     seller_id = (data.get("seller_id") or "").strip()
     app_key = (data.get("app_key") or "").strip()
     app_secret = (data.get("app_secret") or "").strip()
-    if not seller_id or not app_key or not app_secret:
-        return jsonify({"detail": "seller_id, app_key, and app_secret required"}), 400
+    access_token = (data.get("access_token") or "").strip()
+    shop_cipher = (data.get("shop_cipher") or "").strip()
+    if not seller_id or not app_key or not app_secret or not access_token:
+        return jsonify({"detail": "seller_id, app_key, app_secret, and access_token required"}), 400
     try:
-        channels_module.connect_tiktok(merchant["id"], seller_id, app_key, app_secret)
+        channels_module.connect_tiktok(merchant["id"], seller_id, app_key, app_secret, access_token, shop_cipher)
         return jsonify({"status": "connected", "platform": "tiktok"}), 200
     except Exception as e:
         logger.error(f"[Channels] TikTok connect failed: {e}")
@@ -1931,10 +1935,19 @@ def api_connect_amazon():
     access_key = (data.get("access_key") or "").strip()
     secret_key = (data.get("secret_key") or "").strip()
     region = (data.get("region") or "").strip().lower()
+    refresh_token = (data.get("refresh_token") or "").strip()
+    lwa_client_id = (data.get("lwa_client_id") or "").strip()
+    lwa_client_secret = (data.get("lwa_client_secret") or "").strip()
+    role_arn = (data.get("role_arn") or "").strip()
     if not seller_id or not access_key or not secret_key or not region:
         return jsonify({"detail": "seller_id, access_key, secret_key, and region required"}), 400
+    if not refresh_token or not lwa_client_id or not lwa_client_secret:
+        return jsonify({"detail": "refresh_token, lwa_client_id, and lwa_client_secret are required for SP-API sync"}), 400
     try:
-        channels_module.connect_amazon(merchant["id"], seller_id, access_key, secret_key, region)
+        channels_module.connect_amazon(
+            merchant["id"], seller_id, access_key, secret_key, region,
+            refresh_token, lwa_client_id, lwa_client_secret, role_arn
+        )
         return jsonify({"status": "connected", "platform": "amazon"}), 200
     except Exception as e:
         logger.error(f"[Channels] Amazon connect failed: {e}")
@@ -1998,6 +2011,96 @@ def api_admin_sync_shopify(merchant_id):
         return jsonify({"status": "synced", "merchant_id": merchant_id, **result}), 200
     except Exception as e:
         logger.error(f"[Admin Shopify Sync] Failed for {merchant_id}: {e}")
+        return jsonify({"detail": str(e)}), 400
+
+
+@app.route('/api/v1/channels/tiktok/sync', methods=['POST'])
+@require_roles([UserRole.ADMIN, UserRole.MERCHANT, UserRole.ENGINEER])
+def api_sync_tiktok():
+    """Pull the latest TikTok Shop orders and product catalog for this merchant."""
+    merchant = get_merchant_context()
+    if not merchant:
+        return jsonify({"error": "No merchant context"}), 403
+    if not merchant.get("live_access_enabled"):
+        return jsonify({"detail": "Live marketplace sync is disabled during the sandbox."}), 403
+    try:
+        result = tiktok_sync.sync_tiktok(merchant["id"])
+        return jsonify({"status": "synced", **result}), 200
+    except Exception as e:
+        logger.error(f"[TikTok Sync] Failed for {merchant['id']}: {e}")
+        return jsonify({"detail": str(e)}), 400
+
+
+@app.route('/api/v1/channels/tiktok/products', methods=['GET'])
+@require_roles([UserRole.ADMIN, UserRole.MERCHANT, UserRole.ENGINEER])
+def api_get_tiktok_products():
+    """Return the last-synced TikTok Shop product catalog."""
+    merchant = get_merchant_context()
+    if not merchant:
+        return jsonify({"error": "No merchant context"}), 403
+    if not merchant.get("live_access_enabled"):
+        return jsonify({"detail": "Live marketplace data is disabled during the sandbox."}), 403
+    try:
+        return jsonify({"products": tiktok_sync.get_products(merchant["id"])}), 200
+    except Exception as e:
+        logger.error(f"[TikTok Products] Failed for {merchant['id']}: {e}")
+        return jsonify({"detail": str(e)}), 400
+
+
+@app.route('/api/admin/tiktok/sync/<merchant_id>', methods=['POST'])
+@require_roles([UserRole.ADMIN])
+def api_admin_sync_tiktok(merchant_id):
+    """Admin-triggered TikTok Shop sync for testing (bypasses live-access gate)."""
+    try:
+        result = tiktok_sync.sync_tiktok(merchant_id)
+        return jsonify({"status": "synced", "merchant_id": merchant_id, **result}), 200
+    except Exception as e:
+        logger.error(f"[Admin TikTok Sync] Failed for {merchant_id}: {e}")
+        return jsonify({"detail": str(e)}), 400
+
+
+@app.route('/api/v1/channels/amazon/sync', methods=['POST'])
+@require_roles([UserRole.ADMIN, UserRole.MERCHANT, UserRole.ENGINEER])
+def api_sync_amazon():
+    """Pull the latest Amazon orders and product catalog for this merchant."""
+    merchant = get_merchant_context()
+    if not merchant:
+        return jsonify({"error": "No merchant context"}), 403
+    if not merchant.get("live_access_enabled"):
+        return jsonify({"detail": "Live marketplace sync is disabled during the sandbox."}), 403
+    try:
+        result = amazon_sync.sync_amazon(merchant["id"])
+        return jsonify({"status": "synced", **result}), 200
+    except Exception as e:
+        logger.error(f"[Amazon Sync] Failed for {merchant['id']}: {e}")
+        return jsonify({"detail": str(e)}), 400
+
+
+@app.route('/api/v1/channels/amazon/products', methods=['GET'])
+@require_roles([UserRole.ADMIN, UserRole.MERCHANT, UserRole.ENGINEER])
+def api_get_amazon_products():
+    """Return the last-synced Amazon product catalog."""
+    merchant = get_merchant_context()
+    if not merchant:
+        return jsonify({"error": "No merchant context"}), 403
+    if not merchant.get("live_access_enabled"):
+        return jsonify({"detail": "Live marketplace data is disabled during the sandbox."}), 403
+    try:
+        return jsonify({"products": amazon_sync.get_products(merchant["id"])}), 200
+    except Exception as e:
+        logger.error(f"[Amazon Products] Failed for {merchant['id']}: {e}")
+        return jsonify({"detail": str(e)}), 400
+
+
+@app.route('/api/admin/amazon/sync/<merchant_id>', methods=['POST'])
+@require_roles([UserRole.ADMIN])
+def api_admin_sync_amazon(merchant_id):
+    """Admin-triggered Amazon sync for testing (bypasses live-access gate)."""
+    try:
+        result = amazon_sync.sync_amazon(merchant_id)
+        return jsonify({"status": "synced", "merchant_id": merchant_id, **result}), 200
+    except Exception as e:
+        logger.error(f"[Admin Amazon Sync] Failed for {merchant_id}: {e}")
         return jsonify({"detail": str(e)}), 400
 
 

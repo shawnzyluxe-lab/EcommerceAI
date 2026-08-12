@@ -57,6 +57,8 @@ def _seed_demo_channels(merchant_id):
         f"demo_{suffix}",
         "demo_app_key",
         "demo_app_secret",
+        access_token="demo_access_token",
+        shop_cipher="",
     )
     channels_module.connect_amazon(
         merchant_id,
@@ -64,6 +66,10 @@ def _seed_demo_channels(merchant_id):
         "demo_access_key",
         "demo_secret_key",
         "us-east-1",
+        refresh_token="demo_refresh_token",
+        lwa_client_id="demo_lwa_id",
+        lwa_client_secret="demo_lwa_secret",
+        role_arn="",
     )
 
     # Set realistic demo pending-order counts on each channel.
