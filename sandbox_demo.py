@@ -7,6 +7,7 @@ from models import (
     ProfitFeedOrder,
     AdSpendFeed,
     Alert,
+    PendingAction,
     MerchantChannel,
     TenantOAuthToken,
 )
@@ -82,6 +83,7 @@ def _seed_demo_startup_pack(merchant_id, business_name):
 
 def _clear_demo_data(merchant_id):
     """Remove any previously seeded demo data for this merchant."""
+    PendingAction.query.filter_by(merchant_id=merchant_id).delete()
     ProfitFeedOrder.query.filter_by(merchant_id=merchant_id).delete()
     AdSpendFeed.query.filter_by(merchant_id=merchant_id).delete()
     Alert.query.filter_by(merchant_id=merchant_id).delete()
