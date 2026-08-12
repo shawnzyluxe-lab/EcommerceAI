@@ -68,16 +68,17 @@
     <div class="command-box">
       <div class="prompt">
         <span style="color: var(--gold); font-size: 1rem;">◉</span>
-        <input placeholder="Ask anything, or tell it what to do…" autocomplete="off">
-        <button class="btn btn-primary">Run</button>
+        <input id="ov-cmd" placeholder="Ask anything, or tell it what to do…" autocomplete="off">
+        <button class="btn btn-primary" id="ov-cmdgo" onclick="runOverviewCommand()">Run</button>
       </div>
       <div class="chips">
-        {% for s in suggestions %}<span class="chip">{{ s }}</span>{% endfor %}
+        {% for s in suggestions %}<span class="chip ov-chip" style="cursor:pointer;">{{ s }}</span>{% endfor %}
       </div>
     </div>
-    <div class="card" style="margin-top: 14px; display: none;">
+    <div class="card" id="ov-cmdout" style="margin-top: 14px; display: none;">
       <span class="tag tag-blue">Answer</span>
-      <p style="margin-top: 8px;">Response will appear here.</p>
+      <p id="ov-cmdanswer" style="margin-top: 8px; white-space: pre-wrap;"></p>
+      <div id="ov-cmddid" class="chips" style="margin-top: 10px;"></div>
     </div>
   </div>
 </div>
@@ -194,5 +195,30 @@ async function runAssistantAnalysis() {
     if (btn) { btn.disabled = false; btn.textContent = 'Run Assistant Analysis'; }
   }
 }
+
+async function runOverviewCommand() {
+  const input = document.getElementById('ov-cmd');
+  const out = document.getElementById('ov-cmdout');
+  const answer = document.getElementById('ov-cmdanswer');
+  const didBox = document.getElementById('ov-cmddid');
+  const q = input.value.trim();
+  if (!q) return;
+  answer.textContent = 'Thinking…';
+  out.style.display = 'block';
+  didBox.innerHTML = '';
+  try {
+    const res = await fetch('/api/command', {method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({q}), credentials: 'same-origin'});
+    const data = await res.json();
+    answer.textContent = data.answer || 'Done.';
+    if (data.did && data.did.length) {
+      didBox.innerHTML = data.did.map(s => `<span class="chip">${s}</span>`).join('');
+    }
+  } catch (e) {
+    answer.textContent = 'Something went wrong. Please try again.';
+  }
+}
+
+document.getElementById('ov-cmd')?.addEventListener('keydown', e => { if(e.key === 'Enter') runOverviewCommand(); });
+document.querySelectorAll('.ov-chip').forEach(c => c.addEventListener('click', () => { document.getElementById('ov-cmd').value = c.textContent; runOverviewCommand(); }));
 </script>
 {% endblock %}
