@@ -14,7 +14,21 @@
   <div class="app-shell">
     <aside class="sidebar" id="sidebar">
       <div class="brand">
-        <img src="{{ url_for('static', filename='images/vantav-logo.png') }}" alt="Vantav" class="brand-logo">
+        <div class="brand-mark">
+          <svg viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg" aria-label="Vantav logo">
+            <defs>
+              <linearGradient id="vantav-v" x1="8" y1="8" x2="24" y2="26" gradientUnits="userSpaceOnUse">
+                <stop offset="0" stop-color="#8b5cf6"/>
+                <stop offset="1" stop-color="#14b8a6"/>
+              </linearGradient>
+            </defs>
+            <path d="M9 11 L16 25 L23 11" stroke="url(#vantav-v)" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+        </div>
+        <div class="brand-text">
+          <span class="brand-name">VANTAV</span>
+          <span class="brand-tagline">Commerce OS</span>
+        </div>
       </div>
 
       <nav class="sidebar-nav">
@@ -55,6 +69,20 @@
     <div class="main-wrap">
       <header class="topbar">
         <button class="mobile-menu-btn" id="mobile-menu-btn" aria-label="Toggle menu">≡</button>
+        <a href="/dashboard" class="topbar-brand">
+          <div class="brand-mark small">
+            <svg viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg" aria-label="Vantav logo">
+              <defs>
+                <linearGradient id="vantav-v-sm" x1="8" y1="8" x2="24" y2="26" gradientUnits="userSpaceOnUse">
+                  <stop offset="0" stop-color="#8b5cf6"/>
+                  <stop offset="1" stop-color="#14b8a6"/>
+                </linearGradient>
+              </defs>
+              <path d="M9 11 L16 25 L23 11" stroke="url(#vantav-v-sm)" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+          </div>
+          <span class="brand-name">VANTAV</span>
+        </a>
         <div class="breadcrumb">{{ merchant.name | default('Your store') }} / {{ active_page | replace('_ai', '') | replace('_', ' ') | title }}</div>
         <div class="topbar-actions">
           <div class="tier-badge" id="current-merchant-tier-badge">{{ merchant.tier | default('Enterprise Plan') }}</div>
