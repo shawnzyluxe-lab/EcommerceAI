@@ -1,4 +1,5 @@
 """Demo data seeding for sandbox merchants."""
+import json
 from models import db, BusinessMetric, StartupPackProject
 import profit_feed
 import alert_matrix
@@ -66,7 +67,7 @@ def _seed_demo_startup_pack(merchant_id, business_name):
     project.sample_product = "Satin Sleep Set (Ivory)"
     project.status = "pending_brief"
     project.next_steps = "Curated supplier matches and sample order instructions are being prepared."
-    project.checklist = startup_pack._default_checklist(brand, project.niche)
+    project.checklist = json.dumps(startup_pack._default_checklist(brand, project.niche))
     db.session.commit()
 
 
