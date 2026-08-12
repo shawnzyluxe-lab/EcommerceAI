@@ -503,14 +503,21 @@ def get_merchant_context():
     if not profile:
         return None
     tier = (profile.account_tier or "Basic Tier").replace("AI Tier", "Plan").replace("AI", "").strip()
+    now = datetime.utcnow()
+    sandbox_status = profile.sandbox_status or "pending"
+    sandbox_expired = False
+    if sandbox_status == "sandbox" and profile.sandbox_expires_at and profile.sandbox_expires_at <= now:
+        sandbox_status = "expired"
+        sandbox_expired = True
     return {
         "id": s.merchant_id,
         "tier": tier,
         "name": profile.business_name,
         "email": profile.admin_email,
-        "sandbox_status": profile.sandbox_status or "pending",
-        "live_access_enabled": bool(profile.live_access_enabled),
+        "sandbox_status": sandbox_status,
+        "live_access_enabled": bool(profile.live_access_enabled) and not sandbox_expired,
         "sandbox_expires_at": profile.sandbox_expires_at.isoformat() if profile.sandbox_expires_at else None,
+        "sandbox_expired": sandbox_expired,
         "role": s.role,
     }
 
@@ -651,9 +658,9 @@ with app.app_context():
 
     # Seed FK-dependent merchant data now that profiles exist
     if not MerchantMetric.query.filter_by(merchant_id="merchant_shawn_01").first():
-        db.session.add(MerchantMetric(merchant_id="merchant_shawn_01", total_unified_balance=20560.00, true_net_profit=1394.00, gross_revenue=4582.00, ai_briefing="System initialized for Shawnzyluxe multi-tenant parameters."))
+        db.session.add(MerchantMetric(merchant_id="merchant_shawn_01", total_unified_balance=20560.00, true_net_profit=1394.00, gross_revenue=4582.00, ai_briefing="System initialized."))
     if not MerchantMetric.query.filter_by(merchant_id="merchant_guest_02").first():
-        db.session.add(MerchantMetric(merchant_id="merchant_guest_02", total_unified_balance=1240.00, true_net_profit=410.00, gross_revenue=890.00, ai_briefing="System initialized for guest merchant clusters."))
+        db.session.add(MerchantMetric(merchant_id="merchant_guest_02", total_unified_balance=1240.00, true_net_profit=410.00, gross_revenue=890.00, ai_briefing="System initialized."))
     if not MerchantChannel.query.filter_by(merchant_id="merchant_shawn_01").first():
         db.session.add(MerchantChannel(merchant_id="merchant_shawn_01", channel_id="shopify", pending_orders=12, conversion_rate=3.4))
         db.session.add(MerchantChannel(merchant_id="merchant_shawn_01", channel_id="amazon", pending_orders=4, conversion_rate=2.8))
@@ -1023,7 +1030,7 @@ def dispatch_external_email(recipient, subject, html_body):
                 f"https://api.mailgun.net/v3/{MAILGUN_DOMAIN}/messages",
                 auth=("api", MAILGUN_API_KEY),
                 data={
-                    "from": f"Prometheus OS <postmaster@{MAILGUN_DOMAIN}>",
+                    "from": f"Vantav <postmaster@{MAILGUN_DOMAIN}>",
                     "to": recipient,
                     "subject": subject,
                     "html": html_body,
@@ -1045,7 +1052,7 @@ def dispatch_external_email(recipient, subject, html_body):
     try:
         msg = MIMEMultipart("alternative")
         msg["Subject"] = subject
-        msg["From"] = f"Prometheus OS <{SMTP_USERNAME}>"
+        msg["From"] = f"Vantav <{SMTP_USERNAME}>"
         msg["To"] = recipient
         msg.attach(MIMEText(html_body, "html"))
 
@@ -1870,6 +1877,8 @@ def api_connect_shopify():
     merchant = get_merchant_context()
     if not merchant:
         return jsonify({"error": "No merchant context"}), 403
+    if not merchant.get("live_access_enabled"):
+        return jsonify({"detail": "Live marketplace connections are disabled during the sandbox."}), 403
     data = request.get_json(silent=True) or {}
     shop = (data.get("shop") or "").strip().lower()
     token = (data.get("access_token") or "").strip()
@@ -1890,6 +1899,8 @@ def api_connect_tiktok():
     merchant = get_merchant_context()
     if not merchant:
         return jsonify({"error": "No merchant context"}), 403
+    if not merchant.get("live_access_enabled"):
+        return jsonify({"detail": "Live marketplace connections are disabled during the sandbox."}), 403
     data = request.get_json(silent=True) or {}
     seller_id = (data.get("seller_id") or "").strip()
     app_key = (data.get("app_key") or "").strip()
@@ -1911,6 +1922,8 @@ def api_connect_amazon():
     merchant = get_merchant_context()
     if not merchant:
         return jsonify({"error": "No merchant context"}), 403
+    if not merchant.get("live_access_enabled"):
+        return jsonify({"detail": "Live marketplace connections are disabled during the sandbox."}), 403
     data = request.get_json(silent=True) or {}
     seller_id = (data.get("seller_id") or "").strip()
     access_key = (data.get("access_key") or "").strip()
@@ -3330,7 +3343,7 @@ def register_merchant():
             total_unified_balance=0.00,
             true_net_profit=0.00,
             gross_revenue=0.00,
-            ai_briefing="Welcome to your isolated Shawnzyluxe AI workspace node. Connect channels to initialize streams.",
+            ai_briefing="Welcome to Vantav. Connect channels to initialize streams.",
         ))
         db.session.commit()
         logger.info(f"Tenant registered: {new_merchant_id} ({admin_email})")
@@ -3388,7 +3401,7 @@ def generate_magic_link():
         magic_url = f"{request.url_root.rstrip('/')}/api/v1/auth/magic-login?token={magic_token}"
 
         # Dispatch via background worker
-        run_async_task(dispatch_external_email, email, "Access Your Shawnzyluxe AI Workspace",
+        run_async_task(dispatch_external_email, email, "Access Your Vantav Workspace",
                        f"<p>Click below to access your workspace:</p><a href='{magic_url}'>{magic_url}</a>")
 
         log_metered_api_usage(merchant_id, 1)
@@ -3407,32 +3420,43 @@ def magic_login():
     """Validate magic token, drop secure session cookie, and redirect to dashboard."""
     token = request.args.get("token")
     if not token:
-        return redirect("/?error=missing_token")
+        return redirect("/login?error=missing_token")
 
     mlink = MagicLoginToken.query.get(token)
     if not mlink:
-        return redirect("/?error=invalid_token")
+        return redirect("/login?error=invalid_token")
 
-    if mlink.is_used or datetime.now() > mlink.expires_at:
-        return redirect("/?error=token_expired")
+    if mlink.is_used or datetime.utcnow() > mlink.expires_at:
+        return redirect("/login?error=token_expired")
 
     # Mark token used and rotate active session
     mlink.is_used = 1
     profile = MerchantProfile.query.filter_by(admin_email=mlink.admin_email).first()
     if not profile:
-        return redirect("/?error=profile_missing")
+        return redirect("/login?error=profile_missing")
+
+    now = datetime.utcnow()
+    if profile.sandbox_status == "sandbox" and profile.sandbox_expires_at and profile.sandbox_expires_at <= now:
+        return redirect("/login?error=sandbox_expired")
 
     session_token = secrets.token_urlsafe(32)
     assigned_role = UserRole.ADMIN.value if profile.admin_email.lower() in MASTER_ADMIN_EMAILS else UserRole.MERCHANT.value
-    active = ActiveSession(token=session_token, merchant_id=profile.merchant_id, role=assigned_role, created_at=datetime.utcnow())
+    active = ActiveSession(token=session_token, merchant_id=profile.merchant_id, role=assigned_role, created_at=now, last_seen=now)
     db.session.add(active)
     db.session.commit()
+
+    # Tie cookie lifetime to the sandbox window when applicable.
+    if profile.sandbox_status == "sandbox" and profile.sandbox_expires_at:
+        remaining = int((profile.sandbox_expires_at - now).total_seconds())
+        max_age = min(remaining, SESSION_TIMEOUT_DAYS * 86400)
+    else:
+        max_age = SESSION_TIMEOUT_DAYS * 86400
 
     response = make_response(redirect("/"))
     response.set_cookie(
         SESSION_COOKIE_NAME,
         session_token,
-        max_age=SESSION_TIMEOUT_DAYS * 86400,
+        max_age=max_age,
         httponly=True,
         samesite="Lax",
         secure=app.config.get("SESSION_COOKIE_SECURE", os.environ.get("SESSION_COOKIE_SECURE", "true").lower() == "true"),
@@ -3573,6 +3597,11 @@ def health_check():
 @app.route('/api/v1/auth/shopify/connect')
 def shopify_oauth_connect():
     """Step 1: Redirect merchant to Shopify OAuth grant screen."""
+    merchant = get_merchant_context()
+    if not merchant:
+        return redirect("/login?error=auth_required")
+    if not merchant.get("live_access_enabled"):
+        return redirect("/dashboard/commerce-hub?oauth_sync=error")
     shop = request.args.get("shop", "").strip().lower()
     if not re.match(r'^[a-zA-Z0-9\-]+\.myshopify\.com$', shop):
         return jsonify({"success": False, "error": "Invalid shop layout format"}), 400
@@ -3588,7 +3617,9 @@ def shopify_oauth_callback():
     code = request.args.get("code")
     shop = request.args.get("shop", "").strip().lower()
     merchant = get_merchant_context()
-    merchant_id = merchant["id"] if merchant else "merchant_shawn_01"
+    if not merchant or not merchant.get("live_access_enabled"):
+        return redirect("/dashboard/commerce-hub?oauth_sync=error")
+    merchant_id = merchant["id"]
 
     if not shop or not re.match(r'^[a-zA-Z0-9\-]+\.myshopify\.com$', shop):
         return jsonify({"success": False, "error": "Invalid shop domain"}), 400
@@ -3712,10 +3743,58 @@ def api_admin_beta_applications():
 @app.route('/api/admin/beta-applications/<int:app_id>/sandbox', methods=['POST'])
 @require_roles([UserRole.ADMIN])
 def api_admin_approve_sandbox(app_id):
-    """Approve an application into the 48-hour sandbox."""
+    """Approve an application into the 48-hour sandbox and email login credentials."""
     try:
         result = vetted_operator.approve_to_sandbox(app_id)
-        return jsonify({"status": "sandbox", **result}), 200
+        merchant_id = result["merchant_id"]
+        email = result["email"]
+        temp_password = result.get("temp_password")
+        expires_at_str = result["sandbox_expires_at"]
+        expires_at = datetime.fromisoformat(expires_at_str)
+
+        # One-time magic login link that lives as long as the sandbox window.
+        magic_token = secrets.token_urlsafe(32)
+        db.session.add(MagicLoginToken(
+            token=magic_token,
+            admin_email=email,
+            merchant_id=merchant_id,
+            expires_at=expires_at,
+            is_used=0,
+        ))
+        db.session.commit()
+
+        root = request.url_root.rstrip('/')
+        magic_url = f"{root}/api/v1/auth/magic-login?token={magic_token}"
+        login_url = f"{root}/login?email={email}&sandbox=ready"
+
+        body = f"""
+        <p>Hi there,</p>
+        <p>Your Vantav beta 48-hour sandbox is ready. You can log in instantly below and explore the dashboard with simulated data.</p>
+        <p><b>Sandbox expires:</b> {expires_at_str} UTC</p>
+        <p><a href="{magic_url}" style="display:inline-block;padding:10px 18px;background:#d4af37;color:#000;border-radius:8px;text-decoration:none;font-weight:700;">Open Dashboard</a></p>
+        <p>Or log in with your email and temporary password at <a href="{login_url}">{login_url}</a>:</p>
+        <ul>
+          <li><b>Email:</b> {email}</li>
+          <li><b>Temporary password:</b> {temp_password or '(use the magic link above)'}</li>
+        </ul>
+        <p>Live marketplace connections are disabled during the sandbox. Connect stores after your account is upgraded to live access.</p>
+        <p>Questions? Reply to this email.</p>
+        <p>— Vantav Team</p>
+        """
+
+        email_sent = dispatch_external_email(email, "Your Vantav 48-Hour Sandbox is Ready", body)
+        db.session.commit()
+
+        return jsonify({
+            "status": "sandbox",
+            "merchant_id": merchant_id,
+            "email": email,
+            "temp_password": temp_password,
+            "magic_url": magic_url,
+            "login_url": login_url,
+            "sandbox_expires_at": expires_at_str,
+            "email_sent": email_sent,
+        }), 200
     except Exception as e:
         logger.error(f"[Approve Sandbox] Failed: {e}")
         return jsonify({"detail": str(e)}), 400

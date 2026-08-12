@@ -1,4 +1,4 @@
-"""Vetted Operator intake and sandbox lifecycle for the Prometheus OS beta."""
+"""Vetted Operator intake and sandbox lifecycle for the Vantav beta."""
 import os
 import uuid
 import secrets

@@ -134,9 +134,10 @@
 
     <div class="card">
       <div class="error" id="error">{{ error or '' }}</div>
+      <div id="sandbox-message" style="display:none; background:rgba(212,175,55,.1); border:1px solid rgba(212,175,55,.25); color:#d4af37; padding:.75rem 1rem; border-radius:10px; font-size:.85rem; margin-bottom:1rem;"></div>
       <form id="login-form" onsubmit="submitLogin(event)">
         <label for="email">Email</label>
-        <input type="email" id="email" name="email" required autocomplete="email" placeholder="you@company.com">
+        <input type="email" id="email" name="email" required autocomplete="email" placeholder="you@company.com" value="{{ request.args.get('email','') | e }}">
 
         <label for="password">Password</label>
         <input type="password" id="password" name="password" required autocomplete="current-password" placeholder="••••••••">
@@ -159,6 +160,24 @@
 
   <script>
     const recaptchaSiteKey = "{{ recaptcha_site_key }}";
+
+    (function handleQueryMessages() {
+      const params = new URLSearchParams(window.location.search);
+      const err = params.get('error');
+      const msgBox = document.getElementById('error');
+      const sandboxBox = document.getElementById('sandbox-message');
+      if (err === 'token_expired' || err === 'missing_token' || err === 'invalid_token') {
+        msgBox.textContent = 'That login link has expired. Use your email and temporary password to log in.';
+        msgBox.style.display = 'block';
+      } else if (err === 'sandbox_expired') {
+        msgBox.textContent = 'Your 48-hour sandbox has expired. Contact support to upgrade to live access.';
+        msgBox.style.display = 'block';
+      }
+      if (params.get('sandbox') === 'ready') {
+        sandboxBox.textContent = 'Your sandbox is active. Use the temporary password from your email, or click the dashboard link in that email.';
+        sandboxBox.style.display = 'block';
+      }
+    })();
 
     async function submitLogin(e) {
       e.preventDefault();

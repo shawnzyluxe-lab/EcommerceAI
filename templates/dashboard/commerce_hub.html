@@ -20,7 +20,11 @@
       <div style="font-weight: 600; font-size: .85rem;">{{ ch.name }}</div>
       <div style="font-size:.7rem; color:var(--ink-3); margin:4px 0;">{{ ch.state }}</div>
       {% if ch.platform in ('shopify','tiktok','amazon') %}
-      <button class="btn" style="margin-top: 10px; width: 100%; font-size: .72rem; padding: 5px 8px;" onclick="openConnectModal('{{ ch.platform }}')">{{ 'Manage' if ch.state == 'connected' else 'Connect' }}</button>
+        {% if merchant.sandbox_status == 'sandbox' %}
+        <span class="tag tag-ghost" style="margin-top: 10px; display: inline-block;">Disabled in sandbox</span>
+        {% else %}
+        <button class="btn" style="margin-top: 10px; width: 100%; font-size: .72rem; padding: 5px 8px;" onclick="openConnectModal('{{ ch.platform }}')">{{ 'Manage' if ch.state == 'connected' else 'Connect' }}</button>
+        {% endif %}
       {% else %}
       <span class="tag tag-ghost" style="margin-top: 10px; display: inline-block;">Not available in beta</span>
       {% endif %}
@@ -89,7 +93,10 @@
         <input id="amazon-region" type="text" placeholder="us-east-1" style="width: 100%; padding: 10px; margin: 6px 0 12px; border: 1px solid var(--line); border-radius: 8px; background: #fff;">
       </div>
 
-      <button class="btn btn-primary" style="width: 100%;" type="submit">Encrypt &amp; Save Connection</button>
+      <button class="btn btn-primary" style="width: 100%;" type="submit" {% if merchant.sandbox_status == 'sandbox' %}disabled{% endif %}>{% if merchant.sandbox_status == 'sandbox' %}Live connect disabled in sandbox{% else %}Encrypt &amp; Save Connection{% endif %}</button>
+      {% if merchant.sandbox_status == 'sandbox' %}
+      <p style="font-size:.75rem; color:var(--ink-3); margin-top:8px;">Marketplace connections are disabled while your 48-hour sandbox is active. Request live access to connect real stores.</p>
+      {% endif %}
     </form>
     <div id="form-message" style="margin-top:10px; font-size:.8rem;"></div>
   </div>
@@ -108,6 +115,8 @@
 </div>
 
 <script>
+const SANDBOX = {{ (merchant.sandbox_status == 'sandbox') | tojson }};
+
 function toggleFields() {
   const p = document.getElementById('platform').value;
   document.getElementById('shopify-fields').style.display = p === 'shopify' ? 'block' : 'none';
@@ -117,6 +126,10 @@ function toggleFields() {
 
 function openConnectModal(platform) {
   if (!['shopify','tiktok','amazon'].includes(platform)) return;
+  if (SANDBOX) {
+    alert('Live marketplace connections are disabled during the 48-hour sandbox.');
+    return;
+  }
   document.getElementById('platform').value = platform;
   toggleFields();
   document.getElementById('connect-panel').scrollIntoView({behavior: 'smooth'});
@@ -124,6 +137,10 @@ function openConnectModal(platform) {
 
 async function submitConnect(e) {
   e.preventDefault();
+  if (SANDBOX) {
+    alert('Live marketplace connections are disabled during the 48-hour sandbox.');
+    return;
+  }
   const platform = document.getElementById('platform').value;
   const msg = document.getElementById('form-message');
   msg.textContent = '';
@@ -173,12 +190,20 @@ function renderChannels(channels) {
   const grid = document.getElementById('channel-grid');
   grid.innerHTML = channels.map(c => {
     const isBeta = betaPlatforms.includes(c.platform);
+    let action;
+    if (!isBeta) {
+      action = '<span class="tag tag-ghost" style="margin-top: 10px; display: inline-block;">Not available in beta</span>';
+    } else if (SANDBOX) {
+      action = '<span class="tag tag-ghost" style="margin-top: 10px; display: inline-block;">Disabled in sandbox</span>';
+    } else {
+      action = `<button class="btn" style="margin-top: 10px; width: 100%; font-size: .72rem; padding: 5px 8px;" onclick="openConnectModal('${c.platform}')">${c.state === 'connected' ? 'Manage' : 'Connect'}</button>`;
+    }
     return `
     <div data-platform="${c.platform}" style="border: 1px solid var(--line); border-radius: 12px; padding: 16px; text-align: center; ${isBeta ? '' : 'opacity:.6;'}">
       <div style="width: 40px; height: 40px; border-radius: 8px; background: ${c.color}; color: #fff; display: grid; place-items: center; font-weight: 800; margin: 0 auto 8px; font-size: .8rem;">${c.abbr}</div>
       <div style="font-weight: 600; font-size: .85rem;">${c.name}</div>
       <div style="font-size:.7rem; color:var(--ink-3); margin:4px 0;">${c.state}</div>
-      ${isBeta ? `<button class="btn" style="margin-top: 10px; width: 100%; font-size: .72rem; padding: 5px 8px;" onclick="openConnectModal('${c.platform}')">${c.state === 'connected' ? 'Manage' : 'Connect'}</button>` : '<span class="tag tag-ghost" style="margin-top: 10px; display: inline-block;">Not available in beta</span>'}
+      ${action}
     </div>
   `}).join('');
 

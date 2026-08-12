@@ -63,7 +63,11 @@
       </header>
 
       <main class="main-content">
-        {% if merchant.sandbox_status == 'sandbox' %}
+        {% if merchant.sandbox_status == 'expired' %}
+        <div style="background: #fef2f2; border: 1px solid #ef4444; color: #991b1b; padding: 12px 18px; border-radius: 10px; margin-bottom: 18px; font-size: .9rem;">
+          <strong>Your 48-hour sandbox has expired.</strong> Live marketplace connections and paid features are paused. <a href="/subscribe" style="color:#991b1b; text-decoration: underline; font-weight: 600;">Upgrade to keep access</a> or contact support.
+        </div>
+        {% elif merchant.sandbox_status == 'sandbox' %}
         <div style="background: #fffbeb; border: 1px solid #f59e0b; color: #92400e; padding: 12px 18px; border-radius: 10px; margin-bottom: 18px; font-size: .9rem;">
           <strong>Sandbox mode active.</strong> You're exploring Vantav with simulated data. Live marketplace connections are disabled {% if merchant.sandbox_expires_at %}until {{ merchant.sandbox_expires_at }}{% endif %}. <a href="/dashboard/billing" style="color:#92400e; text-decoration: underline; font-weight: 600;">Request live access</a> when ready.
         </div>

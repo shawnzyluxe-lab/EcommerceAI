@@ -4,7 +4,7 @@
 
 <section class="page-header">
   <h1>Beta Waitlist</h1>
-  <p>Review and approve vetted operators for the Prometheus OS beta.</p>
+  <p>Review and approve vetted operators for the Vantav beta.</p>
 </section>
 
 <div class="card">
@@ -74,7 +74,20 @@ async function loadApps(status='') {
 async function approveSandbox(id) {
   const res = await fetch(`/api/admin/beta-applications/${id}/sandbox`, {method: 'POST'});
   const data = await res.json();
-  showResult(res.ok ? `Sandbox approved.\nMerchant ID: ${data.merchant_id}\nEmail: ${data.email}\nTemp password: ${data.temp_password || '(existing)'}\nExpires: ${data.sandbox_expires_at}` : data.detail);
+  if (res.ok) {
+    const lines = [
+      `Sandbox approved and ${data.email_sent ? 'email sent.' : 'email FAILED — copy details below.'}`,
+      `Merchant ID: ${data.merchant_id}`,
+      `Email: ${data.email}`,
+      `Temp password: ${data.temp_password || '(existing)'}`,
+      `Magic link: ${data.magic_url}`,
+      `Login URL: ${data.login_url}`,
+      `Expires: ${data.sandbox_expires_at}`,
+    ];
+    showResult(lines.join('\n'));
+  } else {
+    showResult(data.detail || 'Approval failed.');
+  }
   loadApps();
 }
 
