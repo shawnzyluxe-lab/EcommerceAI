@@ -2277,6 +2277,25 @@ def api_merchant_timezone():
     return jsonify({"timezone": tz}), 200
 
 
+@app.route('/api/v1/merchant/set-password', methods=['POST'])
+@require_roles([UserRole.ADMIN, UserRole.MERCHANT, UserRole.ENGINEER])
+def api_merchant_set_password():
+    """Allow a logged-in merchant to set or reset their password."""
+    merchant = get_merchant_context()
+    if not merchant:
+        return jsonify({"error": "No merchant context"}), 403
+    data = request.get_json(silent=True) or {}
+    new_password = (data.get("new_password") or "").strip()
+    if len(new_password) < 8:
+        return jsonify({"error": "Password must be at least 8 characters"}), 400
+    profile = MerchantProfile.query.get(merchant["id"])
+    if not profile:
+        return jsonify({"error": "Merchant profile not found"}), 404
+    profile.password_hash = generate_password_hash(new_password, method="pbkdf2:sha256")
+    db.session.commit()
+    return jsonify({"updated": True}), 200
+
+
 @app.route('/api/v1/tiktok-studio/posts', methods=['POST'])
 @require_roles([UserRole.ADMIN, UserRole.MERCHANT, UserRole.ENGINEER])
 def api_tiktok_studio_posts():
