@@ -154,6 +154,22 @@ def run_migrations():
         """))
         print("Ensured beta_waitlist_applications table")
 
+        # Make profit_feed_orders unique per merchant + order, not globally.
+        for old_name in ['profit_feed_orders_order_id_key', 'profit_feed_orders_order_id_uq']:
+            try:
+                conn.execute(text(f"ALTER TABLE profit_feed_orders DROP CONSTRAINT IF EXISTS {old_name}"))
+            except Exception as e:
+                print(f"[migrate] drop constraint {old_name}: {e}")
+            try:
+                conn.execute(text(f"DROP INDEX IF EXISTS {old_name}"))
+            except Exception as e:
+                print(f"[migrate] drop index {old_name}: {e}")
+        try:
+            conn.execute(text("ALTER TABLE profit_feed_orders ADD CONSTRAINT _profit_order_merchant_uc UNIQUE (merchant_id, order_id)"))
+            print("Ensured profit_feed_orders unique (merchant_id, order_id)")
+        except Exception as e:
+            print(f"[migrate] profit_feed_orders unique constraint: {e}")
+
 
 if __name__ == "__main__":
     try:

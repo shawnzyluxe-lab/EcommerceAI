@@ -375,7 +375,7 @@ class ProfitFeedOrder(db.Model):
     __tablename__ = "profit_feed_orders"
     id = db.Column(db.Integer, primary_key=True, autoincrement=True)
     merchant_id = db.Column(db.String(100), db.ForeignKey("merchant_profiles.merchant_id"), nullable=False, index=True)
-    order_id = db.Column(db.String(100), nullable=False, unique=True)
+    order_id = db.Column(db.String(100), nullable=False)
     channel = db.Column(db.String(50), nullable=False)  # shopify, tiktok, amazon, etsy, ebay, etc.
     items = db.Column(db.Integer, default=1)
     gross_revenue = db.Column(db.REAL, nullable=False, default=0.0)
@@ -387,6 +387,7 @@ class ProfitFeedOrder(db.Model):
     net_profit = db.Column(db.REAL, nullable=False, default=0.0)
     state = db.Column(db.String(50), default="shipped")  # shipped, delayed, refunded, packed, cancelled
     recorded_at = db.Column(db.DateTime, server_default=db.func.now())
+    __table_args__ = (db.UniqueConstraint('merchant_id', 'order_id', name='_profit_order_merchant_uc'),)
 
 
 class AdSpendFeed(db.Model):
