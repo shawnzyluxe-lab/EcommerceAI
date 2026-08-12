@@ -18,21 +18,33 @@ import action_gate
 import channels as channels_module
 
 
-def _greeting_for(merchant=None):
-    """Return a time-of-day greeting using the merchant's name and timezone."""
-    from zoneinfo import ZoneInfo
+from zoneinfo import ZoneInfo
 
-    name = (merchant or {}).get("name", "there")
-    merchant_id = (merchant or {}).get("id")
+
+def _merchant_timezone(merchant_id=None) -> str:
+    """Return the merchant's saved timezone, or UTC."""
     tz_name = "UTC"
     if merchant_id:
         tz = MerchantSetting.query.filter_by(merchant_id=merchant_id, setting_key="merchant_timezone").first()
         if tz and tz.setting_value:
             tz_name = tz.setting_value.strip()
+    return tz_name
+
+
+def _merchant_now(merchant_id=None):
+    """Return the current datetime in the merchant's timezone."""
+    tz_name = _merchant_timezone(merchant_id)
     try:
-        now = datetime.now(ZoneInfo(tz_name))
+        return datetime.now(ZoneInfo(tz_name))
     except Exception:
-        now = datetime.now(timezone.utc)
+        return datetime.now(timezone.utc)
+
+
+def _greeting_for(merchant=None):
+    """Return a time-of-day greeting using the merchant's name and timezone."""
+    name = (merchant or {}).get("name", "there")
+    merchant_id = (merchant or {}).get("id")
+    now = _merchant_now(merchant_id)
     hour = now.hour
     if hour < 5 or hour >= 22:
         salutation = "Good night"
@@ -515,7 +527,8 @@ NAV_GROUPS = [
 
 
 def context(active_page=None, merchant=None, merchant_id=None):
-    now = datetime.now(timezone.utc)
+    tz_name = _merchant_timezone(merchant_id)
+    now = _merchant_now(merchant_id)
     user_role = (merchant or {}).get("role")
     # Use the real-time Profit Feed when a merchant is identified, otherwise fall
     # back to the static sample data so the dashboard still renders.
@@ -573,20 +586,24 @@ def context(active_page=None, merchant=None, merchant_id=None):
     except Exception:
         channel_data = CHANNELS
 
+    # Ensure the merchant dict carries the timezone so templates can render local time.
+    merchant_obj = dict(merchant or {
+        "name": "Your store",
+        "email": "admin@example.com",
+        "tier": "Beta Plan",
+        "sandbox_status": "approved",
+        "live_access_enabled": True,
+        "sandbox_expires_at": None,
+    })
+    merchant_obj.setdefault("timezone", tz_name)
+
     return {
         "brand": BRAND,
         "nav": NAV,
         "nav_groups": nav_groups,
         "active_page": active_page or "overview",
-        "merchant": merchant or {
-            "name": "Your store",
-            "email": "admin@example.com",
-            "tier": "Beta Plan",
-            "sandbox_status": "approved",
-            "live_access_enabled": True,
-            "sandbox_expires_at": None,
-        },
-        "coo": dict(COO, greeting=_greeting_for(merchant)),
+        "merchant": merchant_obj,
+        "coo": dict(COO, greeting=_greeting_for(merchant_obj)),
         "suggestions": COMMAND_SUGGESTIONS,
         "channels": channel_data,
         "connected": [c for c in channel_data if c.get("state") == "connected"],
@@ -618,6 +635,6 @@ def context(active_page=None, merchant=None, merchant_id=None):
         "mobile_actions": MOBILE_ACTIONS,
         "pending_actions": pending_actions,
         "action_history": action_history,
-        "generated": now.strftime("%A, %d %b %Y · %H:%M UTC"),
+        "generated": now.strftime("%A, %d %b %Y · %H:%M %Z"),
     }
 
