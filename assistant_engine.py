@@ -66,6 +66,8 @@ def _run_tool_loop(merchant_id: str, messages: List[Dict[str, Any]], max_rounds:
     for _ in range(max_rounds):
         response = _call_llm(messages, tools=agent_tools.TOOLS)
         if response is None:
+            if os.environ.get("OPENAI_API_KEY"):
+                return {"answer": "OpenAI key is configured, but the API request failed (no credits or rate limit). I'm answering from live data instead.", "did": did}
             return {"answer": "I'm not connected to a language model yet. Add OPENAI_API_KEY to enable smart answers.", "did": did}
 
         choice = response.choices[0]
