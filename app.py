@@ -3388,7 +3388,7 @@ def generate_magic_link():
             merchant_id = profile.merchant_id
 
         magic_token = secrets.token_urlsafe(32)
-        expires = datetime.now() + timedelta(minutes=15)
+        expires = datetime.utcnow() + timedelta(minutes=15)
         db.session.add(MagicLoginToken(
             token=magic_token,
             admin_email=email,
