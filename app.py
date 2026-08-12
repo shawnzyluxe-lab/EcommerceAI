@@ -1281,7 +1281,7 @@ def home():
         return render_template('coming_soon.html')
     if site_wall_authenticated():
         return redirect(url_for('dashboard'))
-    return redirect(url_for('subscribe'))
+    return render_template('landing.html')
 
 
 @app.route('/subscribe')
