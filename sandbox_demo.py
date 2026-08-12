@@ -4,6 +4,7 @@ from models import (
     db,
     BusinessMetric,
     StartupPackProject,
+    MerchantProfile,
     ProfitFeedOrder,
     AdSpendFeed,
     Alert,
@@ -78,7 +79,7 @@ def _seed_demo_channels(merchant_id):
 def _seed_demo_startup_pack(merchant_id, business_name):
     """Pre-fill the Brand Build project with demo-ready sample data."""
     project = startup_pack.get_project(merchant_id)
-    brand = business_name if business_name and business_name not in ("New Storefront", "", " ") else "Luxe Sleep Co."
+    brand = "Luxe Sleep Co."
     project.brand_name = brand
     project.niche = "Premium Home & Sleep"
     project.target_audience = "Gen Z women 22-34, US, interest in wellness and self-care"
@@ -130,6 +131,12 @@ def seed_sandbox_demo(merchant_id, business_name="", force=False):
     bm = BusinessMetric.query.filter_by(merchant_id=merchant_id).first()
     if bm:
         bm.ai_briefing = "Demo mode: profit, alerts, and actions are generated from simulated multi-channel data."
+        db.session.commit()
+
+    # Use a friendly demo business name for the greeting if the merchant did not supply one.
+    profile = MerchantProfile.query.filter_by(merchant_id=merchant_id).first()
+    if profile and (not profile.business_name or profile.business_name.lower() in (profile.admin_email or "").lower()):
+        profile.business_name = "Luxe Sleep Co."
         db.session.commit()
 
     return True
