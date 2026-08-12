@@ -516,10 +516,11 @@ def get_merchant_context():
     if sandbox_status == "sandbox" and profile.sandbox_expires_at and profile.sandbox_expires_at <= now:
         sandbox_status = "expired"
         sandbox_expired = True
+    display_name = profile.business_name or (profile.admin_email.split("@")[0] if profile.admin_email and "@" in profile.admin_email else s.merchant_id)
     return {
         "id": s.merchant_id,
         "tier": tier,
-        "name": profile.business_name,
+        "name": display_name,
         "email": profile.admin_email,
         "sandbox_status": sandbox_status,
         "live_access_enabled": bool(profile.live_access_enabled) and not sandbox_expired,
@@ -1286,8 +1287,12 @@ def home():
     host = request.host.split(':')[0].lower()
     if host in ('shawnzyluxe.com', 'www.shawnzyluxe.com'):
         return render_template('coming_soon.html')
-    if site_wall_authenticated():
+    merchant = get_merchant_context()
+    if merchant:
         return redirect(url_for('dashboard'))
+    # Site-wall-only users still need to log in as a merchant before viewing the dashboard.
+    if site_wall_authenticated() and site_wall_enabled():
+        return redirect(url_for('login'))
     return render_template('landing.html')
 
 
@@ -1336,7 +1341,9 @@ def legal_refund():
 @app.route('/dashboard')
 def dashboard():
     merchant = get_merchant_context()
-    merchant_id = merchant["id"] if merchant else None
+    if not merchant:
+        return redirect(url_for('login'))
+    merchant_id = merchant["id"]
     ctx = context(active_page='overview', merchant=merchant, merchant_id=merchant_id)
     return render_template('dashboard/overview.html', **ctx)
 
@@ -1351,6 +1358,9 @@ def _dashboard_context(active_page):
 
 @app.route('/dashboard/<page>')
 def dashboard_page(page):
+    merchant = get_merchant_context()
+    if not merchant:
+        return redirect(url_for('login'))
     active_page = page.replace('-', '_')
     valid_pages = {
         'overview', 'command-center', 'commerce-hub', 'alerts', 'action-gate', 'profit-engine', 'startup-pack',
@@ -2379,8 +2389,9 @@ def api_admin_deliver_startup_brief(merchant_id):
 @app.route('/login')
 @limiter.exempt
 def login():
-    if site_wall_authenticated():
-        return redirect(url_for('home'))
+    merchant = get_merchant_context()
+    if merchant:
+        return redirect(url_for('dashboard'))
     return render_template('beta_login.html', error=request.args.get('error') or '', recaptcha_site_key=RECAPTCHA_SITE_KEY)
 
 
@@ -2397,9 +2408,9 @@ def site_login():
         submitted = request.form.get('password', '')
         if hmac.compare_digest(submitted, SITE_WALL_PASSWORD):
             token = secrets.token_urlsafe(32)
-            default_merchant = "merchant_shawn_01"
             now = datetime.utcnow()
-            db.session.add(ActiveSession(token=token, merchant_id=default_merchant, role=UserRole.ADMIN.value, created_at=now, last_seen=now))
+            # Site-wall sessions do not impersonate any merchant; a real login is still required.
+            db.session.add(ActiveSession(token=token, merchant_id=None, role="SiteWall", created_at=now, last_seen=now))
             db.session.commit()
             response = redirect(url_for('home'))
             response.set_cookie(

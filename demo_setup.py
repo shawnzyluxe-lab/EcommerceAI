@@ -15,9 +15,10 @@ import channels as channels_module
 import alert_matrix
 import sandbox_demo
 
-MERCHANT_ID = "merchant_ivor_demo"
-EMAIL = "ivonderhaff@gmail.com"
-PASSWORD = "Pqk57Qa9Weo"
+MERCHANT_ID = os.environ.get("DEMO_MERCHANT_ID", "merchant_ivor_demo")
+EMAIL = os.environ.get("DEMO_MERCHANT_EMAIL", "ivonderhaff@gmail.com")
+PASSWORD = os.environ.get("DEMO_MERCHANT_PASSWORD", "Pqk57Qa9Weo")
+BUSINESS_NAME = os.environ.get("DEMO_BUSINESS_NAME") or (EMAIL.split("@")[0].replace(".", " ").title() if "@" in EMAIL else "Your Store")
 
 STATIC_ORDERS = [
     {"id": "#1042", "channel": "Shopify",     "items": 2, "revenue": 128.00, "profit": 38.42, "state": "delayed"},
@@ -36,7 +37,7 @@ def main():
         profile = MerchantProfile.query.get(MERCHANT_ID)
         if not profile:
             profile = MerchantProfile(merchant_id=MERCHANT_ID)
-        profile.business_name = "Shawn"
+        profile.business_name = BUSINESS_NAME
         profile.admin_email = EMAIL
         profile.password_hash = generate_password_hash(PASSWORD, method="pbkdf2:sha256")
         profile.account_tier = "Enterprise AI Tier"

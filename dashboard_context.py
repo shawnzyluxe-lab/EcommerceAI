@@ -85,7 +85,7 @@ BRAND = {
 # --------------------------------------------------------------------------
 
 COO = {
-    "greeting": "Good morning, Shawn.",
+    "greeting": "Good morning, there.",
     "summary": [
         ("Revenue is up", "18%", "this week"),
         ("Top seller projected to sell out in", "4 days", ""),

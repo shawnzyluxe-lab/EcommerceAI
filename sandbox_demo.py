@@ -139,10 +139,11 @@ def seed_sandbox_demo(merchant_id, business_name="", force=False):
         bm.ai_briefing = "Demo mode: profit, alerts, and actions are generated from simulated multi-channel data."
         db.session.commit()
 
-    # Use a friendly demo business name for the greeting if the merchant did not supply one.
+    # Preserve the merchant's chosen business name; only fill an empty one.
     profile = MerchantProfile.query.filter_by(merchant_id=merchant_id).first()
-    if profile and (not profile.business_name or profile.business_name.lower() in (profile.admin_email or "").lower()):
-        profile.business_name = "Luxe Sleep Co."
+    if profile and not profile.business_name:
+        default_name = business_name or (profile.admin_email.split("@")[0] if profile.admin_email and "@" in profile.admin_email else "Your Store")
+        profile.business_name = default_name
         db.session.commit()
 
     return True
