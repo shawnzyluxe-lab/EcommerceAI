@@ -2293,7 +2293,27 @@ def api_merchant_set_password():
         return jsonify({"error": "Merchant profile not found"}), 404
     profile.password_hash = generate_password_hash(new_password, method="pbkdf2:sha256")
     db.session.commit()
-    return jsonify({"updated": True}), 200
+    return jsonify({"updated": True, "merchant_id": merchant["id"]}), 200
+
+
+@app.route('/api/v1/merchant/seed-sandbox', methods=['POST'])
+@require_roles([UserRole.ADMIN, UserRole.MERCHANT, UserRole.ENGINEER])
+def api_merchant_seed_sandbox():
+    """Reset and seed sandbox demo data for the current merchant."""
+    merchant = get_merchant_context()
+    if not merchant:
+        return jsonify({"error": "No merchant context"}), 403
+    profile = MerchantProfile.query.get(merchant["id"])
+    if not profile:
+        return jsonify({"error": "Merchant profile not found"}), 404
+    now = datetime.utcnow()
+    profile.sandbox_status = "sandbox"
+    profile.sandbox_started_at = now
+    profile.sandbox_expires_at = now + timedelta(hours=48)
+    profile.live_access_enabled = 0
+    db.session.commit()
+    sandbox_demo.seed_sandbox_demo(merchant["id"], profile.business_name or "")
+    return jsonify({"sandbox": True, "merchant_id": merchant["id"], "expires_at": profile.sandbox_expires_at.isoformat()}), 200
 
 
 @app.route('/api/v1/tiktok-studio/posts', methods=['POST'])
