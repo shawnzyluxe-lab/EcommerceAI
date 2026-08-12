@@ -58,7 +58,7 @@ def record_order(merchant_id, channel, order_id, gross_revenue, items=1, state="
         logger.warning("[PROFIT FEED] Ignored order with no order_id")
         return None
 
-    existing = ProfitFeedOrder.query.filter_by(order_id=order_id).first()
+    existing = ProfitFeedOrder.query.filter_by(merchant_id=merchant_id, order_id=order_id).first()
     if existing:
         # Idempotent update for state/refund changes from webhooks.
         existing.state = state
@@ -162,8 +162,11 @@ def _orders_with_ad_attribution(merchant_id, limit=50, since=None):
         spend_per_order = channel_spend.get(o.channel, 0.0) / max(order_counts[o.channel], 1)
         net = _compute_net(o, spend_per_order)
         margin = round(net / o.gross_revenue * 100, 1) if o.gross_revenue else 0.0
+        order_id = o.order_id or ""
+        order_number = order_id.split(":")[-1] if ":" in order_id else order_id
         result.append({
-            "id": o.order_id,
+            "id": order_id,
+            "order_number": order_number,
             "channel": o.channel.title() if o.channel else o.channel,
             "items": o.items,
             "revenue": float(o.gross_revenue),

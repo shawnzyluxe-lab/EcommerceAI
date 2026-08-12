@@ -60,6 +60,7 @@ import alert_matrix
 import vetted_operator
 import action_gate
 import channels as channels_module
+import shopify_sync
 import startup_pack
 import sandbox_demo
 import migrate as migrate_module
@@ -1952,6 +1953,51 @@ def api_disconnect_channel(platform):
         return jsonify({"status": "disconnected", "platform": platform}), 200
     except Exception as e:
         logger.error(f"[Channels] Disconnect failed: {e}")
+        return jsonify({"detail": str(e)}), 400
+
+
+@app.route('/api/v1/channels/shopify/sync', methods=['POST'])
+@require_roles([UserRole.ADMIN, UserRole.MERCHANT, UserRole.ENGINEER])
+def api_sync_shopify():
+    """Pull the latest Shopify orders and product catalog for this merchant."""
+    merchant = get_merchant_context()
+    if not merchant:
+        return jsonify({"error": "No merchant context"}), 403
+    if not merchant.get("live_access_enabled"):
+        return jsonify({"detail": "Live marketplace sync is disabled during the sandbox."}), 403
+    try:
+        result = shopify_sync.sync_shopify(merchant["id"])
+        return jsonify({"status": "synced", **result}), 200
+    except Exception as e:
+        logger.error(f"[Shopify Sync] Failed for {merchant['id']}: {e}")
+        return jsonify({"detail": str(e)}), 400
+
+
+@app.route('/api/v1/channels/shopify/products', methods=['GET'])
+@require_roles([UserRole.ADMIN, UserRole.MERCHANT, UserRole.ENGINEER])
+def api_get_shopify_products():
+    """Return the last-synced Shopify product catalog."""
+    merchant = get_merchant_context()
+    if not merchant:
+        return jsonify({"error": "No merchant context"}), 403
+    if not merchant.get("live_access_enabled"):
+        return jsonify({"detail": "Live marketplace data is disabled during the sandbox."}), 403
+    try:
+        return jsonify({"products": shopify_sync.get_products(merchant["id"])}), 200
+    except Exception as e:
+        logger.error(f"[Shopify Products] Failed for {merchant['id']}: {e}")
+        return jsonify({"detail": str(e)}), 400
+
+
+@app.route('/api/admin/shopify/sync/<merchant_id>', methods=['POST'])
+@require_roles([UserRole.ADMIN])
+def api_admin_sync_shopify(merchant_id):
+    """Admin-triggered Shopify sync for testing (bypasses live-access gate)."""
+    try:
+        result = shopify_sync.sync_shopify(merchant_id)
+        return jsonify({"status": "synced", "merchant_id": merchant_id, **result}), 200
+    except Exception as e:
+        logger.error(f"[Admin Shopify Sync] Failed for {merchant_id}: {e}")
         return jsonify({"detail": str(e)}), 400
 
 
