@@ -11,19 +11,42 @@ from models import db, PendingAction
 
 logger = logging.getLogger(__name__)
 
-DEFAULT_MODEL = "gpt-4o-mini"
+DEFAULT_OPENAI_MODEL = "gpt-4o-mini"
+DEFAULT_DEEPSEEK_MODEL = "deepseek-v4-pro"
+
+
+def _active_provider() -> Dict[str, str]:
+    """Pick the LLM provider from env. Prefer DeepSeek if explicitly requested or only DeepSeek key is set."""
+    provider = os.environ.get("ASSISTANT_PROVIDER", "").lower()
+    if provider == "deepseek" or (os.environ.get("DEEPSEEK_API_KEY") and not os.environ.get("OPENAI_API_KEY")):
+        return {
+            "name": "deepseek",
+            "key": os.environ.get("DEEPSEEK_API_KEY", ""),
+            "base_url": "https://api.deepseek.com",
+            "model": os.environ.get("DEEPSEEK_MODEL", DEFAULT_DEEPSEEK_MODEL),
+        }
+    return {
+        "name": "openai",
+        "key": os.environ.get("OPENAI_API_KEY", ""),
+        "base_url": None,
+        "model": os.environ.get("ASSISTANT_MODEL", DEFAULT_OPENAI_MODEL),
+    }
 
 
 def _llm_client() -> Any:
-    """Return an OpenAI client if the key is configured."""
-    key = os.environ.get("OPENAI_API_KEY")
+    """Return an OpenAI-compatible client for the configured provider."""
+    provider = _active_provider()
+    key = provider["key"]
     if not key:
         return None
     try:
         from openai import OpenAI
-        return OpenAI(api_key=key)
+        kwargs = {"api_key": key}
+        if provider["base_url"]:
+            kwargs["base_url"] = provider["base_url"]
+        return OpenAI(**kwargs)
     except Exception as e:
-        logger.error(f"[Assistant] Could not initialize OpenAI client: {e}")
+        logger.error(f"[Assistant] Could not initialize {provider['name']} client: {e}")
         return None
 
 
@@ -44,7 +67,8 @@ def _call_llm(messages: List[Dict[str, Any]], tools: Optional[List[Dict[str, Any
     client = _llm_client()
     if not client:
         return None
-    model = os.environ.get("ASSISTANT_MODEL", DEFAULT_MODEL)
+    provider = _active_provider()
+    model = provider["model"]
     try:
         kwargs = {
             "model": model,
@@ -66,9 +90,10 @@ def _run_tool_loop(merchant_id: str, messages: List[Dict[str, Any]], max_rounds:
     for _ in range(max_rounds):
         response = _call_llm(messages, tools=agent_tools.TOOLS)
         if response is None:
-            if os.environ.get("OPENAI_API_KEY"):
-                return {"answer": "OpenAI key is configured, but the API request failed (no credits or rate limit). I'm answering from live data instead.", "did": did}
-            return {"answer": "I'm not connected to a language model yet. Add OPENAI_API_KEY to enable smart answers.", "did": did}
+            provider = _active_provider()
+            if provider["key"]:
+                return {"answer": f"{provider['name'].title()} key is configured, but the API request failed (no credits, rate limit, or bad model name). I'm answering from live data instead.", "did": did}
+            return {"answer": "I'm not connected to a language model yet. Add OPENAI_API_KEY or DEEPSEEK_API_KEY to enable smart answers.", "did": did}
 
         choice = response.choices[0]
         message = choice.message
@@ -153,7 +178,7 @@ def _local_answer(merchant_id: str, message: str) -> Dict[str, Any]:
 
     answer = (
         "Here's a quick read from your live data:\n\n" + context_str.replace("\n", "\n\n") +
-        "\n\nAdd an OPENAI_API_KEY environment variable to unlock natural-language reasoning and deeper analysis."
+        "\n\nAdd an OPENAI_API_KEY or DEEPSEEK_API_KEY environment variable to unlock natural-language reasoning and deeper analysis."
     )
     return {"answer": answer, "did": did}
 
