@@ -24,6 +24,7 @@ from flask_limiter.util import get_remote_address
 from datetime import datetime, timedelta
 from enum import Enum
 from functools import wraps
+from typing import Optional
 
 logging.basicConfig(
     level=logging.INFO,
@@ -564,7 +565,7 @@ def enforce_tier_limits(merchant_id, requested_feature):
 def site_wall_protect():
     if not site_wall_enabled():
         return None
-    if request.endpoint in ('home', 'login', 'site_login', 'site_logout', 'subscribe', 'thank_you', 'session_heartbeat', 'create_stripe_checkout', 'beta_apply', 'api_beta_apply', 'auth_login', 'auth_signup', 'auth_provision_node', 'shopify_orders_webhook', 'tiktok_orders_webhook', 'amazon_orders_webhook', 'stripe_billing_webhook', 'supplier_po_update', 'execute_mitigation', 'generate_magic_link', 'magic_login', 'register_merchant', 'shopify_oauth_callback', 'health_check', 'legal_terms', 'legal_privacy', 'legal_refund', 'static'):
+    if request.endpoint in ('home', 'login', 'site_login', 'site_logout', 'subscribe', 'thank_you', 'session_heartbeat', 'create_stripe_checkout', 'beta_apply', 'api_beta_apply', 'auth_login', 'auth_signup', 'auth_provision_node', 'shopify_orders_webhook', 'tiktok_orders_webhook', 'amazon_orders_webhook', 'stripe_billing_webhook', 'supplier_po_update', 'execute_mitigation', 'generate_magic_link', 'magic_login', 'register_merchant', 'shopify_oauth_callback', 'tiktok_oauth_callback', 'health_check', 'legal_terms', 'legal_privacy', 'legal_refund', 'static'):
         return None
     if site_wall_authenticated():
         return None
@@ -607,6 +608,12 @@ SHOPIFY_ACCESS_TOKEN = os.environ.get("SHOPIFY_ACCESS_TOKEN", "")
 SHOPIFY_CLIENT_ID = os.environ.get("SHOPIFY_CLIENT_ID", "")
 SHOPIFY_CLIENT_SECRET = os.environ.get("SHOPIFY_CLIENT_SECRET", "")
 OAUTH_REDIRECT_URI = os.environ.get("OAUTH_REDIRECT_URI", "https://shawnzyluxe.com")
+
+TIKTOK_APP_KEY = os.environ.get("TIKTOK_APP_KEY", "")
+TIKTOK_APP_SECRET = os.environ.get("TIKTOK_APP_SECRET", "")
+TIKTOK_SERVICE_ID = os.environ.get("TIKTOK_SERVICE_ID", "")
+TIKTOK_AUTH_REGION = os.environ.get("TIKTOK_AUTH_REGION", "")
+TIKTOK_REDIRECT_URI = "https://vantavcommerce.com/api/v1/auth/tiktok/callback"
 
 SHOPIFY_DOMAIN = os.environ.get('SHOPIFY_DOMAIN', '').strip()
 STOREFRONT_TOKEN = os.environ.get('SHOPIFY_STOREFRONT_TOKEN', '').strip()
@@ -3909,6 +3916,21 @@ def shopify_oauth_connect():
     return redirect(oauth_url)
 
 
+def _tiktok_oauth_state(merchant_id: str, secret: str) -> str:
+    sig = hmac.new(secret.encode("utf-8"), merchant_id.encode("utf-8"), hashlib.sha256).hexdigest()[:16]
+    return f"{merchant_id}:{sig}"
+
+
+def _verify_tiktok_oauth_state(state: str, secret: str) -> Optional[str]:
+    if not state or ":" not in state:
+        return None
+    merchant_id, sig = state.split(":", 1)
+    expected = hmac.new(secret.encode("utf-8"), merchant_id.encode("utf-8"), hashlib.sha256).hexdigest()[:16]
+    if not hmac.compare_digest(sig, expected):
+        return None
+    return merchant_id
+
+
 @app.route('/api/v1/auth/shopify/callback')
 def shopify_oauth_callback():
     """Step 2: Exchange Shopify OAuth code and persist the connection."""
@@ -3930,6 +3952,84 @@ def shopify_oauth_callback():
         return redirect("/dashboard/commerce-hub?oauth_sync=success")
     except Exception as e:
         logger.error(f"[Shopify OAuth] {e}")
+        return redirect("/dashboard/commerce-hub?oauth_sync=error")
+
+
+@app.route('/api/v1/auth/tiktok/connect')
+def tiktok_oauth_connect():
+    """Step 1: Redirect merchant to TikTok Shop seller authorization screen."""
+    merchant = get_merchant_context()
+    if not merchant:
+        return redirect("/login?error=auth_required")
+    if not merchant.get("live_access_enabled"):
+        return redirect("/dashboard/commerce-hub?oauth_sync=error")
+    if not TIKTOK_APP_KEY or not TIKTOK_APP_SECRET or not TIKTOK_SERVICE_ID:
+        return redirect("/dashboard/commerce-hub?oauth_sync=error")
+
+    state = _tiktok_oauth_state(merchant["id"], TIKTOK_APP_SECRET)
+    auth_url = tiktok_sync.build_auth_url(
+        service_id=TIKTOK_SERVICE_ID,
+        app_key=TIKTOK_APP_KEY,
+        redirect_uri=TIKTOK_REDIRECT_URI,
+        state=state,
+        region=TIKTOK_AUTH_REGION,
+    )
+    return redirect(auth_url)
+
+
+@app.route('/api/v1/auth/tiktok/callback')
+def tiktok_oauth_callback():
+    """Step 2: Exchange TikTok Shop auth code, fetch authorized shops, and persist."""
+    code = request.args.get("code")
+    state = request.args.get("state", "")
+    if not code:
+        return redirect("/dashboard/commerce-hub?oauth_sync=error")
+
+    merchant_id = None
+    if TIKTOK_APP_SECRET:
+        merchant_id = _verify_tiktok_oauth_state(state, TIKTOK_APP_SECRET)
+    if not merchant_id:
+        merchant = get_merchant_context()
+        if merchant:
+            merchant_id = merchant["id"]
+        else:
+            return redirect("/login?error=auth_required")
+
+    if not TIKTOK_APP_KEY or not TIKTOK_APP_SECRET:
+        return redirect("/dashboard/commerce-hub?oauth_sync=error")
+
+    try:
+        token_data = tiktok_sync.exchange_auth_code(code, TIKTOK_APP_KEY, TIKTOK_APP_SECRET)
+        access_token = token_data.get("access_token") or token_data.get("accessToken", "")
+        refresh_token = token_data.get("refresh_token") or token_data.get("refreshToken", "")
+
+        shops = tiktok_sync.get_authorized_shops(
+            access_token=access_token,
+            app_key=TIKTOK_APP_KEY,
+            app_secret=TIKTOK_APP_SECRET,
+            region=TIKTOK_AUTH_REGION,
+        )
+        if not shops:
+            return redirect("/dashboard/commerce-hub?oauth_sync=error")
+
+        shop = shops[0]
+        shop_id = str(shop.get("id") or shop.get("shop_id") or "")
+        shop_cipher = str(shop.get("cipher") or shop.get("shop_cipher") or "")
+        if not shop_id:
+            raise ValueError("TikTok authorized shops response missing shop id")
+
+        channels_module.connect_tiktok(
+            merchant_id=merchant_id,
+            seller_id=shop_id,
+            app_key=TIKTOK_APP_KEY,
+            app_secret=TIKTOK_APP_SECRET,
+            access_token=access_token,
+            shop_cipher=shop_cipher,
+            refresh_token=refresh_token,
+        )
+        return redirect("/dashboard/commerce-hub?oauth_sync=success")
+    except Exception as e:
+        logger.error(f"[TikTok OAuth] {e}")
         return redirect("/dashboard/commerce-hub?oauth_sync=error")
 
 

@@ -114,6 +114,7 @@ def connect_tiktok(
     app_secret: str,
     access_token: str = "",
     shop_cipher: str = "",
+    refresh_token: str = "",
 ) -> Dict[str, Any]:
     """Persist a TikTok Shop connection."""
     _ensure_commerce_channel("tiktok")
@@ -128,6 +129,7 @@ def connect_tiktok(
         "seller_id": seller_id,
         "shop_id": seller_id,
         "access_token": access_token,
+        "refresh_token": refresh_token,
         "shop_cipher": shop_cipher,
     }))
     token.scope_permissions = "shop.list,order.list,product.list"

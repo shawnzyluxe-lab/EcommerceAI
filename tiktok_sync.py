@@ -12,7 +12,7 @@ import re
 import time
 from datetime import datetime
 from typing import Any, Dict, List, Optional, Tuple
-from urllib.parse import unquote
+from urllib.parse import unquote, urlencode
 
 import requests
 
@@ -23,7 +23,19 @@ import profit_feed
 logger = logging.getLogger(__name__)
 
 BASE_URL = "https://open-api.tiktokglobalshop.com"
+AUTH_BASE_US = "https://services.us.tiktokshop.com"
+AUTH_BASE_GLOBAL = "https://services.tiktokshop.com"
+TOKEN_URL = "https://auth.tiktok-shops.com/api/v2/token/get"
 VERSION = "202309"
+
+
+def _auth_base(region: str = "") -> str:
+    return AUTH_BASE_US if str(region).lower() == "us" else AUTH_BASE_GLOBAL
+
+
+def _api_base(region: str = "") -> str:
+    return "https://open-api.us.tiktokshop.com" if str(region).lower() == "us" else BASE_URL
+
 
 
 def _get_credentials(merchant_id: str) -> Dict[str, str]:
@@ -39,6 +51,7 @@ def _get_credentials(merchant_id: str) -> Dict[str, str]:
         "app_key": creds.get("app_key", ""),
         "app_secret": creds.get("app_secret", ""),
         "access_token": creds.get("access_token", ""),
+        "refresh_token": creds.get("refresh_token", ""),
         "shop_id": creds.get("shop_id", ""),
         "shop_cipher": creds.get("shop_cipher", ""),
     }
@@ -79,6 +92,7 @@ def _request(
     credentials: Dict[str, str],
     query: str = "",
     body: Any = None,
+    base_url: Optional[str] = None,
 ) -> Dict[str, Any]:
     """Make a signed request to the TikTok Shop Open Platform."""
     app_key = credentials.get("app_key", "")
@@ -89,7 +103,8 @@ def _request(
     if not all([app_key, app_secret, access_token]):
         raise ValueError("TikTok credentials incomplete: app_key, app_secret, and access_token are required")
 
-    url = f"{BASE_URL}{endpoint}?access_token={access_token}&app_key={app_key}"
+    base = base_url or BASE_URL
+    url = f"{base}{endpoint}?access_token={access_token}&app_key={app_key}"
     if shop_cipher:
         url += f"&shop_cipher={shop_cipher}"
     if shop_id:
@@ -259,3 +274,73 @@ def get_products(merchant_id: str) -> List[Dict[str, Any]]:
         return json.loads(setting.setting_value)
     except json.JSONDecodeError:
         return []
+
+
+def build_auth_url(
+    service_id: str,
+    app_key: str,
+    redirect_uri: str,
+    state: str,
+    region: str = "",
+) -> str:
+    """Return the TikTok Shop seller authorization URL."""
+    params = {"service_id": service_id, "state": state}
+    if redirect_uri:
+        params["redirect_uri"] = redirect_uri
+    base = _auth_base(region)
+    return f"{base}/open/authorize?{urlencode(params)}"
+
+
+def exchange_auth_code(code: str, app_key: str, app_secret: str) -> Dict[str, Any]:
+    """Exchange a TikTok Shop authorization code for access/refresh tokens."""
+    params = {
+        "app_key": app_key,
+        "app_secret": app_secret,
+        "auth_code": code,
+        "grant_type": "authorized_code",
+    }
+    url = f"{TOKEN_URL}?{urlencode(params)}"
+    resp = requests.get(url, timeout=20)
+    if resp.status_code != 200:
+        raise ValueError(f"TikTok token exchange failed ({resp.status_code}): {resp.text[:500]}")
+    data = resp.json()
+    if data.get("code") != 0:
+        raise ValueError(f"TikTok token exchange error {data.get('code')}: {data.get('message')}")
+    return data.get("data", {})
+
+
+def get_authorized_shops(
+    access_token: str,
+    app_key: str,
+    app_secret: str,
+    region: str = "",
+) -> List[Dict[str, Any]]:
+    """Fetch shops authorized for this access token."""
+    credentials = {
+        "app_key": app_key,
+        "app_secret": app_secret,
+        "access_token": access_token,
+        "shop_id": "",
+        "shop_cipher": "",
+    }
+    base_url = _api_base(region)
+    data = _request("GET", "/authorization/202309/shops", credentials, base_url=base_url)
+    return data.get("shops", [])
+
+
+def refresh_access_token(refresh_token: str, app_key: str, app_secret: str) -> Dict[str, Any]:
+    """Refresh a TikTok Shop access token."""
+    params = {
+        "app_key": app_key,
+        "app_secret": app_secret,
+        "refresh_token": refresh_token,
+        "grant_type": "refresh_token",
+    }
+    url = f"{TOKEN_URL}?{urlencode(params)}"
+    resp = requests.get(url, timeout=20)
+    if resp.status_code != 200:
+        raise ValueError(f"TikTok token refresh failed ({resp.status_code}): {resp.text[:500]}")
+    data = resp.json()
+    if data.get("code") != 0:
+        raise ValueError(f"TikTok token refresh error {data.get('code')}: {data.get('message')}")
+    return data.get("data", {})
