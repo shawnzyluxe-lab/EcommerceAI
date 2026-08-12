@@ -198,14 +198,21 @@
       error.style.display = 'none';
 
       try {
-        if (!window.grecaptcha) throw new Error('Security check not ready. Please wait and try again.');
-        const token = await new Promise((resolve, reject) => {
-          window.grecaptcha.ready(() => {
-            window.grecaptcha.execute(recaptchaSiteKey, { action: 'login' })
-              .then(resolve)
-              .catch(reject);
-          });
-        });
+        // reCAPTCHA v3 is optional during beta; collect a token if it's available.
+        let token = '';
+        if (window.grecaptcha && recaptchaSiteKey) {
+          try {
+            token = await new Promise((resolve, reject) => {
+              window.grecaptcha.ready(() => {
+                window.grecaptcha.execute(recaptchaSiteKey, { action: 'login' })
+                  .then(resolve)
+                  .catch(reject);
+              });
+            });
+          } catch (e) {
+            console.warn('reCAPTCHA token not available, continuing without it:', e);
+          }
+        }
 
         const r = await fetch('/api/v1/auth/login', {
           method: 'POST',

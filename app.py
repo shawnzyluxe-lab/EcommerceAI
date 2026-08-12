@@ -2527,22 +2527,21 @@ def session_heartbeat():
 
 
 @app.route('/api/v1/auth/login', methods=['POST'])
+@limiter.limit("10 per minute")
 def auth_login():
-    """Verify reCAPTCHA v3, then validate email + password and issue a session cookie."""
+    """Validate email + password and issue a session cookie.
+
+    reCAPTCHA v3 is temporarily relaxed for the beta; rate limiting and password
+    hashing still protect the endpoint.
+    """
     payload = request.get_json(silent=True) or {}
     email = (payload.get("email") or "").strip().lower()
     password = payload.get("password", "")
-    captcha_token = payload.get("captcha_token", "")
 
     if not email or not password:
         return jsonify({"detail": "CRITICAL ERROR: Email and password are required."}), 400
 
-    # 1. Enforce Bot Interception Pass
-    bot_score = verify_captcha_v3(captcha_token)
-    if bot_score < 0.5:
-        return jsonify({"detail": "AUTOMATION GUARD: Automated traffic signature identified. Access blocked."}), 403
-
-    # 2. Credential evaluation against DB hash
+    # 1. Credential evaluation against DB hash
     profile = MerchantProfile.query.filter_by(admin_email=email).first()
     if not profile or not profile.password_hash:
         return jsonify({"detail": "CRITICAL ERROR: Invalid authentication credentials match failed."}), 401
