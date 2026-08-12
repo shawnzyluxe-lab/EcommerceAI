@@ -3828,6 +3828,25 @@ def api_admin_reject(app_id):
         return jsonify({"detail": str(e)}), 400
 
 
+@app.route('/api/admin/reset-password', methods=['POST'])
+@require_roles([UserRole.ADMIN])
+def api_admin_reset_password():
+    """Generate or set a temporary password for a merchant account."""
+    data = request.get_json(silent=True) or {}
+    email = (data.get("email") or "").strip().lower()
+    password = (data.get("password") or "").strip()
+    if not email:
+        return jsonify({"detail": "Email is required"}), 400
+    profile = MerchantProfile.query.filter_by(admin_email=email).first()
+    if not profile:
+        return jsonify({"detail": "Merchant not found"}), 404
+    if not password:
+        password = secrets.token_urlsafe(8)
+    profile.password_hash = generate_password_hash(password, method="pbkdf2:sha256")
+    db.session.commit()
+    return jsonify({"merchant_id": profile.merchant_id, "email": email, "temp_password": password}), 200
+
+
 @app.route('/api/merchant/live-access-check', methods=['GET'])
 def api_live_access_check():
     """Check whether the current merchant can connect live marketplace credentials."""
