@@ -1,4 +1,4 @@
-{# Single-click Action Compliance Matrix card #}
+{# Single-click action recommendation card #}
 {% set evidence = action.evidence or {} %}
 {% set telemetry = evidence.telemetry_evidence_log or {} %}
 {% set confidence = evidence.confidence_score or 0 %}
@@ -10,9 +10,9 @@
   <div style="border-bottom:1px solid var(--line); padding:12px 16px; display:flex; justify-content:space-between; align-items:center; background:rgba(212,175,55,0.03);">
     <div style="display:flex; align-items:center; gap:8px; font-size:.65rem; font-weight:700; text-transform:uppercase; letter-spacing:.08em; color:var(--red);">
       <span style="width:8px; height:8px; border-radius:50%; background:var(--red); box-shadow:0 0 8px var(--red);"></span>
-      Critical Mitigation Draft
+      Recommended Action
     </div>
-    <div style="font-size:.7rem; color:var(--ink-3); font-family:monospace;">ID: ACT_COO_{{ action.id }}</div>
+    <div style="font-size:.7rem; color:var(--ink-3); font-family:monospace;">ID: ACT-{{ action.id }}</div>
   </div>
 
   <!-- Summary -->
@@ -24,7 +24,7 @@
   <!-- Evidence panel -->
   <div style="margin:0 16px 16px; padding:14px; background:var(--bg-soft); border:1px solid var(--line); border-radius:10px;">
     <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid var(--line); padding-bottom:8px; margin-bottom:10px;">
-      <span style="font-size:.65rem; font-weight:700; text-transform:uppercase; letter-spacing:.08em; color:var(--ink-3);">Why I'm Recommending This</span>
+      <span style="font-size:.65rem; font-weight:700; text-transform:uppercase; letter-spacing:.08em; color:var(--ink-3);">Why I'm recommending this</span>
       <span style="font-size:.7rem; font-weight:700; color:var(--primary); padding:3px 8px; background:rgba(212,175,55,0.08); border:1px solid rgba(212,175,55,0.2); border-radius:20px;">Confidence: {{ confidence }}%</span>
     </div>
 
@@ -60,14 +60,14 @@
     </button>
     <button id="btn-compliance-{{ action.id }}" onclick="approveComplianceAction({{ action.id }})"
             class="btn btn-primary" style="flex:2; font-size:.75rem; padding:12px; border-radius:8px; text-transform:uppercase; letter-spacing:.08em; font-weight:700;">
-      Approve Execution
+      Approve
     </button>
   </div>
 
   <!-- Success overlay -->
   <div id="successOverlay-complianceCard-{{ action.id }}" style="display:none; position:absolute; inset:0; background:rgba(13,13,17,0.96); backdrop-filter:blur(8px); flex-direction:column; justify-content:center; align-items:center; text-align:center; padding:24px; z-index:10;">
     <div style="width:44px; height:44px; border-radius:50%; border:1px solid var(--green); color:var(--green); display:grid; place-items:center; font-weight:700; font-size:1.2rem; margin-bottom:12px;">✓</div>
-    <h4 style="margin:0 0 6px; font-size:.9rem; font-weight:700; color:#fff; text-transform:uppercase; letter-spacing:.08em;">Mutation Complete</h4>
+    <h4 style="margin:0 0 6px; font-size:.9rem; font-weight:700; color:#fff; text-transform:uppercase; letter-spacing:.08em;">Action Complete</h4>
     <p id="successReport-complianceCard-{{ action.id }}" style="margin:0; font-size:.78rem; color:var(--ink-3); max-width:280px; line-height:1.5;"></p>
   </div>
 </div>

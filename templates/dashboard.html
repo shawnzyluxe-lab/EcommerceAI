@@ -4,7 +4,7 @@
 <link rel="icon" type="image/x-icon" href="/static/images/favicon.ico">
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>{{ brand.name }} {{ brand.product }} — AI operating system for commerce</title>
+<title>{{ brand.name }} {{ brand.product }} — AI commerce operations</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
@@ -349,7 +349,7 @@ body.sidebar-collapsed .shell { grid-template-columns: 60px 1fr; }
       <!-- ---------- Profit Engine ---------- -->
       <section class="section" id="profit">
         <div class="section-head">
-          <h2>AI Profit Engine</h2>
+          <h2>True Profit</h2>
           <p>Real profit, not revenue — every cost included, per order, in real time.</p>
         </div>
         <div class="grid g12">
@@ -889,13 +889,13 @@ body.sidebar-collapsed .shell { grid-template-columns: 60px 1fr; }
       </div>
 
       <div style="background:var(--card); padding:25px; border:1px solid #262636; border-radius:6px; margin-bottom:20px;">
-        <h5 style="margin-top:0; color:#fff;">2. Operational Billing Plan</h5>
-        <p style="font-size:14px; margin:0 0 15px 0;">Current Active Organization Tier Level: <strong style="color:#D4AF37;">{{ merchant.tier | upper }} PLAN</strong></p>
-        <button style="background:#222; color:#fff; padding:10px 20px; border:none; border-radius:4px; cursor:pointer;" onclick="alert('Tier upgrade flow not yet implemented.')">Modify Subscription Tier Mapping</button>
+        <h5 style="margin-top:0; color:#fff;">2. Billing Plan</h5>
+        <p style="font-size:14px; margin:0 0 15px 0;">Current plan: <strong style="color:#D4AF37;">{{ merchant.tier | upper }}</strong></p>
+        <button style="background:#222; color:#fff; padding:10px 20px; border:none; border-radius:4px; cursor:pointer;" onclick="alert('Tier upgrade flow not yet implemented.')">Change plan</button>
       </div>
 
       <div style="background:var(--card); padding:25px; border:1px solid #262636; border-radius:6px;">
-        <h5 style="margin-top:0; color:#fff;">3. Assistant Engine Permissions</h5>
+        <h5 style="margin-top:0; color:#fff;">3. Assistant Permissions</h5>
         <label style="display:flex; align-items:center; cursor:pointer; font-size:14px;">
           <input type="checkbox" id="coo-auto-reorder" checked style="margin-right:10px;">
           Allow the assistant to autonomously draft purchase orders when inventory is running low
@@ -904,10 +904,10 @@ body.sidebar-collapsed .shell { grid-template-columns: 60px 1fr; }
 
       <div style="background:var(--card); padding:25px; border:1px solid #262636; border-radius:6px; margin-top:20px;">
         <h5 style="margin-top:0; color:#fff;">4. Contact &amp; Support</h5>
-        <p style="font-size:14px; color:#b7bdc9; margin:0 0 12px 0;">Get help with your Prometheus OS node.</p>
+        <p style="font-size:14px; color:#b7bdc9; margin:0 0 12px 0;">Get help with your Vantav account.</p>
         <div style="display:grid; gap:10px; font-size:13px; color:#f4f4f6;">
           <div><strong>General Support:</strong> <a href="mailto:support@shawnzyluxe.com" style="color:#D4AF37;">support@shawnzyluxe.com</a></div>
-          <div><strong>Technical Engineering:</strong> <a href="mailto:engineering@shawnzyluxe.com" style="color:#D4AF37;">engineering@shawnzyluxe.com</a></div>
+          <div><strong>Engineering:</strong> <a href="mailto:engineering@shawnzyluxe.com" style="color:#D4AF37;">engineering@shawnzyluxe.com</a></div>
           <div><strong>Billing &amp; Tiers:</strong> <a href="mailto:billing@shawnzyluxe.com" style="color:#D4AF37;">billing@shawnzyluxe.com</a></div>
           <div><strong>Emergency Line:</strong> <span style="color:#D4AF37;">+1 (305) 600-7654</span></div>
         </div>
@@ -1189,7 +1189,7 @@ async function commitOneClickMitigation(actionKey) {
   });
   const data = await response.json();
   if (data.success) {
-    alert('AI Operations Engine executed fixed workflow map. Pipeline restored healthy.');
+    alert('Vantav executed the recovery workflow. The issue has been resolved.');
     performTelemetryWorkspaceSync();
   } else {
     alert(data.error || 'Mitigation failed.');
