@@ -3,215 +3,155 @@
 {% block content %}
 
 <section class="page-header" style="margin-bottom: 18px;">
-  <div style="font-size: .7rem; color: var(--ink-3); text-transform: uppercase; letter-spacing: .06em; margin-bottom: 4px;">Overview</div>
-  <h1 style="font-size: 1.35rem; margin: 0;"><span class="js-greeting">{{ coo.greeting }}</span></h1>
-  <p style="color: var(--ink-2); margin-top: 6px;">True profit, what needs attention, and what to do next — all in one place.</p>
+  <h1 style="font-size: 1.55rem; margin: 0;"><span class="js-greeting">{{ coo.greeting }}</span></h1>
+  <p style="color: var(--ink-3); margin-top: 6px; font-size: .92rem;">True profit, attention alerts, and recommended actions — all in one place.</p>
 </section>
 
-<!-- 1. TRUE PROFIT -->
-<div class="card" style="margin-bottom: 24px;">
-  <div class="card-head" style="align-items: center;">
-    <div style="display: flex; align-items: center; gap: 10px;">
-      <div style="width: 28px; height: 28px; border-radius: 8px; background: var(--primary); color: #fff; display: grid; place-items: center; font-size: .8rem; font-weight: 800;">1</div>
-      <h2 style="font-size: 1rem; margin: 0;">True Profit</h2>
+<div class="grid grid-3" style="align-items: start;">
+
+  <!-- PILLAR 1: TRUE PROFIT LEDGERS -->
+  <div class="card" style="background: transparent; border: 1px solid var(--line); padding: 0; overflow: hidden; display: flex; flex-direction: column;">
+    <div style="padding: 16px 18px; border-bottom: 1px solid var(--line); background: var(--purple-bg);">
+      <span style="font-size: .65rem; text-transform: uppercase; letter-spacing: .1em; color: var(--purple); font-weight: 700;">// PILLAR 01 //</span>
+      <h2 style="font-size: .95rem; margin: 4px 0 0;">True Profit Ledgers</h2>
     </div>
-    <span class="spacer"></span>
-    <a href="/dashboard/profit-engine" class="btn btn-ghost">View details</a>
-  </div>
-  <div class="grid grid-2" style="gap: 28px; align-items: center;">
-    <div>
-      <div style="font-size: .8rem; color: var(--ink-3); margin-bottom: 6px;">Net profit after all costs</div>
-      <div style="font-size: 3rem; font-weight: 800; line-height: 1; color: var(--ink-1);">${{ '{:,.0f}'.format(net) }}</div>
-      <div style="font-size: .9rem; color: var(--success); margin-top: 6px; font-weight: 500;">▲ 6% · {{ net_margin }}% margin</div>
-      <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; margin-top: 20px;">
-        <div class="card" style="padding: 12px; background: var(--bg-soft);">
-          <div style="font-size: .72rem; color: var(--ink-3); margin-bottom: 4px;">Revenue</div>
-          <div style="font-size: 1.1rem; font-weight: 700; color: var(--ink-1);">${{ '{:,.0f}'.format(gross) }}</div>
-        </div>
-        <div class="card" style="padding: 12px; background: var(--bg-soft);">
-          <div style="font-size: .72rem; color: var(--ink-3); margin-bottom: 4px;">Costs</div>
-          <div style="font-size: 1.1rem; font-weight: 700; color: var(--ink-1);">−${{ '{:,.0f}'.format(costs) }}</div>
-        </div>
-        <div class="card" style="padding: 12px; background: var(--bg-soft);">
-          <div style="font-size: .72rem; color: var(--ink-3); margin-bottom: 4px;">Orders</div>
-          <div style="font-size: 1.1rem; font-weight: 700; color: var(--ink-1);">{{ orders|length }}</div>
-        </div>
-      </div>
-    </div>
-    <div>
-      <div style="display: flex; align-items: flex-end; gap: 4px; height: 90px; padding-bottom: 2px;">
+
+    <div style="padding: 20px 18px;">
+      <div style="font-size: .7rem; text-transform: uppercase; letter-spacing: .08em; color: var(--ink-3);">Actual Net Earnings</div>
+      <div style="font-size: 2.6rem; font-weight: 800; line-height: 1; margin-top: 8px; color: var(--ink);">${{ '{:,.2f}'.format(net) }}</div>
+      <div style="font-size: .85rem; color: var(--green); margin-top: 6px; font-weight: 600;">▲ {{ net_margin }}% net margin</div>
+
+      <div style="display: flex; align-items: flex-end; gap: 3px; height: 56px; margin-top: 18px;">
         {% for p in series %}
-        <div style="flex: 1; background: linear-gradient(to top, var(--primary), var(--primary-light, #a78bfa)); border-radius: 3px 3px 0 0; height: {{ (p['value'] / series_max * 100)|round }}%; opacity: {{ 0.35 + 0.65 * (p['value'] / series_max) }};" title="{{ p['date'] }}: ${{ '{:,.0f}'.format(p['value']) }}"></div>
+        <div style="flex: 1; background: linear-gradient(to top, var(--purple), var(--purple-2)); border-radius: 2px 2px 0 0; height: {{ (p['value'] / series_max * 100)|round }}%; opacity: {{ 0.35 + 0.65 * (p['value'] / series_max) }};" title="{{ p['date'] }}: ${{ '{:,.0f}'.format(p['value']) }}"></div>
         {% endfor %}
       </div>
-      <div style="display: flex; justify-content: space-between; font-size: .7rem; color: var(--ink-3); margin-top: 6px;">
+      <div style="display: flex; justify-content: space-between; font-size: .65rem; color: var(--ink-3); margin-top: 6px;">
         <span>{{ series[0]['date'] }}</span>
         <span>{{ series[-1]['date'] }}</span>
       </div>
     </div>
+
+    <div style="padding: 0 18px 20px; flex: 1;">
+      <div style="font-size: .7rem; text-transform: uppercase; letter-spacing: .08em; color: var(--ink-3); margin-bottom: 12px;">Variable Cost Accounting Waterfall</div>
+      {% for r in profit_rows %}
+      <div style="display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px dashed var(--line); font-size: .84rem;">
+        <span style="color: var(--ink-2);">{{ r['label'] }}</span>
+        <span class="mono" style="font-weight: 600; color: {% if r['kind'] == 'in' %}var(--green){% else %}var(--red){% endif %};">
+          {% if r['kind'] == 'in' %}+{% else %}−{% endif %}${{ '{:,.2f}'.format(r['amount']|abs) }}
+        </span>
+      </div>
+      {% endfor %}
+      <div style="display: flex; justify-content: space-between; padding-top: 12px; font-weight: 700; font-size: .95rem; border-top: 2px solid var(--line);">
+        <span style="color: var(--purple);">Calculated Net Margin</span>
+        <span class="mono" style="color: var(--green);">{{ net_margin }}%</span>
+      </div>
+    </div>
   </div>
-</div>
 
-<div class="grid grid-2" style="align-items: start; margin-bottom: 24px;">
-  <div style="display: flex; flex-direction: column; gap: 24px;">
-
-    <!-- 2. WHAT NEEDS ATTENTION -->
-    <div class="card" id="attention-card">
-      <div class="card-head" style="align-items: center; margin-bottom: 14px;">
-        <div style="display: flex; align-items: center; gap: 10px;">
-          <div style="width: 28px; height: 28px; border-radius: 8px; background: var(--amber); color: #fff; display: grid; place-items: center; font-size: .8rem; font-weight: 800;">2</div>
-          <h2 style="font-size: 1rem; margin: 0;">What Needs Attention</h2>
-        </div>
-        <span class="spacer"></span>
-        <a href="/dashboard/alerts" class="btn btn-ghost">View all alerts</a>
-      </div>
-      {% if alerts %}
-      <div class="alert-feed" style="display: flex; flex-direction: column; gap: 12px;">
-        {% for a in alerts[:3] %}
-        <div class="alert-item {{ a.level }}" style="border-radius: 12px; border: 1px solid var(--line);">
-          <div class="alert-bar"></div>
-          <div class="alert-body" style="padding: 14px;">
-            <div class="alert-title" style="font-weight: 700;">{{ a.title }}</div>
-            <div class="alert-detail" style="color: var(--ink-2); margin-top: 4px; line-height: 1.45;">{{ a.detail }}</div>
-            <div class="alert-actions" style="margin-top: 10px;">
-              {% for act in a.actions %}<button class="btn" style="padding: 5px 10px; font-size: .74rem;">{{ act }}</button>{% endfor %}
-            </div>
-          </div>
-          <div class="alert-when" style="padding: 14px; font-size: .75rem; color: var(--ink-3); white-space: nowrap;">{{ a.when }}</div>
-        </div>
-        {% endfor %}
-      </div>
-      {% else %}
-      <div style="padding: 24px; text-align: center; color: var(--ink-3); font-size: .9rem;">
-        No open alerts. Your stores look healthy.
-      </div>
-      {% endif %}
+  <!-- PILLAR 2: ATTENTION ALERTS -->
+  <div class="card" style="background: transparent; border: 1px solid var(--line); padding: 0; overflow: hidden; display: flex; flex-direction: column;">
+    <div style="padding: 16px 18px; border-bottom: 1px solid var(--line); background: var(--purple-bg);">
+      <span style="font-size: .65rem; text-transform: uppercase; letter-spacing: .1em; color: var(--purple); font-weight: 700;">// PILLAR 02 //</span>
+      <h2 style="font-size: .95rem; margin: 4px 0 0;">Attention Alerts</h2>
     </div>
 
-    <!-- 3. AI ACTIONS -->
-    <div class="card" id="action-gate-card">
-      <div class="card-head" style="align-items: center; margin-bottom: 14px;">
-        <div style="display: flex; align-items: center; gap: 10px;">
-          <div style="width: 28px; height: 28px; border-radius: 8px; background: var(--success); color: #fff; display: grid; place-items: center; font-size: .8rem; font-weight: 800;">3</div>
-          <h2 style="font-size: 1rem; margin: 0;">AI Actions</h2>
+    <div style="padding: 18px; display: flex; flex-direction: column; gap: 12px; flex: 1;">
+      {% if alerts %}
+        {% for a in alerts[:3] %}
+        <div class="alert-item {{ a.level }}" style="border-radius: 10px; padding: 14px;">
+          <div class="alert-bar"></div>
+          <div class="alert-body" style="flex: 1;">
+            <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 6px;">
+              <span style="width: 7px; height: 7px; border-radius: 50%; background: {% if a.level == 'crit' %}var(--red){% elif a.level == 'warn' %}var(--amber){% else %}var(--green){% endif %}; box-shadow: 0 0 8px currentColor;"></span>
+              <span style="font-size: .65rem; text-transform: uppercase; letter-spacing: .08em; color: {% if a.level == 'crit' %}var(--red){% elif a.level == 'warn' %}var(--amber){% else %}var(--green){% endif %}; font-weight: 700;">{{ a.title }}</span>
+            </div>
+            <div class="alert-detail" style="color: var(--ink-2); line-height: 1.55;">{{ a.detail }}</div>
+            <div class="alert-actions" style="margin-top: 10px;">
+              {% for act in a.actions %}<button class="btn" style="padding: 5px 10px; font-size: .72rem;">{{ act }}</button>{% endfor %}
+            </div>
+          </div>
+          <div class="alert-when" style="font-size: .72rem; color: var(--ink-3); white-space: nowrap; padding-top: 4px;">{{ a.when }}</div>
         </div>
-        <span class="spacer"></span>
-        <a href="/dashboard/action-gate" class="btn btn-ghost">Open Action Gate</a>
+        {% endfor %}
+      {% else %}
+        <div style="padding: 24px; text-align: center; color: var(--ink-3); border: 1px dashed var(--line); border-radius: 10px;">
+          No open alerts. Your stores look healthy.
+        </div>
+      {% endif %}
+    </div>
+  </div>
+
+  <!-- PILLAR 3: RECOMMENDED ACTIONS -->
+  <div class="card" style="background: transparent; border: 1px solid var(--line); padding: 0; overflow: hidden; display: flex; flex-direction: column;">
+    <div style="padding: 16px 18px; border-bottom: 1px solid var(--line); background: var(--purple-bg);">
+      <span style="font-size: .65rem; text-transform: uppercase; letter-spacing: .1em; color: var(--purple); font-weight: 700;">// PILLAR 03 //</span>
+      <h2 style="font-size: .95rem; margin: 4px 0 0;">Recommended Actions</h2>
+    </div>
+
+    <div style="padding: 18px; display: flex; flex-direction: column; gap: 14px; flex: 1;">
+      <!-- AI Operator status -->
+      <div style="padding: 12px 14px; border-radius: 10px; background: var(--purple-bg); border: 1px solid rgba(139,92,246,.18); display: flex; align-items: center; gap: 10px;">
+        <span style="width: 8px; height: 8px; border-radius: 50%; background: var(--purple); box-shadow: 0 0 8px var(--purple);"></span>
+        <span style="font-size: .84rem; color: var(--ink);">AI Assistant is monitoring {{ connected|length }} channel{{ 's' if connected|length != 1 else '' }}</span>
       </div>
 
       {% if hero_action %}
-      <div style="display: flex; gap: 14px; align-items: flex-start; margin-bottom: 14px;">
-        <div style="width: 44px; height: 44px; border-radius: 11px; background: var(--gold-bg); color: var(--amber); display: grid; place-items: center; font-weight: 800; font-size: 1.1rem; flex: none;">⚡</div>
-        <div style="min-width: 0;">
-          <div style="font-weight: 700; font-size: 1.05rem; color: var(--ink-1);">{{ hero_action.title }}</div>
-          <div style="font-size: .86rem; color: var(--ink-2); margin-top: 4px; line-height: 1.5;">{{ hero_action.detail }}</div>
-          <span class="tag tag-amber" style="margin-top: 8px; display: inline-block;">Recommended</span>
+      <div class="card" style="border: 1px solid var(--line); padding: 0; overflow: hidden; position: relative;">
+        <div style="padding: 14px 16px; border-bottom: 1px solid var(--line); display: flex; justify-content: space-between; align-items: center; background: rgba(139,92,246,0.05);">
+          <span style="font-size: .65rem; text-transform: uppercase; letter-spacing: .08em; color: var(--ink-3);">Executive Action</span>
+          <span style="font-size: .7rem; color: var(--purple); font-weight: 700; padding: 3px 8px; background: var(--purple-bg); border-radius: 99px;">Recommended</span>
+        </div>
+        <div style="padding: 16px;">
+          <h3 style="font-size: 1rem; margin: 0 0 8px;">{{ hero_action.title }}</h3>
+          <p style="font-size: .85rem; color: var(--ink-2); line-height: 1.55; margin-bottom: 12px;">{{ hero_action.detail }}</p>
+
+          <div style="padding: 12px; border-radius: 10px; background: var(--line-2); margin-bottom: 14px;">
+            <div style="font-size: .65rem; text-transform: uppercase; letter-spacing: .08em; color: var(--ink-3); margin-bottom: 8px;">Why I'm recommending this</div>
+            <ul style="margin: 0; padding-left: 18px; font-size: .82rem; color: var(--ink-2); line-height: 1.6;">
+              {% for e in hero_action.evidence %}
+              <li style="margin-bottom: 4px;">{{ e }}</li>
+              {% endfor %}
+            </ul>
+          </div>
+
+          <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+            <button class="btn btn-primary" id="approve-hero-btn" onclick="approveHeroAction({{ hero_action.id }})">Approve & Execute</button>
+            <button class="btn" onclick="dismissHeroAction({{ hero_action.id }})">Dismiss</button>
+            <a href="/dashboard/action-gate" class="btn btn-ghost">Modify</a>
+          </div>
         </div>
       </div>
-
-      <div style="background: var(--bg-soft); border-radius: 12px; padding: 14px 16px; margin-bottom: 16px;">
-        <div style="font-size: .68rem; text-transform: uppercase; letter-spacing: .06em; color: var(--ink-3); margin-bottom: 8px;">Evidence</div>
-        <ul style="margin: 0; padding-left: 18px; font-size: .84rem; color: var(--ink-2); line-height: 1.55;">
-          {% for e in hero_action.evidence %}
-          <li style="margin-bottom: 4px;">{{ e }}</li>
-          {% endfor %}
-        </ul>
-      </div>
-
-      <div style="display: flex; gap: 8px; flex-wrap: wrap;">
-        <button class="btn btn-primary" id="approve-hero-btn" onclick="approveHeroAction({{ hero_action.id }})">Approve & Execute</button>
-        <button class="btn" onclick="window.location.href='/dashboard/action-gate'">Modify</button>
-        <button class="btn btn-ghost" onclick="dismissHeroAction({{ hero_action.id }})">Dismiss</button>
-      </div>
       {% else %}
-      <div style="padding: 24px; text-align: center; color: var(--ink-2); font-size: .9rem;">
+      <div style="padding: 24px; text-align: center; color: var(--ink-3); border: 1px dashed var(--line); border-radius: 10px;">
         <p style="margin-bottom: 14px;">No recommended actions yet. Run the assistant to detect opportunities.</p>
         <button class="btn btn-primary" id="run-analysis-btn" onclick="runAssistantAnalysis()">Run Assistant Analysis</button>
       </div>
       {% endif %}
-    </div>
 
-  </div>
-
-  <!-- AI Assistant -->
-  <div class="card" id="assistant-card">
-    <div class="card-head" style="margin-bottom: 14px;">
-      <div style="display: flex; align-items: center; gap: 10px;">
-        <span style="color: var(--primary); font-size: 1.1rem;">✦</span>
-        <h3 style="margin: 0; font-size: 1rem;">AI Assistant</h3>
+      <!-- Assistant prompt -->
+      <div class="command-box" style="border-radius: 14px; padding: 14px; margin-top: auto;">
+        <div class="prompt" style="border-radius: 10px;">
+          <span style="color: var(--purple); font-size: 1rem; flex: none;">◉</span>
+          <input id="ov-cmd" placeholder="Ask anything about your business..." autocomplete="off" style="min-width: 0; color: var(--ink);">
+          <button class="btn btn-primary" id="ov-cmdgo" onclick="runOverviewCommand()" style="flex: none;">Run</button>
+        </div>
+        <div class="chips" style="margin-top: 10px;">
+          {% for s in suggestions %}<span class="chip ov-chip" style="font-size: .75rem;">{{ s }}</span>{% endfor %}
+        </div>
       </div>
-      <p style="color: var(--ink-2); font-size: .85rem; margin: 6px 0 0 0;">Type or speak — it performs the work instead of just answering.</p>
-    </div>
-    <div class="command-box" style="margin-bottom: 12px;">
-      <div class="prompt" style="flex-wrap: nowrap;">
-        <span style="color: var(--gold); font-size: 1rem; flex: none;">◉</span>
-        <input id="ov-cmd" placeholder="Ask anything, or tell it what to do…" autocomplete="off" style="min-width: 0;">
-        <button class="btn btn-primary" id="ov-cmdgo" onclick="runOverviewCommand()" style="flex: none;">Run</button>
+      <div class="card" id="ov-cmdout" style="display: none; background: var(--line-2); margin-top: 0;">
+        <span class="tag tag-blue">Answer</span>
+        <p id="ov-cmdanswer" style="margin-top: 8px; white-space: pre-wrap; color: var(--ink-2);"></p>
       </div>
-      <div class="chips" style="margin-top: 10px;">
-        {% for s in suggestions %}<span class="chip ov-chip" style="cursor:pointer; font-size: .78rem;">{{ s }}</span>{% endfor %}
-      </div>
-    </div>
-    <div class="card" id="ov-cmdout" style="margin-top: 14px; display: none; background: var(--bg-soft);">
-      <span class="tag tag-blue">Answer</span>
-      <p id="ov-cmdanswer" style="margin-top: 8px; white-space: pre-wrap;"></p>
-    </div>
-  </div>
-</div>
-
-<!-- Supporting modules: Commerce Hub + Profit Dashboard -->
-<div class="grid grid-2" style="margin-bottom: 24px;">
-  <div class="card">
-    <div class="card-head">
-      <h3>Commerce Hub</h3>
-      <p style="color: var(--ink-2); font-size: .85rem; margin: 0;">One login. One dashboard. {{ connected|length }} of {{ channels|length }} channels connected.</p>
-      <span class="spacer"></span>
-      <a href="/dashboard/commerce-hub" class="btn btn-ghost">Manage</a>
-    </div>
-    <div class="table-wrap">
-      <table>
-        <thead><tr><th>Channel</th><th class="num">Orders</th><th class="num">Revenue</th><th>Status</th></tr></thead>
-        <tbody>
-          {% for c in channels %}
-          <tr>
-            <td class="b">{{ c['name'] }}</td>
-            <td class="num mono">{{ c['orders'] }}</td>
-            <td class="num mono">${{ '{:,.2f}'.format(c['revenue']) }}</td>
-            <td><span class="tag {{ 'tag-green' if c['state'] == 'connected' else 'tag-ghost' }}">{{ 'Live' if c['state'] == 'connected' else 'Connect' }}</span></td>
-          </tr>
-          {% endfor %}
-        </tbody>
-      </table>
     </div>
   </div>
 
-  <div class="card">
-    <div class="card-head">
-      <h3>Profit Dashboard</h3>
-      <p style="color: var(--ink-2); font-size: .85rem; margin: 0;">Real profit, not revenue — every cost included, per order.</p>
-      <span class="spacer"></span>
-      <a href="/dashboard/profit-engine" class="btn btn-ghost">View details</a>
-    </div>
-    <div style="padding: 4px 0;">
-      {% for r in profit_rows %}
-      <div style="display: flex; justify-content: space-between; padding: 7px 0; border-bottom: 1px dashed var(--line); font-size: .85rem;">
-        <span style="color: var(--ink-3);">{{ r['label'] }}</span>
-        <span class="mono {{ 'up' if r['kind'] == 'in' else 'down' }}" style="font-weight: 600;">
-          {{ '${:,.2f}'.format(r['amount']) if r['kind'] == 'in' else '−${:,.2f}'.format(-r['amount']) }}
-        </span>
-      </div>
-      {% endfor %}
-      <div style="display: flex; justify-content: space-between; padding-top: 12px; font-weight: 800; font-size: .95rem;">
-        <span>Net profit</span><span class="mono">${{ '{:,.2f}'.format(net) }}</span>
-      </div>
-      <div style="font-size: .8rem; color: var(--ink-3); margin-top: 4px;">{{ net_margin }}% net margin after all costs</div>
-    </div>
-  </div>
 </div>
 
 <!-- Channel true-profit comparison -->
 {% if channel_summary %}
-<div class="card" style="margin-bottom: 24px;">
+<div class="card" style="margin-top: 24px;">
   <div class="card-head" style="margin-bottom: 14px;">
     <h3>Channel Performance</h3>
     <p style="color: var(--ink-2); font-size: .85rem; margin: 0;">True profit by sales channel — revenue minus all costs.</p>
