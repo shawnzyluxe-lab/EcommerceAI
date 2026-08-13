@@ -63,6 +63,7 @@ import action_gate
 import rules_engine
 import forecaster
 import channel_analytics
+import coo_agent_mesh
 import channels as channels_module
 import shopify_sync
 import tiktok_sync
@@ -2390,6 +2391,26 @@ def api_forecast_cron():
         return jsonify({"reports": [r.model_dump() for r in reports], "alerts": alerts}), 200
     except Exception as e:
         logger.error(f"[Forecast] CRON run failed: {e}")
+        return jsonify({"detail": str(e)}), 500
+
+
+@app.route('/api/v1/coo/diagnostic', methods=['POST'])
+@require_roles([UserRole.ADMIN, UserRole.MERCHANT, UserRole.ENGINEER])
+def api_coo_diagnostic():
+    """Run the multi-agent COO diagnostic for the merchant and stage validated actions."""
+    merchant = get_merchant_context()
+    if not merchant:
+        return jsonify({"error": "No merchant context"}), 403
+    data = request.get_json(silent=True) or {}
+    days = int(data.get("days", 1) or 1)
+    create_actions = bool(data.get("create_actions", True))
+    try:
+        actions = coo_agent_mesh.run_diagnostic(
+            merchant["id"], days=days, create_actions=create_actions
+        )
+        return jsonify({"actions": actions}), 200
+    except Exception as e:
+        logger.error(f"[COO Mesh] Diagnostic failed: {e}")
         return jsonify({"detail": str(e)}), 500
 
 
