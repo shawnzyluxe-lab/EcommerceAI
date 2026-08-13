@@ -276,6 +276,18 @@ class UserRole(str, Enum):
     ENGINEER = "Engineer"
 
 
+def _profile_for_email(email: str):
+    """Return the most recently created merchant profile for an email.
+
+    This keeps login/magic-link flows deterministic when duplicate accounts exist.
+    """
+    return (
+        MerchantProfile.query.filter_by(admin_email=email)
+        .order_by(MerchantProfile.created_at.desc())
+        .first()
+    )
+
+
 def get_current_user():
     """Return the active session record with its role, or None."""
     token = request.cookies.get(SESSION_COOKIE_NAME)
@@ -2542,7 +2554,7 @@ def auth_login():
         return jsonify({"detail": "CRITICAL ERROR: Email and password are required."}), 400
 
     # 1. Credential evaluation against DB hash
-    profile = MerchantProfile.query.filter_by(admin_email=email).first()
+    profile = _profile_for_email(email)
     if not profile or not profile.password_hash:
         return jsonify({"detail": "CRITICAL ERROR: Invalid authentication credentials match failed."}), 401
 
@@ -3764,7 +3776,7 @@ def generate_magic_link():
         return jsonify({"success": False, "error": "Administrative target email required."}), 400
 
     try:
-        profile = MerchantProfile.query.filter_by(admin_email=email).first()
+        profile = _profile_for_email(email)
         if not profile:
             merchant_id = f"merchant_{secrets.token_hex(4)}"
             db.session.add(MerchantProfile(
@@ -3828,7 +3840,7 @@ def magic_login():
 
     # Mark token used and rotate active session
     mlink.is_used = 1
-    profile = MerchantProfile.query.filter_by(admin_email=mlink.admin_email).first()
+    profile = _profile_for_email(mlink.admin_email)
     if not profile:
         return redirect("/login?error=profile_missing")
 
