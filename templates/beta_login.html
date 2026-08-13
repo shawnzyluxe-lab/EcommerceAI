@@ -203,7 +203,7 @@
       error.style.display = 'none';
 
       try {
-        // reCAPTCHA v3 is optional during beta; collect a token if it's available.
+        // reCAPTCHA v3 is optional; collect a token if it's available.
         let token = '';
         if (window.grecaptcha && recaptchaSiteKey) {
           try {

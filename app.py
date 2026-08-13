@@ -1279,7 +1279,7 @@ def home():
 @app.route('/subscribe')
 @limiter.exempt
 def subscribe():
-    """Public beta waitlist landing page."""
+    """Public pricing and plan selection page."""
     host = request.host.split(':')[0].lower()
     if host in ('shawnzyluxe.com', 'www.shawnzyluxe.com'):
         return render_template('coming_soon.html')
@@ -1289,7 +1289,7 @@ def subscribe():
 @app.route('/checkout')
 @limiter.exempt
 def checkout():
-    """Public Stripe checkout page for paid beta subscription."""
+    """Public Stripe checkout page for paid Vantav plans."""
     host = request.host.split(':')[0].lower()
     if host in ('shawnzyluxe.com', 'www.shawnzyluxe.com'):
         return render_template('coming_soon.html')
@@ -2865,8 +2865,7 @@ def session_heartbeat():
 def auth_login():
     """Validate email + password and issue a session cookie.
 
-    reCAPTCHA v3 is temporarily relaxed for the beta; rate limiting and password
-    hashing still protect the endpoint.
+    Rate limiting and password hashing protect the endpoint.
     """
     payload = request.get_json(silent=True) or {}
     email = (payload.get("email") or "").strip().lower()
@@ -4592,8 +4591,8 @@ def logout():
 @app.route('/beta', methods=['GET'])
 @app.route('/beta/apply', methods=['GET'])
 def beta_apply():
-    """Public beta application waitlist page."""
-    return render_template('beta_apply.html')
+    """Redirect legacy beta waitlist URLs to the public pricing page."""
+    return redirect(url_for('subscribe'), code=301)
 
 
 @app.route('/api/beta/apply', methods=['POST'])

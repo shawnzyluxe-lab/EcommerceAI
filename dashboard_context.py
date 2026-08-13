@@ -307,14 +307,13 @@ COMMAND_RESPONSES = {
 # --------------------------------------------------------------------------
 
 CHANNELS = [
-    {"name": "Shopify", "abbr": "SH", "color": "#5a8f3d", "state": "connected", "orders": 34, "revenue": 2610.40, "sync": "2 min ago"},
-    {"name": "TikTok Shop", "abbr": "TT", "color": "#111827", "state": "connected", "orders": 14, "revenue": 902.15, "sync": "6 min ago"},
-    {"name": "Amazon", "abbr": "AZ", "color": "#e07b00", "state": "connected", "orders": 9, "revenue": 741.00, "sync": "11 min ago"},
-    {"name": "Etsy", "abbr": "ET", "color": "#f1641e", "state": "connected", "orders": 4, "revenue": 328.60, "sync": "18 min ago"},
-    {"name": "eBay", "abbr": "EB", "color": "#0064d2", "state": "not connected", "orders": 0, "revenue": 0.0, "sync": "—"},
-    {"name": "WooCommerce", "abbr": "WC", "color": "#7f54b3", "state": "not connected", "orders": 0, "revenue": 0.0, "sync": "—"},
-    {"name": "Walmart", "abbr": "WM", "color": "#0071ce", "state": "not connected", "orders": 0, "revenue": 0.0, "sync": "—"},
-    {"name": "BigCommerce", "abbr": "BC", "color": "#121118", "state": "not connected", "orders": 0, "revenue": 0.0, "sync": "—"},
+    {"platform": "shopify", "name": "Shopify", "abbr": "SP", "color": "#7AB55C", "state": "disconnected", "orders": 0, "revenue": 0.0, "sync": "Never"},
+    {"platform": "tiktok", "name": "TikTok Shop", "abbr": "TT", "color": "#000000", "state": "disconnected", "orders": 0, "revenue": 0.0, "sync": "Never"},
+    {"platform": "amazon", "name": "Amazon", "abbr": "AZ", "color": "#FF9900", "state": "disconnected", "orders": 0, "revenue": 0.0, "sync": "Never"},
+    {"platform": "ebay", "name": "eBay", "abbr": "EB", "color": "#E53238", "state": "disconnected", "orders": 0, "revenue": 0.0, "sync": "Never"},
+    {"platform": "walmart", "name": "Walmart", "abbr": "WM", "color": "#0071CE", "state": "disconnected", "orders": 0, "revenue": 0.0, "sync": "Never"},
+    {"platform": "bigcommerce", "name": "BigCommerce", "abbr": "BC", "color": "#34313F", "state": "disconnected", "orders": 0, "revenue": 0.0, "sync": "Never"},
+    {"platform": "woocommerce", "name": "WooCommerce", "abbr": "WC", "color": "#96588A", "state": "disconnected", "orders": 0, "revenue": 0.0, "sync": "Never"},
 ]
 
 # --------------------------------------------------------------------------
