@@ -148,6 +148,7 @@ def sync_products(merchant_id: str, limit: int = 250) -> int:
                 catalog.append({
                     "product_id": str(product.get("id", "")),
                     "variant_id": str(variant.get("id", "")),
+                    "inventory_item_id": str(variant.get("inventory_item_id") or ""),
                     "title": product.get("title", ""),
                     "sku": variant.get("sku", ""),
                     "price": float(variant.get("price") or 0.0),

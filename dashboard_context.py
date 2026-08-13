@@ -12,7 +12,7 @@ from datetime import datetime, timedelta, timezone
 from typing import Any, Dict, List, Optional
 
 from flask import Flask, render_template, request, jsonify
-from models import PredictiveLogistics, MerchantSetting
+from models import PredictiveLogistics, MerchantSetting, SaaSBilling
 import profit_feed
 import alert_matrix
 import action_gate
@@ -688,6 +688,34 @@ def context(active_page=None, merchant=None, merchant_id=None):
         except Exception:
             pass
 
+    # Billing context for the dashboard Billing page.
+    billing_account = None
+    tier_limits = {}
+    if merchant_id:
+        try:
+            billing = SaaSBilling.query.get(merchant_id)
+            if billing:
+                billing_account = {
+                    "current_plan": billing.current_plan or merchant_obj.get("tier", "Basic Tier"),
+                    "stripe_customer_id": billing.stripe_customer_id or "",
+                    "stripe_subscription_id": billing.stripe_subscription_item_id or "",
+                    "metered_usage_units": billing.metered_usage_units or 0,
+                    "accrued_invoice_value": billing.accrued_invoice_value or 0.0,
+                    "billing_cycle_end": billing.billing_cycle_end or "",
+                }
+            # Default usage limits by tier.
+            tier_key = (merchant_obj.get("tier") or "Basic Tier").replace("AI Tier", "Plan").strip()
+            TIER_LIMITS_LOCAL = {
+                "Basic Tier": {"orders": 500, "products": 1000, "customers": 1000, "storage": 500},
+                "Beta Tier": {"orders": 5000, "products": 10000, "customers": 100000, "storage": 500},
+                "Beta + Startup Pack": {"orders": 5000, "products": 10000, "customers": 100000, "storage": 500},
+                "Pro Tier": {"orders": 50000, "products": 50000, "customers": 500000, "storage": 2000},
+                "Enterprise Tier": {"orders": 999999, "products": 999999, "customers": 999999, "storage": 10000},
+            }
+            tier_limits = TIER_LIMITS_LOCAL.get(tier_key, TIER_LIMITS_LOCAL["Basic Tier"])
+        except Exception:
+            pass
+
     # Channel list from persistent connections.
     try:
         channel_data = channels_module.list_channels(merchant_id) if merchant_id else CHANNELS
@@ -746,6 +774,8 @@ def context(active_page=None, merchant=None, merchant_id=None):
         "hero_action": hero_action,
         "channel_summary": channel_summary,
         "channel_totals": channel_totals,
+        "billing_account": billing_account,
+        "tier_limits": tier_limits,
         "generated": now.strftime("%A, %d %b %Y · %H:%M %Z"),
     }
 

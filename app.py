@@ -68,6 +68,7 @@ import channels as channels_module
 import shopify_sync
 import tiktok_sync
 import amazon_sync
+import outbound
 import tiktok_studio
 import assistant_engine
 import startup_pack
@@ -603,7 +604,7 @@ def enforce_tier_limits(merchant_id, requested_feature):
 def site_wall_protect():
     if not site_wall_enabled():
         return None
-    if request.endpoint in ('home', 'login', 'site_login', 'site_logout', 'subscribe', 'thank_you', 'session_heartbeat', 'create_stripe_checkout', 'beta_apply', 'api_beta_apply', 'auth_login', 'auth_signup', 'auth_provision_node', 'shopify_orders_webhook', 'tiktok_orders_webhook', 'amazon_orders_webhook', 'stripe_billing_webhook', 'supplier_po_update', 'execute_mitigation', 'generate_magic_link', 'magic_login', 'register_merchant', 'shopify_oauth_callback', 'tiktok_oauth_callback', 'health_check', 'legal_terms', 'legal_privacy', 'legal_refund', 'static'):
+    if request.endpoint in ('home', 'login', 'site_login', 'site_logout', 'subscribe', 'checkout', 'thank_you', 'session_heartbeat', 'create_stripe_checkout', 'beta_apply', 'api_beta_apply', 'auth_login', 'auth_signup', 'auth_provision_node', 'shopify_orders_webhook', 'tiktok_orders_webhook', 'amazon_orders_webhook', 'stripe_billing_webhook', 'supplier_po_update', 'execute_mitigation', 'generate_magic_link', 'magic_login', 'register_merchant', 'shopify_oauth_callback', 'tiktok_oauth_callback', 'health_check', 'legal_terms', 'legal_privacy', 'legal_refund', 'static'):
         return None
     if site_wall_authenticated():
         return None
@@ -1341,6 +1342,16 @@ def subscribe():
     if host in ('shawnzyluxe.com', 'www.shawnzyluxe.com'):
         return render_template('coming_soon.html')
     return render_template('subscribe.html', recaptcha_site_key=RECAPTCHA_SITE_KEY, meta_pixel_id=os.environ.get('META_PIXEL_ID', ''), tiktok_pixel_id=os.environ.get('TIKTOK_PIXEL_ID', ''), gtm_id=os.environ.get('GTM_ID', ''))
+
+
+@app.route('/checkout')
+@limiter.exempt
+def checkout():
+    """Public Stripe checkout page for paid beta subscription."""
+    host = request.host.split(':')[0].lower()
+    if host in ('shawnzyluxe.com', 'www.shawnzyluxe.com'):
+        return render_template('coming_soon.html')
+    return render_template('checkout.html')
 
 
 @app.route('/thank-you')
@@ -2215,6 +2226,34 @@ def api_admin_sync_amazon(merchant_id):
     except Exception as e:
         logger.error(f"[Admin Amazon Sync] Failed for {merchant_id}: {e}")
         return jsonify({"detail": str(e)}), 400
+
+
+@app.route('/api/v1/channels/writeback', methods=['POST'])
+@require_roles([UserRole.ADMIN, UserRole.MERCHANT, UserRole.ENGINEER])
+def api_channel_writeback():
+    """Execute a live outbound write-back to a connected marketplace."""
+    merchant = get_merchant_context()
+    if not merchant:
+        return jsonify({"detail": "No merchant context"}), 403
+    data = request.get_json(silent=True) or {}
+    action_type = (data.get("action_type") or "").lower()
+    sku = data.get("sku", "")
+    quantity = data.get("quantity")
+    price = data.get("price")
+    platform = data.get("platform", "")
+
+    payload = {"sku": sku, "platform": platform}
+    if quantity is not None:
+        payload["quantity"] = int(quantity)
+    if price is not None:
+        payload["price"] = float(price)
+
+    try:
+        result = outbound.dispatch_action(action_type, merchant["id"], payload)
+        return jsonify({"status": "ok", "writeback": result}), 200
+    except Exception as e:
+        logger.error(f"[Outbound] Writeback failed for {merchant['id']}: {e}")
+        return jsonify({"detail": "Writeback failed"}), 500
 
 
 # ============================================================
@@ -3109,6 +3148,33 @@ def stripe_customer_portal():
     except Exception as e:
         logger.error(f"[Stripe Portal] Failed: {e}")
         return jsonify({"detail": "Unable to open billing portal."}), 500
+
+
+@app.route('/api/v1/stripe/upgrade-session', methods=['POST'])
+def stripe_upgrade_session():
+    """Create a Stripe Checkout session for the currently authenticated merchant."""
+    merchant = get_merchant_context()
+    if not merchant:
+        return jsonify({"detail": "Authentication required."}), 403
+    data = request.get_json(silent=True) or {}
+    plan = (data.get("plan") or "beta").lower().strip()
+    include_startup_addon = bool(data.get("include_startup_addon"))
+    try:
+        success_url = url_for('dashboard_page', page='billing', _external=True, _scheme='https') + '?checkout=success'
+        cancel_url = url_for('dashboard_page', page='billing', _external=True, _scheme='https') + '?checkout=canceled'
+        session_url, session_id, customer_id = billing_module.create_checkout_session(
+            merchant["id"],
+            merchant.get("email") or "",
+            merchant.get("name") or merchant.get("email") or "",
+            include_startup_addon=include_startup_addon,
+            plan=plan,
+            success_url=success_url,
+            cancel_url=cancel_url,
+        )
+        return jsonify({"url": session_url, "session_id": session_id, "customer_id": customer_id}), 200
+    except Exception as e:
+        logger.error(f"[Stripe Upgrade Session] Failed: {e}")
+        return jsonify({"detail": "Unable to start checkout session."}), 500
 
 
 @app.route('/api/v1/fulfillment/tracking-injection', methods=['POST'])

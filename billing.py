@@ -8,8 +8,8 @@ from models import db, SaaSBilling, MerchantProfile
 
 logger = logging.getLogger(__name__)
 
-stripe.api_key = os.environ.get("STRIPE_SECRET_KEY", "")
-STRIPE_PUBLISHABLE_KEY = os.environ.get("STRIPE_PUBLISHABLE_KEY", "")
+stripe.api_key = os.environ.get("STRIPE_SECRET_KEY", os.environ.get("STRIPE_LIVE_SECRET_KEY", ""))
+STRIPE_PUBLISHABLE_KEY = os.environ.get("STRIPE_PUBLISHABLE_KEY", os.environ.get("STRIPE_LIVE_PUBLISHABLE_KEY", ""))
 PRICE_BETA_MONTHLY = os.environ.get("STRIPE_PRICE_BETA_MONTHLY", "")
 PRICE_BETA_STARTUP = os.environ.get("STRIPE_PRICE_BETA_STARTUP", "")
 PRICE_STARTUP_ADDON = os.environ.get("STRIPE_PRICE_STARTUP_ADDON", "")
@@ -124,8 +124,7 @@ def create_checkout_session(merchant_id, email, name, include_startup_addon=Fals
         "allow_promotion_codes": True,
         "success_url": success_url or "https://vantavcommerce.com/dashboard/billing?checkout=success",
         "cancel_url": cancel_url or "https://vantavcommerce.com/subscribe?canceled=1",
-        "automatic_tax": {"enabled": False},
-        "managed_payments": {"enabled": False},
+        "automatic_tax": {"enabled": True},
     }
 
     session = stripe.checkout.Session.create(**params)

@@ -4,28 +4,40 @@
 
 <section class="page-header">
   <h1>Billing</h1>
-  <p>Manage your subscription, invoices, and payment methods.</p>
+  <p>Manage your plan, usage, invoices, and payment methods.</p>
 </section>
 
-{% set is_startup = 'Startup' in (merchant.tier | default('')) %}
+{% set plan = billing_account.current_plan | default(merchant.tier) | default('Basic Tier') %}
+{% set is_startup = 'Startup' in plan %}
 
-<div class="grid grid-2">
+{% if request.args.get('checkout') == 'success' %}
+<div class="card" style="border: 1px solid var(--green); background: var(--green-bg); margin-bottom: 18px;">
+  <div style="font-weight: 700; color: var(--green); margin-bottom: 4px;">Payment successful</div>
+  <div style="font-size: .85rem; color: var(--ink-2);">Your subscription is active. It may take a moment for the dashboard to reflect the new plan.</div>
+</div>
+{% endif %}
+
+<div class="grid grid-2" style="align-items: start;">
   <div class="card">
     <div class="card-head"><h3>Current Plan</h3></div>
-    <div style="background: var(--ink); color: #fff; border-radius: var(--radius); padding: 18px; margin-bottom: 14px;">
-      <div style="font-size: 1.2rem; font-weight: 700; margin-bottom: 4px;">{{ merchant.tier | default('Basic Tier') }}</div>
-      <div id="plan-desc" style="font-size: .85rem; color: #b7bdc9; margin-bottom: 14px;">Vantav beta access.</div>
-      <div style="font-size: 1.6rem; font-weight: 800; margin-bottom: 4px;">${% if is_startup %}348{% else %}249{% endif %}<span style="font-size: .85rem; color: #b7bdc9;">/mo</span></div>
-      <div id="renewal-date" style="font-size: .8rem; color: var(--gold);">Manage via Stripe</div>
+    <div style="background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); padding: 18px; margin-bottom: 14px;">
+      <div style="font-size: 1.2rem; font-weight: 700; margin-bottom: 4px; color: var(--ink);">{{ plan }}</div>
+      <div id="plan-desc" style="font-size: .85rem; color: var(--ink-2); margin-bottom: 14px;">Vantav beta access. Upgrade anytime.</div>
+      <div style="font-size: 1.6rem; font-weight: 800; margin-bottom: 4px; color: var(--ink);">${% if is_startup %}348{% else %}249{% endif %}<span style="font-size: .85rem; color: var(--ink-3);">/mo</span></div>
+      {% if billing_account and billing_account.billing_cycle_end %}
+      <div id="renewal-date" style="font-size: .8rem; color: var(--ink-3); margin-top: 6px;">Current cycle ends {{ billing_account.billing_cycle_end }}</div>
+      {% endif %}
     </div>
-    <a href="/subscribe" class="btn btn-primary" style="width: 100%; display: block; text-align: center; margin-bottom: 8px;">Upgrade or change plan</a>
-    <button id="portal-btn" class="btn" style="width: 100%;">Manage billing & invoices</button>
+    <div style="display: flex; flex-direction: column; gap: 8px;">
+      <button id="upgrade-btn" class="btn btn-primary" style="width: 100%;" onclick="openUpgradeModal()">Upgrade or change plan</button>
+      <button id="portal-btn" class="btn" style="width: 100%;">Manage billing & invoices</button>
+    </div>
   </div>
 
   <div class="card">
     <div class="card-head"><h3>{% if is_startup %}Startup Pack Included{% else %}Add Startup Pack{% endif %}</h3></div>
     {% if is_startup %}
-    <ul style="font-size: .9rem; color: #bbb; line-height: 1.6; padding-left: 1.2rem;">
+    <ul style="font-size: .9rem; color: var(--ink-2); line-height: 1.6; padding-left: 1.2rem;">
       <li>Website & landing page build</li>
       <li>Brand name, logo & positioning guidance</li>
       <li>US-based manufacturer / no-inventory supplier directory</li>
@@ -33,21 +45,31 @@
       <li>1-year launch guidance & action plan</li>
     </ul>
     {% else %}
-    <p style="font-size: .9rem; color: #bbb; line-height: 1.5;">Upgrade to the <strong>$348/mo Beta + Startup Pack</strong> to get a website/landing page build, brand creation, curated US suppliers, no-inventory fulfillment, a branded sample, and a 1-year launch plan.</p>
-    <a href="/subscribe" class="btn" style="width: 100%; display: block; text-align: center; margin-top: 8px;">Add Startup Pack</a>
+    <p style="font-size: .9rem; color: var(--ink-2); line-height: 1.5;">Upgrade to the <strong>$348/mo Beta + Startup Pack</strong> to get a website/landing page build, brand creation, curated US suppliers, no-inventory fulfillment, a branded sample, and a 1-year launch plan.</p>
+    <button class="btn" style="width: 100%; margin-top: 10px;" onclick="startCheckout('beta_startup')">Add Startup Pack</button>
     {% endif %}
   </div>
 </div>
 
 <div class="card">
   <div class="card-head"><h3>Usage this cycle</h3></div>
-  {% for label, used, limit in [['Orders', 12450, 100000], ['Products', 1250, 10000], ['Customers', 8750, 100000], ['Storage', 45.6, 500]] %}
+  {% set usage = {
+    'Orders': (billing_account.metered_usage_units | default(0), tier_limits.orders | default(5000)),
+    'Products': (1250 if plan == 'Basic Tier' else (catalog | default({}) | length), tier_limits.products | default(10000)),
+    'Customers': (8750, tier_limits.customers | default(100000)),
+    'Storage': (45.6, tier_limits.storage | default(500))
+  } %}
+  {% for label, vals in usage.items() %}
+  {% set used = vals[0] | float %}
+  {% set limit = vals[1] | float %}
+  {% set raw_pct = used / limit * 100 %}
+  {% set pct = raw_pct if raw_pct < 100 else 100 %}
   <div style="margin-bottom: 14px;">
-    <div style="display: flex; justify-content: space-between; font-size: .85rem; margin-bottom: 5px;">
-      <span>{{ label }}</span><span>{{ used }} / {{ limit }}</span>
+    <div style="display: flex; justify-content: space-between; font-size: .85rem; margin-bottom: 5px; color: var(--ink-2);">
+      <span>{{ label }}</span><span>{{ used | int }} / {{ limit | int }}</span>
     </div>
     <div style="height: 7px; border-radius: 99px; background: var(--line-2); overflow: hidden;">
-      <div style="height: 100%; border-radius: 99px; background: var(--gold); width: {{ (used / limit * 100) | round(1) }}%;"></div>
+      <div style="height: 100%; border-radius: 99px; background: var(--purple); width: {{ pct | round(1) }}%;"></div>
     </div>
   </div>
   {% endfor %}
@@ -59,31 +81,100 @@
     <table>
       <thead><tr><th>Invoice</th><th>Date</th><th class="num">Amount</th><th>Status</th><th></th></tr></thead>
       <tbody>
-        <tr><td class="b">INV-2025-07</td><td>Jul 15, 2025</td><td class="num mono">${% if is_startup %}348.00{% else %}249.00{% endif %}</td><td><span class="tag tag-green">Paid</span></td><td class="num"><button class="btn" style="font-size: .75rem;">Download</button></td></tr>
+        <tr>
+          <td class="b">Current accrued balance</td>
+          <td>—</td>
+          <td class="num mono">${{ '{:,.2f}'.format(billing_account.accrued_invoice_value | default(0.0)) }}</td>
+          <td><span class="tag tag-ghost">Open</span></td>
+          <td class="num">—</td>
+        </tr>
       </tbody>
     </table>
+  </div>
+  <p style="font-size: .8rem; color: var(--ink-3); margin-top: 10px;">Detailed invoices are available in the Stripe Billing Portal.</p>
+</div>
+
+<!-- Upgrade modal -->
+<div id="upgrade-modal" style="display: none; position: fixed; inset: 0; background: rgba(0,0,0,.6); backdrop-filter: blur(4px); z-index: 100; align-items: center; justify-content: center; padding: 20px;">
+  <div style="background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); max-width: 420px; width: 100%; padding: 24px; box-shadow: var(--shadow);">
+    <h3 style="margin: 0 0 8px;">Choose a plan</h3>
+    <p style="color: var(--ink-2); font-size: .85rem; margin-bottom: 16px;">Select the plan that fits your business. You will be redirected to Stripe to complete payment.</p>
+    <div style="display: flex; flex-direction: column; gap: 10px; margin-bottom: 18px;">
+      <label style="display: flex; align-items: center; gap: 10px; padding: 12px; border: 1px solid var(--line); border-radius: 10px; cursor: pointer; background: var(--bg);">
+        <input type="radio" name="upgrade-plan" value="beta" checked style="accent-color: var(--purple);">
+        <div>
+          <div style="font-weight: 700; color: var(--ink);">Beta Plan — $249/mo</div>
+          <div style="font-size: .8rem; color: var(--ink-3);">True profit, alerts, and all channel sync</div>
+        </div>
+      </label>
+      <label style="display: flex; align-items: center; gap: 10px; padding: 12px; border: 1px solid var(--line); border-radius: 10px; cursor: pointer; background: var(--bg);">
+        <input type="radio" name="upgrade-plan" value="beta_startup" style="accent-color: var(--purple);">
+        <div>
+          <div style="font-weight: 700; color: var(--ink);">Beta + Startup Pack — $348/mo</div>
+          <div style="font-size: .8rem; color: var(--ink-3);">Everything in Beta plus brand build and launch guidance</div>
+        </div>
+      </label>
+    </div>
+    <div style="display: flex; gap: 10px;">
+      <button class="btn" style="flex: 1;" onclick="closeUpgradeModal()">Cancel</button>
+      <button id="upgrade-confirm" class="btn btn-primary" style="flex: 2;" onclick="confirmUpgrade()">Continue to payment</button>
+    </div>
   </div>
 </div>
 
 <script>
-  document.getElementById('portal-btn').addEventListener('click', async () => {
-    const btn = document.getElementById('portal-btn');
-    btn.disabled = true;
-    btn.textContent = 'Opening...';
-    try {
-      const res = await fetch('/api/v1/stripe/customer-portal', {method: 'POST'});
-      const data = await res.json();
-      if (res.ok && data.url) {
-        window.location.href = data.url;
-      } else {
-        throw new Error(data.detail || 'Could not open portal');
-      }
-    } catch (e) {
-      alert(e.message);
-      btn.disabled = false;
-      btn.textContent = 'Manage billing & invoices';
+document.getElementById('portal-btn').addEventListener('click', async () => {
+  const btn = document.getElementById('portal-btn');
+  btn.disabled = true;
+  btn.textContent = 'Opening...';
+  try {
+    const res = await fetch('/api/v1/stripe/customer-portal', {method: 'POST', credentials: 'same-origin'});
+    const data = await res.json();
+    if (res.ok && data.url) {
+      window.location.href = data.url;
+    } else {
+      throw new Error(data.detail || 'Could not open portal');
     }
-  });
+  } catch (e) {
+    alert(e.message);
+    btn.disabled = false;
+    btn.textContent = 'Manage billing & invoices';
+  }
+});
+
+function openUpgradeModal() {
+  document.getElementById('upgrade-modal').style.display = 'flex';
+}
+function closeUpgradeModal() {
+  document.getElementById('upgrade-modal').style.display = 'none';
+}
+
+async function confirmUpgrade() {
+  const plan = document.querySelector('input[name="upgrade-plan"]:checked').value;
+  await startCheckout(plan);
+}
+
+async function startCheckout(plan) {
+  const btn = document.getElementById('upgrade-confirm') || document.getElementById('upgrade-btn');
+  if (btn) { btn.disabled = true; btn.textContent = 'Redirecting...'; }
+  try {
+    const res = await fetch('/api/v1/stripe/upgrade-session', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({plan}),
+      credentials: 'same-origin'
+    });
+    const data = await res.json();
+    if (res.ok && data.url) {
+      window.location.href = data.url;
+    } else {
+      throw new Error(data.detail || 'Unable to start checkout');
+    }
+  } catch (e) {
+    alert(e.message);
+    if (btn) { btn.disabled = false; btn.textContent = 'Continue to payment'; }
+  }
+}
 </script>
 
 {% endblock %}

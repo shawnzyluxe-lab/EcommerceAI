@@ -8,6 +8,7 @@ from typing import List, Dict, Any, Optional
 from models import db, PendingAction, Alert, PredictiveLogistics, GeneratedPurchaseOrder, ProfitFeedOrder, AdSpendAnalytic, BusinessMetric, MerchantProfile, BusinessMemory, ActionEvidence
 import alert_matrix
 import competitor_intelligence
+import outbound
 
 logger = logging.getLogger(__name__)
 
@@ -565,13 +566,14 @@ def _execute_action(action: PendingAction, payload: Dict[str, Any]) -> Dict[str,
             pl.days_remaining = 30
             pl.status_flag = "HEALTHY"
 
-        db.session.add(GeneratedPurchaseOrder(
+        po = GeneratedPurchaseOrder(
             po_reference=po_ref,
             merchant_id=merchant_id,
             variant_sku=sku,
             units_ordered=quantity,
             fulfillment_status="PENDING",
-        ))
+        )
+        db.session.add(po)
 
         # Business metric update
         db.session.add(BusinessMetric(
@@ -582,7 +584,12 @@ def _execute_action(action: PendingAction, payload: Dict[str, Any]) -> Dict[str,
             ai_briefing=f"Action Gate approved: {po_ref} created for {quantity} units of {sku} from {supplier} ({lead_days}-day lead).",
         ))
         db.session.commit()
-        return {"message": f"Created {po_ref} for {quantity} units of {sku}.", "po_reference": po_ref}
+        writeback = outbound.send_supplier_po(merchant_id, po)
+        return {
+            "message": f"Created {po_ref} for {quantity} units of {sku}.",
+            "po_reference": po_ref,
+            "writeback": writeback,
+        }
 
     if action_type == "refund":
         order_id = payload.get("order_id", "")
@@ -592,8 +599,10 @@ def _execute_action(action: PendingAction, payload: Dict[str, Any]) -> Dict[str,
             order.refund_amount = order.gross_revenue
             order.net_profit = -order.marketplace_fees - order.cost_of_goods_sold - order.shipping_costs - order.ad_spend_attributed
             db.session.commit()
-            return {"message": f"Order {order_id} marked as refunded."}
-        return {"message": f"Order {order_id} not found; refund logged."}
+            writeback = outbound.dispatch_action("refund", merchant_id, payload)
+            return {"message": f"Order {order_id} marked as refunded.", "writeback": writeback}
+        writeback = outbound.dispatch_action("refund", merchant_id, payload)
+        return {"message": f"Order {order_id} not found; refund logged.", "writeback": writeback}
 
     if action_type == "ad_adjust":
         platform = payload.get("platform", "")
@@ -603,8 +612,10 @@ def _execute_action(action: PendingAction, payload: Dict[str, Any]) -> Dict[str,
             new_budget = ad.budget_allocated * (1 + adjustment / 100.0) if ad.budget_allocated else 0.0
             ad.budget_allocated = max(0.0, new_budget)
             db.session.commit()
-            return {"message": f"{platform} ad budget adjusted by {adjustment}% to ${new_budget:,.2f}."}
-        return {"message": f"{platform} ad record not found; adjustment logged."}
+            writeback = outbound.ad_platform_update_budget(platform, merchant_id, new_budget)
+            return {"message": f"{platform} ad budget adjusted by {adjustment}% to ${new_budget:,.2f}.", "writeback": writeback}
+        writeback = outbound.ad_platform_update_budget(platform, merchant_id, 0.0)
+        return {"message": f"{platform} ad record not found; adjustment logged.", "writeback": writeback}
 
     if action_type == "reroute":
         sku = payload.get("sku", "SZL-VAR-B")
