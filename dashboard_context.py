@@ -604,7 +604,7 @@ MOBILE_ACTIONS = [
 NAV = [
     ("Home", "/home", False),
     ("Overview", "#top", True),
-    ("Vanta", "#command", False),
+    ("Vantav", "#command", False),
     ("Commerce Hub", "#channels", False),
     ("Alerts", "#alerts", False),
     ("Profit Dashboard", "#profit", False),
@@ -618,7 +618,7 @@ NAV = [
     ("Automations", "#automations", False),
     ("Team", "#team", False),
     ("Health Score", "#health", False),
-    ("Vanta Mobile", "#mobile", False),
+    ("Vantav Mobile", "#mobile", False),
 ]
 
 # New commercial-grade page navigation (matches mockups)
@@ -627,7 +627,7 @@ NAV_GROUPS = [
         "label": "Workspace",
         "links": [
             {"id": "overview", "label": "Overview", "url": "/dashboard", "icon": "◈"},
-            {"id": "command_center", "label": "Vanta", "url": "/dashboard/command-center", "icon": "◉"},
+            {"id": "command_center", "label": "Vantav", "url": "/dashboard/command-center", "icon": "◉"},
             {"id": "orders", "label": "Orders", "url": "/dashboard/orders", "icon": "◫", "badge": "24"},
             {"id": "customers", "label": "Customers", "url": "/dashboard/customers", "icon": "○"},
             {"id": "analytics", "label": "Analytics", "url": "/dashboard/analytics", "icon": "▤"},
@@ -666,7 +666,7 @@ NAV_GROUPS = [
             {"id": "automations", "label": "Automations", "url": "/dashboard/automations", "icon": "⏵"},
             {"id": "team_ai", "label": "Team", "url": "/dashboard/team-ai", "icon": "✦"},
             {"id": "health_score", "label": "Health Score", "url": "/dashboard/health-score", "icon": "♥"},
-            {"id": "mobile_copilot", "label": "Vanta Mobile", "url": "/dashboard/mobile-copilot", "icon": "☎"},
+            {"id": "mobile_copilot", "label": "Vantav Mobile", "url": "/dashboard/mobile-copilot", "icon": "☎"},
             {"id": "monitoring", "label": "Monitoring", "url": "/dashboard/monitoring", "icon": "◈"},
         ],
     },

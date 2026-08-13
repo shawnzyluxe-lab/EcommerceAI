@@ -3883,7 +3883,7 @@ def compile_executive_digest():
     <div class="metric-box"><div>True Net Profit</div><div class="val">${profit:,.2f}</div></div>
     <div class="metric-box"><div>Gross Revenue</div><div class="val">${revenue:,.2f}</div></div>
   </div>
-  <h3>Vanta Summary</h3>
+  <h3>Vantav Summary</h3>
   <div class="briefing-box">{briefing}</div>
 </body>
 </html>"""
@@ -3962,7 +3962,7 @@ def telemetry_poll():
                 for a in ads
             ],
             "inter_agent_stream": [
-                {"sender": AGENT_DISPLAY_NAME.get(m.sender_agent, "Vanta"), "text": m.payload}
+                {"sender": AGENT_DISPLAY_NAME.get(m.sender_agent, "Vantav"), "text": m.payload}
                 for m in reversed(messages)
             ],
             "metrics": {
@@ -3991,7 +3991,7 @@ def telemetry_poll():
             },
             "agents_pool": [
                 {
-                    "name": AGENT_DISPLAY_NAME.get(a.agent_id, a.agent_name or "Vanta"),
+                    "name": AGENT_DISPLAY_NAME.get(a.agent_id, a.agent_name or "Vantav"),
                     "status": a.status,
                     "last_action": a.last_action,
                 }
