@@ -148,8 +148,6 @@ def create_checkout_session(
     db.session.commit()
 
     subscription_data = {"metadata": subscription_metadata}
-    if concierge_bundle:
-        subscription_data["add_invoice_items"] = [{"price": concierge_price, "quantity": 1}]
 
     params = {
         "customer": customer_id,
