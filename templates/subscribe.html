@@ -9,7 +9,7 @@
   <script>window.dataLayer = window.dataLayer || [];</script>
   {% if gtm_id %}<script>(function(w,d,s,l,i){w[l]=w[l]||[];w[l].push({'gtm.start':new Date().getTime(),event:'gtm.js'});var f=d.getElementsByTagName(s)[0],j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src='https://www.googletagmanager.com/gtm.js?id='+i+dl;f.parentNode.insertBefore(j,f);})(window,document,'script','dataLayer','{{ gtm_id }}');</script>{% endif %}
   {% if meta_pixel_id %}<script>!function(f,b,e,v,n,t,s){if(f.fbq)return;n=f.fbq=function(){n.callMethod?n.callMethod.apply(n,arguments):n.queue.push(arguments)};if(!f._fbq)f._fbq=n;n.push=n;n.loaded=!0;n.version='2.0';n.queue=[];t=b.createElement(e);t.async=!0;t.src=v;s=b.getElementsByTagName(e)[0];s.parentNode.insertBefore(t,s)}(window,document,'script','https://connect.facebook.net/en_US/fbevents.js');fbq('init','{{ meta_pixel_id }}');fbq('track','PageView');</script><noscript><img height="1" width="1" style="display:none" src="https://www.facebook.com/tr?id={{ meta_pixel_id }}&ev=PageView&noscript=1"/></noscript>{% endif %}
-  {% if tiktok_pixel_id %}<script>!function(w,d,t){var ttq=w.ttq||[];w.ttq=ttq;ttq.methods=["page","track","identify","instances","debug","on","off","once","ready","alias","group"];ttq.setAndDefer=function(s,t){s[t]=function(){s.push([t].concat(Array.prototype.slice.call(arguments,0)))}};for(var i=0;i<ttq.methods.length;i++){ttq.setAndDefer(ttq,ttq.methods[i])}ttq.instance=function(s){var e=ttq._i[s]||[];for(var n=0;n<ttq.methods.length;n++){ttq.setAndDefer(e,ttq.methods[n])}return e};ttq.load=function(e,n){var r="https://analytics.tiktok.com/i18n/pixel/events.js";ttq._i=ttq._i||{},ttq._i[e]=[],ttq._i[e]._u=r;var i=document.createElement("script");i.type="text/javascript",i.async=!0,i.src=r+"?sdkid="+e+"&lib="+t;var o=document.getElementsByTagName("script")[0];o.parentNode.insertBefore(i,o)};ttq.load('{{ tiktok_pixel_id }}');ttq.page();}(window,document,'ttq');</script>{% endif %}
+  {% if tiktok_pixel_id %}<script>!function(w,d,t){var ttq=w.ttq||[];w.ttq=ttq;ttq.methods=["page","track","identify","instances","debug","on","off","once","ready","alias","group"];ttq.setAndDefer=function(s,t){s[t]=function(){s.push([t].concat(Array.prototype.slice.call(arguments,0)))}};for(var i=0;i<ttq.methods.length;i++){ttq.setAndDefer(ttq,ttq.methods[i])}ttq.instance=function(s){var e=ttq._i[s]||[];for(var n=0;n<ttq.methods.length;n++){ttq.setAndDefer(e,ttq.methods[n])}return e};ttq.load=function(e,n){var r="https://analytics.tiktok.com/i18n/pixel/events.js";ttq._i=ttq._i||{},ttq._i[e]=[],ttq._i[e]._u=r;var i=document.createElement("script");i.type="text/javascript";i.async=!0;i.src=r+"?sdkid="+e+"&lib="+t;var o=document.getElementsByTagName("script")[0];o.parentNode.insertBefore(i,o)};ttq.load('{{ tiktok_pixel_id }}');ttq.page();}(window,document,'ttq');</script>{% endif %}
   <style>
     :root { --bg: #0c0c11; --card: #14141c; --ink: #f4f2f9; --muted: #c6c3d2; --line: #23232d; --accent: #8b5cf6; --accent-2: #a78bfa; --accent-bg: rgba(139,92,246,0.12); --success: #34d399; }
     * { box-sizing: border-box; }
@@ -50,7 +50,7 @@
   <div class="wrap">
     <div class="topbar">Vantav Plans</div>
     <h1>Choose your Vantav plan</h1>
-    <p class="sub">Pay for the operations layer you actually need. Every plan includes the full core loop: monitor, detect, recommend, approve.</p>
+    <p class="sub">Simple pricing for every stage of your business. Every plan includes the full Vantav experience: track what matters, know what needs attention, get clear recommendations, and approve the next step.</p>
 
     <div class="plans">
       <div class="plan">
@@ -61,11 +61,11 @@
           <li>Up to 2 connected stores</li>
           <li>All supported ecommerce integrations</li>
           <li>True-profit reporting</li>
-          <li>Revenue, orders, costs, margins, refunds, inventory</li>
-          <li>Attention alerts</li>
-          <li>AI-generated recommendations</li>
-          <li>Evidence and confidence scores</li>
-          <li>Approve / modify / dismiss workflow</li>
+          <li>Full revenue, cost, margin, refund, and inventory view</li>
+          <li>Alerts when something needs attention</li>
+          <li>Clear, actionable recommendations</li>
+          <li>See the reasoning behind every recommendation</li>
+          <li>Approve, edit, or skip any suggestion</li>
           <li>Basic inventory forecasting</li>
           <li>3 users</li>
           <li>Standard support</li>
@@ -79,15 +79,15 @@
         <ul>
           <li>Everything in Operator</li>
           <li>Up to 5 connected stores</li>
-          <li>More frequent monitoring</li>
-          <li>Advanced anomaly detection</li>
+          <li>Updates every 15 minutes</li>
+          <li>Smarter issue detection</li>
           <li>SKU velocity and stockout forecasting</li>
           <li>Recommended reorder timing</li>
-          <li>Projected financial impact</li>
-          <li>Advanced AI recommendation volume</li>
-          <li>Cross-store comparisons</li>
+          <li>See projected financial impact of each suggestion</li>
+          <li>More recommendations each month</li>
+          <li>Compare performance across stores</li>
           <li>Longer historical analysis</li>
-          <li>Action verification</li>
+          <li>Track completed actions and results</li>
           <li>Action history & business context</li>
           <li>10 users</li>
           <li>Priority support</li>
@@ -103,13 +103,13 @@
           <li>Up to 15 stores</li>
           <li>Portfolio-wide intelligence</li>
           <li>Advanced cross-store monitoring</li>
-          <li>Higher AI / action limits</li>
+          <li>Higher monthly action allowance</li>
           <li>Advanced forecasting</li>
           <li>Multi-brand reporting</li>
           <li>Custom alert rules</li>
           <li>Advanced permissions</li>
           <li>Complete action / audit history</li>
-          <li>API / data access</li>
+          <li>API and data access</li>
           <li>Priority onboarding</li>
           <li>Priority support</li>
         </ul>
@@ -119,8 +119,8 @@
 
     <div class="bundle">
       <h3>Concierge Bundle</h3>
-      <div class="price">$999<span>/mo</span></div>
-      <p class="desc">Done-for-you launch services on top of any plan. One combined price.</p>
+      <div class="price">$999</div>
+      <p class="desc">Done-for-you launch services on top of any plan. One combined price, one time.</p>
       <ul>
         <li>Custom brand build + manufacturer match</li>
         <li>Curated ad plan (TikTok, Amazon, Meta)</li>

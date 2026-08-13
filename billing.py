@@ -21,13 +21,14 @@ PRICE_STARTUP_ADDON = os.environ.get("STRIPE_PRICE_STARTUP_ADDON", "")
 PRICE_OPERATOR_MONTHLY = os.environ.get("STRIPE_PRICE_OPERATOR_MONTHLY", "")
 PRICE_GROWTH_MONTHLY = os.environ.get("STRIPE_PRICE_GROWTH_MONTHLY", "")
 PRICE_SCALE_MONTHLY = os.environ.get("STRIPE_PRICE_SCALE_MONTHLY", "")
-PRICE_CONCIERGE_BUNDLE_MONTHLY = os.environ.get("STRIPE_PRICE_CONCIERGE_BUNDLE_MONTHLY", "")
+# Concierge Bundle is a one-time add-on fee charged on the first invoice.
+PRICE_CONCIERGE_BUNDLE = os.environ.get("STRIPE_PRICE_CONCIERGE_BUNDLE", os.environ.get("STRIPE_PRICE_CONCIERGE_BUNDLE_MONTHLY", ""))
 
 _PRICE_MAP = {
     "operator": PRICE_OPERATOR_MONTHLY,
     "growth": PRICE_GROWTH_MONTHLY,
     "scale": PRICE_SCALE_MONTHLY,
-    "concierge_bundle": PRICE_CONCIERGE_BUNDLE_MONTHLY,
+    "concierge_bundle": PRICE_CONCIERGE_BUNDLE,
     "beta": PRICE_BETA_MONTHLY,
     "beta_startup": PRICE_BETA_STARTUP,
 }
@@ -116,11 +117,17 @@ def create_checkout_session(
     line_items = [{"price": price_id, "quantity": 1}]
 
     add_ons = []
+    subscription_metadata = {
+        "merchant_id": merchant_id,
+        "selected_tier": selected_tier,
+        "concierge_bundle": "false",
+    }
     if concierge_bundle:
         concierge_price = _price_id("concierge_bundle")
         if not concierge_price:
-            raise RuntimeError("STRIPE_PRICE_CONCIERGE_BUNDLE_MONTHLY is not configured")
-        line_items.append({"price": concierge_price, "quantity": 1})
+            raise RuntimeError("STRIPE_PRICE_CONCIERGE_BUNDLE is not configured")
+        # One-time add-on fee added to the first subscription invoice.
+        subscription_metadata["concierge_bundle"] = "true"
         add_ons.append("concierge_bundle")
 
     profile = MerchantProfile.query.get(merchant_id)
@@ -139,6 +146,10 @@ def create_checkout_session(
     billing.add_ons = list(set((billing.add_ons or []) + add_ons))
     db.session.commit()
 
+    subscription_data = {"metadata": subscription_metadata}
+    if concierge_bundle:
+        subscription_data["add_invoice_items"] = [{"price": concierge_price, "quantity": 1}]
+
     params = {
         "customer": customer_id,
         "mode": "subscription",
@@ -150,13 +161,7 @@ def create_checkout_session(
             "plan_choice": chosen_plan,
             "concierge_bundle": str(bool(concierge_bundle)).lower(),
         },
-        "subscription_data": {
-            "metadata": {
-                "merchant_id": merchant_id,
-                "selected_tier": selected_tier,
-                "concierge_bundle": str(bool(concierge_bundle)).lower(),
-            }
-        },
+        "subscription_data": subscription_data,
         "allow_promotion_codes": True,
         "success_url": success_url or "https://vantavcommerce.com/dashboard/billing?checkout=success",
         "cancel_url": cancel_url or "https://vantavcommerce.com/subscribe?canceled=1",

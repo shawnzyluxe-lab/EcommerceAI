@@ -67,6 +67,8 @@ services:
         sync: false
       - key: STRIPE_PRICE_SCALE_MONTHLY
         sync: false
+      - key: STRIPE_PRICE_CONCIERGE_BUNDLE
+        sync: false
       - key: STRIPE_PRICE_CONCIERGE_BUNDLE_MONTHLY
         sync: false
       - key: SHOPIFY_STORE_URL
