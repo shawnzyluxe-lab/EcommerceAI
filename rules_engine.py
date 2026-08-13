@@ -3,7 +3,6 @@
 Evaluates incoming multi-channel telemetry against the merchant's business_memory
 guardrails and produces Alert + PendingAction drafts without calling external LLMs.
 """
-import json
 import logging
 import hashlib
 import uuid
@@ -15,8 +14,9 @@ from pydantic import BaseModel, Field, ConfigDict
 
 logger = logging.getLogger(__name__)
 
-from models import db, BusinessMemory, Alert, PredictiveLogistics, ProfitFeedOrder, AdSpendFeed, LocalProductCatalog
+from models import db, BusinessMemory, Alert, Product, Supplier, UnifiedOrder, OrderItem, DailyCost
 import action_gate
+import forecaster
 
 
 class BusinessMemoryProfile(BaseModel):
@@ -213,65 +213,88 @@ class VantaRulesEngine:
         return hashlib.sha256(seed.encode()).hexdigest()[:16]
 
 
-def _on_hand_inventory(merchant_id: str, sku: str) -> int:
-    """Best-effort on-hand inventory lookup. Defaults to 100 when unknown."""
-    if sku and sku != "ALL":
-        pl = PredictiveLogistics.query.filter_by(variant_sku=sku).first()
-        if pl and pl.days_remaining is not None and pl.forecasted_demand_velocity:
-            try:
-                return int(pl.days_remaining * pl.forecasted_demand_velocity)
-            except Exception:
-                pass
-        cat = LocalProductCatalog.query.filter_by(shopify_product_id=sku).first()
-        if cat and cat.inventory_quantity:
-            return int(cat.inventory_quantity)
-
-    total = db.session.query(db.func.coalesce(db.func.sum(LocalProductCatalog.inventory_quantity), 0)).scalar()
-    return int(total or 100)
+def _on_hand_inventory(sku: str) -> int:
+    """Look up on-hand inventory from the unified product catalog."""
+    product = Product.query.filter_by(sku=sku).first()
+    if product:
+        return (product.on_hand or 0) + (product.inbound or 0)
+    return 0
 
 
-def aggregate_telemetry(merchant_id: str, sku: str = "ALL", window_hours: int = 24) -> SKUTelemetry:
-    """Aggregate multi-channel sales data into a telemetry snapshot."""
-    since = datetime.utcnow() - timedelta(hours=window_hours)
+def get_sku_telemetry_from_unified(merchant_id: str, sku: str, window_hours: int = 24) -> SKUTelemetry:
+    """Build a 24h SKU telemetry snapshot from the relational orders/order_items/daily_costs tables."""
+    since_dt = datetime.utcnow() - timedelta(hours=window_hours)
+    since_date = since_dt.date()
 
-    orders = ProfitFeedOrder.query.filter(
-        ProfitFeedOrder.merchant_id == merchant_id,
-        ProfitFeedOrder.recorded_at >= since,
-    ).all()
+    line_rows = (
+        db.session.query(
+            db.func.coalesce(db.func.sum(OrderItem.qty * OrderItem.unit_price), 0).label("revenue"),
+            db.func.coalesce(db.func.sum(OrderItem.qty * OrderItem.unit_cost), 0).label("cogs"),
+        )
+        .join(UnifiedOrder, UnifiedOrder.id == OrderItem.order_id)
+        .filter(
+            UnifiedOrder.merchant_id == merchant_id,
+            OrderItem.sku == sku,
+            UnifiedOrder.created_at >= since_dt,
+        )
+        .first()
+    )
 
-    revenue = sum(_to_float(o.gross_revenue) for o in orders)
-    cogs = sum(_to_float(o.cost_of_goods_sold) for o in orders)
-    fees = sum(_to_float(o.marketplace_fees) for o in orders)
-    shipping = sum(_to_float(o.shipping_costs) for o in orders)
-    refunds = sum(_to_float(o.refund_amount) for o in orders)
-    ad_spend = sum(_to_float(o.ad_spend_attributed) for o in orders)
-    refund_count = sum(1 for o in orders if _to_float(o.refund_amount) > 0)
-    total_orders = len(orders)
+    daily = (
+        db.session.query(
+            db.func.coalesce(db.func.sum(DailyCost.ad_spend), 0).label("ad_spend"),
+            db.func.coalesce(db.func.sum(DailyCost.ship_cost), 0).label("ship_cost"),
+            db.func.coalesce(db.func.sum(DailyCost.fee), 0).label("fee"),
+            db.func.coalesce(db.func.sum(DailyCost.refund), 0).label("refund"),
+            db.func.coalesce(db.func.sum(DailyCost.tax), 0).label("tax"),
+        )
+        .filter(DailyCost.sku == sku, DailyCost.log_date >= since_date)
+        .first()
+    )
 
-    # AdSpendFeed may contain additional unattributed ad spend.
-    ad_rows = AdSpendFeed.query.filter(
-        AdSpendFeed.merchant_id == merchant_id,
-        AdSpendFeed.recorded_at >= since,
-    ).all()
-    ad_spend += sum(_to_float(a.amount) for a in ad_rows)
+    order_counts = (
+        db.session.query(
+            db.func.count(UnifiedOrder.id).label("total"),
+            db.func.count(db.case((UnifiedOrder.status.in_(["refunded", "cancelled"]), 1))).label("refund_count"),
+        )
+        .join(OrderItem, UnifiedOrder.id == OrderItem.order_id)
+        .filter(
+            UnifiedOrder.merchant_id == merchant_id,
+            OrderItem.sku == sku,
+            UnifiedOrder.created_at >= since_dt,
+        )
+        .first()
+    )
 
-    days = max(window_hours / 24.0, 1.0)
-    velocity = total_orders / days
+    forecast = forecaster.forecast_sku(merchant_id, sku, days=max(window_hours // 24, 14))
 
     return SKUTelemetry(
         sku=sku,
-        revenue_24h=round(revenue, 2),
-        cogs_24h=round(cogs, 2),
-        ad_spend_24h=round(ad_spend, 2),
-        shipping_cost_24h=round(shipping, 2),
-        fees_24h=round(fees, 2),
-        refunds_24h=round(refunds, 2),
-        taxes_24h=0.0,
-        on_hand_inventory=_on_hand_inventory(merchant_id, sku),
-        daily_sales_velocity=round(velocity, 2),
-        refund_count_24h=refund_count,
-        total_orders_24h=total_orders,
+        revenue_24h=round(float(line_rows.revenue or 0), 2),
+        cogs_24h=round(float(line_rows.cogs or 0), 2),
+        ad_spend_24h=round(float(daily.ad_spend or 0), 2),
+        shipping_cost_24h=round(float(daily.ship_cost or 0), 2),
+        fees_24h=round(float(daily.fee or 0), 2),
+        refunds_24h=round(float(daily.refund or 0), 2),
+        taxes_24h=round(float(daily.tax or 0), 2),
+        on_hand_inventory=_on_hand_inventory(sku),
+        daily_sales_velocity=forecast.predicted_daily_velocity,
+        refund_count_24h=int(order_counts.refund_count or 0),
+        total_orders_24h=int(order_counts.total or 0),
     )
+
+
+def evaluate_products(merchant_id: str, window_hours: int = 24) -> List[Dict[str, Any]]:
+    """Run rules across every product in the merchant catalog."""
+    memory = _memory_profile(merchant_id)
+    engine = VantaRulesEngine(memory)
+    products = Product.query.filter_by(merchant_id=merchant_id).all()
+
+    all_events: List[Dict[str, Any]] = []
+    for product in products:
+        telemetry = get_sku_telemetry_from_unified(merchant_id, product.sku, window_hours=window_hours)
+        all_events.extend(engine.evaluate_sku_state(telemetry))
+    return save_events(merchant_id, all_events)
 
 
 def save_events(merchant_id: str, events: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
@@ -332,12 +355,8 @@ def save_events(merchant_id: str, events: List[Dict[str, Any]]) -> List[Dict[str
 
 
 def run_for_merchant(merchant_id: str, window_hours: int = 24) -> List[Dict[str, Any]]:
-    """Evaluate merchant telemetry and write any new alerts/actions."""
-    telemetry = aggregate_telemetry(merchant_id, window_hours=window_hours)
-    memory = _memory_profile(merchant_id)
-    engine = VantaRulesEngine(memory)
-    events = engine.evaluate_sku_state(telemetry)
-    return save_events(merchant_id, events)
+    """Evaluate all SKU-level telemetry for a merchant and write alerts/actions."""
+    return evaluate_products(merchant_id, window_hours=window_hours)
 
 
 def run_for_sku(merchant_id: str, telemetry: Dict[str, Any]) -> List[Dict[str, Any]]:

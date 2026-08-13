@@ -8,6 +8,7 @@ from collections import defaultdict
 
 import tracking
 import rules_engine
+import unified_ingest
 from models import db, ProfitFeedOrder, AdSpendFeed
 
 logger = logging.getLogger(__name__)
@@ -50,7 +51,7 @@ def _normalize_channel(channel):
     return (channel or "").lower().replace(" shop", "").replace(" shop", "").replace(" marketplace", "").strip()
 
 
-def record_order(merchant_id, channel, order_id, gross_revenue, items=1, state="shipped", refund_amount=0.0, tracking_number="", carrier=""):
+def record_order(merchant_id, channel, order_id, gross_revenue, items=1, state="shipped", refund_amount=0.0, tracking_number="", carrier="", order_items=None):
     """Record a channel order and compute its true net profit.
 
     Returns the created/updated ProfitFeedOrder or None if already recorded.
@@ -98,6 +99,23 @@ def record_order(merchant_id, channel, order_id, gross_revenue, items=1, state="
     )
     order.net_profit = _compute_net(order, 0.0)
     db.session.add(order)
+    if order_items:
+        try:
+            unified_ingest.record_unified_order(
+                merchant_id=merchant_id,
+                channel=channel,
+                order_id=order_id,
+                order_items=order_items,
+                revenue=gross,
+                status=state,
+                created_at=datetime.now(timezone.utc),
+                shipping_cost=shipping,
+                fee=fees,
+                refund=refund,
+                tax=0.0,
+            )
+        except Exception as e:
+            logger.warning(f"[UNIFIED INGEST] record_unified_order failed: {e}")
     db.session.commit()
     try:
         rules_engine.run_for_merchant(merchant_id)

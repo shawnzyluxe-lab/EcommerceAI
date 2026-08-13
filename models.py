@@ -452,3 +452,69 @@ class ActionEvidence(db.Model):
     execution_report = db.Column(db.Text)
 
     created_at = db.Column(db.DateTime, server_default=db.func.now())
+
+
+class Supplier(db.Model):
+    __tablename__ = "suppliers"
+    id = db.Column(db.String(36), primary_key=True, default=_uuid)
+    merchant_id = db.Column(db.String(100), db.ForeignKey("merchant_profiles.merchant_id"), nullable=False, index=True)
+    name = db.Column(db.String(255), nullable=False)
+    lead_days = db.Column(db.Integer, nullable=False, default=14)
+    defect_rate = db.Column(db.Numeric(5, 4), nullable=False, default=0.0000)
+    refund_rate = db.Column(db.Numeric(5, 4), nullable=False, default=0.0000)
+    reliability_score = db.Column(db.Integer, nullable=False, default=100)
+    created_at = db.Column(db.DateTime, server_default=db.func.now())
+
+
+class Product(db.Model):
+    __tablename__ = "products"
+    sku = db.Column(db.String(100), primary_key=True)
+    merchant_id = db.Column(db.String(100), db.ForeignKey("merchant_profiles.merchant_id"), nullable=False, index=True)
+    title = db.Column(db.String(255), nullable=False)
+    channel_ids = db.Column(db.JSON, nullable=False, default=dict)
+    on_hand = db.Column(db.Integer, nullable=False, default=0)
+    inbound = db.Column(db.Integer, nullable=False, default=0)
+    reorder_point = db.Column(db.Integer, nullable=False, default=10)
+    unit_cost = db.Column(db.Numeric(12, 4), nullable=False, default=0.0000)
+    supplier_id = db.Column(db.String(36), db.ForeignKey("suppliers.id", ondelete="SET NULL"))
+    updated_at = db.Column(db.DateTime, server_default=db.func.now(), onupdate=db.func.now())
+
+
+class UnifiedOrder(db.Model):
+    __tablename__ = "orders"
+    id = db.Column(db.String(150), primary_key=True)
+    merchant_id = db.Column(db.String(100), db.ForeignKey("merchant_profiles.merchant_id"), nullable=False, index=True)
+    channel = db.Column(db.String(50), nullable=False)
+    revenue = db.Column(db.Numeric(12, 4), nullable=False)
+    shipping_charged = db.Column(db.Numeric(12, 4), nullable=False, default=0.0000)
+    tax = db.Column(db.Numeric(12, 4), nullable=False, default=0.0000)
+    status = db.Column(db.String(50), nullable=False, default="pending")
+    fraud_score = db.Column(db.Integer, nullable=False, default=0)
+    customer_id = db.Column(db.String(255))
+    ship_to = db.Column(db.JSON, nullable=False, default=dict)
+    promised_at = db.Column(db.DateTime)
+    delivered_at = db.Column(db.DateTime)
+    created_at = db.Column(db.DateTime, nullable=False, server_default=db.func.now())
+
+
+class OrderItem(db.Model):
+    __tablename__ = "order_items"
+    id = db.Column(db.String(36), primary_key=True, default=_uuid)
+    order_id = db.Column(db.String(150), db.ForeignKey("orders.id", ondelete="CASCADE"), nullable=False, index=True)
+    sku = db.Column(db.String(100), db.ForeignKey("products.sku", ondelete="RESTRICT"), nullable=False, index=True)
+    qty = db.Column(db.Integer, nullable=False)
+    unit_price = db.Column(db.Numeric(12, 4), nullable=False)
+    unit_cost = db.Column(db.Numeric(12, 4), nullable=False)
+
+
+class DailyCost(db.Model):
+    __tablename__ = "daily_costs"
+    id = db.Column(db.String(36), primary_key=True, default=_uuid)
+    sku = db.Column(db.String(100), db.ForeignKey("products.sku", ondelete="CASCADE"), nullable=False, index=True)
+    log_date = db.Column(db.Date, nullable=False)
+    ad_spend = db.Column(db.Numeric(12, 4), nullable=False, default=0.0000)
+    ship_cost = db.Column(db.Numeric(12, 4), nullable=False, default=0.0000)
+    fee = db.Column(db.Numeric(12, 4), nullable=False, default=0.0000)
+    refund = db.Column(db.Numeric(12, 4), nullable=False, default=0.0000)
+    tax = db.Column(db.Numeric(12, 4), nullable=False, default=0.0000)
+    __table_args__ = (db.UniqueConstraint("sku", "log_date", name="unique_sku_date"),)

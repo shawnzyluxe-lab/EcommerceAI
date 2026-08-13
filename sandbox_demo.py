@@ -11,12 +11,16 @@ from models import (
     PendingAction,
     MerchantChannel,
     TenantOAuthToken,
+    Product,
+    Supplier,
+    UnifiedOrder,
 )
 import profit_feed
 import alert_matrix
 import action_gate
 import channels as channels_module
 import startup_pack
+import unified_ingest
 
 DEMO_ORDERS = [
     ("shopify", 2, 128.00, "shipped", "1Z999AA10123456784", "ups"),
@@ -29,6 +33,25 @@ DEMO_ORDERS = [
     ("amazon", 1, 49.99, "shipped", "TBC987654321098", "amazon"),
     ("shopify", 1, 89.00, "delayed", "C12345678901234", "ontrac"),
 ]
+
+DEMO_ORDER_SKUS = [
+    "SZL-VAR-A",
+    "SZL-VAR-B",
+    "SZL-VAR-C",
+    "SZL-VAR-A",
+    "SZL-VAR-D",
+    "SZL-VAR-A",
+    "SZL-VAR-B",
+    "SZL-VAR-C",
+    "SZL-VAR-A",
+]
+
+DEMO_PRODUCTS = {
+    "SZL-VAR-A": {"title": "Satin Sleep Set", "on_hand": 68, "unit_cost": 14.0},
+    "SZL-VAR-B": {"title": "Velvet Scrunchie Pack", "on_hand": 30, "unit_cost": 5.0},
+    "SZL-VAR-C": {"title": "Silk Pillowcase", "on_hand": 120, "unit_cost": 9.0},
+    "SZL-VAR-D": {"title": "Satin Robe", "on_hand": 40, "unit_cost": 18.0},
+}
 
 DEMO_AD_SPEND = [
     ("meta", 80.00, 24),
@@ -103,11 +126,14 @@ def _clear_demo_data(merchant_id):
     """Remove any previously seeded demo data for this merchant."""
     PendingAction.query.filter_by(merchant_id=merchant_id).delete()
     ProfitFeedOrder.query.filter_by(merchant_id=merchant_id).delete()
+    UnifiedOrder.query.filter_by(merchant_id=merchant_id).delete()
     AdSpendFeed.query.filter_by(merchant_id=merchant_id).delete()
     Alert.query.filter_by(merchant_id=merchant_id).delete()
     MerchantChannel.query.filter_by(merchant_id=merchant_id).delete()
     TenantOAuthToken.query.filter_by(merchant_id=merchant_id).delete()
     StartupPackProject.query.filter_by(merchant_id=merchant_id).delete()
+    Product.query.filter_by(merchant_id=merchant_id).delete()
+    Supplier.query.filter_by(merchant_id=merchant_id).delete()
     db.session.commit()
 
 
@@ -121,10 +147,42 @@ def seed_sandbox_demo(merchant_id, business_name="", force=False):
             return False
         _clear_demo_data(merchant_id)
 
+    # Seed unified supplier/product catalog for forecasting.
+    supplier = unified_ingest.upsert_supplier(merchant_id, name="Demo Supplier", lead_days=10)
+    for sku, data in DEMO_PRODUCTS.items():
+        unified_ingest.upsert_product(
+            merchant_id=merchant_id,
+            sku=sku,
+            title=data["title"],
+            unit_cost=data["unit_cost"],
+            on_hand=data["on_hand"],
+            supplier_id=supplier.id,
+        )
+
     suffix = _order_suffix(merchant_id)
     for i, (channel, items, gross, state, tracking_number, carrier) in enumerate(DEMO_ORDERS):
         order_id = f"DEMO-{suffix}-{i + 1001}"
-        profit_feed.record_order(merchant_id, channel, order_id, gross, items=items, state=state, tracking_number=tracking_number, carrier=carrier)
+        sku = DEMO_ORDER_SKUS[i]
+        unit_price = round(gross / max(items, 1), 4)
+        unit_cost = DEMO_PRODUCTS.get(sku, {}).get("unit_cost", unit_price * 0.35)
+        order_items = [{
+            "sku": sku,
+            "qty": items,
+            "price": unit_price,
+            "unit_cost": unit_cost,
+            "title": DEMO_PRODUCTS.get(sku, {}).get("title", sku),
+        }]
+        profit_feed.record_order(
+            merchant_id,
+            channel,
+            order_id,
+            gross,
+            items=items,
+            state=state,
+            tracking_number=tracking_number,
+            carrier=carrier,
+            order_items=order_items,
+        )
 
     for platform, amount, conv in DEMO_AD_SPEND:
         profit_feed.record_ad_spend(merchant_id, platform, amount, conv)

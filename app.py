@@ -61,6 +61,7 @@ import alert_matrix
 import vetted_operator
 import action_gate
 import rules_engine
+import forecaster
 import channels as channels_module
 import shopify_sync
 import tiktok_sync
@@ -2290,6 +2291,58 @@ def api_rules_evaluate():
         return jsonify({"detail": str(e)}), 500
 
 
+@app.route('/api/v1/forecast/sku', methods=['POST'])
+@require_roles([UserRole.ADMIN, UserRole.MERCHANT, UserRole.ENGINEER])
+def api_forecast_sku():
+    """Return a stockout/reorder forecast for a specific SKU."""
+    merchant = get_merchant_context()
+    if not merchant:
+        return jsonify({"error": "No merchant context"}), 403
+    data = request.get_json(silent=True) or {}
+    sku = (data.get("sku") or "").strip()
+    if not sku:
+        return jsonify({"error": "sku is required"}), 400
+    try:
+        report = forecaster.forecast_sku(merchant["id"], sku)
+        return jsonify(report.model_dump()), 200
+    except Exception as e:
+        logger.error(f"[Forecast] SKU forecast failed: {e}")
+        return jsonify({"detail": str(e)}), 500
+
+
+@app.route('/api/v1/forecast/run', methods=['POST'])
+@require_roles([UserRole.ADMIN, UserRole.MERCHANT, UserRole.ENGINEER])
+def api_forecast_run():
+    """Run forecasting for every product and return reports."""
+    merchant = get_merchant_context()
+    if not merchant:
+        return jsonify({"error": "No merchant context"}), 403
+    data = request.get_json(silent=True) or {}
+    days = int(data.get("days", 14) or 14)
+    try:
+        reports = forecaster.forecast_all_skus(merchant["id"], days=days)
+        return jsonify({"reports": [r.model_dump() for r in reports]}), 200
+    except Exception as e:
+        logger.error(f"[Forecast] Run failed: {e}")
+        return jsonify({"detail": str(e)}), 500
+
+
+@app.route('/api/v1/forecast/cron', methods=['POST'])
+@require_roles([UserRole.ADMIN, UserRole.MERCHANT, UserRole.ENGINEER])
+def api_forecast_cron():
+    """Morning CRON-style entrypoint: run forecasts and create alerts/actions for stockouts."""
+    merchant = get_merchant_context()
+    if not merchant:
+        return jsonify({"error": "No merchant context"}), 403
+    try:
+        reports = forecaster.forecast_all_skus(merchant["id"], days=14)
+        alerts = rules_engine.evaluate_products(merchant["id"], window_hours=24)
+        return jsonify({"reports": [r.model_dump() for r in reports], "alerts": alerts}), 200
+    except Exception as e:
+        logger.error(f"[Forecast] CRON run failed: {e}")
+        return jsonify({"detail": str(e)}), 500
+
+
 @app.route('/api/v1/assistant/thread', methods=['DELETE'])
 @require_roles([UserRole.ADMIN, UserRole.MERCHANT, UserRole.ENGINEER])
 def api_assistant_clear_thread():
@@ -3152,6 +3205,22 @@ def shopify_orders_webhook():
 
         # Feed the real-time Profit Feed for this channel order.
         line_items = payload.get("line_items") or payload.get("lineItems") or []
+        order_items = []
+        if isinstance(line_items, list):
+            for li in line_items:
+                if not isinstance(li, dict):
+                    continue
+                sku = li.get("sku") or li.get("product_id") or li.get("variant_id") or ""
+                qty = li.get("quantity") or 1
+                price = li.get("price") or li.get("unit_price") or 0.0
+                title = li.get("title") or li.get("name") or sku
+                if sku:
+                    order_items.append({
+                        "sku": str(sku).strip(),
+                        "qty": int(qty or 1),
+                        "price": float(price or 0.0),
+                        "title": title,
+                    })
         order_ref = str(payload.get("name") or payload.get("order_number") or event_id)
         profit_feed.record_order(
             merchant_id=merchant_target,
@@ -3161,6 +3230,7 @@ def shopify_orders_webhook():
             items=len(line_items) if isinstance(line_items, list) else 1,
             state="shipped" if payload.get("fulfillment_status") != "cancelled" else "cancelled",
             refund_amount=abs(float(payload.get("total_refund_amount", 0.0) or 0.0)),
+            order_items=order_items,
         )
 
         latest = BusinessMetric.query.order_by(BusinessMetric.id.desc()).first()
@@ -3270,14 +3340,35 @@ def tiktok_orders_webhook():
         created = process_idempotent_channel_event(event_id, merchant_target, "tiktok", order_price)
         db.session.commit()
         # Feed the real-time Profit Feed for TikTok Shop.
-        skus = raw.get("skus") or raw.get("items") or []
+        line_items = raw.get("line_items") or raw.get("skus") or raw.get("items") or []
+        order_items = []
+        if isinstance(line_items, list):
+            for li in line_items:
+                if isinstance(li, dict):
+                    sku = li.get("sku_id") or li.get("sku") or li.get("product_id") or ""
+                    qty = li.get("quantity") or 1
+                    price = li.get("sale_price", {}).get("amount", 0.0) if isinstance(li.get("sale_price"), dict) else (li.get("price") or 0.0)
+                    title = li.get("product_name") or li.get("title") or sku
+                else:
+                    sku = str(li)
+                    qty = 1
+                    price = round(order_price / max(len(line_items), 1), 4) if order_price else 0.0
+                    title = sku
+                if sku:
+                    order_items.append({
+                        "sku": str(sku).strip(),
+                        "qty": int(qty or 1),
+                        "price": float(price or 0.0),
+                        "title": title,
+                    })
         profit_feed.record_order(
             merchant_id=merchant_target,
             channel="tiktok",
             order_id=str(raw.get("order_id") or event_id),
             gross_revenue=order_price,
-            items=len(skus) if isinstance(skus, list) else 1,
+            items=len(order_items) if order_items else (len(line_items) if isinstance(line_items, list) else 1),
             state="shipped" if raw.get("status") != "CANCELLED" else "cancelled",
+            order_items=order_items,
         )
         # Trigger real-time multi-channel routing pipeline in the background
         run_async_task(lambda: asyncio.run(process_incoming_order_event(raw)))
@@ -3305,13 +3396,42 @@ def amazon_orders_webhook():
         db.session.commit()
         # Feed the real-time Profit Feed for Amazon.
         items = payload.get("NumberOfItemsShipped") or payload.get("items") or []
+        amazon_items = payload.get("OrderItems") or []
+        order_items = []
+        if isinstance(amazon_items, list):
+            for li in amazon_items:
+                if not isinstance(li, dict):
+                    continue
+                sku = li.get("SellerSKU") or li.get("ASIN") or li.get("OrderItemId") or ""
+                qty = li.get("Quantity") or li.get("QuantityOrdered") or 1
+                price = li.get("ItemPrice", {}).get("Amount", 0.0) if isinstance(li.get("ItemPrice"), dict) else (li.get("Price") or 0.0)
+                title = li.get("Title") or sku
+                if sku:
+                    order_items.append({
+                        "sku": str(sku).strip(),
+                        "qty": int(qty or 1),
+                        "price": float(price or 0.0),
+                        "title": title,
+                    })
+        if not order_items and order_price:
+            # Fallback if only a count is provided.
+            count = int(items) if isinstance(items, (int, float, str)) and str(items).isdigit() else 1
+            unit = round(order_price / max(count, 1), 4)
+            for i in range(count):
+                order_items.append({
+                    "sku": f"AMAZON-FALLBACK-{i+1}",
+                    "qty": 1,
+                    "price": unit,
+                    "title": "Amazon item",
+                })
         profit_feed.record_order(
             merchant_id=merchant_target,
             channel="amazon",
             order_id=str(payload.get("AmazonOrderId") or payload.get("order_id") or event_id),
             gross_revenue=order_price,
-            items=int(items) if isinstance(items, (int, float, str)) and str(items).isdigit() else (len(items) if isinstance(items, list) else 1),
+            items=len(order_items) if order_items else (len(items) if isinstance(items, list) else 1),
             state="shipped" if payload.get("OrderStatus") != "Canceled" else "cancelled",
+            order_items=order_items,
         )
         return jsonify({"status": "synchronized" if created else "ignored"}), 200
     except Exception as e:

@@ -180,10 +180,20 @@ def sync_orders(merchant_id: str) -> int:
             line_items = order.get("line_items", [])
             items = sum(int(li.get("quantity", 1) or 1) for li in line_items)
             gross = 0.0
+            order_items = []
             for li in line_items:
                 price = li.get("sale_price") or {}
                 amount = float(price.get("amount", 0.0) or 0.0)
-                gross += amount * int(li.get("quantity", 1) or 1)
+                qty = int(li.get("quantity", 1) or 1)
+                gross += amount * qty
+                sku = li.get("sku_id") or li.get("sku") or li.get("product_id") or ""
+                if sku:
+                    order_items.append({
+                        "sku": str(sku).strip(),
+                        "qty": qty,
+                        "price": amount,
+                        "title": li.get("product_name") or li.get("title") or sku,
+                    })
 
             state = _map_order_status(order.get("order_status"))
             profit_feed.record_order(
@@ -193,6 +203,7 @@ def sync_orders(merchant_id: str) -> int:
                 gross_revenue=gross,
                 items=items,
                 state=state,
+                order_items=order_items,
             )
             count += 1
         except Exception as e:

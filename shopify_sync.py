@@ -81,6 +81,21 @@ def sync_orders(merchant_id: str, limit: int = 250) -> Tuple[int, List[str]]:
             items = order.get("line_items") or []
             state = _order_state(order)
             refund = _parse_refund_amount(order)
+            order_items = []
+            for li in items:
+                if not isinstance(li, dict):
+                    continue
+                sku = li.get("sku") or li.get("product_id") or li.get("variant_id") or ""
+                qty = li.get("quantity") or 1
+                price = li.get("price") or 0.0
+                title = li.get("title") or li.get("name") or sku
+                if sku:
+                    order_items.append({
+                        "sku": str(sku).strip(),
+                        "qty": int(qty or 1),
+                        "price": float(price or 0.0),
+                        "title": title,
+                    })
             profit_feed.record_order(
                 merchant_id=merchant_id,
                 channel="shopify",
@@ -89,6 +104,7 @@ def sync_orders(merchant_id: str, limit: int = 250) -> Tuple[int, List[str]]:
                 items=len(items),
                 state=state,
                 refund_amount=refund,
+                order_items=order_items,
             )
             count += 1
         except Exception as e:
