@@ -16,6 +16,7 @@ import profit_feed
 import alert_matrix
 import action_gate
 import channels as channels_module
+import tracking
 
 
 from zoneinfo import ZoneInfo
@@ -255,16 +256,30 @@ RESEARCH = [
 # Fulfillment
 # --------------------------------------------------------------------------
 
+FULFILLMENT_ROWS = [
+    {"order": "#1042", "supplier": "Supplier C", "warehouse": "Dallas", "carrier": "UPS Ground", "tracking_number": "1Z999AA10123456784", "cost": 6.40, "flag": "Address mismatch"},
+    {"order": "#1041", "supplier": "Supplier A", "warehouse": "Miami", "carrier": "USPS Priority", "tracking_number": "9400111899223456789012", "cost": 8.10, "flag": ""},
+    {"order": "#1040", "supplier": "Supplier C", "warehouse": "Dallas", "carrier": "UPS Ground", "tracking_number": "1Z999AA10123456784", "cost": 6.40, "flag": ""},
+    {"order": "#1039", "supplier": "Supplier B", "warehouse": "Reno", "carrier": "FedEx Home", "tracking_number": "449044304137821", "cost": 7.25, "flag": "Fraud risk 61"},
+]
+
+
+def _fulfillment_rows():
+    """Return fulfillment sample rows with computed tracking URLs."""
+    rows = []
+    for r in FULFILLMENT_ROWS:
+        row = dict(r)
+        row["tracking_url"] = tracking.tracking_url(row.get("tracking_number", ""), row.get("carrier", ""))
+        row["carrier_key"] = tracking.detect_carrier(row.get("tracking_number", "")) or (row.get("carrier", "").split()[0].lower() if row.get("carrier") else "")
+        rows.append(row)
+    return rows
+
+
 FULFILLMENT = {
     "routed_today": 58,
     "auto_rate": 94,
     "avg_saving": 1.86,
-    "rows": [
-        {"order": "#1042", "supplier": "Supplier C", "warehouse": "Dallas", "carrier": "UPS Ground", "cost": 6.40, "flag": "Address mismatch"},
-        {"order": "#1041", "supplier": "Supplier A", "warehouse": "Miami", "carrier": "USPS Priority", "cost": 8.10, "flag": ""},
-        {"order": "#1040", "supplier": "Supplier C", "warehouse": "Dallas", "carrier": "UPS Ground", "cost": 6.40, "flag": ""},
-        {"order": "#1039", "supplier": "Supplier B", "warehouse": "Reno", "carrier": "FedEx Home", "cost": 7.25, "flag": "Fraud risk 61"},
-    ],
+    "rows": _fulfillment_rows(),
 }
 
 # --------------------------------------------------------------------------
@@ -445,7 +460,7 @@ MOBILE_ACTIONS = [
 NAV = [
     ("Home", "/home", False),
     ("Overview", "#top", True),
-    ("Assistant", "#command", False),
+    ("Vanta", "#command", False),
     ("Commerce Hub", "#channels", False),
     ("Alerts", "#alerts", False),
     ("Profit Dashboard", "#profit", False),
@@ -459,7 +474,7 @@ NAV = [
     ("Automations", "#automations", False),
     ("Team", "#team", False),
     ("Health Score", "#health", False),
-    ("Mobile Assistant", "#mobile", False),
+    ("Vanta Mobile", "#mobile", False),
 ]
 
 # New commercial-grade page navigation (matches mockups)
@@ -468,7 +483,7 @@ NAV_GROUPS = [
         "label": "Workspace",
         "links": [
             {"id": "overview", "label": "Overview", "url": "/dashboard", "icon": "◈"},
-            {"id": "command_center", "label": "Assistant", "url": "/dashboard/command-center", "icon": "◉"},
+            {"id": "command_center", "label": "Vanta", "url": "/dashboard/command-center", "icon": "◉"},
             {"id": "orders", "label": "Orders", "url": "/dashboard/orders", "icon": "◫", "badge": "24"},
             {"id": "customers", "label": "Customers", "url": "/dashboard/customers", "icon": "○"},
             {"id": "analytics", "label": "Analytics", "url": "/dashboard/analytics", "icon": "▤"},
@@ -507,7 +522,7 @@ NAV_GROUPS = [
             {"id": "automations", "label": "Automations", "url": "/dashboard/automations", "icon": "⏵"},
             {"id": "team_ai", "label": "Team", "url": "/dashboard/team-ai", "icon": "✦"},
             {"id": "health_score", "label": "Health Score", "url": "/dashboard/health-score", "icon": "♥"},
-            {"id": "mobile_copilot", "label": "Mobile Assistant", "url": "/dashboard/mobile-copilot", "icon": "☎"},
+            {"id": "mobile_copilot", "label": "Vanta Mobile", "url": "/dashboard/mobile-copilot", "icon": "☎"},
         ],
     },
     {

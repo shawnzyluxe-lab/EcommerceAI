@@ -33,7 +33,7 @@
 <div class="grid grid-2" style="margin-bottom: 24px;">
   <div class="card" id="assistant-card">
     <div class="card-head">
-      <span class="tag tag-blue">Assistant</span>
+      <span class="tag tag-blue">Vanta</span>
       <span class="tag tag-ghost">Confidence {{ coo.confidence }}%</span>
       <span class="spacer"></span>
       <span style="font-size: .76rem; color: var(--ink-3);">{{ generated }}</span>
@@ -53,7 +53,7 @@
       {% endfor %}
     </div>
     <div style="display: flex; gap: 8px; flex-wrap: wrap;">
-      <button class="btn btn-primary" id="run-analysis-btn" onclick="runAssistantAnalysis()">Run Assistant Analysis</button>
+      <button class="btn btn-primary" id="run-analysis-btn" onclick="runAssistantAnalysis()">Run Vanta Analysis</button>
       <a href="/dashboard/action-gate" class="btn">Approve &amp; Execute</a>
       <button class="btn" onclick="alert('Modify action flow coming in the next release.')">Modify</button>
       <button class="btn btn-ghost" onclick="document.getElementById('assistant-card').style.display='none'">Dismiss</button>
@@ -62,8 +62,8 @@
 
   <div class="card">
     <div class="card-head">
-      <h3>Assistant</h3>
-      <p>Type or speak — your assistant performs the work instead of just answering.</p>
+      <h3>Vanta</h3>
+      <p>Type or speak — Vanta performs the work instead of just answering.</p>
     </div>
     <div class="command-box">
       <div class="prompt" style="flex-wrap: nowrap;">
@@ -192,7 +192,7 @@ async function runAssistantAnalysis() {
   } catch (e) {
     alert('Network error. Please try again.');
   } finally {
-    if (btn) { btn.disabled = false; btn.textContent = 'Run Assistant Analysis'; }
+    if (btn) { btn.disabled = false; btn.textContent = 'Run Vanta Analysis'; }
   }
 }
 
