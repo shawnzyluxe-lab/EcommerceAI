@@ -362,6 +362,19 @@ def _execute_action(action: PendingAction, payload: Dict[str, Any]) -> Dict[str,
 
 
 def action_to_dict(action: PendingAction) -> Dict[str, Any]:
+    evidence = {}
+    try:
+        ae = ActionEvidence.query.filter_by(action_id=action.id).first()
+        if ae:
+            evidence = {
+                "confidence_score": ae.confidence_score,
+                "expected_weekly_impact_min": float(ae.expected_weekly_impact_min or 0),
+                "expected_weekly_impact_max": float(ae.expected_weekly_impact_max or 0),
+                "reasoning_summary": ae.reasoning_summary,
+                "telemetry_evidence_log": ae.telemetry_evidence_log or {},
+            }
+    except Exception:
+        pass
     return {
         "id": action.id,
         "merchant_id": action.merchant_id,
@@ -375,4 +388,5 @@ def action_to_dict(action: PendingAction) -> Dict[str, Any]:
         "decided_at": action.decided_at.isoformat() if action.decided_at else None,
         "decision_by": action.decision_by,
         "result_summary": action.result_summary,
+        "evidence": evidence,
     }

@@ -21,9 +21,13 @@
         <div class="alert-title">{{ action.title }}</div>
         <div class="alert-detail">{{ action.detail }}</div>
         <div class="alert-detail" style="font-size:.8rem; color:var(--ink-3);">
-          {% for k, v in action.payload.items() %}
+          {% for k, v in action['payload'].items() %}
             <span style="margin-right:12px;"><strong>{{ k }}:</strong> {{ v }}</span>
           {% endfor %}
+          {% if action.evidence and action.evidence.confidence_score %}
+            <span style="margin-right:12px;"><strong>Confidence:</strong> {{ action.evidence.confidence_score }}%</span>
+            <span style="margin-right:12px;"><strong>Expected impact:</strong> ${{ '{:,.2f}'.format(action.evidence.expected_weekly_impact_min) }}-${{ '{:,.2f}'.format(action.evidence.expected_weekly_impact_max) }}/week</span>
+          {% endif %}
         </div>
       </div>
       <div class="alert-actions" style="align-items:center; gap:6px;">
