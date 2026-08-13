@@ -1,0 +1,30 @@
+{% extends 'dashboard/base.html' %}
+{% block title %}Reports — {{ brand.name }} {{ brand.product }}{% endblock %}
+{% block content %}
+
+<section class="page-header">
+  <h1>Reports</h1>
+  <p>Scheduled and on-demand executive reports.</p>
+</section>
+
+<div class="card">
+  <div class="card-head"><h3>Available Reports</h3><span class="spacer"></span><button class="btn btn-primary">Generate custom</button></div>
+  <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 14px;">
+    {% for r in [
+      {'title':'P&L Statement','desc':'Weekly profit and loss by channel'},
+      {'title':'Inventory Aging','desc':'Stock age and slow-mover analysis'},
+      {'title':'Customer LTV','desc':'Lifetime value and cohorts'},
+      {'title':'Ad ROAS','desc':'True ROAS across all paid channels'},
+      {'title':'Supplier Scorecard','desc':'Price, defect, and lead time trends'},
+      {'title':'Cash Flow','desc':'Projected 30-day cash position'}
+    ] %}
+    <div style="border: 1px solid var(--line); border-radius: 12px; padding: 14px;">
+      <div style="font-weight: 700; font-size: .9rem; margin-bottom: 4px;">{{ r.title }}</div>
+      <div style="font-size: .78rem; color: var(--ink-3); margin-bottom: 12px;">{{ r.desc }}</div>
+      <button class="btn" style="font-size: .75rem; padding: 5px 10px;">Run</button>
+    </div>
+    {% endfor %}
+  </div>
+</div>
+
+{% endblock %}

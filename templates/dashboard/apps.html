@@ -1,0 +1,28 @@
+{% extends 'dashboard/base.html' %}
+{% block title %}Apps — {{ brand.name }} {{ brand.product }}{% endblock %}
+{% block content %}
+
+<section class="page-header">
+  <h1>Apps</h1>
+  <p>Connect third-party tools and extensions.</p>
+</section>
+
+<div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 16px;">
+  {% for app in [
+    {'name':'Klaviyo','desc':'Email & SMS marketing','status':'Connected'},
+    {'name':'Recharge','desc':'Subscriptions','status':'Install'},
+    {'name':'Gorgias','desc':'Helpdesk','status':'Install'},
+    {'name':'ShipStation','desc':'Shipping labels','status':'Connected'},
+    {'name':'Loox','desc':'Reviews & photos','status':'Install'},
+    {'name':'Triple Whale','desc':'Marketing attribution','status':'Install'}
+  ] %}
+  <div class="card" style="display: flex; flex-direction: column;">
+    <div style="width: 40px; height: 40px; border-radius: 8px; background: var(--line-2); display: grid; place-items: center; font-weight: 800; color: var(--ink-3); margin-bottom: 12px;">{{ app.name[:2] }}</div>
+    <div style="font-weight: 700; font-size: .95rem; margin-bottom: 4px;">{{ app.name }}</div>
+    <div style="font-size: .8rem; color: var(--ink-3); margin-bottom: 12px; flex: 1;">{{ app.desc }}</div>
+    <button class="btn {% if app.status == 'Connected' %}btn-ghost{% else %}btn-primary{% endif %}" style="width: 100%;">{{ app.status }}</button>
+  </div>
+  {% endfor %}
+</div>
+
+{% endblock %}

@@ -1,0 +1,57 @@
+{% extends 'dashboard/base.html' %}
+{% block title %}Predictions — {{ brand.name }} {{ brand.product }}{% endblock %}
+{% block content %}
+
+<section class="page-header">
+  <h1>Predictive Analytics</h1>
+  <p>Forecasts for sales, stock, demand, cash, and restock timing.</p>
+</section>
+
+<div class="grid grid-2" style="margin-bottom: 24px;">
+  <div class="card">
+    <div class="card-head"><h3>Revenue · 5 actual + 2 forecast</h3><span class="spacer"></span><span class="tag tag-ghost">Hatched = forecast</span></div>
+    <div style="display: flex; align-items: flex-end; gap: 6px; height: 140px; padding-top: 10px;">
+      {% for p in series %}
+      <div style="flex: 1; background: {% if p.forecast %}repeating-linear-gradient(135deg,#c7dcfb,#c7dcfb 4px,#e5eefc 4px,#e5eefc 8px){% else %}linear-gradient(180deg,#93c5fd,#2563eb){% endif %}; border-radius: 5px 5px 3px 3px; min-height: 3px; height: {{ (p.value / series_max * 100) | round(1) }}%;"></div>
+      {% endfor %}
+    </div>
+    <div style="display: flex; gap: 6px; margin-top: 8px;">
+      {% for p in series %}<span style="flex: 1; text-align: center; font-size: .7rem; color: var(--ink-3);">{{ p.day }}</span>{% endfor %}
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-head"><h3>Forecasts</h3></div>
+    {% for f in forecasts %}
+    <div style="padding: 10px 0; border-bottom: 1px dashed var(--line);">
+      <div style="display: flex; justify-content: space-between; font-size: .9rem;">
+        <span style="color: var(--ink-3);">{{ f.label }}</span>
+        <span style="font-weight: 700;">{{ f.value }}</span>
+      </div>
+      <div style="font-size: .78rem; color: var(--ink-3); margin-top: 2px;">{{ f.note }}</div>
+    </div>
+    {% endfor %}
+  </div>
+</div>
+
+<div class="card">
+  <div class="card-head"><h3>Predictive Logistics</h3></div>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>SKU</th><th class="num">Days left</th><th class="num">Velocity</th><th>Restock date</th><th>Status</th></tr></thead>
+      <tbody>
+        {% for p in predictive %}
+        <tr>
+          <td class="b mono">{{ p.sku }}</td>
+          <td class="num mono">{{ p.days }}</td>
+          <td class="num mono">{{ p.velocity }}</td>
+          <td class="mono">{{ p.restock }}</td>
+          <td><span class="tag {{ 'tag-red' if p.flag == 'CRITICAL_STOCKOUT' else 'tag-amber' if p.flag == 'LOW_STOCK' else 'tag-green' }}">{{ p.flag }}</span></td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+{% endblock %}

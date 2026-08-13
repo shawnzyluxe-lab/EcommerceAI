@@ -1,9 +1,10 @@
 <!doctype html>
 <html lang="en">
 <head>
+    <link rel="icon" type="image/x-icon" href="/static/images/favicon.ico">
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>Prometheus OS — Autonomous Commerce Intelligence</title>
+    <title>Vantav — AI Commerce Operations</title>
     <script src="https://www.google.com/recaptcha/api.js?render={{ recaptcha_site_key }}" async defer></script>
     <script src="https://cdn.tailwindcss.com"></script>
     <script>
@@ -34,11 +35,10 @@
     <header class="border-b border-borderMuted bg-onyx/80 backdrop-blur-md sticky top-0 z-40 px-6 py-4 flex items-center justify-between">
         <div class="flex items-center space-x-3">
             <div class="w-3 h-3 bg-accentGold rounded-full glow-ring"></div>
-            <span class="font-mono text-sm tracking-[0.3em] font-bold text-white">PROMETHEUS // OS</span>
+            <span class="font-mono text-sm tracking-[0.3em] font-bold text-white">VANTAV</span>
         </div>
         <nav class="hidden md:flex space-x-8 text-xs tracking-widest text-gray-400 uppercase">
             <a href="#architecture" class="hover:text-white transition">Architecture</a>
-            <a href="#tiers" class="hover:text-white transition">Tiers</a>
             <a href="#security" class="hover:text-white transition">Security</a>
         </nav>
         <a href="#auth" class="text-xs tracking-widest text-gray-400 hover:text-white uppercase transition">Access</a>
@@ -47,16 +47,16 @@
     <main id="auth" class="flex-grow flex flex-col items-center justify-center text-center px-4 max-w-5xl mx-auto py-16">
         <div class="mb-4">
             <span class="text-xs uppercase tracking-[0.4em] text-accentGold font-mono font-semibold bg-accentGold/10 px-3 py-1 border border-accentGold/20 rounded-full">
-                Multi-Channel Autonomous Engine
+                Multi-Channel Commerce OS
             </span>
         </div>
 
         <h1 class="text-4xl md:text-6xl font-bold tracking-tight text-white mb-6 uppercase max-w-4xl leading-tight">
-            The AI Operating System For Commerce
+            AI Operations For Commerce
         </h1>
 
         <p class="text-gray-400 text-base md:text-lg max-w-2xl mb-12 leading-relaxed">
-            Stop digging through static metrics. Prometheus compiles your sales data, automates real-time net profit accounting, and coordinates specialized background agents to run your supply chain safely under single-click merchant approval.
+            Stop digging through static metrics. Vantav compiles your sales data, automates real-time net profit accounting, and coordinates your supply chain behind a simple, single-click approval workflow.
         </p>
 
         <div class="w-full max-w-md p-6 bg-slateDark border border-borderMuted rounded-md shadow-2xl text-left" id="authContainer">
@@ -67,10 +67,10 @@
 
             <div id="login-panel" class="form-panel active">
                 <form id="loginForm" onsubmit="handleAuthSubmit(event, 'login')">
-                    <input type="email" id="login-email" class="w-full bg-onyx border border-borderMuted focus:border-accentGold rounded-sm px-3 py-2 text-sm text-white font-mono placeholder:text-gray-600 focus:outline-none transition mb-3" placeholder="System Email" required>
-                    <input type="password" id="login-password" class="w-full bg-onyx border border-borderMuted focus:border-accentGold rounded-sm px-3 py-2 text-sm text-white font-mono placeholder:text-gray-600 focus:outline-none transition mb-3" placeholder="Security Token / Password" required>
+                    <input type="email" id="login-email" class="w-full bg-onyx border border-borderMuted focus:border-accentGold rounded-sm px-3 py-2 text-sm text-white font-mono placeholder:text-gray-600 focus:outline-none transition mb-3" placeholder="Email" required>
+                    <input type="password" id="login-password" class="w-full bg-onyx border border-borderMuted focus:border-accentGold rounded-sm px-3 py-2 text-sm text-white font-mono placeholder:text-gray-600 focus:outline-none transition mb-3" placeholder="Password" required>
                     <button type="submit" class="w-full bg-white hover:bg-accentGold text-onyx font-bold uppercase text-xs tracking-widest py-3 px-4 transition font-mono rounded-sm shadow-md">
-                        Authorize Session
+                        Log in
                     </button>
                 </form>
             </div>
@@ -79,85 +79,40 @@
                 <form id="signupForm" onsubmit="handleAuthSubmit(event, 'signup')">
                     <input type="email" id="signup-email" class="w-full bg-onyx border border-borderMuted focus:border-accentGold rounded-sm px-3 py-2 text-sm text-white font-mono placeholder:text-gray-600 focus:outline-none transition mb-3" placeholder="Enter Registration Email" required>
                     <input type="password" id="signup-password" class="w-full bg-onyx border border-borderMuted focus:border-accentGold rounded-sm px-3 py-2 text-sm text-white font-mono placeholder:text-gray-600 focus:outline-none transition mb-3" placeholder="Set Secure Password" minlength="8" required>
-                    <label class="text-xs font-mono text-gray-400 mb-1 block">Select Operational Matrix Tier:</label>
+                    <label class="text-xs font-mono text-gray-400 mb-1 block">Select your plan:</label>
                     <select id="signup-tier" class="w-full bg-onyx border border-borderMuted focus:border-accentGold rounded-sm px-3 py-2 text-sm text-white font-mono mb-3">
                         <option value="Starter">Starter (2 Stores Max | 500 Orders/Mo Cap)</option>
                         <option value="Pro">Pro (Unlimited Stores | 5K Orders/Mo Cap)</option>
                         <option value="Enterprise">Enterprise (Unlimited Volume | Real-Time Sync)</option>
                     </select>
                     <button type="submit" class="w-full bg-white hover:bg-accentGold text-onyx font-bold uppercase text-xs tracking-widest py-3 px-4 transition font-mono rounded-sm shadow-md">
-                        Provision New Storefront Node
+                        Create account
                     </button>
                 </form>
             </div>
 
             {% if error %}
-            <div class="text-red-500 font-mono text-xs mt-3">CRITICAL DETECT: AUTHENTICATION FAILURE. HARD SYSTEM LOCKOUT 403 RECORDED.</div>
+            <div class="text-red-500 font-mono text-xs mt-3">Authentication failed. Please check your credentials.</div>
             {% endif %}
         </div>
     </main>
 
     <section id="architecture" class="border-t border-borderMuted bg-slateDark/30 py-16 px-6">
         <div class="max-w-6xl mx-auto">
-            <h2 class="text-xs font-mono uppercase tracking-[0.3em] text-accentGold mb-12 text-center">Engine Core Topography</h2>
+            <h2 class="text-xs font-mono uppercase tracking-[0.3em] text-accentGold mb-12 text-center">How it works</h2>
             <div class="grid grid-cols-1 md:grid-cols-3 gap-8">
                 <div class="border border-borderMuted p-6 bg-onyx rounded-sm card-hover">
-                    <div class="text-accentGold font-mono text-xs mb-3">// 01 / UNIVERSAL SYNC MATRIX</div>
-                    <p class="text-sm text-gray-400 leading-relaxed">Synchronize orders, shipping times, and live inventory allocations across Shopify, TikTok Shop, Amazon, and eBay from an isolated execution core.</p>
+                    <div class="text-accentGold font-mono text-xs mb-3">// 01 / UNIVERSAL SYNC</div>
+                    <p class="text-sm text-gray-400 leading-relaxed">Synchronize orders, shipping times, and live inventory allocations across Shopify, TikTok Shop, Amazon, and eBay from a unified workspace.</p>
                 </div>
                 <div class="border border-borderMuted p-6 bg-onyx rounded-sm card-hover">
-                    <div class="text-accentGold font-mono text-xs mb-3">// 02 / REAL-TIME PROFIT ENGINE</div>
-                    <p class="text-sm text-gray-400 leading-relaxed">Pipes ad spend, dynamic shipping calculations, COGS, marketplace fees, and taxes into a single unified financial ledger.</p>
+                    <div class="text-accentGold font-mono text-xs mb-3">// 02 / REAL-TIME TRUE PROFIT</div>
+                    <p class="text-sm text-gray-400 leading-relaxed">Ad spend, dynamic shipping, COGS, marketplace fees, and taxes flow into a single, unified financial ledger.</p>
                 </div>
                 <div class="border border-borderMuted p-6 bg-onyx rounded-sm card-hover">
-                    <div class="text-accentGold font-mono text-xs mb-3">// 03 / THE DRAFT ACTION RULE</div>
-                    <p class="text-sm text-gray-400 leading-relaxed">Uncompromising stability. Autonomous agents generate data alerts and staging workflows, but can never mutate a live store without explicit merchant approval.</p>
+                    <div class="text-accentGold font-mono text-xs mb-3">// 03 / APPROVAL-FIRST ACTIONS</div>
+                    <p class="text-sm text-gray-400 leading-relaxed">Vantav surfaces alerts and recommended actions, but nothing changes in your live store until you approve it.</p>
                 </div>
-            </div>
-        </div>
-    </section>
-
-    <section id="tiers" class="border-t border-borderMuted py-16 px-6 max-w-6xl mx-auto w-full">
-        <h2 class="text-xs font-mono uppercase tracking-[0.3em] text-accentGold mb-12 text-center">System Monetization Plans</h2>
-        <div class="grid grid-cols-1 md:grid-cols-3 gap-8">
-            <div class="border border-borderMuted p-8 bg-slateDark flex flex-col justify-between rounded-sm">
-                <div>
-                    <h3 class="text-lg font-bold text-white mb-2">Starter Core</h3>
-                    <div class="font-mono text-accentGold text-xl mb-4">$99<span class="text-xs text-gray-500">/mo</span></div>
-                    <ul class="text-xs text-gray-400 space-y-2 mb-8 font-mono">
-                        <li>+ Unified Inventory Matrix</li>
-                        <li>+ Basic Multi-Channel Aggregator</li>
-                        <li>+ Static Profit Calculations</li>
-                    </ul>
-                </div>
-                <button onclick="openLoginModal()" class="w-full border border-white/10 hover:border-white text-white py-2 text-xs uppercase tracking-widest font-mono transition">Deploy Core</button>
-            </div>
-            <div class="border-2 border-accentGold p-8 bg-slateDark flex flex-col justify-between shadow-xl relative rounded-sm">
-                <span class="absolute -top-3 left-1/2 transform -translate-x-1/2 bg-accentGold text-onyx text-[10px] font-mono font-bold px-3 py-0.5 uppercase tracking-widest">Most Deployed</span>
-                <div>
-                    <h3 class="text-lg font-bold text-white mb-2">Co-Pilot Pro</h3>
-                    <div class="font-mono text-accentGold text-xl mb-4">$299<span class="text-xs text-gray-500">/mo</span></div>
-                    <ul class="text-xs text-gray-400 space-y-2 mb-8 font-mono">
-                        <li>+ Everything in Tier 1</li>
-                        <li>+ AI Command Center Access</li>
-                        <li>+ Autonomous Rule Alerts</li>
-                        <li>+ Predictive Demand Models</li>
-                    </ul>
-                </div>
-                <button onclick="openLoginModal()" class="w-full bg-accentGold text-onyx font-bold py-2 text-xs uppercase tracking-widest font-mono transition">Deploy Co-Pilot</button>
-            </div>
-            <div class="border border-borderMuted p-8 bg-slateDark flex flex-col justify-between rounded-sm">
-                <div>
-                    <h3 class="text-lg font-bold text-white mb-2">Autonomous Scale</h3>
-                    <div class="font-mono text-accentGold text-xl mb-4">$899<span class="text-xs text-gray-500">/mo</span></div>
-                    <ul class="text-xs text-gray-400 space-y-2 mb-8 font-mono">
-                        <li>+ Full Private Agent Mesh</li>
-                        <li>+ Custom Natural Language Rule Builder</li>
-                        <li>+ Cross-Vendor Procurement Optimization</li>
-                        <li>+ Dedicated Sandboxed Cloud Compute</li>
-                    </ul>
-                </div>
-                <button onclick="openLoginModal()" class="w-full border border-white/10 hover:border-white text-white py-2 text-xs uppercase tracking-widest font-mono transition">Initialize Scale</button>
             </div>
         </div>
     </section>
@@ -165,18 +120,18 @@
     <div id="loginModal" class="fixed inset-0 bg-onyx/90 backdrop-blur-md hidden items-center justify-center z-50 p-4">
         <div class="bg-slateDark border border-borderMuted w-full max-w-md p-8 relative rounded-md shadow-2xl">
             <button onclick="closeLoginModal()" class="absolute top-4 right-4 text-gray-500 hover:text-white font-mono text-sm">&times; CLOSE</button>
-            <h3 class="text-xs font-mono uppercase tracking-widest text-gray-400 mb-6">Client Secure Terminal</h3>
+            <h3 class="text-xs font-mono uppercase tracking-widest text-gray-400 mb-6">Secure access</h3>
             <form method="post" action="{{ url_for('site_login') }}" class="space-y-4">
-                <input type="password" name="password" placeholder="System Access Key" class="w-full bg-onyx border border-borderMuted focus:border-accentGold rounded-sm px-4 py-3 text-sm text-white font-mono placeholder:text-gray-600 focus:outline-none transition" required>
+                <input type="password" name="password" placeholder="Access password" class="w-full bg-onyx border border-borderMuted focus:border-accentGold rounded-sm px-4 py-3 text-sm text-white font-mono placeholder:text-gray-600 focus:outline-none transition" required>
                 <button type="submit" class="w-full bg-accentGold text-onyx font-bold uppercase text-xs tracking-widest py-3 transition font-mono rounded-sm shadow-md">
-                    Request Terminal Authorization
+                    Enter
                 </button>
             </form>
         </div>
     </div>
 
     <footer class="border-t border-borderMuted py-6 text-center text-[10px] text-gray-500 font-mono tracking-widest uppercase">
-        © 2026 PROMETHEUS OS INC. GLOBAL PROPRIETARY HARDENED SYSTEM ENVIRONMENT. BUILD STACK: PYTHON_CORE v4.02
+        © 2026 Vantav Inc.
     </footer>
 
     <script>
@@ -252,7 +207,7 @@
 
         const urlParams = new URLSearchParams(window.location.search);
         if (urlParams.get('oauth_sync') === 'success') {
-            alert('Multi-Tenant Channel Sync Successful: Outbound token array index locked.');
+            alert('Channel connected successfully.');
         }
     </script>
 

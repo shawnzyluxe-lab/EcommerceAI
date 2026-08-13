@@ -1,0 +1,73 @@
+{# Single-click action recommendation card #}
+{% set evidence = action.evidence or {} %}
+{% set telemetry = evidence.telemetry_evidence_log or {} %}
+{% set confidence = evidence.confidence_score or 0 %}
+{% set impact_min = evidence.expected_weekly_impact_min or 0 %}
+{% set impact_max = evidence.expected_weekly_impact_max or 0 %}
+
+<div id="complianceCard-{{ action.id }}" class="card" style="overflow:hidden; position:relative; margin-bottom:20px; border:1px solid var(--line);">
+  <!-- Status bar -->
+  <div style="border-bottom:1px solid var(--line); padding:12px 16px; display:flex; justify-content:space-between; align-items:center; background:var(--accent-bg-subtle);">
+    <div style="display:flex; align-items:center; gap:8px; font-size:.65rem; font-weight:700; text-transform:uppercase; letter-spacing:.08em; color:var(--accent);">
+      <span style="width:8px; height:8px; border-radius:50%; background:var(--accent); box-shadow:0 0 8px var(--accent);"></span>
+      Recommended Action
+    </div>
+    <div style="font-size:.7rem; color:var(--ink-3); font-family:monospace;">ID: ACT-{{ action.id }}</div>
+  </div>
+
+  <!-- Summary -->
+  <div style="padding:20px 16px 12px;">
+    <h3 style="margin:0 0 8px; font-size:1.05rem; font-weight:700; color:var(--ink); text-transform:capitalize; letter-spacing:.02em;">{{ action.title }}</h3>
+    <p style="margin:0; font-size:.88rem; line-height:1.55; color:var(--ink-2);">{{ action.detail }}</p>
+  </div>
+
+  <!-- Evidence panel -->
+  <div style="margin:0 16px 16px; padding:14px; background:var(--bg-soft); border:1px solid var(--line); border-radius:10px;">
+    <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid var(--line); padding-bottom:8px; margin-bottom:10px;">
+      <span style="font-size:.65rem; font-weight:700; text-transform:uppercase; letter-spacing:.08em; color:var(--ink-3);">Why I'm recommending this</span>
+      <span style="font-size:.7rem; font-weight:700; color:var(--primary); padding:3px 8px; background:var(--accent-bg); border:1px solid var(--accent-line); border-radius:20px;">Confidence: {{ confidence }}%</span>
+    </div>
+
+    <ul style="margin:0; padding-left:18px; font-size:.82rem; color:var(--ink-2); line-height:1.6;">
+      {% if evidence.reasoning_summary %}
+      <li style="margin-bottom:6px;">{{ evidence.reasoning_summary }}</li>
+      {% endif %}
+      {% if telemetry.margin is not none %}
+      <li style="margin-bottom:6px;">Net margin at creation: {{ telemetry.margin }}%</li>
+      {% endif %}
+      {% if telemetry.competitor_median_price %}
+      <li style="margin-bottom:6px;">Market median: ${{ '{:,.2f}'.format(telemetry.competitor_median_price) }} — trend {{ telemetry.market_trend or 'flat' }}</li>
+      {% endif %}
+      {% if telemetry.orders %}
+      <li style="margin-bottom:6px;">Orders in window: {{ telemetry.orders }}</li>
+      {% endif %}
+      {% for k, v in action['payload'].items() %}
+      <li style="margin-bottom:6px;"><strong>{{ k.replace('_',' ').title() }}:</strong> {{ v }}</li>
+      {% endfor %}
+    </ul>
+
+    <div style="display:flex; justify-content:space-between; align-items:center; border-top:1px solid var(--line); padding-top:10px; margin-top:10px; font-size:.8rem;">
+      <span style="color:var(--ink-3);">Projected weekly impact</span>
+      <span style="color:var(--green); font-weight:700;">+${{ '{:,.2f}'.format(impact_min) }} – ${{ '{:,.2f}'.format(impact_max) }}</span>
+    </div>
+  </div>
+
+  <!-- Action triggers -->
+  <div style="padding:16px; display:flex; gap:10px; border-top:1px solid var(--line); background:rgba(0,0,0,0.1);">
+    <button onclick="dismissComplianceCard({{ action.id }})"
+            class="btn" style="flex:1; background:transparent; border:1px solid var(--line); color:var(--ink-2); font-size:.75rem; padding:12px; border-radius:8px; text-transform:uppercase; letter-spacing:.08em; font-weight:600;">
+      Dismiss
+    </button>
+    <button id="btn-compliance-{{ action.id }}" onclick="approveComplianceAction({{ action.id }})"
+            class="btn btn-primary" style="flex:2; font-size:.75rem; padding:12px; border-radius:8px; text-transform:uppercase; letter-spacing:.08em; font-weight:700;">
+      Approve
+    </button>
+  </div>
+
+  <!-- Success overlay -->
+  <div id="successOverlay-complianceCard-{{ action.id }}" style="display:none; position:absolute; inset:0; background:rgba(13,13,17,0.96); backdrop-filter:blur(8px); flex-direction:column; justify-content:center; align-items:center; text-align:center; padding:24px; z-index:10;">
+    <div style="width:44px; height:44px; border-radius:50%; border:1px solid var(--green); color:var(--green); display:grid; place-items:center; font-weight:700; font-size:1.2rem; margin-bottom:12px;">✓</div>
+    <h4 style="margin:0 0 6px; font-size:.9rem; font-weight:700; color:var(--ink); text-transform:uppercase; letter-spacing:.08em;">Action Complete</h4>
+    <p id="successReport-complianceCard-{{ action.id }}" style="margin:0; font-size:.78rem; color:var(--ink-3); max-width:280px; line-height:1.5;"></p>
+  </div>
+</div>

@@ -1,0 +1,116 @@
+{% extends 'dashboard/base.html' %}
+{% block title %}Profit Dashboard — {{ brand.name }} {{ brand.product }}{% endblock %}
+{% block content %}
+
+<section class="page-header">
+  <h1>Profit Dashboard</h1>
+  <p>Real profit, not revenue — every cost included, per order, in real time.</p>
+</section>
+
+<div class="grid grid-2">
+  <div class="card">
+    <div class="card-head"><h3>True margin</h3></div>
+    <div id="breakdown-rows">
+      {% for r in profit_rows %}
+      <div style="display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px dashed var(--line); font-size: .9rem;">
+        <span style="color: var(--ink-3);">{{ r.label }}</span>
+        <span class="mono {{ 'up' if r.kind == 'in' else 'down' }}" style="font-weight: 600;">
+          {{ '${:,.2f}'.format(r.amount) if r.kind == 'in' else '−${:,.2f}'.format(-r.amount) }}
+        </span>
+      </div>
+      {% endfor %}
+    </div>
+    <div style="display: flex; justify-content: space-between; padding-top: 14px; font-weight: 800; font-size: 1.05rem;">
+      <span>Net profit</span><span id="net-profit" class="mono">${{ '{:,.2f}'.format(net) }}</span>
+    </div>
+    <div id="net-margin" style="font-size: .82rem; color: var(--ink-3); margin-top: 4px;">{{ net_margin }}% net margin after all costs</div>
+  </div>
+
+  <div class="card">
+    <div class="card-head">
+      <h3>Profit per order</h3>
+      <span class="spacer"></span>
+      <span class="tag tag-green">Live</span>
+    </div>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>Order</th><th>Channel</th><th class="num">Revenue</th><th class="num">Profit</th><th class="num">Margin</th><th>State</th><th>Tracking</th></tr></thead>
+        <tbody id="orders-body">
+          {% for o in orders %}
+          <tr>
+            <td class="b mono">{{ o.order_number or o.id }}</td>
+            <td>{{ o.channel }}</td>
+            <td class="num mono">${{ '%.2f'|format(o.revenue) }}</td>
+            <td class="num mono {{ 'up' if o.profit > 0 else 'down' }}">${{ '%.2f'|format(o.profit) }}</td>
+            <td class="num mono">{{ o.margin }}%</td>
+            <td><span class="tag {{ {'shipped':'tag-green','delayed':'tag-amber','refunded':'tag-red','packed':'tag-blue'}[o.state] }}">{{ o.state }}</span></td>
+            <td>
+              {% if o.tracking_url %}
+              <a href="{{ o.tracking_url }}" target="_blank" rel="noopener" class="btn btn-ghost" style="padding: 4px 8px; font-size: .78rem;">Track</a>
+              {% else %}—{% endif %}
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<script>
+(function() {
+  const fmt = n => n.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2});
+  const stateClass = {'shipped':'tag-green','delayed':'tag-amber','refunded':'tag-red','packed':'tag-blue','cancelled':'tag-red'};
+
+  function renderBreakdown(data) {
+    const rows = document.getElementById('breakdown-rows');
+    if (!rows) return;
+    rows.innerHTML = data.rows.map(r => `
+      <div style="display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px dashed var(--line); font-size: .9rem;">
+        <span style="color: var(--ink-3);">${r.label}</span>
+        <span class="mono ${r.kind === 'in' ? 'up' : 'down'}" style="font-weight: 600;">${r.kind === 'in' ? '$' : '−$'}${fmt(Math.abs(r.amount))}</span>
+      </div>
+    `).join('');
+    const np = document.getElementById('net-profit');
+    if (np) np.textContent = '$' + fmt(data.net_profit);
+    const nm = document.getElementById('net-margin');
+    if (nm) nm.textContent = data.net_margin + '% net margin after all costs';
+  }
+
+  function renderOrders(orders) {
+    const tbody = document.getElementById('orders-body');
+    if (!tbody) return;
+    tbody.innerHTML = orders.map(o => `
+      <tr>
+        <td class="b mono">${o.order_number || o.id}</td>
+        <td>${o.channel}</td>
+        <td class="num mono">$${fmt(o.revenue)}</td>
+        <td class="num mono ${o.profit > 0 ? 'up' : 'down'}">$${fmt(o.profit)}</td>
+        <td class="num mono">${o.margin}%</td>
+        <td><span class="tag ${stateClass[o.state] || 'tag-amber'}">${o.state}</span></td>
+        <td>
+          ${o.tracking_url ? `<a href="${o.tracking_url}" target="_blank" rel="noopener" class="btn btn-ghost" style="padding: 4px 8px; font-size: .78rem;">Track</a>` : '—'}
+        </td>
+      </tr>
+    `).join('');
+  }
+
+  async function refresh() {
+    try {
+      const [bd, od] = await Promise.all([
+        fetch('/api/profit/breakdown').then(r => r.json()),
+        fetch('/api/orders').then(r => r.json())
+      ]);
+      if (bd && bd.rows) renderBreakdown(bd);
+      if (od && od.orders) renderOrders(od.orders);
+    } catch (e) {
+      console.error('Profit refresh failed', e);
+    }
+  }
+
+  refresh();
+  setInterval(refresh, 60000);
+})();
+</script>
+
+{% endblock %}

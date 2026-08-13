@@ -1,0 +1,327 @@
+{% extends 'dashboard/base.html' %}
+{% block title %}Overview — {{ brand.name }} {{ brand.product }}{% endblock %}
+{% block content %}
+
+<section class="page-header" style="margin-bottom: 8px;">
+  <h1 style="font-size: 1.55rem; margin: 0;"><span class="js-greeting">{{ coo.greeting }}</span></h1>
+  <p style="color: var(--ink-3); margin-top: 6px; font-size: .92rem;">
+    Vanta is monitoring {{ connected|length }} channel{{ 's' if connected|length != 1 else '' }}{% if connected %}: {% for c in connected %}{{ c.name or c.channel or c.id }}{% if not loop.last %} • {% endif %}{% endfor %}{% endif %}
+  </p>
+</section>
+
+<div class="ai-greeting" id="ai-greeting" style="display:none;">
+  <span class="ai-greeting-icon">{{ ai_greeting }}</span>
+</div>
+
+<div class="workflow-pillars" style="margin-top: 18px;">
+
+  <!-- PILLAR 01: TRUE PROFIT -->
+  <div class="pillar">
+    <div class="pillar-header">
+      <div style="display: flex; align-items: center;">
+        <span class="pillar-number">01</span>
+        <div>
+          <div class="pillar-title">TRUE PROFIT</div>
+          <div class="pillar-subtitle">What is happening?</div>
+        </div>
+      </div>
+    </div>
+
+    <div style="padding: 22px 18px; flex: 1; display: flex; flex-direction: column;">
+      <div style="font-size: .7rem; text-transform: uppercase; letter-spacing: .08em; color: var(--ink-3);">Actual Net Earnings</div>
+      <div class="big-profit">${{ '{:,.2f}'.format(net) }}</div>
+      <div style="font-size: .95rem; color: var(--green); margin-top: 6px; font-weight: 700;">{{ net_margin }}% Net Margin</div>
+
+      <div style="display: flex; align-items: flex-end; gap: 3px; height: 70px; margin-top: 20px;">
+        {% for p in series %}
+        <div style="flex: 1; background: linear-gradient(to top, var(--purple), var(--purple-2)); border-radius: 2px 2px 0 0; height: {{ (p['value'] / series_max * 100)|round }}%; opacity: {{ 0.35 + 0.65 * (p['value'] / series_max) }};" title="{{ p['date'] }}: ${{ '{:,.0f}'.format(p['value']) }}"></div>
+        {% endfor %}
+      </div>
+      <div style="display: flex; justify-content: space-between; font-size: .65rem; color: var(--ink-3); margin-top: 6px;">
+        <span>{{ series[0]['date'] }}</span>
+        <span>{{ series[-1]['date'] }}</span>
+      </div>
+
+      <button class="btn btn-ghost" style="margin-top: auto; align-self: flex-start; font-size: .78rem;" onclick="document.getElementById('profit-waterfall').classList.toggle('hidden')">
+        View Profit Breakdown →
+      </button>
+
+      <div id="profit-waterfall" class="hidden" style="margin-top: 16px; padding-top: 16px; border-top: 1px solid var(--line);">
+        <div style="font-size: .7rem; text-transform: uppercase; letter-spacing: .08em; color: var(--ink-3); margin-bottom: 12px;">Variable Cost Accounting Waterfall</div>
+        {% for r in profit_rows %}
+        <div style="display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px dashed var(--line); font-size: .84rem;">
+          <span style="color: var(--ink-2);">{{ r['label'] }}</span>
+          <span class="mono" style="font-weight: 600; color: {% if r['kind'] == 'in' %}var(--green){% else %}var(--red){% endif %};">
+            {% if r['kind'] == 'in' %}+{% else %}−{% endif %}${{ '{:,.2f}'.format(r['amount']|abs) }}
+          </span>
+        </div>
+        {% endfor %}
+        <div style="display: flex; justify-content: space-between; padding-top: 12px; font-weight: 700; font-size: .95rem; border-top: 2px solid var(--line);">
+          <span style="color: var(--purple);">Calculated Net Margin</span>
+          <span class="mono" style="color: var(--green);">{{ net_margin }}%</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="pillar-arrow">
+    <span>→</span>
+    <span class="arrow-label">Alerts</span>
+  </div>
+
+  <!-- PILLAR 02: ATTENTION ALERTS -->
+  <div class="pillar">
+    <div class="pillar-header">
+      <div style="display: flex; align-items: center;">
+        <span class="pillar-number">02</span>
+        <div>
+          <div class="pillar-title">ALERTS</div>
+          <div class="pillar-subtitle">What needs attention?</div>
+        </div>
+      </div>
+    </div>
+
+    <div style="padding: 18px; display: flex; flex-direction: column; gap: 12px; flex: 1;">
+      {% if alerts %}
+        {% for a in alerts[:3] %}
+        <div class="alert-item {{ a.level }}" style="border-radius: 10px; padding: 14px;">
+          <div class="alert-bar"></div>
+          <div class="alert-body" style="flex: 1;">
+            <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 6px;">
+              <span style="width: 7px; height: 7px; border-radius: 50%; background: {% if a.level == 'crit' %}var(--red){% elif a.level == 'warn' %}var(--amber){% else %}var(--green){% endif %}; box-shadow: 0 0 8px currentColor;"></span>
+              <span style="font-size: .65rem; text-transform: uppercase; letter-spacing: .08em; color: {% if a.level == 'crit' %}var(--red){% elif a.level == 'warn' %}var(--amber){% else %}var(--green){% endif %}; font-weight: 700;">{{ a.title }}</span>
+            </div>
+            <div class="alert-detail" style="color: var(--ink-2); line-height: 1.55;">{{ a.detail }}</div>
+            <div class="alert-actions" style="margin-top: 10px;">
+              {% for act in a.actions %}<button class="btn" style="padding: 5px 10px; font-size: .72rem;">{{ act }}</button>{% endfor %}
+            </div>
+          </div>
+          <div class="alert-when" style="font-size: .72rem; color: var(--ink-3); white-space: nowrap; padding-top: 4px;">{{ a.when }}</div>
+        </div>
+        {% endfor %}
+      {% else %}
+        <div style="padding: 24px; text-align: center; color: var(--ink-3); border: 1px dashed var(--line); border-radius: 10px;">
+          No open alerts. Your stores look healthy.
+        </div>
+      {% endif %}
+    </div>
+  </div>
+
+  <div class="pillar-arrow">
+    <span>→</span>
+    <span class="arrow-label">Actions</span>
+  </div>
+
+  <!-- PILLAR 03: AI RECOMMENDED ACTIONS -->
+  <div class="pillar">
+    <div class="pillar-header">
+      <div style="display: flex; align-items: center;">
+        <span class="pillar-number">03</span>
+        <div>
+          <div class="pillar-title">AI RECOMMENDED ACTIONS</div>
+          <div class="pillar-subtitle">What should I do next?</div>
+        </div>
+      </div>
+    </div>
+
+    <div style="padding: 18px; display: flex; flex-direction: column; gap: 14px; flex: 1;">
+      {% if hero_action %}
+      <div class="card" style="border: 1px solid var(--line); padding: 0; overflow: hidden; position: relative; background: var(--surface);">
+        <div style="padding: 14px 16px; border-bottom: 1px solid var(--line); display: flex; justify-content: space-between; align-items: center; background: var(--accent-bg-subtle);">
+          <span style="font-size: .65rem; text-transform: uppercase; letter-spacing: .08em; color: var(--ink-3);">Executive Action</span>
+          <span style="font-size: .7rem; color: var(--purple); font-weight: 700; padding: 3px 8px; background: var(--purple-bg); border-radius: 99px;">Recommended</span>
+        </div>
+        <div style="padding: 16px;">
+          <h3 style="font-size: 1rem; margin: 0 0 8px;">{{ hero_action.title }}</h3>
+          <p style="font-size: .85rem; color: var(--ink-2); line-height: 1.55; margin-bottom: 12px;">{{ hero_action.detail }}</p>
+
+          {% set ev = hero_action.evidence %}
+          <div style="padding: 12px; border-radius: 10px; background: var(--line-2); margin-bottom: 14px; font-size: .82rem; color: var(--ink-2); line-height: 1.6;">
+            {% if ev and ev.confidence_score %}<div><span style="color: var(--purple); font-weight: 700;">Confidence:</span> {{ ev.confidence_score|round|int }}%</div>{% endif %}
+            {% if ev and ev.expected_weekly_impact_max is not none %}
+            <div style="margin-top: 4px;">
+              <span style="color: var(--green); font-weight: 700;">Expected impact:</span>
+              ${{ '{:,.2f}'.format(ev.expected_weekly_impact_min|default(0)|float) }} — ${{ '{:,.2f}'.format(ev.expected_weekly_impact_max|default(0)|float) }}/week
+            </div>
+            {% endif %}
+            {% if hero_action.reasons %}
+            <ul style="margin: 8px 0 0 18px;">
+              {% for r in hero_action.reasons[:3] %}<li>{{ r }}</li>{% endfor %}
+            </ul>
+            {% endif %}
+          </div>
+
+          <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+            <button class="btn btn-primary" id="approve-hero-btn" onclick="approveHeroAction({{ hero_action.id }})">Approve & Execute</button>
+            <button class="btn" onclick="dismissHeroAction({{ hero_action.id }})">Dismiss</button>
+            <a href="/dashboard/action-gate" class="btn btn-ghost">Modify</a>
+          </div>
+        </div>
+      </div>
+
+      <div style="display: flex; align-items: center; justify-content: center; gap: 10px; font-size: .75rem; color: var(--ink-3); margin-top: auto; padding-top: 8px;">
+        <span style="width: 24px; height: 24px; border-radius: 50%; background: var(--purple-bg); color: var(--purple); display: inline-flex; align-items: center; justify-content: center; font-weight: 700;">1</span> Review
+        <span style="color: var(--purple);">→</span>
+        <span style="width: 24px; height: 24px; border-radius: 50%; background: var(--purple-bg); color: var(--purple); display: inline-flex; align-items: center; justify-content: center; font-weight: 700;">2</span> Approve
+        <span style="color: var(--purple);">→</span>
+        <span style="width: 24px; height: 24px; border-radius: 50%; background: var(--purple-bg); color: var(--purple); display: inline-flex; align-items: center; justify-content: center; font-weight: 700;">3</span> Execute
+      </div>
+      {% else %}
+      <div style="padding: 24px; text-align: center; color: var(--ink-3); border: 1px dashed var(--line); border-radius: 10px; flex: 1; display: flex; flex-direction: column; justify-content: center;">
+        <p style="margin-bottom: 14px;">No recommended actions yet. Run the assistant to detect opportunities.</p>
+        <button class="btn btn-primary" id="run-analysis-btn" onclick="runAssistantAnalysis()" style="align-self: center;">Run Assistant Analysis</button>
+      </div>
+      {% endif %}
+    </div>
+  </div>
+
+</div>
+
+<div style="text-align: center; margin-top: 22px;">
+  <div style="font-size: 1.1rem; font-weight: 800; letter-spacing: .18em; color: var(--purple);">REVIEW • APPROVE • EXECUTE</div>
+  <div style="font-size: .85rem; color: var(--ink-3); margin-top: 6px;">Vanta is watching.</div>
+</div>
+
+<!-- AI operator banner -->
+<div class="ai-banner">
+  <div class="ai-avatar">🤖</div>
+  <div style="flex: 1;">
+    <div style="font-weight: 700; color: var(--ink); font-size: .95rem;">Vantav is your AI operations layer.</div>
+    <div style="font-size: .82rem; color: var(--ink-2); margin-top: 3px;">We monitor. We analyze. We recommend. You approve. We execute.</div>
+  </div>
+  <a href="/dashboard/commerce-hub" class="btn btn-primary" style="flex: none;">Connect More Channels</a>
+</div>
+
+<!-- Channel true-profit comparison -->
+{% if channel_summary %}
+<div class="card" style="margin-top: 24px;">
+  <div class="card-head" style="margin-bottom: 14px;">
+    <h3>Channel Performance</h3>
+    <p style="color: var(--ink-2); font-size: .85rem; margin: 0;">True profit by sales channel — revenue minus all costs.</p>
+    <span class="spacer"></span>
+    <a href="/dashboard/commerce-hub" class="btn btn-ghost">Manage channels</a>
+  </div>
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th>Channel</th>
+          <th class="num">Orders</th>
+          <th class="num">Revenue</th>
+          <th class="num">Net Profit</th>
+          <th class="num">Margin</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for c in channel_summary %}
+        <tr>
+          <td class="b" style="text-transform: capitalize;">{{ c.channel }}</td>
+          <td class="num mono">{{ c.orders }}</td>
+          <td class="num mono">${{ '{:,.2f}'.format(c.revenue) }}</td>
+          <td class="num mono">${{ '{:,.2f}'.format(c.net_profit) }}</td>
+          <td class="num mono">{{ c.margin_pct }}%</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+      <tfoot style="border-top: 2px solid var(--line);">
+        <tr style="font-weight: 700;">
+          <td>Total</td>
+          <td class="num mono">{{ channel_totals.orders }}</td>
+          <td class="num mono">${{ '{:,.2f}'.format(channel_totals.revenue) }}</td>
+          <td class="num mono">${{ '{:,.2f}'.format(channel_totals.net_profit) }}</td>
+          <td class="num mono">{{ channel_totals.margin_pct }}%</td>
+        </tr>
+      </tfoot>
+    </table>
+  </div>
+</div>
+{% endif %}
+
+<style>
+.ai-greeting {
+  background: var(--purple-bg);
+  border: 1px solid var(--accent-line);
+  border-radius: 12px;
+  padding: 12px 16px;
+  color: var(--ink);
+  font-size: .9rem;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.ai-greeting-icon::before {
+  content: "✦";
+  color: var(--purple);
+  margin-right: 8px;
+  font-weight: 700;
+}
+.hidden { display: none !important; }
+</style>
+
+<script>
+async function runAssistantAnalysis() {
+  const btn = document.getElementById('run-analysis-btn');
+  if (btn) { btn.disabled = true; btn.textContent = 'Running…'; }
+  try {
+    const res = await fetch('/api/v1/assistant/proactive', {method: 'POST', credentials: 'same-origin'});
+    const data = await res.json();
+    if (res.ok) {
+      window.location.reload();
+    } else {
+      alert('Analysis failed: ' + (data.detail || 'unknown error'));
+    }
+  } catch (e) {
+    alert('Network error. Please try again.');
+  } finally {
+    if (btn) { btn.disabled = false; btn.textContent = 'Run Assistant Analysis'; }
+  }
+}
+
+async function approveHeroAction(actionId) {
+  const btn = document.getElementById('approve-hero-btn');
+  if (btn) { btn.disabled = true; btn.textContent = 'Approving…'; }
+  try {
+    const res = await fetch('/api/actions/' + actionId + '/approve', {method: 'POST', credentials: 'same-origin'});
+    if (res.ok) {
+      window.location.reload();
+    } else {
+      const data = await res.json();
+      alert('Action failed: ' + (data.detail || 'unknown error'));
+    }
+  } catch (e) {
+    alert('Network error. Please try again.');
+  } finally {
+    if (btn) { btn.disabled = false; btn.textContent = 'Approve & Execute'; }
+  }
+}
+
+async function dismissHeroAction(actionId) {
+  if (!confirm('Dismiss this recommendation?')) return;
+  try {
+    const res = await fetch('/api/actions/' + actionId + '/deny', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({reason: 'dismissed from overview'}),
+      credentials: 'same-origin'
+    });
+    if (res.ok) {
+      window.location.reload();
+    } else {
+      const data = await res.json();
+      alert('Dismiss failed: ' + (data.detail || 'unknown error'));
+    }
+  } catch (e) {
+    alert('Network error. Please try again.');
+  }
+}
+
+// Show the personalized AI greeting once per session
+(function(){
+  const banner = document.getElementById('ai-greeting');
+  if (banner && !sessionStorage.getItem('vanta_greeting_shown')) {
+    banner.style.display = 'flex';
+    sessionStorage.setItem('vanta_greeting_shown', '1');
+  }
+})();
+</script>
+{% endblock %}

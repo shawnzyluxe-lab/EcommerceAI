@@ -1,0 +1,71 @@
+{% extends 'dashboard/base.html' %}
+{% block title %}Orders — {{ brand.name }} {{ brand.product }}{% endblock %}
+{% block content %}
+
+<section class="page-header">
+  <h1>Orders</h1>
+  <p>Track, filter, and manage orders across every connected sales channel.</p>
+</section>
+
+<div class="kpi-grid">
+  <div class="card kpi-card">
+    <div class="kpi-label">Total orders</div>
+    <div class="kpi-value">1,248</div>
+    <div class="kpi-delta up">▲ 12.5% vs last 30 days</div>
+  </div>
+  <div class="card kpi-card">
+    <div class="kpi-label">Pending</div>
+    <div class="kpi-value">132</div>
+    <div class="kpi-delta up">▲ 8.4% vs last 30 days</div>
+  </div>
+  <div class="card kpi-card">
+    <div class="kpi-label">Shipped</div>
+    <div class="kpi-value">856</div>
+    <div class="kpi-delta up">▲ 15.3% vs last 30 days</div>
+  </div>
+  <div class="card kpi-card">
+    <div class="kpi-label">Refunded</div>
+    <div class="kpi-value">32</div>
+    <div class="kpi-delta down">▼ 3.7% vs last 30 days</div>
+  </div>
+</div>
+
+<div class="card">
+  <div class="card-head">
+    <h3>All Orders</h3>
+    <span class="spacer"></span>
+    <button class="btn btn-primary">Export</button>
+  </div>
+  <div style="display: flex; gap: 10px; margin-bottom: 14px; flex-wrap: wrap;">
+    <input type="text" placeholder="Search orders…" class="btn" style="justify-content: flex-start; text-align: left; flex: 1; min-width: 200px;">
+    <select class="btn" style="min-width: 140px;"><option>All channels</option><option>Shopify</option><option>Amazon</option><option>TikTok Shop</option></select>
+    <select class="btn" style="min-width: 140px;"><option>All statuses</option><option>Paid</option><option>Shipped</option><option>Delivered</option><option>Refunded</option></select>
+  </div>
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr><th>Order #</th><th>Channel</th><th>Customer</th><th class="num">Items</th><th class="num">Total</th><th>Status</th><th>Date</th><th>Tracking</th></tr>
+      </thead>
+      <tbody>
+        {% for o in orders %}
+        <tr>
+          <td class="b mono">{{ o.id }}</td>
+          <td>{{ o.channel }}</td>
+          <td class="b">{{ {'Shopify':'Sophia Martinez','Amazon':'Ethan Johnson','TikTok Shop':'Olivia Brown','Etsy':'Liam Wilson'}[o.channel] | default('Guest') }}</td>
+          <td class="num">{{ o['items'] }}</td>
+          <td class="num mono">${{ '%.2f'|format(o.revenue) }}</td>
+          <td><span class="tag {{ {'shipped':'tag-green','delayed':'tag-amber','refunded':'tag-red','packed':'tag-blue'}[o.state] }}">{{ o.state | title }}</span></td>
+          <td>Jun {{ 12 - loop.index0 }}, 2025</td>
+          <td>
+            {% if o.tracking_url %}
+            <a href="{{ o.tracking_url }}" target="_blank" rel="noopener" class="btn btn-ghost" style="padding: 4px 8px; font-size: .78rem;">Track</a>
+            {% else %}—{% endif %}
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+{% endblock %}

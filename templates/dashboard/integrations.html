@@ -1,0 +1,29 @@
+{% extends 'dashboard/base.html' %}
+{% block title %}Integrations — {{ brand.name }} {{ brand.product }}{% endblock %}
+{% block content %}
+
+<section class="page-header">
+  <h1>Integrations</h1>
+  <p>API keys, webhooks, and third-party service connections.</p>
+</section>
+
+<div class="card">
+  <div class="card-head"><h3>API Keys</h3></div>
+  <div style="display: flex; flex-direction: column; gap: 12px;">
+    <div>
+      <label style="font-size: .75rem; color: var(--ink-3); font-weight: 600;">Public API key</label>
+      <input type="text" value="pk_live_51HZ...XyZ" style="width: 100%; padding: 10px; margin-top: 6px; border: 1px solid var(--line); border-radius: 8px;" disabled>
+    </div>
+    <div>
+      <label style="font-size: .75rem; color: var(--ink-3); font-weight: 600;">Secret API key</label>
+      <input type="password" value="sk_live_****************************************" style="width: 100%; padding: 10px; margin-top: 6px; border: 1px solid var(--line); border-radius: 8px;" disabled>
+    </div>
+    <div>
+      <label style="font-size: .75rem; color: var(--ink-3); font-weight: 600;">Webhook URL</label>
+      <input type="text" value="https://api.shawnzyluxe.com/webhooks/orders" style="width: 100%; padding: 10px; margin-top: 6px; border: 1px solid var(--line); border-radius: 8px;">
+    </div>
+  </div>
+  <button class="btn btn-primary" style="margin-top: 14px;">Save integrations</button>
+</div>
+
+{% endblock %}

@@ -6,26 +6,243 @@ replacing one function/constant and nothing else. Nothing here calls an external
 API: the numbers are illustrative sample data, clearly labelled in the UI.
 """
 
+import copy
 import os
 from datetime import datetime, timedelta, timezone
+from typing import Any, Dict, List, Optional
 
 from flask import Flask, render_template, request, jsonify
-from models import PredictiveLogistics
+from sqlalchemy import func
+from models import db, PredictiveLogistics, MerchantSetting, SaaSBilling, Product, OrderItem, UnifiedOrder
+import profit_feed
+import alert_matrix
+import action_gate
+import channels as channels_module
+import channel_analytics
+import tracking
+
+
+from zoneinfo import ZoneInfo
+
+
+def _merchant_timezone(merchant_id=None) -> str:
+    """Return the merchant's saved timezone, or UTC."""
+    tz_name = "UTC"
+    if merchant_id:
+        tz = MerchantSetting.query.filter_by(merchant_id=merchant_id, setting_key="merchant_timezone").first()
+        if tz and tz.setting_value:
+            tz_name = tz.setting_value.strip()
+    return tz_name
+
+
+def _merchant_now(merchant_id=None):
+    """Return the current datetime in the merchant's timezone."""
+    tz_name = _merchant_timezone(merchant_id)
+    try:
+        return datetime.now(ZoneInfo(tz_name))
+    except Exception:
+        return datetime.now(timezone.utc)
+
+
+def _evidence_for_action(action: Dict[str, Any], merchant_id: Optional[str] = None) -> List[str]:
+    """Build human-readable evidence bullets from action payload, evidence table, and live snapshot."""
+    evidence: List[str] = []
+    payload = action.get("payload") or {}
+    action_type = action.get("action_type", "")
+    action_id = action.get("id")
+    snapshot = None
+    if merchant_id:
+        try:
+            import agent_context
+            snapshot = agent_context.get_snapshot(merchant_id)
+        except Exception:
+            snapshot = None
+    kpis = (snapshot.get("kpis") or {}) if snapshot else {}
+
+    # Attach stored evidence if available.
+    if action_id:
+        try:
+            from models import ActionEvidence
+            ae = ActionEvidence.query.filter_by(action_id=action_id).first()
+            if ae:
+                evidence.append(f"Confidence: {ae.confidence_score}%")
+                evidence.append(
+                    f"Expected impact: ${float(ae.expected_weekly_impact_min or 0):,.2f}"
+                    f"-${float(ae.expected_weekly_impact_max or 0):,.2f}/week"
+                )
+                if ae.reasoning_summary:
+                    evidence.append(f"Why: {ae.reasoning_summary}")
+                telemetry = ae.telemetry_evidence_log or {}
+                if telemetry.get("margin") is not None:
+                    evidence.append(f"Net margin at creation: {telemetry['margin']}%")
+                if telemetry.get("orders"):
+                    evidence.append(f"Orders in window: {telemetry['orders']}")
+                if telemetry.get("competitor_median_price"):
+                    trend = telemetry.get("market_trend", "flat")
+                    evidence.append(
+                        f"Market: median ${telemetry['competitor_median_price']:.2f}, "
+                        f"trend {trend}, velocity {telemetry.get('sales_velocity_delta', 0):+.1f}%"
+                    )
+                if ae.execution_report:
+                    evidence.append(f"Report: {ae.execution_report}")
+        except Exception:
+            pass
+
+    if action_type == "ad_adjust":
+        evidence.append(f"Platform: {payload.get('platform', 'ads')}")
+        adj = payload.get("adjustment")
+        if adj is not None:
+            evidence.append(f"Recommended change: {adj}% budget")
+        margin = kpis.get("net_margin")
+        if margin is not None:
+            evidence.append(f"Current net margin: {margin}%")
+        revenue = kpis.get("gross_revenue")
+        if revenue is not None:
+            evidence.append(f"Gross revenue: ${revenue:,.0f}")
+    elif action_type == "reorder":
+        evidence.append(f"SKU: {payload.get('sku', 'unknown')}")
+        evidence.append(f"Quantity: {payload.get('quantity', 'N/A')}")
+        evidence.append(f"Supplier: {payload.get('supplier', 'N/A')} ({payload.get('lead_days', 'N/A')}-day lead)")
+        orders = kpis.get("orders")
+        if orders is not None:
+            evidence.append(f"Recent orders: {orders}")
+    elif action_type == "refund":
+        evidence.append(f"Order: {payload.get('order_id', 'unknown')}")
+        margin = kpis.get("net_margin")
+        if margin is not None:
+            evidence.append(f"Current net margin: {margin}%")
+    else:
+        for k, v in payload.items():
+            evidence.append(f"{k.replace('_', ' ').title()}: {v}")
+    if not evidence:
+        evidence.append("AI evaluated this as a high-impact opportunity")
+    return evidence
+
+
+def _hero_action(pending_actions: List[Dict[str, Any]], merchant_id: Optional[str] = None) -> Optional[Dict[str, Any]]:
+    """Return the top pending action decorated with evidence for the overview."""
+    if not pending_actions:
+        return None
+    hero = dict(pending_actions[0])
+    hero["reasons"] = _evidence_for_action(hero, merchant_id)
+    return hero
+
+
+def _greeting_for(merchant=None):
+    """Return a time-of-day greeting using the merchant's name and timezone."""
+    name = (merchant or {}).get("name", "there")
+    merchant_id = (merchant or {}).get("id")
+    now = _merchant_now(merchant_id)
+    hour = now.hour
+    if hour < 5 or hour >= 22:
+        salutation = "Good night"
+    elif hour < 12:
+        salutation = "Good morning"
+    elif hour < 17:
+        salutation = "Good afternoon"
+    else:
+        salutation = "Good evening"
+    return f"{salutation}, {name}."
+
+
+def _ai_greeting(merchant_id: Optional[str], merchant: Optional[Dict[str, Any]] = None) -> str:
+    """Return a personalized AI greeting with revenue trend and top-seller projection."""
+    name = (merchant or {}).get("name") or (merchant or {}).get("business_name") or "there"
+    if not merchant_id:
+        return f"Hi {name}, here's what's happening with your store today."
+    try:
+        now = _merchant_now(merchant_id)
+        seven_ago = now - timedelta(days=7)
+        fourteen_ago = now - timedelta(days=14)
+        thirty_ago = now - timedelta(days=30)
+
+        rev_now = db.session.query(func.coalesce(func.sum(UnifiedOrder.revenue), 0)).filter(
+            UnifiedOrder.merchant_id == merchant_id,
+            UnifiedOrder.created_at >= seven_ago,
+            UnifiedOrder.created_at < now,
+        ).scalar() or 0
+        rev_prev = db.session.query(func.coalesce(func.sum(UnifiedOrder.revenue), 0)).filter(
+            UnifiedOrder.merchant_id == merchant_id,
+            UnifiedOrder.created_at >= fourteen_ago,
+            UnifiedOrder.created_at < seven_ago,
+        ).scalar() or 0
+        rev_now = float(rev_now)
+        rev_prev = float(rev_prev)
+        if rev_prev:
+            change = round(((rev_now - rev_prev) / rev_prev) * 100, 1)
+        elif rev_now > 0:
+            change = 100.0
+        else:
+            change = 0.0
+        direction = "up" if change >= 0 else "down"
+
+        top = db.session.query(
+            Product.title,
+            Product.sku,
+            func.sum(OrderItem.qty).label("units"),
+            func.sum(OrderItem.qty * OrderItem.unit_price).label("item_revenue"),
+        ).join(OrderItem, Product.sku == OrderItem.sku
+        ).join(UnifiedOrder, UnifiedOrder.id == OrderItem.order_id
+        ).filter(
+            Product.merchant_id == merchant_id,
+            UnifiedOrder.merchant_id == merchant_id,
+            UnifiedOrder.created_at >= thirty_ago,
+        ).group_by(Product.sku, Product.title
+        ).order_by(func.sum(OrderItem.qty * OrderItem.unit_price).desc()
+        ).first()
+
+        if top:
+            units_last_7 = db.session.query(func.coalesce(func.sum(OrderItem.qty), 0)).join(
+                UnifiedOrder, UnifiedOrder.id == OrderItem.order_id
+            ).filter(
+                OrderItem.sku == top.sku,
+                UnifiedOrder.merchant_id == merchant_id,
+                UnifiedOrder.created_at >= seven_ago,
+            ).scalar() or 0
+            projected = round(float(units_last_7))
+            return f"Hi {name}, revenue is {direction} {abs(change)}% this week. Top seller: {top.title} — projected to sell {projected} more units in the next 7 days."
+        return f"Hi {name}, revenue is {direction} {abs(change)}% this week."
+    except Exception:
+        return f"Hi {name}, here's what's happening with your store today."
+
+
+# Beta feature gating: when BETA_MODE=true, merchants only see beta-ready pages.
+# Admins and engineers can still see every page so development can continue.
+BETA_MODE = os.environ.get("BETA_MODE", "false").lower() in ("true", "1", "yes")
+BETA_READY_PAGE_IDS = {
+    "overview",
+    "alerts",
+    "action_gate",
+    "profit_engine",
+    "billing",
+}
+
+
+def _filter_nav_for_beta(nav_groups, user_role):
+    """Return a copy of nav_groups with only beta-ready pages for merchants."""
+    if not BETA_MODE or user_role in ("Admin", "Engineer"):
+        return nav_groups
+    filtered = []
+    for group in nav_groups:
+        links = [link for link in group["links"] if link.get("id") in BETA_READY_PAGE_IDS]
+        if links:
+            filtered.append({**group, "links": links})
+    return filtered
 
 
 BRAND = {
-    "name": "Shawnzyluxe",
-    "product": "Commerce AI",
-    "owner": "Shawn",
-    "domain": "shawnzyluxe.com",
+    "name": "Vantav",
+    "product": "Dashboard",
+    "owner": "there",
+    "domain": "your-store.com",
 }
 
 # --------------------------------------------------------------------------
-# AI COO — the headline panel
+# Assistant headline panel
 # --------------------------------------------------------------------------
 
 COO = {
-    "greeting": "Good morning, Shawn.",
+    "greeting": "Good morning, there.",
     "summary": [
         ("Revenue is up", "18%", "this week"),
         ("Top seller projected to sell out in", "4 days", ""),
@@ -97,7 +314,7 @@ CHANNELS = [
 ]
 
 # --------------------------------------------------------------------------
-# AI Business Advisor — morning briefing
+# Business Advisor — morning briefing
 # --------------------------------------------------------------------------
 
 BRIEFING = {
@@ -112,7 +329,7 @@ BRIEFING = {
 }
 
 # --------------------------------------------------------------------------
-# Autonomous AI Manager — proactive alerts
+# Alerts — proactive notifications
 # --------------------------------------------------------------------------
 
 ALERTS = [
@@ -124,7 +341,7 @@ ALERTS = [
 ]
 
 # --------------------------------------------------------------------------
-# AI Profit Engine — true profit per order
+# Profit Engine — true profit per order
 # --------------------------------------------------------------------------
 
 PROFIT_BREAKDOWN = [
@@ -169,7 +386,7 @@ FORECASTS = [
 ]
 
 # --------------------------------------------------------------------------
-# AI Product Research
+# Product Research
 # --------------------------------------------------------------------------
 
 RESEARCH = [
@@ -180,23 +397,37 @@ RESEARCH = [
 ]
 
 # --------------------------------------------------------------------------
-# AI Fulfillment
+# Fulfillment
 # --------------------------------------------------------------------------
+
+FULFILLMENT_ROWS = [
+    {"order": "#1042", "supplier": "Supplier C", "warehouse": "Dallas", "carrier": "UPS Ground", "tracking_number": "1Z999AA10123456784", "cost": 6.40, "flag": "Address mismatch"},
+    {"order": "#1041", "supplier": "Supplier A", "warehouse": "Miami", "carrier": "USPS Priority", "tracking_number": "9400111899223456789012", "cost": 8.10, "flag": ""},
+    {"order": "#1040", "supplier": "Supplier C", "warehouse": "Dallas", "carrier": "UPS Ground", "tracking_number": "1Z999AA10123456784", "cost": 6.40, "flag": ""},
+    {"order": "#1039", "supplier": "Supplier B", "warehouse": "Reno", "carrier": "FedEx Home", "tracking_number": "449044304137821", "cost": 7.25, "flag": "Fraud risk 61"},
+]
+
+
+def _fulfillment_rows():
+    """Return fulfillment sample rows with computed tracking URLs."""
+    rows = []
+    for r in FULFILLMENT_ROWS:
+        row = dict(r)
+        row["tracking_url"] = tracking.tracking_url(row.get("tracking_number", ""), row.get("carrier", ""))
+        row["carrier_key"] = tracking.detect_carrier(row.get("tracking_number", "")) or (row.get("carrier", "").split()[0].lower() if row.get("carrier") else "")
+        rows.append(row)
+    return rows
+
 
 FULFILLMENT = {
     "routed_today": 58,
     "auto_rate": 94,
     "avg_saving": 1.86,
-    "rows": [
-        {"order": "#1042", "supplier": "Supplier C", "warehouse": "Dallas", "carrier": "UPS Ground", "cost": 6.40, "flag": "Address mismatch"},
-        {"order": "#1041", "supplier": "Supplier A", "warehouse": "Miami", "carrier": "USPS Priority", "cost": 8.10, "flag": ""},
-        {"order": "#1040", "supplier": "Supplier C", "warehouse": "Dallas", "carrier": "UPS Ground", "cost": 6.40, "flag": ""},
-        {"order": "#1039", "supplier": "Supplier B", "warehouse": "Reno", "carrier": "FedEx Home", "cost": 7.25, "flag": "Fraud risk 61"},
-    ],
+    "rows": _fulfillment_rows(),
 }
 
 # --------------------------------------------------------------------------
-# AI Fraud Detection
+# Fraud Detection
 # --------------------------------------------------------------------------
 
 FRAUD = [
@@ -216,7 +447,7 @@ SUPPLIERS = [
 ]
 
 # --------------------------------------------------------------------------
-# AI Marketing Studio
+# Marketing Studio
 # --------------------------------------------------------------------------
 
 STUDIO = [
@@ -229,7 +460,7 @@ STUDIO = [
 ]
 
 # --------------------------------------------------------------------------
-# AI Customer Support
+# Customer Support
 # --------------------------------------------------------------------------
 
 SUPPORT = {
@@ -291,19 +522,19 @@ def predictive_context():
     return DEFAULT_PREDICTIVE
 
 STRIPE = {
-    "plan": "Enterprise AI Tier",
+    "plan": "Enterprise Plan",
     "usage": 4820,
     "invoice": 241.00,
 }
 
 CATALOG = {
-    "title": "Shawnzyluxe Luxury Hoodie",
+    "title": "Premium Sample Product",
     "sku": "SZL-VAR-A",
     "price": 145.00,
 }
 
 # --------------------------------------------------------------------------
-# AI Automation Builder
+# Automation Builder
 # --------------------------------------------------------------------------
 
 AUTOMATIONS = [
@@ -314,16 +545,16 @@ AUTOMATIONS = [
 ]
 
 # --------------------------------------------------------------------------
-# Team AI
+# Team
 # --------------------------------------------------------------------------
 
 SPECIALISTS = [
-    {"name": "Marketing AI", "status": "Rewriting 5 TikTok hooks", "state": "working"},
-    {"name": "Inventory AI", "status": "2 stockouts predicted", "state": "attention"},
-    {"name": "Finance AI", "status": "Margin recomputed · 30.4%", "state": "idle"},
-    {"name": "Logistics AI", "status": "58 orders routed today", "state": "working"},
-    {"name": "Support AI", "status": "78% auto-resolved", "state": "working"},
-    {"name": "Analytics AI", "status": "Forecast refreshed 06:10", "state": "idle"},
+    {"name": "Marketing", "status": "Rewriting 5 TikTok hooks", "state": "working"},
+    {"name": "Inventory", "status": "2 stockouts predicted", "state": "attention"},
+    {"name": "Finance", "status": "Margin recomputed · 30.4%", "state": "idle"},
+    {"name": "Logistics", "status": "58 orders routed today", "state": "working"},
+    {"name": "Support", "status": "78% auto-resolved", "state": "working"},
+    {"name": "Analytics", "status": "Forecast refreshed 06:10", "state": "idle"},
 ]
 
 # --------------------------------------------------------------------------
@@ -360,7 +591,7 @@ GLOBAL_TOOLS = [
 ]
 
 # --------------------------------------------------------------------------
-# Mobile AI Copilot
+# Mobile Assistant
 # --------------------------------------------------------------------------
 
 MOBILE_ACTIONS = [
@@ -373,10 +604,10 @@ MOBILE_ACTIONS = [
 NAV = [
     ("Home", "/home", False),
     ("Overview", "#top", True),
-    ("Command Center", "#command", False),
+    ("Vanta", "#command", False),
     ("Commerce Hub", "#channels", False),
     ("Alerts", "#alerts", False),
-    ("Profit Engine", "#profit", False),
+    ("Profit Dashboard", "#profit", False),
     ("Predictions", "#predict", False),
     ("Product Research", "#research", False),
     ("Fulfillment", "#fulfillment", False),
@@ -385,38 +616,216 @@ NAV = [
     ("Marketing Studio", "#studio", False),
     ("Support", "#support", False),
     ("Automations", "#automations", False),
-    ("Team AI", "#team", False),
+    ("Team", "#team", False),
     ("Health Score", "#health", False),
-    ("Mobile Copilot", "#mobile", False),
+    ("Vanta Mobile", "#mobile", False),
+]
+
+# New commercial-grade page navigation (matches mockups)
+NAV_GROUPS = [
+    {
+        "label": "Workspace",
+        "links": [
+            {"id": "overview", "label": "Overview", "url": "/dashboard", "icon": "◈"},
+            {"id": "command_center", "label": "Vanta", "url": "/dashboard/command-center", "icon": "◉"},
+            {"id": "orders", "label": "Orders", "url": "/dashboard/orders", "icon": "◫", "badge": "24"},
+            {"id": "customers", "label": "Customers", "url": "/dashboard/customers", "icon": "○"},
+            {"id": "analytics", "label": "Analytics", "url": "/dashboard/analytics", "icon": "▤"},
+        ],
+    },
+    {
+        "label": "Commerce",
+        "links": [
+            {"id": "commerce_hub", "label": "Commerce Hub", "url": "/dashboard/commerce-hub", "icon": "☰"},
+            {"id": "products", "label": "Products", "url": "/dashboard/products", "icon": "□"},
+            {"id": "inventory", "label": "Inventory", "url": "/dashboard/inventory", "icon": "▣"},
+            {"id": "shipments", "label": "Shipments", "url": "/dashboard/shipments", "icon": "✈"},
+            {"id": "suppliers", "label": "Suppliers", "url": "/dashboard/suppliers", "icon": "▩"},
+            {"id": "returns", "label": "Returns", "url": "/dashboard/returns", "icon": "↩"},
+        ],
+    },
+    {
+        "label": "Intelligence",
+        "links": [
+            {"id": "alerts", "label": "Alerts", "url": "/dashboard/alerts", "icon": "⚠", "badge": str(len(ALERTS))},
+            {"id": "action_gate", "label": "Action Gate", "url": "/dashboard/action-gate", "icon": "✓"},
+            {"id": "profit_engine", "label": "Profit Dashboard", "url": "/dashboard/profit-engine", "icon": "$"},
+            {"id": "predictions", "label": "Predictions", "url": "/dashboard/predictions", "icon": "◐"},
+            {"id": "product_research", "label": "Product Research", "url": "/dashboard/product-research", "icon": "◎"},
+            {"id": "fulfillment", "label": "Fulfillment", "url": "/dashboard/fulfillment", "icon": "⛟"},
+            {"id": "fraud", "label": "Fraud", "url": "/dashboard/fraud", "icon": "⚡"},
+        ],
+    },
+    {
+        "label": "Operations",
+        "links": [
+            {"id": "tiktok_studio", "label": "TikTok Studio", "url": "/dashboard/tiktok-studio", "icon": "✦"},
+            {"id": "marketing", "label": "Marketing Studio", "url": "/dashboard/marketing", "icon": "✦"},
+            {"id": "discounts", "label": "Discounts", "url": "/dashboard/discounts", "icon": "%"},
+            {"id": "support", "label": "Support", "url": "/dashboard/support", "icon": "✉"},
+            {"id": "automations", "label": "Automations", "url": "/dashboard/automations", "icon": "⏵"},
+            {"id": "team_ai", "label": "Team", "url": "/dashboard/team-ai", "icon": "✦"},
+            {"id": "health_score", "label": "Health Score", "url": "/dashboard/health-score", "icon": "♥"},
+            {"id": "mobile_copilot", "label": "Vanta Mobile", "url": "/dashboard/mobile-copilot", "icon": "☎"},
+            {"id": "monitoring", "label": "Monitoring", "url": "/dashboard/monitoring", "icon": "◈"},
+        ],
+    },
+    {
+        "label": "Store",
+        "links": [
+            {"id": "startup_pack", "label": "Brand Build", "url": "/dashboard/startup-pack", "icon": "☆"},
+            {"id": "store_catalog", "label": "Store Catalog", "url": "/dashboard/store-catalog", "icon": "▤"},
+            {"id": "apps", "label": "Apps", "url": "/dashboard/apps", "icon": "◫"},
+            {"id": "themes", "label": "Themes", "url": "/dashboard/themes", "icon": "◉"},
+            {"id": "reports", "label": "Reports", "url": "/dashboard/reports", "icon": "▦"},
+            {"id": "billing", "label": "Billing", "url": "/dashboard/billing", "icon": "$"},
+            {"id": "integrations", "label": "Integrations", "url": "/dashboard/integrations", "icon": "∞"},
+            {"id": "settings", "label": "Settings", "url": "/dashboard/settings", "icon": "⚙"},
+        ],
+    },
 ]
 
 
-def context():
-    now = datetime.now(timezone.utc)
-    gross = sum(r["amount"] for r in PROFIT_BREAKDOWN if r["kind"] == "in")
-    costs = -sum(r["amount"] for r in PROFIT_BREAKDOWN if r["kind"] == "out")
-    net = gross - costs
+def context(active_page=None, merchant=None, merchant_id=None):
+    tz_name = _merchant_timezone(merchant_id)
+    now = _merchant_now(merchant_id)
+    user_role = (merchant or {}).get("role")
+    # Use the real-time Profit Feed when a merchant is identified, otherwise fall
+    # back to the static sample data so the dashboard still renders.
+    feed = profit_feed.get_profit_breakdown(merchant_id) if merchant_id else None
+    orders = profit_feed.get_recent_orders(merchant_id) if merchant_id else RECENT_ORDERS
+    if feed is None:
+        gross = sum(r["amount"] for r in PROFIT_BREAKDOWN if r["kind"] == "in")
+        costs = -sum(r["amount"] for r in PROFIT_BREAKDOWN if r["kind"] == "out")
+        net = gross - costs
+        profit_rows = PROFIT_BREAKDOWN
+    else:
+        gross = feed["gross_revenue"]
+        costs = feed["total_costs"]
+        net = feed["net_profit"]
+        profit_rows = feed["profit_rows"]
+    # Always serve fresh headline numbers even if BRIEFING is mutated elsewhere.
+    briefing = dict(BRIEFING)
+    briefing["revenue"] = gross
+    briefing["profit"] = net
+
+    # Live Alert Matrix — refresh and format open alerts for the merchant.
+    if merchant_id:
+        try:
+            alert_matrix.refresh_alerts(merchant_id)
+            live_alerts = [alert_matrix.alert_to_dict(a) for a in alert_matrix.get_alerts(merchant_id)]
+            fraud_alerts = [alert_matrix.fraud_alert_to_dict(a) for a in alert_matrix.get_fraud_alerts(merchant_id)]
+        except Exception:
+            live_alerts = ALERTS
+            fraud_alerts = FRAUD
+    else:
+        live_alerts = ALERTS
+        fraud_alerts = FRAUD
+
+    # Dynamic nav badge reflects open alert count.
+    nav_groups = copy.deepcopy(NAV_GROUPS)
+    for group in nav_groups:
+        for link in group["links"]:
+            if link.get("id") == "alerts":
+                link["badge"] = str(len(live_alerts))
+    nav_groups = _filter_nav_for_beta(nav_groups, user_role)
+
+    # Action Gate: draft approvals from open alerts.
+    pending_actions = []
+    action_history = []
+    if merchant_id and (active_page in ("overview", "action_gate") or active_page is None):
+        try:
+            pending_actions = [action_gate.action_to_dict(a) for a in action_gate.list_pending_actions(merchant_id)]
+            action_history = [action_gate.action_to_dict(a) for a in action_gate.list_action_history(merchant_id)]
+        except Exception:
+            pass
+    hero_action = _hero_action(pending_actions, merchant_id)
+
+    # Channel true-profit analytics.
+    channel_summary = []
+    channel_totals = {}
+    if merchant_id:
+        try:
+            channel_summary = channel_analytics.summarize_channels(merchant_id, days=30)
+            channel_totals = channel_analytics.channel_totals(merchant_id, days=30)
+        except Exception:
+            pass
+
+    # Billing context for the dashboard Billing page.
+    billing_account = None
+    tier_limits = {}
+    if merchant_id:
+        try:
+            from tier_manager import TierManager
+            billing = SaaSBilling.query.get(merchant_id)
+            tier_key = (merchant_obj.get("tier") or "Basic Tier").replace("AI Tier", "Plan").strip()
+            meta = TierManager.get_tier_meta(tier_key)
+            if billing:
+                billing_account = {
+                    "current_plan": billing.current_plan or tier_key,
+                    "add_ons": billing.add_ons or [],
+                    "concierge_bundle": "concierge_bundle" in (billing.add_ons or []),
+                    "stripe_customer_id": billing.stripe_customer_id or "",
+                    "stripe_subscription_id": billing.stripe_subscription_item_id or "",
+                    "metered_usage_units": billing.metered_usage_units or 0,
+                    "approved_actions": TierManager.current_action_count(merchant_id),
+                    "accrued_invoice_value": billing.accrued_invoice_value or 0.0,
+                    "billing_cycle_end": billing.billing_cycle_end or "",
+                }
+            tier_limits = {
+                "orders": meta.get("monthly_order_limit", 500),
+                "actions": meta.get("max_monthly_actions", 50),
+                "stores": meta.get("max_store_connections", 2),
+                "users": meta.get("max_users", 1),
+                "products": 10000,
+                "customers": 100000,
+                "storage": 500,
+            }
+        except Exception:
+            pass
+
+    # Channel list from persistent connections.
+    try:
+        channel_data = channels_module.list_channels(merchant_id) if merchant_id else CHANNELS
+    except Exception:
+        channel_data = CHANNELS
+
+    # Ensure the merchant dict carries the timezone so templates can render local time.
+    merchant_obj = dict(merchant or {
+        "name": "Your store",
+        "email": "admin@example.com",
+        "tier": "Beta Plan",
+        "sandbox_status": "approved",
+        "live_access_enabled": True,
+        "sandbox_expires_at": None,
+    })
+    merchant_obj.setdefault("timezone", tz_name)
+
     return {
         "brand": BRAND,
         "nav": NAV,
-        "coo": COO,
+        "nav_groups": nav_groups,
+        "active_page": active_page or "overview",
+        "merchant": merchant_obj,
+        "coo": dict(COO, greeting=_greeting_for(merchant_obj)),
+        "ai_greeting": _ai_greeting(merchant_id, merchant_obj),
         "suggestions": COMMAND_SUGGESTIONS,
-        "channels": CHANNELS,
-        "connected": [c for c in CHANNELS if c["state"] == "connected"],
-        "briefing": BRIEFING,
-        "alerts": ALERTS,
-        "profit_rows": PROFIT_BREAKDOWN,
+        "channels": channel_data,
+        "connected": [c for c in channel_data if c.get("state") == "connected"],
+        "briefing": briefing,
+        "alerts": live_alerts,
+        "profit_rows": profit_rows,
         "gross": gross,
         "costs": costs,
         "net": net,
         "net_margin": round(net / gross * 100, 1) if gross else 0.0,
-        "orders": RECENT_ORDERS,
+        "orders": orders,
         "series": SALES_SERIES,
         "series_max": max(p["value"] for p in SALES_SERIES),
         "forecasts": FORECASTS,
         "research": RESEARCH,
         "fulfillment": FULFILLMENT,
-        "fraud": FRAUD,
+        "fraud": fraud_alerts,
         "suppliers": SUPPLIERS,
         "studio": STUDIO,
         "support": SUPPORT,
@@ -429,6 +838,14 @@ def context():
         "health": HEALTH,
         "global_tools": GLOBAL_TOOLS,
         "mobile_actions": MOBILE_ACTIONS,
-        "generated": now.strftime("%A, %d %b %Y · %H:%M UTC"),
+        "pending_actions": pending_actions,
+        "action_history": action_history,
+        "hero_action": hero_action,
+        "channel_summary": channel_summary,
+        "channel_totals": channel_totals,
+        "billing_account": billing_account,
+        "tier_limits": tier_limits,
+        "team_users": [],
+        "generated": now.strftime("%A, %d %b %Y · %H:%M %Z"),
     }
 

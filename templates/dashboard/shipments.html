@@ -1,0 +1,42 @@
+{% extends 'dashboard/base.html' %}
+{% block title %}Shipments — {{ brand.name }} {{ brand.product }}{% endblock %}
+{% block content %}
+
+<section class="page-header">
+  <h1>Shipments</h1>
+  <p>Track packages, carriers, and delivery exceptions.</p>
+</section>
+
+<div class="kpi-grid">
+  <div class="card kpi-card"><div class="kpi-label">Active shipments</div><div class="kpi-value">{{ orders | length }}</div></div>
+  <div class="card kpi-card"><div class="kpi-label">Shipped</div><div class="kpi-value">{{ orders | selectattr('state','equalto','shipped') | list | length }}</div></div>
+  <div class="card kpi-card"><div class="kpi-label">Delayed</div><div class="kpi-value">{{ orders | selectattr('state','equalto','delayed') | list | length }}</div><div class="kpi-delta down">needs attention</div></div>
+  <div class="card kpi-card"><div class="kpi-label">With tracking</div><div class="kpi-value">{{ orders | selectattr('tracking_number') | list | length }}</div></div>
+</div>
+
+<div class="card">
+  <div class="card-head"><h3>Active Shipments</h3></div>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Order</th><th>Channel</th><th>Tracking</th><th>Carrier</th><th>Status</th><th>Track</th></tr></thead>
+      <tbody>
+        {% for o in orders %}
+        <tr>
+          <td class="b mono">{{ o.order_number or o.id }}</td>
+          <td>{{ o.channel }}</td>
+          <td class="mono">{{ o.tracking_number or '—' }}</td>
+          <td>{{ o.carrier.upper() if o.carrier else '—' }}</td>
+          <td><span class="tag {{ {'shipped':'tag-green','delayed':'tag-amber','refunded':'tag-red','packed':'tag-blue'}[o.state] }}">{{ o.state }}</span></td>
+          <td>
+            {% if o.tracking_url %}
+            <a href="{{ o.tracking_url }}" target="_blank" rel="noopener" class="btn btn-ghost" style="padding: 4px 8px; font-size: .78rem;">Track</a>
+            {% else %}—{% endif %}
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+{% endblock %}

@@ -1,0 +1,116 @@
+{% extends 'dashboard/base.html' %}
+{% block title %}Vanta — {{ brand.name }}{% endblock %}
+{% block content %}
+
+<section class="page-header">
+  <h1>Vanta</h1>
+  <p>Ask questions, run reports, create content, or approve actions — Vanta works with live data.</p>
+</section>
+
+<div class="card">
+  <div class="command-box">
+    <div class="prompt">
+      <span style="color: var(--gold); font-size: 1rem;">◉</span>
+      <input id="cmd" placeholder="Ask anything, or tell it what to do…" autocomplete="off">
+      <button class="btn btn-primary" id="cmdgo">Run</button>
+    </div>
+    <div class="chips" id="chips">
+      {% for s in suggestions %}<span class="chip js-chip">{{ s }}</span>{% endfor %}
+    </div>
+  </div>
+
+  <div class="card" id="cmdout" style="margin-top: 14px; display: none; background: var(--line-2);">
+    <div style="display:flex; justify-content:space-between; align-items:center;">
+      <span class="tag tag-blue">Answer</span>
+      <button class="btn" id="clear-thread" style="font-size:.7rem; padding:4px 8px;">Clear conversation</button>
+    </div>
+    <p id="cmdanswer" style="margin-top: 8px; color: var(--ink); white-space: pre-wrap;"></p>
+  </div>
+</div>
+
+<div class="grid grid-2" style="margin-top: 24px;">
+  <div class="card">
+    <div class="card-head"><h3>Recent Questions</h3></div>
+    <div id="recent-commands" style="display: flex; flex-direction: column; gap: 8px;">
+      <p style="font-size:.8rem; color:var(--ink-3);">Ask a question to build your history.</p>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-head"><h3>What Vanta can do</h3></div>
+    <ul style="margin: 0; padding-left: 18px; color: var(--ink-2); font-size: .85rem; line-height: 1.8;">
+      <li>Read cross-channel revenue and true profit from live orders</li>
+      <li>Draft TikTok hooks, weekly plans, and creator briefs</li>
+      <li>Identify alerts and recommend actions for approval</li>
+      <li>Sync Shopify, TikTok Shop, and Amazon on command</li>
+      <li>Answer questions using your product catalog and order history</li>
+    </ul>
+  </div>
+</div>
+
+<script>
+const out = document.getElementById('cmdout');
+const input = document.getElementById('cmd');
+const answer = document.getElementById('cmdanswer');
+const recentBox = document.getElementById('recent-commands');
+const chipBox = document.getElementById('chips');
+
+const responses = {
+  "how did i do today": "How did I do today?",
+  "why are sales down": "Why are sales down?",
+  "which products should i discontinue": "Which products should I discontinue?",
+  "show delayed orders": "Show delayed orders",
+  "create a discount campaign": "Create a discount campaign"
+};
+
+async function run(q){
+  if(!q) return;
+  answer.textContent = 'Thinking…';
+  out.style.display = 'block';
+  try {
+    const res = await fetch('/api/command', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({q})
+    });
+    const data = await res.json();
+    answer.textContent = data.answer || 'Done.';
+    addRecent(q);
+  } catch (e) {
+    answer.textContent = 'Something went wrong. Please try again.';
+  }
+}
+
+function addRecent(q) {
+  if (!recentBox.querySelector('.recent-item')) recentBox.innerHTML = '';
+  const div = document.createElement('div');
+  div.className = 'recent-item';
+  div.style.cssText = 'padding: 10px; border: 1px solid var(--line); border-radius: 10px; font-size: .85rem; cursor: pointer;';
+  div.innerHTML = `<strong>${escapeHtml(q)}</strong>`;
+  div.addEventListener('click', () => { input.value = q; run(q); });
+  recentBox.prepend(div);
+}
+
+function escapeHtml(text) {
+  const div = document.createElement('div');
+  div.textContent = text;
+  return div.innerHTML;
+}
+
+document.getElementById('cmdgo').addEventListener('click', () => run(input.value));
+input.addEventListener('keydown', e => { if(e.key === 'Enter') run(input.value); });
+document.querySelectorAll('.js-chip').forEach(c => c.addEventListener('click', () => {
+  const text = c.textContent.trim();
+  input.value = text;
+  run(text);
+}));
+
+document.getElementById('clear-thread').addEventListener('click', async () => {
+  try {
+    await fetch('/api/v1/assistant/thread', {method: 'DELETE'});
+    answer.textContent = 'Conversation cleared.';
+  } catch (e) { alert('Could not clear conversation.'); }
+});
+</script>
+
+{% endblock %}

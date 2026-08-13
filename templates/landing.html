@@ -1,0 +1,193 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <link rel="icon" type="image/x-icon" href="/static/images/favicon.ico">
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Vantav — Vanta for Multi-Channel Ecommerce</title>
+  <meta name="description" content="Vantav connects Shopify, TikTok Shop, and Amazon so you see true profit, catch margin leaks, and act before problems spread.">
+  <style>
+    :root {
+      --bg: #0c0c11;
+      --card: #14141c;
+      --ink: #f4f2f9;
+      --muted: #c6c3d2;
+      --line: #23232d;
+      --purple: #8b5cf6;
+      --purple-2: #a78bfa;
+      --teal: #2dd4bf;
+    }
+    * { box-sizing: border-box; }
+    html { scroll-behavior: smooth; }
+    body {
+      margin: 0;
+      background: var(--bg);
+      color: var(--ink);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      min-height: 100vh;
+      overflow-x: hidden;
+    }
+    a { color: inherit; text-decoration: none; }
+    .wrap { max-width: 1000px; margin: 0 auto; padding: 0 1.5rem; }
+    header {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 1.25rem 1.5rem;
+      border-bottom: 1px solid var(--line);
+      flex-wrap: wrap; gap: .75rem;
+    }
+    .brand { display: flex; align-items: center; gap: .6rem; font-weight: 800; letter-spacing: -0.02em; }
+    .brand-mark {
+      width: 28px; height: 28px; border-radius: 7px;
+      background: #14141c;
+      display: grid; place-items: center;
+      box-shadow: 0 4px 10px rgba(139,92,246,.25);
+    }
+    .brand-mark svg { width: 18px; height: 18px; }
+    .brand span { font-size: 1.1rem; }
+    .nav a {
+      font-size: .85rem; color: var(--muted); font-weight: 500;
+      padding: .5rem .9rem; border-radius: 8px;
+    }
+    .nav a:hover { color: var(--ink); background: #1b1b25; }
+    .nav .btn {
+      background: linear-gradient(135deg, var(--purple) 0%, #0c0c11 100%);
+      color: var(--ink); font-weight: 700; padding: .55rem 1.1rem; border-radius: 8px;
+      box-shadow: 0 4px 12px rgba(139,92,246,.25);
+    }
+    .hero {
+      text-align: center; padding: 5rem 1.5rem 4rem;
+    }
+    .eyebrow {
+      display: inline-block; font-size: .7rem; text-transform: uppercase; letter-spacing: .14em;
+      color: var(--teal); border: 1px solid rgba(45,212,191,.35); padding: .35rem .7rem; border-radius: 99px;
+      margin-bottom: 1.25rem;
+    }
+    h1 {
+      font-size: clamp(1.65rem, 6.5vw, 3.8rem);
+      font-weight: 800; letter-spacing: -0.03em; line-height: 1.08;
+      margin: 0 auto 1.25rem; max-width: 100%;
+      overflow-wrap: break-word; word-break: normal;
+      background: linear-gradient(135deg, #f4f2f9 30%, var(--purple-2) 100%);
+      -webkit-background-clip: text; background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+    .hero p {
+      font-size: 1.1rem; color: var(--muted); line-height: 1.65;
+      max-width: 100%; margin: 0 auto 2.25rem;
+      overflow-wrap: break-word;
+    }
+    .ctas { display: flex; gap: .75rem; justify-content: center; flex-wrap: wrap; }
+    .btn-primary {
+      background: linear-gradient(135deg, var(--purple) 0%, #0c0c11 100%);
+      color: var(--ink); font-weight: 700; padding: .9rem 1.6rem; border-radius: 10px;
+      box-shadow: 0 6px 18px rgba(139,92,246,.28);
+      border: none; cursor: pointer; font-size: 1rem;
+    }
+    .btn-secondary {
+      border: 1px solid var(--line); color: var(--ink); background: transparent;
+      padding: .9rem 1.6rem; border-radius: 10px; font-weight: 600; font-size: 1rem;
+    }
+    .proof {
+      display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 1rem;
+      padding-bottom: 5rem;
+    }
+    .proof-card {
+      background: var(--card); border: 1px solid var(--line); border-radius: 16px; padding: 1.6rem;
+      overflow-wrap: break-word;
+    }
+    .proof-card h3 { margin: 0 0 .4rem; font-size: 1.1rem; }
+    .proof-card p { margin: 0; color: var(--muted); font-size: .92rem; line-height: 1.55; }
+    .icon { width: 40px; height: 40px; border-radius: 10px; display: grid; place-items: center; margin-bottom: 1rem; background: rgba(139,92,246,.12); color: var(--purple-2); font-size: 1.2rem; }
+    .icon.teal { background: rgba(45,212,191,.12); color: var(--teal); }
+    .trust {
+      border-top: 1px solid var(--line); padding: 2.5rem 1.5rem; text-align: center;
+    }
+    .trust p { color: var(--muted); font-size: .9rem; margin: 0 0 1rem; }
+    .badges { display: flex; gap: .75rem; justify-content: center; flex-wrap: wrap; }
+    .badge {
+      border: 1px solid var(--line); border-radius: 99px; padding: .35rem .85rem;
+      font-size: .75rem; color: var(--muted); background: #0f0f0f;
+    }
+    footer { border-top: 1px solid var(--line); padding: 1.5rem; text-align: center; color: var(--muted); font-size: .8rem; }
+    @media (max-width: 600px) {
+      .nav { display: flex; width: 100%; justify-content: center; gap: .75rem; margin-top: .25rem; }
+      .nav a { flex: 1; text-align: center; }
+      .hero { padding: 3.5rem 1rem 3rem; }
+      .hero p { font-size: 1rem; max-width: 100%; }
+      .ctas { flex-direction: column; align-items: stretch; }
+      .ctas a { width: 100%; text-align: center; }
+    }
+    @media (max-width: 480px) {
+      .hero { padding: 3rem 1rem 2.5rem; }
+      .wrap { padding: 0 1rem; }
+      .proof { grid-template-columns: 1fr; }
+      .hero p { font-size: .95rem; }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="brand">
+      <div class="brand-mark">
+        <svg viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg" aria-label="Vantav logo">
+          <defs>
+            <linearGradient id="vantav-v" x1="8" y1="8" x2="24" y2="26" gradientUnits="userSpaceOnUse">
+              <stop offset="0" stop-color="#8b5cf6"/>
+              <stop offset="1" stop-color="#14b8a6"/>
+            </linearGradient>
+          </defs>
+          <path d="M9 11 L16 25 L23 11" stroke="url(#vantav-v)" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+      </div>
+      <span>VANTAV</span>
+    </div>
+    <nav class="nav">
+      <a href="/login">Log in</a>
+      <a href="/subscribe" class="btn">See plans</a>
+    </nav>
+  </header>
+
+  <main>
+    <section class="hero">
+      <div class="eyebrow">Now available</div>
+      <h1>See true profit across Shopify, TikTok Shop, and Amazon — and let Vanta catch margin leaks before they spread.</h1>
+      <p>Vantav connects your stores, calculates real-time net profit after fees, shipping, and ad spend, and alerts you to problems like ad spikes, refunds, and low stock.</p>
+      <div class="ctas">
+        <a href="/subscribe" class="btn-primary">Start your subscription</a>
+        <a href="/demo" class="btn-secondary">See how it works</a>
+      </div>
+    </section>
+
+    <section id="how" class="wrap proof">
+      <div class="proof-card">
+        <div class="icon">$</div>
+        <h3>Real-time profit by channel, SKU, and order</h3>
+        <p>Know exactly what you keep after marketplace fees, shipping, discounts, refunds, and ad spend — not just top-line revenue.</p>
+      </div>
+      <div class="proof-card">
+        <div class="icon teal">!</div>
+        <h3>Alerts for ad spend, refunds, and low stock</h3>
+        <p>Get notified when a TikTok ad is draining margin, a refund is spiking, or inventory is about to run out.</p>
+      </div>
+      <div class="proof-card">
+        <div class="icon">&#10003;</div>
+        <h3>AI-drafted actions you approve in one tap</h3>
+        <p>Review suggested reorders, price changes, and ad adjustments. You stay in control; nothing runs without your approval.</p>
+      </div>
+    </section>
+
+    <section class="trust">
+      <p>Built for Shopify, TikTok Shop, and Amazon sellers who want clearer numbers.</p>
+      <div class="badges">
+        <span class="badge">48-hour sandbox</span>
+        <span class="badge">Encrypted API credentials</span>
+        <span class="badge">No store credentials required to preview</span>
+      </div>
+    </section>
+  </main>
+
+  <footer>
+    &copy; 2026 Vantav LLC. <a href="/terms" style="color:var(--muted)">Terms</a> &middot; <a href="/privacy" style="color:var(--muted)">Privacy</a>
+  </footer>
+</body>
+</html>

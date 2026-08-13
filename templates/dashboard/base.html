@@ -1,0 +1,314 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <link rel="icon" type="image/x-icon" href="/static/images/favicon.ico">
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}Vantav Dashboard{% endblock %}</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/dashboard.css') }}">
+  {% block head %}{% endblock %}
+</head>
+<body data-merchant-name="{{ merchant.name | default('there') }}" data-merchant-timezone="{{ merchant.timezone | default('UTC') }}" style="--brand-accent: {{ merchant.brand_color | default('#8b5cf6') }}; --brand-accent-2: {{ merchant.brand_color_secondary | default('#a78bfa') }};">
+  <div class="app-shell">
+    <aside class="sidebar" id="sidebar">
+      <div class="brand">
+        <div class="brand-mark">
+          <svg viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg" aria-label="Vantav logo">
+            <defs>
+              <linearGradient id="vantav-v" x1="8" y1="8" x2="24" y2="26" gradientUnits="userSpaceOnUse">
+                <stop offset="0" stop-color="#8b5cf6"/>
+                <stop offset="1" stop-color="#14b8a6"/>
+              </linearGradient>
+            </defs>
+            <path d="M9 11 L16 25 L23 11" stroke="url(#vantav-v)" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+        </div>
+        <div class="brand-text">
+          <span class="brand-name">VANTAV</span>
+          <span class="brand-tagline">Commerce OS</span>
+        </div>
+      </div>
+
+      <nav class="sidebar-nav">
+        {% for group in nav_groups %}
+        <div class="nav-group">
+          <div class="nav-group-label">{{ group.label }}</div>
+          {% for item in group.links %}
+          <a class="nav-item {% if active_page == item.id %}active{% endif %}" href="{{ item.url }}" data-section="{{ item.id }}">
+            <span class="nav-icon">{{ item.icon }}</span>
+            <span class="nav-text">{{ item.label }}</span>
+            {% if item.badge %}<span class="nav-badge">{{ item.badge }}</span>{% endif %}
+          </a>
+          {% endfor %}
+        </div>
+        {% endfor %}
+      </nav>
+
+      <div class="sidebar-footer">
+        <div class="plan-card">
+          <div class="plan-icon">{% if merchant.tier and 'Enterprise' in merchant.tier %}♛{% else %}★{% endif %}</div>
+          <div class="plan-name">{{ merchant.tier | default('Enterprise Plan') }}</div>
+          <div class="plan-note">Unlimited access</div>
+          <a href="/dashboard/billing" class="plan-link">View Plan</a>
+        </div>
+        <div class="user-row" style="justify-content: space-between;">
+          <div style="display: flex; align-items: center; gap: 10px;">
+            <div class="user-avatar">{{ (merchant.name | default('Admin'))[:2] | upper }}</div>
+            <div class="user-info">
+              <div class="user-name">{{ merchant.name | default('Admin User') }}</div>
+              <div class="user-email">{{ merchant.email | default('admin@example.com') }}</div>
+            </div>
+          </div>
+          <a href="/site-logout" class="btn btn-ghost" style="font-size: .75rem; padding: 4px 8px;">Log out</a>
+        </div>
+      </div>
+    </aside>
+
+    <div class="main-wrap">
+      <header class="topbar">
+        <button class="mobile-menu-btn" id="mobile-menu-btn" aria-label="Toggle menu">≡</button>
+        <a href="/dashboard" class="topbar-brand">
+          <div class="brand-mark small">
+            <svg viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg" aria-label="Vantav logo">
+              <defs>
+                <linearGradient id="vantav-v-sm" x1="8" y1="8" x2="24" y2="26" gradientUnits="userSpaceOnUse">
+                  <stop offset="0" stop-color="#8b5cf6"/>
+                  <stop offset="1" stop-color="#14b8a6"/>
+                </linearGradient>
+              </defs>
+              <path d="M9 11 L16 25 L23 11" stroke="url(#vantav-v-sm)" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+          </div>
+          <span class="brand-name">VANTAV</span>
+        </a>
+        <div class="breadcrumb">{{ merchant.name | default('Your store') }} / {{ active_page | replace('_ai', '') | replace('_', ' ') | title }}</div>
+        <div class="topbar-actions">
+          <div class="tier-badge" id="current-merchant-tier-badge">{{ merchant.tier | default('Enterprise Plan') }}</div>
+          <a href="/dashboard/commerce-hub" class="btn btn-primary">Connect a channel</a>
+          <a href="/site-logout" class="btn btn-ghost">Log out</a>
+          <div class="topbar-avatar">{{ (merchant.name | default('Admin'))[:2] | upper }}</div>
+        </div>
+      </header>
+
+      <main class="main-content">
+        {% if merchant.sandbox_status == 'expired' %}
+        <div style="background: var(--red-bg); border: 1px solid var(--red); color: var(--ink); padding: 12px 18px; border-radius: 10px; margin-bottom: 18px; font-size: .9rem;">
+          <strong>Your 48-hour sandbox has expired.</strong> Live marketplace connections and paid features are paused. <a href="/subscribe" style="color:var(--red); text-decoration: underline; font-weight: 600;">Upgrade to keep access</a> or contact support.
+        </div>
+        {% elif merchant.sandbox_status == 'sandbox' %}
+        <div style="background: var(--amber-bg); border: 1px solid var(--amber); color: var(--ink); padding: 12px 18px; border-radius: 10px; margin-bottom: 18px; font-size: .9rem;">
+          <strong>Sandbox mode active.</strong> You're exploring Vantav with simulated data. Live marketplace connections are disabled {% if merchant.sandbox_expires_at %}until {{ merchant.sandbox_expires_at }}{% endif %}. <a href="/dashboard/billing" style="color:var(--amber); text-decoration: underline; font-weight: 600;">Request live access</a> when ready.
+        </div>
+        {% elif merchant.sandbox_status == 'pending' %}
+        <div style="background: var(--teal-bg); border: 1px solid var(--teal); color: var(--ink); padding: 12px 18px; border-radius: 10px; margin-bottom: 18px; font-size: .9rem;">
+          <strong>Account pending approval.</strong> Your beta application is under review. Live features are disabled until an admin approves your account.
+        </div>
+        {% elif merchant.sandbox_status == 'rejected' %}
+        <div style="background: var(--red-bg); border: 1px solid var(--red); color: var(--ink); padding: 12px 18px; border-radius: 10px; margin-bottom: 18px; font-size: .9rem;">
+          <strong>Application not approved.</strong> This account does not have access to live marketplace features.
+        </div>
+        {% endif %}
+        {% block content %}{% endblock %}
+      </main>
+    </div>
+  </div>
+
+  <script>
+    document.getElementById('mobile-menu-btn')?.addEventListener('click', () => {
+      document.getElementById('sidebar').classList.toggle('open');
+    });
+
+    // Keep the session alive while the tab is open; redirect if it expires.
+    (function keepAlive() {
+      setInterval(async () => {
+        try {
+          const res = await fetch('/api/session/heartbeat', { method: 'POST', credentials: 'same-origin' });
+          if (res.status === 401) {
+            window.location.href = '/login?error=session_expired';
+          }
+        } catch (e) {
+          // network hiccup; do not redirect immediately
+        }
+      }, 5 * 60 * 1000); // every 5 minutes
+    })();
+
+    // Sync merchant timezone from browser for accurate greetings and scheduling.
+    (function syncTimezone() {
+      try {
+        const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
+        if (!tz) return;
+        fetch('/api/v1/merchant/timezone', {
+          method: 'POST',
+          headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify({timezone: tz}),
+          credentials: 'same-origin'
+        });
+      } catch (e) {}
+    })();
+
+    // Update greeting elements to the merchant's saved timezone on first paint.
+    (function updateGreeting() {
+      const name = document.body.dataset.merchantName || document.querySelector('[data-merchant-name]')?.dataset.merchantName || 'there';
+      const tz = document.body.dataset.merchantTimezone || Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC';
+      const now = new Date();
+      const hour = parseInt(new Intl.DateTimeFormat('en-US', { timeZone: tz, hour: 'numeric', hour12: false }).format(now), 10);
+      let salutation = 'Good morning';
+      if (hour < 5 || hour >= 22) salutation = 'Good night';
+      else if (hour >= 12 && hour < 17) salutation = 'Good afternoon';
+      else if (hour >= 17 && hour < 22) salutation = 'Good evening';
+      document.querySelectorAll('.js-greeting').forEach(el => {
+        el.textContent = `${salutation}, ${name}.`;
+      });
+    })();
+  </script>
+  {% block scripts %}{% endblock %}
+
+  {% if active_page %}
+  <!-- AI Assistant floating popup (all dashboard pages) -->
+  <div class="ai-float" data-page="{{ active_page }}">
+    <div id="ai-popup" class="ai-popup">
+      <div class="ai-popup-head">
+        <h4><span class="status-dot"></span>AI Assistant</h4>
+        <button class="ai-popup-close" onclick="toggleAIPopup()">&times;</button>
+      </div>
+      <div class="ai-popup-body" id="ai-popup-body">
+        <div id="ai-hero-card" class="hero-card" style="display:none;">
+          <div class="hero-title" id="ai-hero-title"></div>
+          <div class="hero-detail" id="ai-hero-detail"></div>
+          <ul id="ai-hero-evidence" style="margin:8px 0 0 16px; font-size:.78rem; color:var(--ink-2); line-height:1.5;"></ul>
+          <div class="hero-actions">
+            <button class="btn btn-primary" id="ai-hero-approve" style="padding:5px 10px; font-size:.74rem;">Approve</button>
+            <button class="btn" id="ai-hero-dismiss" style="padding:5px 10px; font-size:.74rem;">Dismiss</button>
+          </div>
+        </div>
+        <div id="ai-chat-log" class="ai-chat-log"></div>
+      </div>
+      <div class="ai-popup-prompt">
+        <div class="prompt" style="padding:8px 10px;">
+          <span style="color:var(--purple); flex:none;">&#9673;</span>
+          <input id="ai-popup-input" placeholder="Ask anything about your business..." autocomplete="off" style="min-width:0; color:var(--ink);">
+          <button class="btn btn-primary" onclick="sendAIPopupMessage()" style="flex:none; padding:6px 12px; font-size:.78rem;">Run</button>
+        </div>
+        <div class="chips" id="ai-popup-chips"></div>
+      </div>
+    </div>
+    <button class="ai-float-btn" id="ai-float-btn" onclick="toggleAIPopup()" title="Open AI Assistant">&#10022;</button>
+  </div>
+
+  <script>
+  (function(){
+    const popup = document.getElementById('ai-popup');
+    const btn = document.getElementById('ai-float-btn');
+    const log = document.getElementById('ai-chat-log');
+    const input = document.getElementById('ai-popup-input');
+    const heroCard = document.getElementById('ai-hero-card');
+    const chips = document.getElementById('ai-popup-chips');
+    const page = document.querySelector('.ai-float')?.dataset.page || 'default';
+
+    const PAGE_CONTEXT = {
+      profit_engine: { chips: ['Show my profit waterfall', 'Which SKU is least profitable', 'Forecast stockouts'], types: ['ad_adjust','reorder','price','margin'] },
+      commerce_hub: { chips: ['Check channel margins', 'Sync all channels', 'Connect TikTok Shop'], types: ['channel','sync','connect'] },
+      action_gate: { chips: ['Approve top action', 'Run analysis', 'Show pending actions'], types: [] },
+      alerts: { chips: ['Why is the top alert firing', 'What should I do first', 'Run assistant analysis'], types: [] },
+      billing: { chips: ['Show my plan', 'What features can I unlock', 'Upgrade when ready'], types: [] },
+      settings: { chips: ['Set my margin floor', 'Update business rules', 'Invite team member'], types: [] },
+      default: { chips: ['Run assistant analysis', 'Show my top profit drain', 'What needs my attention'], types: [] }
+    };
+    const ctx = PAGE_CONTEXT[page] || PAGE_CONTEXT.default;
+
+    function renderChips(){
+      chips.innerHTML = '';
+      ctx.chips.forEach(text => {
+        const span = document.createElement('span');
+        span.className = 'chip';
+        span.textContent = text;
+        span.onclick = () => useAIPopupChip(span);
+        chips.appendChild(span);
+      });
+    }
+    renderChips();
+
+    window.toggleAIPopup = function(){
+      popup.classList.toggle('open');
+      if(popup.classList.contains('open')){
+        btn.classList.remove('pulse');
+        loadAIHero();
+      }
+    };
+
+    async function loadAIHero(){
+      try{
+        const res = await fetch('/api/actions', {credentials:'same-origin'});
+        if(!res.ok) return;
+        const data = await res.json();
+        let pending = (data.pending || []);
+        if(ctx.types.length){
+          const filtered = pending.filter(a => ctx.types.includes(a.action_type));
+          if(filtered.length) pending = filtered;
+        }
+        if(pending.length === 0){ heroCard.style.display='none'; return; }
+        const hero = pending[0];
+        document.getElementById('ai-hero-title').textContent = hero.title;
+        document.getElementById('ai-hero-detail').textContent = hero.detail || '';
+        const evList = document.getElementById('ai-hero-evidence');
+        evList.innerHTML = '';
+        (hero.evidence || []).forEach(e => {
+          const li = document.createElement('li'); li.textContent = e; evList.appendChild(li);
+        });
+        heroCard.style.display='block';
+        document.getElementById('ai-hero-approve').onclick = () => runHeroAction(hero.id, 'approve');
+        document.getElementById('ai-hero-dismiss').onclick = () => runHeroAction(hero.id, 'deny');
+        if(!popup.classList.contains('open')) btn.classList.add('pulse');
+      }catch(e){ console.error(e); }
+    }
+
+    async function runHeroAction(id, verb){
+      const url = verb === 'approve' ? `/api/actions/${id}/approve` : `/api/actions/${id}/deny`;
+      try{
+        const opts = {method:'POST', credentials:'same-origin', headers:{}};
+        if(verb === 'deny'){ opts.headers['Content-Type']='application/json'; opts.body=JSON.stringify({reason:'dismissed from assistant popup'}); }
+        const res = await fetch(url, opts);
+        if(res.ok){
+          addMessage('assistant', verb === 'approve' ? 'Action approved and executed.' : 'Action dismissed.');
+          heroCard.style.display='none';
+        } else {
+          const data = await res.json();
+          addMessage('assistant', 'Failed: ' + (data.detail || 'unknown'));
+        }
+      }catch(e){ addMessage('assistant', 'Network error.'); }
+    }
+    window.runHeroAction = runHeroAction;
+
+    function addMessage(role, text){
+      const div = document.createElement('div');
+      div.className = 'ai-chat-msg ' + role;
+      div.textContent = text;
+      log.appendChild(div);
+      log.scrollTop = log.scrollHeight;
+    }
+
+    window.sendAIPopupMessage = async function(){
+      const q = input.value.trim();
+      if(!q) return;
+      addMessage('user', q);
+      input.value='';
+      try{
+        const res = await fetch('/api/command', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({q}), credentials:'same-origin'});
+        const data = await res.json();
+        addMessage('assistant', data.answer || 'Done.');
+      }catch(e){ addMessage('assistant', 'Something went wrong. Please try again.'); }
+    };
+
+    input?.addEventListener('keydown', e => { if(e.key==='Enter') sendAIPopupMessage(); });
+
+    window.useAIPopupChip = function(el){ input.value = el.textContent; sendAIPopupMessage(); };
+
+    loadAIHero();
+  })();
+  </script>
+  {% endif %}
+</body>
+</html>

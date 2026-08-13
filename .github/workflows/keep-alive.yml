@@ -1,0 +1,13 @@
+name: Keep Vantav awake
+
+on:
+  schedule:
+    - cron: '*/10 * * * *'
+  workflow_dispatch:
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Ping Render health endpoint
+        run: curl -s -o /dev/null -w "%{http_code}\n" https://vantavcommerce.com/health

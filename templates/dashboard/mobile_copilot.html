@@ -1,0 +1,61 @@
+{% extends 'dashboard/base.html' %}
+{% block title %}Vanta Mobile — {{ brand.name }} {{ brand.product }}{% endblock %}
+{% block content %}
+
+<section class="page-header">
+  <h1>Vanta Mobile</h1>
+  <p>Vanta for ecommerce operations. Get real-time insights, take actions, and manage your business on the go.</p>
+</section>
+
+<div class="grid grid-2">
+  <div style="display: grid; place-items: center;">
+    <div style="width: 280px; height: 560px; border: 12px solid var(--ink); border-radius: 36px; background: var(--surface); overflow: hidden; box-shadow: var(--shadow);">
+      <div style="background: var(--bg); padding: 16px; height: 100%; display: flex; flex-direction: column;">
+        <div style="text-align: center; margin-bottom: 12px;">
+          <div style="color: var(--gold); font-size: 1.2rem;">✦</div>
+          <div style="font-weight: 700; font-size: .9rem;">Vanta Mobile</div>
+        </div>
+        <div style="flex: 1; overflow-y: auto; font-size: .8rem;">
+          <div style="background: var(--gold-bg); border-radius: 12px; padding: 10px; margin-bottom: 8px; color: var(--amber);">
+            <strong>Vanta</strong> Online<br>
+            Hi Admin, how can I help you with your store today?
+          </div>
+          <div style="background: var(--line-2); border-radius: 12px; padding: 10px; margin-bottom: 8px; text-align: right;">
+            How much profit did I make today?
+          </div>
+          <div style="background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 10px; margin-bottom: 8px;">
+            Your profit for today is <strong>$8,392.21</strong><br>
+            <span style="color: var(--green);">+12.4% vs yesterday</span>
+          </div>
+        </div>
+        <div style="padding-top: 10px; border-top: 1px solid var(--line);">
+          <div class="prompt" style="padding: 8px;"><input placeholder="Ask anything…" style="font-size: .8rem;"><button class="btn btn-primary" style="padding: 6px 10px; font-size: .75rem;">➤</button></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div>
+    <div class="card" style="margin-bottom: 16px;">
+      <div class="card-head"><h3>Quick Actions</h3></div>
+      <div style="display: flex; flex-direction: column; gap: 10px;">
+        {% for action in mobile_actions %}
+        <div style="display: flex; align-items: center; justify-content: space-between; padding: 14px; border: 1px solid var(--line); border-radius: 12px; cursor: pointer;">
+          <span style="font-weight: 600;">{{ action }}</span>
+          <span style="color: var(--gold);">→</span>
+        </div>
+        {% endfor %}
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-head"><h3>Get the Mobile App</h3></div>
+      <p style="color: var(--ink-3); margin-bottom: 14px;">Scan the QR code or download from the app stores.</p>
+      <div style="display: flex; gap: 10px; flex-wrap: wrap;">
+        <button class="btn" style="background: var(--ink); color: var(--bg);">App Store</button>
+        <button class="btn" style="background: var(--ink); color: var(--bg);">Google Play</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+{% endblock %}

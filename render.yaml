@@ -3,10 +3,14 @@ services:
     name: shawnzyluxe
     runtime: python
     buildCommand: pip install -r requirements.txt
-    startCommand: gunicorn -w 1 -b 0.0.0.0:$PORT app:app
+    startCommand: python migrate.py && gunicorn -w 1 -b 0.0.0.0:$PORT --timeout 120 --access-logfile - --error-logfile - --log-level info app:app
+    healthCheckPath: /health
+    domains:
+      - vantavcommerce.com
+      - www.vantavcommerce.com
     envVars:
       - key: PYTHON_VERSION
-        value: 3.11.0
+        value: 3.11.9
       - key: SHOPIFY_DOMAIN
         sync: false
       - key: SHOPIFY_STOREFRONT_TOKEN
@@ -18,13 +22,13 @@ services:
       - key: SECRET_KEY
         generateValue: true
       - key: MASTER_ADMIN_EMAIL
-        value: shawn@shawnzyluxe.com
+        value: shawn@vantavcommerce.com
       - key: RECAPTCHA_SITE_KEY
         sync: false
       - key: RECAPTCHA_SECRET_KEY
         sync: false
       - key: ENGINEER_EMAIL
-        value: engineer@shawnzyluxe.com
+        value: engineer@vantavcommerce.com
       - key: TEMP_ACCOUNTS_PASSWORD
         sync: false
       - key: DATABASE_URL
@@ -57,6 +61,14 @@ services:
         sync: false
       - key: STRIPE_SECRET_KEY
         sync: false
+      - key: STRIPE_PRICE_OPERATOR_MONTHLY
+        sync: false
+      - key: STRIPE_PRICE_GROWTH_MONTHLY
+        sync: false
+      - key: STRIPE_PRICE_SCALE_MONTHLY
+        sync: false
+      - key: STRIPE_PRICE_CONCIERGE_BUNDLE_MONTHLY
+        sync: false
       - key: SHOPIFY_STORE_URL
         sync: false
       - key: SHOPIFY_ACCESS_TOKEN
@@ -66,4 +78,4 @@ services:
       - key: SHOPIFY_CLIENT_SECRET
         sync: false
       - key: OAUTH_REDIRECT_URI
-        value: https://shawnzyluxe.com
+        value: https://vantavcommerce.com

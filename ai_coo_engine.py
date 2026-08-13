@@ -10,7 +10,7 @@ class COORunnerPayload(BaseModel):
 
 
 class AICooEngine:
-    """Main Execution Subsystem for the AI Chief Operating Officer."""
+    """Main execution subsystem for the platform assistant."""
 
     def __init__(self, tenant_id: str):
         self.tenant_id = tenant_id
@@ -30,7 +30,7 @@ class AICooEngine:
         """Autonomously flag broken channel connections for rebuild."""
         repaired_channels = []
         for error in sync_errors:
-            print(f"[AI COO ACTION] Rebuilding OAuth route for broken channel: {error}")
+            print(f"[ASSISTANT ACTION] Rebuilding OAuth route for broken channel: {error}")
             repaired_channels.append(error)
         return repaired_channels
 
@@ -42,7 +42,7 @@ class AICooEngine:
         return "Supply chains stable. No immediate replenishment orders required."
 
     def execute_analysis(self, data_context: Dict[str, Any]) -> Dict[str, Any]:
-        """Run the full AI COO analysis with real DB-derived context."""
+        """Run the full assistant analysis with real DB-derived context."""
         health = self.get_business_health_score(
             data_context.get("sync_error_count", 0),
             data_context.get("net_profit_margin", 0.0),
@@ -59,7 +59,7 @@ class AICooEngine:
         repaired = self.run_automation_builder(simulated_errors)
 
         summary = (
-            f"🤖 [AI COO EXECUTIVE BRIEFING FOR {self.tenant_id.upper()}]\n\n"
+            f"🤖 [ASSISTANT EXECUTIVE BRIEFING FOR {self.tenant_id.upper()}]\n\n"
             f"1. BUSINESS HEALTH RATING: {health['health_score']}/100 ({health['status']})\n"
             f"   - {health['metric_summary']}\n\n"
             f"2. SUPPLY CHAIN INTELLIGENCE:\n"
@@ -73,7 +73,7 @@ class AICooEngine:
             summary += "   - All multi-channel API routes running at peak capacity."
 
         return {
-            "status": "COO_ANALYSIS_COMPLETE",
+            "status": "ASSISTANT_ANALYSIS_COMPLETE",
             "active_view": data_context.get("active_screen_view", "dashboard"),
             "executive_summary": summary,
             "health_data": health,

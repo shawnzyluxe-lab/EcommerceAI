@@ -1,0 +1,249 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <link rel="icon" type="image/x-icon" href="/static/images/favicon.ico">
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Vantav — Log in</title>
+  <script src="https://www.google.com/recaptcha/api.js?render={{ recaptcha_site_key }}" async defer></script>
+  <style>
+    :root {
+      --bg: #0c0c11;
+      --card: #14141c;
+      --ink: #f4f2f9;
+      --muted: #c6c3d2;
+      --line: #23232d;
+      --accent: #8b5cf6;
+      --accent-2: #a78bfa;
+      --accent-bg: rgba(139,92,246,0.12);
+      --error: #fb7185;
+    }
+    * { box-sizing: border-box; }
+    html, body {
+      margin: 0;
+      background: var(--bg);
+      color: var(--ink);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      min-height: 100vh;
+      overflow-x: hidden;
+    }
+    .wrap {
+      max-width: 420px;
+      margin: 0 auto;
+      padding: 4rem 1.5rem;
+      display: flex;
+      flex-direction: column;
+      min-height: 100vh;
+    }
+    .brand {
+      text-align: center;
+      margin-bottom: 2.5rem;
+      font-size: .7rem;
+      letter-spacing: .25em;
+      text-transform: uppercase;
+      color: var(--muted);
+    }
+    .brand strong { color: var(--accent); }
+    h1 {
+      font-size: clamp(1.45rem, 5.5vw, 1.75rem);
+      font-weight: 700;
+      text-align: center;
+      margin: 0 0 .5rem;
+      letter-spacing: -.02em;
+      max-width: 100%;
+      overflow-wrap: break-word;
+      word-break: normal;
+    }
+    .sub {
+      text-align: center;
+      color: var(--muted);
+      font-size: .9rem;
+      margin: 0 0 2rem;
+    }
+    .card {
+      background: var(--card);
+      border: 1px solid var(--line);
+      border-radius: 16px;
+      padding: 2rem;
+      box-shadow: 0 20px 60px rgba(0,0,0,.35);
+    }
+    label {
+      display: block;
+      font-size: .75rem;
+      font-weight: 600;
+      color: var(--muted);
+      margin-bottom: .4rem;
+      letter-spacing: .02em;
+    }
+    input[type="email"], input[type="password"] {
+      width: 100%;
+      padding: .85rem 1rem;
+      margin-bottom: 1.1rem;
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      background: #111;
+      color: var(--ink);
+      font-size: .95rem;
+      outline: none;
+      transition: border-color .15s;
+    }
+    input:focus { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-bg); }
+    button {
+      width: 100%;
+      padding: .95rem;
+      border: none;
+      border-radius: 10px;
+      background: linear-gradient(135deg, var(--accent) 0%, #0c0c11 100%);
+      color: var(--ink);
+      font-size: .9rem;
+      font-weight: 700;
+      cursor: pointer;
+      transition: opacity .15s;
+    }
+    button:hover { opacity: .92; }
+    button:disabled { opacity: .6; cursor: not-allowed; }
+    .error {
+      background: rgba(251,113,133,.1);
+      border: 1px solid rgba(251,113,133,.25);
+      color: #fb7185;
+      padding: .75rem 1rem;
+      border-radius: 10px;
+      font-size: .85rem;
+      margin-bottom: 1rem;
+      display: none;
+    }
+    .links {
+      text-align: center;
+      margin-top: 1.25rem;
+      font-size: .85rem;
+      color: var(--muted);
+    }
+    .links a {
+      color: var(--accent);
+      text-decoration: none;
+      font-weight: 600;
+      overflow-wrap: break-word;
+    }
+    .footer {
+      margin-top: auto;
+      padding-top: 3rem;
+      text-align: center;
+      font-size: .7rem;
+      color: #555;
+    }
+    .footer a { color: var(--muted); text-decoration: none; margin: 0 .4rem; }
+    @media (max-width: 480px) {
+      .wrap { padding: 2rem 1rem; max-width: 100%; }
+      .card { padding: 1.25rem; }
+      .sub { font-size: .85rem; }
+      input[type="email"], input[type="password"] { padding: .75rem .9rem; font-size: .9rem; }
+      button { padding: .85rem; font-size: .9rem; }
+      .links { font-size: .8rem; }
+    }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="brand"><strong>Vantav</strong> Beta</div>
+    <h1>Log in to your dashboard</h1>
+    <p class="sub">Approved beta members only.</p>
+
+    <div class="card">
+      <div class="error" id="error">{{ error or '' }}</div>
+      <div id="sandbox-message" style="display:none; background:var(--accent-bg); border:1px solid rgba(139,92,246,.25); color:var(--accent); padding:.75rem 1rem; border-radius:10px; font-size:.85rem; margin-bottom:1rem;"></div>
+      <form id="login-form" onsubmit="submitLogin(event)">
+        <label for="email">Email</label>
+        <input type="email" id="email" name="email" required autocomplete="email" placeholder="you@company.com" value="{{ request.args.get('email','') | e }}">
+
+        <label for="password">Password</label>
+        <input type="password" id="password" name="password" required autocomplete="current-password" placeholder="••••••••">
+
+        <button type="submit" id="btn">Log in</button>
+      </form>
+    </div>
+
+    <div class="links">
+      Don't have access? <a href="/subscribe">Apply for the closed beta</a>
+    </div>
+
+    <div class="footer">
+      &copy; 2026 Vantav LLC.
+      <a href="/terms">Terms</a>
+      <a href="/privacy">Privacy</a>
+      <a href="/refund">Refund</a>
+    </div>
+  </div>
+
+  <script>
+    const recaptchaSiteKey = "{{ recaptcha_site_key }}";
+
+    (function handleQueryMessages() {
+      const params = new URLSearchParams(window.location.search);
+      const err = params.get('error');
+      const msgBox = document.getElementById('error');
+      const sandboxBox = document.getElementById('sandbox-message');
+      if (err === 'token_expired' || err === 'missing_token' || err === 'invalid_token') {
+        msgBox.textContent = 'That login link has expired. Use your email and temporary password to log in.';
+        msgBox.style.display = 'block';
+      } else if (err === 'sandbox_expired') {
+        msgBox.textContent = 'Your 48-hour sandbox has expired. Contact support to upgrade to live access.';
+        msgBox.style.display = 'block';
+      }
+      if (params.get('sandbox') === 'ready') {
+        sandboxBox.textContent = 'Your sandbox is active. Use the temporary password from your email, or click the dashboard link in that email.';
+        sandboxBox.style.display = 'block';
+      }
+    })();
+
+    async function submitLogin(e) {
+      e.preventDefault();
+      const btn = document.getElementById('btn');
+      const error = document.getElementById('error');
+      btn.disabled = true;
+      btn.textContent = 'Logging in…';
+      error.style.display = 'none';
+
+      try {
+        // reCAPTCHA v3 is optional during beta; collect a token if it's available.
+        let token = '';
+        if (window.grecaptcha && recaptchaSiteKey) {
+          try {
+            token = await new Promise((resolve, reject) => {
+              window.grecaptcha.ready(() => {
+                window.grecaptcha.execute(recaptchaSiteKey, { action: 'login' })
+                  .then(resolve)
+                  .catch(reject);
+              });
+            });
+          } catch (e) {
+            console.warn('reCAPTCHA token not available, continuing without it:', e);
+          }
+        }
+
+        const r = await fetch('/api/v1/auth/login', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'same-origin',
+          body: JSON.stringify({
+            email: document.getElementById('email').value,
+            password: document.getElementById('password').value,
+            captcha_token: token,
+          }),
+        });
+
+        const data = await r.json();
+        if (r.ok && data.status === 'AUTHORIZED') {
+          window.location.href = '/dashboard';
+        } else {
+          throw new Error(data.detail || 'Login failed.');
+        }
+      } catch (err) {
+        error.textContent = err.message || 'Unable to log in. Please try again.';
+        error.style.display = 'block';
+        btn.disabled = false;
+        btn.textContent = 'Log in';
+      }
+    }
+  </script>
+</body>
+</html>

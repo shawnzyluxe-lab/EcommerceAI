@@ -1,0 +1,74 @@
+{% extends 'dashboard/base.html' %}
+{% block title %}Support — {{ brand.name }} {{ brand.product }}{% endblock %}
+{% block content %}
+
+<section class="page-header">
+  <h1>Customer Support</h1>
+  <p>Smart support. Happier customers.</p>
+</section>
+
+<div class="kpi-grid">
+  <div class="card kpi-card">
+    <div class="kpi-label">Resolved rate</div>
+    <div class="kpi-value">{{ support.resolved_rate }}%</div>
+    <div class="kpi-delta up">▲ 12% vs last 30 days</div>
+  </div>
+  <div class="card kpi-card">
+    <div class="kpi-label">Open</div>
+    <div class="kpi-value">{{ support.open }}</div>
+    <div class="kpi-delta down">▼ 2 vs last 30 days</div>
+  </div>
+  <div class="card kpi-card">
+    <div class="kpi-label">Escalated</div>
+    <div class="kpi-value">{{ support.escalated }}</div>
+    <div class="kpi-delta down">▼ 1 vs last 30 days</div>
+  </div>
+  <div class="card kpi-card">
+    <div class="kpi-label">Avg first reply</div>
+    <div class="kpi-value">{{ support.avg_first_reply }}</div>
+    <div class="kpi-delta down">▼ 14s vs last 30 days</div>
+  </div>
+</div>
+
+<div class="grid grid-2">
+  <div class="card">
+    <div class="card-head"><h3>All Conversations</h3></div>
+    <div class="chips" style="margin-bottom: 12px;">
+      <span class="chip" style="background: var(--gold-bg); color: var(--amber);">All</span>
+      <span class="chip">Open</span>
+      <span class="chip">Auto-resolved</span>
+      <span class="chip">Escalated</span>
+    </div>
+    <div style="display: flex; flex-direction: column; gap: 8px;">
+      {% for t in support.threads %}
+      <div style="display: flex; gap: 10px; align-items: center; padding: 12px; border: 1px solid var(--line); border-radius: 12px;">
+        <div style="width: 36px; height: 36px; border-radius: 50%; background: var(--line-2); display: grid; place-items: center; font-weight: 700; color: var(--ink-3); flex: none;">{{ t.who[:1] }}</div>
+        <div style="flex: 1; min-width: 0;">
+          <div style="font-weight: 600; font-size: .86rem;">{{ t.who }} — {{ t.topic }}</div>
+          <div style="font-size: .78rem; color: var(--ink-3); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">{{ t.note }}</div>
+        </div>
+        <span class="tag {{ 'tag-amber' if t.state == 'escalated' else 'tag-green' }}">{{ t.state }}</span>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-head"><h3>Suggested Replies</h3></div>
+    <div style="border: 1px solid var(--line); border-radius: 12px; padding: 12px; margin-bottom: 10px; background: #fff;">
+      Your order #78945 is currently in transit and expected to arrive on May 26, 2025. You can track it here: {tracking_link}
+    </div>
+    <div style="border: 1px solid var(--line); border-radius: 12px; padding: 12px; margin-bottom: 10px; background: #fff;">
+      I checked with our shipping partner and there's a slight delay. Your order should arrive by May 27, 2025.
+    </div>
+    <div style="border: 1px solid var(--line); border-radius: 12px; padding: 12px; background: #fff;">
+      Apologies for the delay! I've sent you a small discount code as a token of our apology.
+    </div>
+    <div class="prompt" style="margin-top: 14px;">
+      <input placeholder="Type your message…" style="font-size: .9rem;">
+      <button class="btn btn-primary">Send</button>
+    </div>
+  </div>
+</div>
+
+{% endblock %}

@@ -1,0 +1,30 @@
+{% extends 'dashboard/base.html' %}
+{% block title %}Returns — {{ brand.name }} {{ brand.product }}{% endblock %}
+{% block content %}
+
+<section class="page-header">
+  <h1>Returns</h1>
+  <p>Manage returns, refunds, and exchange requests.</p>
+</section>
+
+<div class="kpi-grid">
+  <div class="card kpi-card"><div class="kpi-label">Return rate</div><div class="kpi-value">2.4%</div><div class="kpi-delta down">▼ 0.5% vs last 30 days</div></div>
+  <div class="card kpi-card"><div class="kpi-label">Open returns</div><div class="kpi-value">14</div></div>
+  <div class="card kpi-card"><div class="kpi-label">Refunds issued</div><div class="kpi-value">$2,840</div><div class="kpi-delta down">▼ 3.1% vs last 30 days</div></div>
+  <div class="card kpi-card"><div class="kpi-label">Avg resolution</div><div class="kpi-value">2.1d</div></div>
+</div>
+
+<div class="card">
+  <div class="card-head"><h3>Return Requests</h3></div>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Order</th><th>Product</th><th>Reason</th><th class="num">Refund</th><th>Status</th></tr></thead>
+      <tbody>
+        <tr><td class="b mono">#1037</td><td>Prometheus Ceramic Mug</td><td>Arrived broken</td><td class="num mono">$19.99</td><td><span class="tag tag-amber">In review</span></td></tr>
+        <tr><td class="b mono">#1029</td><td>Prometheus Hoodie</td><td>Wrong size</td><td class="num mono">$59.99</td><td><span class="tag tag-green">Approved</span></td></tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+{% endblock %}

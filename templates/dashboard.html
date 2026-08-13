@@ -1,9 +1,10 @@
 <!doctype html>
 <html lang="en">
 <head>
+<link rel="icon" type="image/x-icon" href="/static/images/favicon.ico">
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>{{ brand.name }} {{ brand.product }} — AI operating system for commerce</title>
+<title>{{ brand.name }} {{ brand.product }} — AI commerce operations</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
@@ -143,10 +144,10 @@ body.sidebar-collapsed .shell { grid-template-columns: 60px 1fr; }
 
     <div class="wrap">
 
-      <!-- ---------- AI COO ---------- -->
+      <!-- ---------- Assistant ---------- -->
       <section class="coo">
         <div class="card-head" style="margin-bottom:10px">
-          <span class="tag blue">AI COO</span>
+          <span class="tag blue">Assistant</span>
           <span class="tag ghost">Confidence {{ coo.confidence }}%</span>
           <span class="spacer"></span>
           <span class="crumb" style="font-size:.76rem;color:var(--ink-3)">{{ generated }}</span>
@@ -173,40 +174,40 @@ body.sidebar-collapsed .shell { grid-template-columns: 60px 1fr; }
           {% endfor %}
         </div>
         <div class="approve">
-          <button class="btn blue" onclick="executeContextualAIAnalysis()">Run AI COO Analysis</button>
+          <button class="btn blue" onclick="executeContextualAIAnalysis()">Run Assistant Analysis</button>
           <button class="btn blue" onclick="executeLearnedMitigationMoat('INVENTORY_SHORTAGE','APPROVED','Supplier C')">Approve &amp; Execute</button>
           <button class="btn" onclick="executeLearnedMitigationMoat('INVENTORY_SHORTAGE','MODIFIED','Supplier C')">Modify</button>
           <button class="btn">Dismiss</button>
         </div>
-        <pre id="ai-output" style="margin-top:12px; padding:12px; background:#0b1020; color:#d4e3ff; border-radius:10px; font-size:12px; white-space:pre-wrap; min-height:60px;">AI COO standing by.</pre>
+        <pre id="ai-output" style="margin-top:12px; padding:12px; background:#0b1020; color:#d4e3ff; border-radius:10px; font-size:12px; white-space:pre-wrap; min-height:60px;">Assistant standing by.</pre>
       </section>
 
-      <!-- ---------- Team AI Orchestration Loop ---------- -->
+      <!-- ---------- Assistant Workstreams ---------- -->
       <section class="section" id="agents">
         <div class="section-head">
-          <h2>Team AI Orchestration Loop</h2>
-          <p>Real-time background agent collaboration array.</p>
+          <h2>Assistant Workstreams</h2>
+          <p>Real-time cross-checks across operations, finance, marketing, and support.</p>
           <span class="spacer"></span>
           <button class="btn blue" onclick="executeLearnedMitigationMoat('INVENTORY_SHORTAGE','APPROVED','Supplier C')">Run Override</button>
         </div>
         <div class="glass-card" style="border-top: 2px solid #D4AF37; background: #16161F;">
           <div id="multi-agent-status-matrix-box" style="display:flex; flex-direction:column; gap:12px;">
-            <div style="font-size:12px; color:#7d8798; text-align:center;">Initializing agent mesh network connectivity...</div>
+            <div style="font-size:12px; color:#7d8798; text-align:center;">Initializing workstream status...</div>
           </div>
         </div>
       </section>
 
-      <!-- ---------- Inter-Agent Dialogue Terminal ---------- -->
+      <!-- ---------- Assistant Activity Feed ---------- -->
       <section class="section" id="inter-agent-dialogue">
         <div class="section-head">
-          <h2>Inter-Agent Dialogue Terminal</h2>
-          <p>Real-time background worker communications.</p>
+          <h2>Assistant Activity Feed</h2>
+          <p>Real-time assistant updates and cross-checks.</p>
           <span class="spacer"></span>
-          <span class="tag green" style="font-family:'JetBrains Mono';">STREAM_ACTIVE</span>
+          <span class="tag green" style="font-family:'JetBrains Mono';">LIVE</span>
         </div>
         <div class="glass-card" style="border-top: 2px solid #5C6E88; background: #1C1D21; color:#b7bdc9; font-family:'JetBrains Mono', monospace; padding:14px;">
           <div id="inter-agent-chat-feed-box" style="display:flex; flex-direction:column; gap:10px; font-size:11px; height:130px; overflow-y:auto; line-height:1.4;">
-            <div style="color:#7d8798;">Connecting terminal pipeline channels...</div>
+            <div style="color:#7d8798;">Connecting to assistant feed...</div>
           </div>
         </div>
       </section>
@@ -348,7 +349,7 @@ body.sidebar-collapsed .shell { grid-template-columns: 60px 1fr; }
       <!-- ---------- Profit Engine ---------- -->
       <section class="section" id="profit">
         <div class="section-head">
-          <h2>AI Profit Engine</h2>
+          <h2>True Profit</h2>
           <p>Real profit, not revenue — every cost included, per order, in real time.</p>
         </div>
         <div class="grid g12">
@@ -385,7 +386,7 @@ body.sidebar-collapsed .shell { grid-template-columns: 60px 1fr; }
                 <tr>
                   <td class="b mono">{{ o.id }}</td>
                   <td>{{ o.channel }}</td>
-                  <td class="num">{{ o.items }}</td>
+                  <td class="num">{{ o['items'] }}</td>
                   <td class="num mono">${{ '%.2f'|format(o.revenue) }}</td>
                   <td class="num mono {{ 'up' if o.profit > 0 else 'down' }}" style="font-weight:600">${{ '%.2f'|format(o.profit) }}</td>
                   <td class="num mono">{{ o.margin }}%</td>
@@ -844,11 +845,11 @@ body.sidebar-collapsed .shell { grid-template-columns: 60px 1fr; }
 
           <div class="card" id="mobile">
             <div class="card-head">
-              <h3>Mobile AI Copilot</h3>
+              <h3>Mobile Assistant</h3>
               <p class="hint">Same brain, phone-sized.</p>
             </div>
             <div class="card tight" style="max-width:300px;margin:0 auto;border-radius:22px;background:linear-gradient(180deg,#f4f8ff,#fff)">
-              <div class="tag blue" style="margin-bottom:8px">Copilot</div>
+              <div class="tag blue" style="margin-bottom:8px">Assistant</div>
               <p style="font-size:.86rem;color:var(--ink)">Profit today is <strong>${{ '{:,.0f}'.format(briefing.profit) }}</strong> on {{ briefing.orders }} orders. {{ briefing.delayed }} shipments are delayed.</p>
               <div class="suggests" style="margin-top:10px">
                 {% for m in mobile_actions %}<span class="chip" style="font-size:.74rem">{{ m }}</span>{% endfor %}
@@ -872,7 +873,7 @@ body.sidebar-collapsed .shell { grid-template-columns: 60px 1fr; }
     <section class="section" id="settings">
       <div class="section-head">
         <h2>⚙️ System Settings</h2>
-        <p>Platform operations, channel tokens, and AI COO permissions.</p>
+        <p>Platform operations, channel tokens, and assistant permissions.</p>
       </div>
       <div style="background:var(--card); padding:25px; border:1px solid #262636; border-radius:6px; margin-bottom:20px;">
         <h5 style="margin-top:0; color:#fff;">1. Storefront Channel API Tokens</h5>
@@ -888,25 +889,25 @@ body.sidebar-collapsed .shell { grid-template-columns: 60px 1fr; }
       </div>
 
       <div style="background:var(--card); padding:25px; border:1px solid #262636; border-radius:6px; margin-bottom:20px;">
-        <h5 style="margin-top:0; color:#fff;">2. Operational Billing Plan</h5>
-        <p style="font-size:14px; margin:0 0 15px 0;">Current Active Organization Tier Level: <strong style="color:#D4AF37;">{{ merchant.tier | upper }} PLAN</strong></p>
-        <button style="background:#222; color:#fff; padding:10px 20px; border:none; border-radius:4px; cursor:pointer;" onclick="alert('Tier upgrade flow not yet implemented.')">Modify Subscription Tier Mapping</button>
+        <h5 style="margin-top:0; color:#fff;">2. Billing Plan</h5>
+        <p style="font-size:14px; margin:0 0 15px 0;">Current plan: <strong style="color:#D4AF37;">{{ merchant.tier | upper }}</strong></p>
+        <button style="background:#222; color:#fff; padding:10px 20px; border:none; border-radius:4px; cursor:pointer;" onclick="alert('Tier upgrade flow not yet implemented.')">Change plan</button>
       </div>
 
       <div style="background:var(--card); padding:25px; border:1px solid #262636; border-radius:6px;">
-        <h5 style="margin-top:0; color:#fff;">3. Internal AI COO Engine Permissions</h5>
+        <h5 style="margin-top:0; color:#fff;">3. Assistant Permissions</h5>
         <label style="display:flex; align-items:center; cursor:pointer; font-size:14px;">
           <input type="checkbox" id="coo-auto-reorder" checked style="margin-right:10px;">
-          Allow AI COO to autonomously draft purchase orders when inventory running low
+          Allow the assistant to autonomously draft purchase orders when inventory is running low
         </label>
       </div>
 
       <div style="background:var(--card); padding:25px; border:1px solid #262636; border-radius:6px; margin-top:20px;">
         <h5 style="margin-top:0; color:#fff;">4. Contact &amp; Support</h5>
-        <p style="font-size:14px; color:#b7bdc9; margin:0 0 12px 0;">Get help with your Prometheus OS node.</p>
+        <p style="font-size:14px; color:#b7bdc9; margin:0 0 12px 0;">Get help with your Vantav account.</p>
         <div style="display:grid; gap:10px; font-size:13px; color:#f4f4f6;">
           <div><strong>General Support:</strong> <a href="mailto:support@shawnzyluxe.com" style="color:#D4AF37;">support@shawnzyluxe.com</a></div>
-          <div><strong>Technical Engineering:</strong> <a href="mailto:engineering@shawnzyluxe.com" style="color:#D4AF37;">engineering@shawnzyluxe.com</a></div>
+          <div><strong>Engineering:</strong> <a href="mailto:engineering@shawnzyluxe.com" style="color:#D4AF37;">engineering@shawnzyluxe.com</a></div>
           <div><strong>Billing &amp; Tiers:</strong> <a href="mailto:billing@shawnzyluxe.com" style="color:#D4AF37;">billing@shawnzyluxe.com</a></div>
           <div><strong>Emergency Line:</strong> <span style="color:#D4AF37;">+1 (305) 600-7654</span></div>
         </div>
@@ -1131,10 +1132,16 @@ function updateMultiAgentWorkspaceMatrixCard(agentsPoolArray) {
 function updateInterAgentVisualChatTerminal(dialogueStreamArray) {
   const chatContainer = document.getElementById('inter-agent-chat-feed-box');
   if (!chatContainer || !dialogueStreamArray) return;
+  const colorMap = {
+    'Operations': '#FF8C00',
+    'Finance': '#22C55E',
+    'Marketing': '#9D4EDD',
+    'Support': '#3B82F6',
+  };
   let html = "";
   dialogueStreamArray.forEach(line => {
-    let nameTag = line.sender === 'agent_logistics' ? 'LOGISTICS_AI' : (line.sender === 'agent_finance' ? 'FINANCE_AI' : (line.sender === 'agent_marketing' ? 'MARKETING_AI' : 'SUPPORT_AI'));
-    let nameColor = line.sender === 'agent_logistics' ? '#FF8C00' : (line.sender === 'agent_finance' ? '#22C55E' : '#9D4EDD');
+    const nameTag = line.sender || 'Assistant';
+    const nameColor = colorMap[nameTag] || '#9CA3AF';
     html += `<div><span style="color:${nameColor}; font-weight:700;">[${nameTag}]:</span> <span style="color:#E0E6ED;">${line.text}</span></div>`;
   });
   chatContainer.innerHTML = html;
@@ -1182,7 +1189,7 @@ async function commitOneClickMitigation(actionKey) {
   });
   const data = await response.json();
   if (data.success) {
-    alert('AI Operations Engine executed fixed workflow map. Pipeline restored healthy.');
+    alert('Vantav executed the recovery workflow. The issue has been resolved.');
     performTelemetryWorkspaceSync();
   } else {
     alert(data.error || 'Mitigation failed.');
@@ -1211,7 +1218,7 @@ async function commitCredentialsToVault() {
 
 async function executeContextualAIAnalysis() {
   const aiOutputBox = document.getElementById('ai-output');
-  aiOutputBox.innerText = "AI COO is analyzing real-time workspace pipelines...";
+  aiOutputBox.innerText = "Assistant is analyzing real-time workspace pipelines...";
 
   const payload = {
     tenant_id: "tenant_current",
@@ -1230,7 +1237,7 @@ async function executeContextualAIAnalysis() {
     const data = await response.json();
     aiOutputBox.innerText = data.executive_summary;
   } catch (error) {
-    aiOutputBox.innerText = "AI COO Error: " + error.message;
+    aiOutputBox.innerText = "Assistant error: " + error.message;
   }
 }
 

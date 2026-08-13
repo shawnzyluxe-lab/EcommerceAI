@@ -1,0 +1,21 @@
+{% extends 'dashboard/base.html' %}
+{% block title %}{{ page_title }} — {{ brand.name }} {{ brand.product }}{% endblock %}
+{% block content %}
+
+<section class="page-header">
+  <h1>{{ page_title }}</h1>
+  <p>{{ page_description }}</p>
+</section>
+
+{% if page_content %}
+  {{ page_content | safe }}
+{% else %}
+  <div class="card" style="text-align: center; padding: 60px 24px;">
+    <div style="font-size: 2.5rem; margin-bottom: 16px;">🚧</div>
+    <h2 style="margin-bottom: 8px;">{{ page_title }}</h2>
+    <p style="color: var(--ink-3); margin-bottom: 24px;">This module is being rebuilt to the new commercial-grade standard. Check back shortly.</p>
+    <a href="/dashboard" class="btn btn-primary">Back to Overview</a>
+  </div>
+{% endif %}
+
+{% endblock %}
