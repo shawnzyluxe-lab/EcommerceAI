@@ -126,9 +126,10 @@ def create_checkout_session(
         concierge_price = _price_id("concierge_bundle")
         if not concierge_price:
             raise RuntimeError("STRIPE_PRICE_CONCIERGE_BUNDLE is not configured")
-        # One-time add-on fee added to the first subscription invoice.
+        # One-time add-on fee charged on the first invoice alongside the subscription.
         subscription_metadata["concierge_bundle"] = "true"
         add_ons.append("concierge_bundle")
+        line_items.append({"price": concierge_price, "quantity": 1})
 
     profile = MerchantProfile.query.get(merchant_id)
     if not profile:
