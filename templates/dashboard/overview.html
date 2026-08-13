@@ -2,26 +2,37 @@
 {% block title %}Overview — {{ brand.name }} {{ brand.product }}{% endblock %}
 {% block content %}
 
-<section class="page-header" style="margin-bottom: 18px;">
+<section class="page-header" style="margin-bottom: 8px;">
   <h1 style="font-size: 1.55rem; margin: 0;"><span class="js-greeting">{{ coo.greeting }}</span></h1>
-  <p style="color: var(--ink-3); margin-top: 6px; font-size: .92rem;">True profit, attention alerts, and recommended actions — all in one place.</p>
+  <p style="color: var(--ink-3); margin-top: 6px; font-size: .92rem;">
+    Vanta is monitoring {{ connected|length }} channel{{ 's' if connected|length != 1 else '' }}{% if connected %}: {% for c in connected %}{{ c.name or c.channel or c.id }}{% if not loop.last %} • {% endif %}{% endfor %}{% endif %}
+  </p>
 </section>
 
-<div class="grid grid-3" style="align-items: start;">
+<div class="ai-greeting" id="ai-greeting" style="display:none;">
+  <span class="ai-greeting-icon">{{ ai_greeting }}</span>
+</div>
 
-  <!-- PILLAR 1: TRUE PROFIT LEDGERS -->
-  <div class="card" style="background: transparent; border: 1px solid var(--line); padding: 0; overflow: hidden; display: flex; flex-direction: column;">
-    <div style="padding: 16px 18px; border-bottom: 1px solid var(--line); background: var(--purple-bg);">
-      <span style="font-size: .65rem; text-transform: uppercase; letter-spacing: .1em; color: var(--purple); font-weight: 700;">// PILLAR 01 //</span>
-      <h2 style="font-size: .95rem; margin: 4px 0 0;">True Profit Ledgers</h2>
+<div class="workflow-pillars" style="margin-top: 18px;">
+
+  <!-- PILLAR 01: TRUE PROFIT -->
+  <div class="pillar">
+    <div class="pillar-header">
+      <div style="display: flex; align-items: center;">
+        <span class="pillar-number">01</span>
+        <div>
+          <div class="pillar-title">TRUE PROFIT</div>
+          <div class="pillar-subtitle">What is happening?</div>
+        </div>
+      </div>
     </div>
 
-    <div style="padding: 20px 18px;">
+    <div style="padding: 22px 18px; flex: 1; display: flex; flex-direction: column;">
       <div style="font-size: .7rem; text-transform: uppercase; letter-spacing: .08em; color: var(--ink-3);">Actual Net Earnings</div>
-      <div style="font-size: 2.6rem; font-weight: 800; line-height: 1; margin-top: 8px; color: var(--ink);">${{ '{:,.2f}'.format(net) }}</div>
-      <div style="font-size: .85rem; color: var(--green); margin-top: 6px; font-weight: 600;">▲ {{ net_margin }}% net margin</div>
+      <div class="big-profit">${{ '{:,.2f}'.format(net) }}</div>
+      <div style="font-size: .95rem; color: var(--green); margin-top: 6px; font-weight: 700;">{{ net_margin }}% Net Margin</div>
 
-      <div style="display: flex; align-items: flex-end; gap: 3px; height: 56px; margin-top: 18px;">
+      <div style="display: flex; align-items: flex-end; gap: 3px; height: 70px; margin-top: 20px;">
         {% for p in series %}
         <div style="flex: 1; background: linear-gradient(to top, var(--purple), var(--purple-2)); border-radius: 2px 2px 0 0; height: {{ (p['value'] / series_max * 100)|round }}%; opacity: {{ 0.35 + 0.65 * (p['value'] / series_max) }};" title="{{ p['date'] }}: ${{ '{:,.0f}'.format(p['value']) }}"></div>
         {% endfor %}
@@ -30,30 +41,44 @@
         <span>{{ series[0]['date'] }}</span>
         <span>{{ series[-1]['date'] }}</span>
       </div>
-    </div>
 
-    <div style="padding: 0 18px 20px; flex: 1;">
-      <div style="font-size: .7rem; text-transform: uppercase; letter-spacing: .08em; color: var(--ink-3); margin-bottom: 12px;">Variable Cost Accounting Waterfall</div>
-      {% for r in profit_rows %}
-      <div style="display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px dashed var(--line); font-size: .84rem;">
-        <span style="color: var(--ink-2);">{{ r['label'] }}</span>
-        <span class="mono" style="font-weight: 600; color: {% if r['kind'] == 'in' %}var(--green){% else %}var(--red){% endif %};">
-          {% if r['kind'] == 'in' %}+{% else %}−{% endif %}${{ '{:,.2f}'.format(r['amount']|abs) }}
-        </span>
-      </div>
-      {% endfor %}
-      <div style="display: flex; justify-content: space-between; padding-top: 12px; font-weight: 700; font-size: .95rem; border-top: 2px solid var(--line);">
-        <span style="color: var(--purple);">Calculated Net Margin</span>
-        <span class="mono" style="color: var(--green);">{{ net_margin }}%</span>
+      <button class="btn btn-ghost" style="margin-top: auto; align-self: flex-start; font-size: .78rem;" onclick="document.getElementById('profit-waterfall').classList.toggle('hidden')">
+        View Profit Breakdown →
+      </button>
+
+      <div id="profit-waterfall" class="hidden" style="margin-top: 16px; padding-top: 16px; border-top: 1px solid var(--line);">
+        <div style="font-size: .7rem; text-transform: uppercase; letter-spacing: .08em; color: var(--ink-3); margin-bottom: 12px;">Variable Cost Accounting Waterfall</div>
+        {% for r in profit_rows %}
+        <div style="display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px dashed var(--line); font-size: .84rem;">
+          <span style="color: var(--ink-2);">{{ r['label'] }}</span>
+          <span class="mono" style="font-weight: 600; color: {% if r['kind'] == 'in' %}var(--green){% else %}var(--red){% endif %};">
+            {% if r['kind'] == 'in' %}+{% else %}−{% endif %}${{ '{:,.2f}'.format(r['amount']|abs) }}
+          </span>
+        </div>
+        {% endfor %}
+        <div style="display: flex; justify-content: space-between; padding-top: 12px; font-weight: 700; font-size: .95rem; border-top: 2px solid var(--line);">
+          <span style="color: var(--purple);">Calculated Net Margin</span>
+          <span class="mono" style="color: var(--green);">{{ net_margin }}%</span>
+        </div>
       </div>
     </div>
   </div>
 
-  <!-- PILLAR 2: ATTENTION ALERTS -->
-  <div class="card" style="background: transparent; border: 1px solid var(--line); padding: 0; overflow: hidden; display: flex; flex-direction: column;">
-    <div style="padding: 16px 18px; border-bottom: 1px solid var(--line); background: var(--purple-bg);">
-      <span style="font-size: .65rem; text-transform: uppercase; letter-spacing: .1em; color: var(--purple); font-weight: 700;">// PILLAR 02 //</span>
-      <h2 style="font-size: .95rem; margin: 4px 0 0;">Attention Alerts</h2>
+  <div class="pillar-arrow">
+    <span>→</span>
+    <span class="arrow-label">Alerts</span>
+  </div>
+
+  <!-- PILLAR 02: ATTENTION ALERTS -->
+  <div class="pillar">
+    <div class="pillar-header">
+      <div style="display: flex; align-items: center;">
+        <span class="pillar-number">02</span>
+        <div>
+          <div class="pillar-title">ALERTS</div>
+          <div class="pillar-subtitle">What needs attention?</div>
+        </div>
+      </div>
     </div>
 
     <div style="padding: 18px; display: flex; flex-direction: column; gap: 12px; flex: 1;">
@@ -82,22 +107,26 @@
     </div>
   </div>
 
-  <!-- PILLAR 3: RECOMMENDED ACTIONS -->
-  <div class="card" style="background: transparent; border: 1px solid var(--line); padding: 0; overflow: hidden; display: flex; flex-direction: column;">
-    <div style="padding: 16px 18px; border-bottom: 1px solid var(--line); background: var(--purple-bg);">
-      <span style="font-size: .65rem; text-transform: uppercase; letter-spacing: .1em; color: var(--purple); font-weight: 700;">// PILLAR 03 //</span>
-      <h2 style="font-size: .95rem; margin: 4px 0 0;">Recommended Actions</h2>
+  <div class="pillar-arrow">
+    <span>→</span>
+    <span class="arrow-label">Actions</span>
+  </div>
+
+  <!-- PILLAR 03: AI RECOMMENDED ACTIONS -->
+  <div class="pillar">
+    <div class="pillar-header">
+      <div style="display: flex; align-items: center;">
+        <span class="pillar-number">03</span>
+        <div>
+          <div class="pillar-title">AI RECOMMENDED ACTIONS</div>
+          <div class="pillar-subtitle">What should I do next?</div>
+        </div>
+      </div>
     </div>
 
     <div style="padding: 18px; display: flex; flex-direction: column; gap: 14px; flex: 1;">
-      <!-- AI Operator status -->
-      <div style="padding: 12px 14px; border-radius: 10px; background: var(--purple-bg); border: 1px solid rgba(139,92,246,.18); display: flex; align-items: center; gap: 10px;">
-        <span style="width: 8px; height: 8px; border-radius: 50%; background: var(--purple); box-shadow: 0 0 8px var(--purple);"></span>
-        <span style="font-size: .84rem; color: var(--ink);">AI Assistant is monitoring {{ connected|length }} channel{{ 's' if connected|length != 1 else '' }}</span>
-      </div>
-
       {% if hero_action %}
-      <div class="card" style="border: 1px solid var(--line); padding: 0; overflow: hidden; position: relative;">
+      <div class="card" style="border: 1px solid var(--line); padding: 0; overflow: hidden; position: relative; background: var(--surface);">
         <div style="padding: 14px 16px; border-bottom: 1px solid var(--line); display: flex; justify-content: space-between; align-items: center; background: rgba(139,92,246,0.05);">
           <span style="font-size: .65rem; text-transform: uppercase; letter-spacing: .08em; color: var(--ink-3);">Executive Action</span>
           <span style="font-size: .7rem; color: var(--purple); font-weight: 700; padding: 3px 8px; background: var(--purple-bg); border-radius: 99px;">Recommended</span>
@@ -106,13 +135,20 @@
           <h3 style="font-size: 1rem; margin: 0 0 8px;">{{ hero_action.title }}</h3>
           <p style="font-size: .85rem; color: var(--ink-2); line-height: 1.55; margin-bottom: 12px;">{{ hero_action.detail }}</p>
 
-          <div style="padding: 12px; border-radius: 10px; background: var(--line-2); margin-bottom: 14px;">
-            <div style="font-size: .65rem; text-transform: uppercase; letter-spacing: .08em; color: var(--ink-3); margin-bottom: 8px;">Why I'm recommending this</div>
-            <ul style="margin: 0; padding-left: 18px; font-size: .82rem; color: var(--ink-2); line-height: 1.6;">
-              {% for e in hero_action.evidence %}
-              <li style="margin-bottom: 4px;">{{ e }}</li>
-              {% endfor %}
+          {% set ev = hero_action.evidence %}
+          <div style="padding: 12px; border-radius: 10px; background: var(--line-2); margin-bottom: 14px; font-size: .82rem; color: var(--ink-2); line-height: 1.6;">
+            {% if ev and ev.confidence_score %}<div><span style="color: var(--purple); font-weight: 700;">Confidence:</span> {{ ev.confidence_score|round|int }}%</div>{% endif %}
+            {% if ev and ev.expected_weekly_impact_max is not none %}
+            <div style="margin-top: 4px;">
+              <span style="color: var(--green); font-weight: 700;">Expected impact:</span>
+              ${{ '{:,.2f}'.format(ev.expected_weekly_impact_min|default(0)|float) }} — ${{ '{:,.2f}'.format(ev.expected_weekly_impact_max|default(0)|float) }}/week
+            </div>
+            {% endif %}
+            {% if hero_action.reasons %}
+            <ul style="margin: 8px 0 0 18px;">
+              {% for r in hero_action.reasons[:3] %}<li>{{ r }}</li>{% endfor %}
             </ul>
+            {% endif %}
           </div>
 
           <div style="display: flex; gap: 8px; flex-wrap: wrap;">
@@ -122,31 +158,38 @@
           </div>
         </div>
       </div>
+
+      <div style="display: flex; align-items: center; justify-content: center; gap: 10px; font-size: .75rem; color: var(--ink-3); margin-top: auto; padding-top: 8px;">
+        <span style="width: 24px; height: 24px; border-radius: 50%; background: var(--purple-bg); color: var(--purple); display: inline-flex; align-items: center; justify-content: center; font-weight: 700;">1</span> Review
+        <span style="color: var(--purple);">→</span>
+        <span style="width: 24px; height: 24px; border-radius: 50%; background: var(--purple-bg); color: var(--purple); display: inline-flex; align-items: center; justify-content: center; font-weight: 700;">2</span> Approve
+        <span style="color: var(--purple);">→</span>
+        <span style="width: 24px; height: 24px; border-radius: 50%; background: var(--purple-bg); color: var(--purple); display: inline-flex; align-items: center; justify-content: center; font-weight: 700;">3</span> Execute
+      </div>
       {% else %}
-      <div style="padding: 24px; text-align: center; color: var(--ink-3); border: 1px dashed var(--line); border-radius: 10px;">
+      <div style="padding: 24px; text-align: center; color: var(--ink-3); border: 1px dashed var(--line); border-radius: 10px; flex: 1; display: flex; flex-direction: column; justify-content: center;">
         <p style="margin-bottom: 14px;">No recommended actions yet. Run the assistant to detect opportunities.</p>
-        <button class="btn btn-primary" id="run-analysis-btn" onclick="runAssistantAnalysis()">Run Assistant Analysis</button>
+        <button class="btn btn-primary" id="run-analysis-btn" onclick="runAssistantAnalysis()" style="align-self: center;">Run Assistant Analysis</button>
       </div>
       {% endif %}
-
-      <!-- Assistant prompt -->
-      <div class="command-box" style="border-radius: 14px; padding: 14px; margin-top: auto;">
-        <div class="prompt" style="border-radius: 10px;">
-          <span style="color: var(--purple); font-size: 1rem; flex: none;">◉</span>
-          <input id="ov-cmd" placeholder="Ask anything about your business..." autocomplete="off" style="min-width: 0; color: var(--ink);">
-          <button class="btn btn-primary" id="ov-cmdgo" onclick="runOverviewCommand()" style="flex: none;">Run</button>
-        </div>
-        <div class="chips" style="margin-top: 10px;">
-          {% for s in suggestions %}<span class="chip ov-chip" style="font-size: .75rem;">{{ s }}</span>{% endfor %}
-        </div>
-      </div>
-      <div class="card" id="ov-cmdout" style="display: none; background: var(--line-2); margin-top: 0;">
-        <span class="tag tag-blue">Answer</span>
-        <p id="ov-cmdanswer" style="margin-top: 8px; white-space: pre-wrap; color: var(--ink-2);"></p>
-      </div>
     </div>
   </div>
 
+</div>
+
+<div style="text-align: center; margin-top: 22px;">
+  <div style="font-size: 1.1rem; font-weight: 800; letter-spacing: .18em; color: var(--purple);">REVIEW • APPROVE • EXECUTE</div>
+  <div style="font-size: .85rem; color: var(--ink-3); margin-top: 6px;">Vanta is watching.</div>
+</div>
+
+<!-- AI operator banner -->
+<div class="ai-banner">
+  <div class="ai-avatar">🤖</div>
+  <div style="flex: 1;">
+    <div style="font-weight: 700; color: var(--ink); font-size: .95rem;">Vantav is your AI operations layer.</div>
+    <div style="font-size: .82rem; color: var(--ink-2); margin-top: 3px;">We monitor. We analyze. We recommend. You approve. We execute.</div>
+  </div>
+  <a href="/dashboard/commerce-hub" class="btn btn-primary" style="flex: none;">Connect More Channels</a>
 </div>
 
 <!-- Channel true-profit comparison -->
@@ -193,6 +236,27 @@
   </div>
 </div>
 {% endif %}
+
+<style>
+.ai-greeting {
+  background: var(--purple-bg);
+  border: 1px solid rgba(139,92,246,.18);
+  border-radius: 12px;
+  padding: 12px 16px;
+  color: var(--ink);
+  font-size: .9rem;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.ai-greeting-icon::before {
+  content: "✦";
+  color: var(--purple);
+  margin-right: 8px;
+  font-weight: 700;
+}
+.hidden { display: none !important; }
+</style>
 
 <script>
 async function runAssistantAnalysis() {
@@ -251,24 +315,13 @@ async function dismissHeroAction(actionId) {
   }
 }
 
-async function runOverviewCommand() {
-  const input = document.getElementById('ov-cmd');
-  const out = document.getElementById('ov-cmdout');
-  const answer = document.getElementById('ov-cmdanswer');
-  const q = input.value.trim();
-  if (!q) return;
-  answer.textContent = 'Thinking…';
-  out.style.display = 'block';
-  try {
-    const res = await fetch('/api/command', {method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({q}), credentials: 'same-origin'});
-    const data = await res.json();
-    answer.textContent = data.answer || 'Done.';
-  } catch (e) {
-    answer.textContent = 'Something went wrong. Please try again.';
+// Show the personalized AI greeting once per session
+(function(){
+  const banner = document.getElementById('ai-greeting');
+  if (banner && !sessionStorage.getItem('vanta_greeting_shown')) {
+    banner.style.display = 'flex';
+    sessionStorage.setItem('vanta_greeting_shown', '1');
   }
-}
-
-document.getElementById('ov-cmd')?.addEventListener('keydown', e => { if(e.key === 'Enter') runOverviewCommand(); });
-document.querySelectorAll('.ov-chip').forEach(c => c.addEventListener('click', () => { document.getElementById('ov-cmd').value = c.textContent; runOverviewCommand(); }));
+})();
 </script>
 {% endblock %}

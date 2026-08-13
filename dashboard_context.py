@@ -12,7 +12,8 @@ from datetime import datetime, timedelta, timezone
 from typing import Any, Dict, List, Optional
 
 from flask import Flask, render_template, request, jsonify
-from models import PredictiveLogistics, MerchantSetting, SaaSBilling
+from sqlalchemy import func
+from models import db, PredictiveLogistics, MerchantSetting, SaaSBilling, Product, OrderItem, UnifiedOrder
 import profit_feed
 import alert_matrix
 import action_gate
@@ -123,7 +124,7 @@ def _hero_action(pending_actions: List[Dict[str, Any]], merchant_id: Optional[st
     if not pending_actions:
         return None
     hero = dict(pending_actions[0])
-    hero["evidence"] = _evidence_for_action(hero, merchant_id)
+    hero["reasons"] = _evidence_for_action(hero, merchant_id)
     return hero
 
 
@@ -142,6 +143,67 @@ def _greeting_for(merchant=None):
     else:
         salutation = "Good evening"
     return f"{salutation}, {name}."
+
+
+def _ai_greeting(merchant_id: Optional[str], merchant: Optional[Dict[str, Any]] = None) -> str:
+    """Return a personalized AI greeting with revenue trend and top-seller projection."""
+    name = (merchant or {}).get("name") or (merchant or {}).get("business_name") or "there"
+    if not merchant_id:
+        return f"Hi {name}, here's what's happening with your store today."
+    try:
+        now = _merchant_now(merchant_id)
+        seven_ago = now - timedelta(days=7)
+        fourteen_ago = now - timedelta(days=14)
+        thirty_ago = now - timedelta(days=30)
+
+        rev_now = db.session.query(func.coalesce(func.sum(UnifiedOrder.revenue), 0)).filter(
+            UnifiedOrder.merchant_id == merchant_id,
+            UnifiedOrder.created_at >= seven_ago,
+            UnifiedOrder.created_at < now,
+        ).scalar() or 0
+        rev_prev = db.session.query(func.coalesce(func.sum(UnifiedOrder.revenue), 0)).filter(
+            UnifiedOrder.merchant_id == merchant_id,
+            UnifiedOrder.created_at >= fourteen_ago,
+            UnifiedOrder.created_at < seven_ago,
+        ).scalar() or 0
+        rev_now = float(rev_now)
+        rev_prev = float(rev_prev)
+        if rev_prev:
+            change = round(((rev_now - rev_prev) / rev_prev) * 100, 1)
+        elif rev_now > 0:
+            change = 100.0
+        else:
+            change = 0.0
+        direction = "up" if change >= 0 else "down"
+
+        top = db.session.query(
+            Product.title,
+            Product.sku,
+            func.sum(OrderItem.qty).label("units"),
+            func.sum(OrderItem.qty * OrderItem.unit_price).label("item_revenue"),
+        ).join(OrderItem, Product.sku == OrderItem.sku
+        ).join(UnifiedOrder, UnifiedOrder.id == OrderItem.order_id
+        ).filter(
+            Product.merchant_id == merchant_id,
+            UnifiedOrder.merchant_id == merchant_id,
+            UnifiedOrder.created_at >= thirty_ago,
+        ).group_by(Product.sku, Product.title
+        ).order_by(func.sum(OrderItem.qty * OrderItem.unit_price).desc()
+        ).first()
+
+        if top:
+            units_last_7 = db.session.query(func.coalesce(func.sum(OrderItem.qty), 0)).join(
+                UnifiedOrder, UnifiedOrder.id == OrderItem.order_id
+            ).filter(
+                OrderItem.sku == top.sku,
+                UnifiedOrder.merchant_id == merchant_id,
+                UnifiedOrder.created_at >= seven_ago,
+            ).scalar() or 0
+            projected = round(float(units_last_7))
+            return f"Hi {name}, revenue is {direction} {abs(change)}% this week. Top seller: {top.title} — projected to sell {projected} more units in the next 7 days."
+        return f"Hi {name}, revenue is {direction} {abs(change)}% this week."
+    except Exception:
+        return f"Hi {name}, here's what's happening with your store today."
 
 
 # Beta feature gating: when BETA_MODE=true, merchants only see beta-ready pages.
@@ -741,6 +803,7 @@ def context(active_page=None, merchant=None, merchant_id=None):
         "active_page": active_page or "overview",
         "merchant": merchant_obj,
         "coo": dict(COO, greeting=_greeting_for(merchant_obj)),
+        "ai_greeting": _ai_greeting(merchant_id, merchant_obj),
         "suggestions": COMMAND_SUGGESTIONS,
         "channels": channel_data,
         "connected": [c for c in channel_data if c.get("state") == "connected"],

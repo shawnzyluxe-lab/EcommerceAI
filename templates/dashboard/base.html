@@ -166,8 +166,8 @@
   </script>
   {% block scripts %}{% endblock %}
 
-  {% if active_page != 'overview' %}
-  <!-- AI Assistant floating popup (all dashboard pages except Overview) -->
+  {% if active_page %}
+  <!-- AI Assistant floating popup (all dashboard pages) -->
   <div class="ai-float" data-page="{{ active_page }}">
     <div id="ai-popup" class="ai-popup">
       <div class="ai-popup-head">
