@@ -186,9 +186,11 @@ SESSION_TIMEOUT_DAYS = int(os.environ.get("SESSION_TIMEOUT_DAYS", "7"))
 SESSION_IDLE_TIMEOUT_MINUTES = int(os.environ.get("SESSION_IDLE_TIMEOUT_MINUTES", "120"))
 SESSION_MAX_AGE_HOURS = int(os.environ.get("SESSION_MAX_AGE_HOURS", "12"))
 
-BETA_MODE = os.environ.get("BETA_MODE", "false").lower() in ("true", "1", "yes")
-BETA_READY_DASHBOARD_PAGES = {
-    "overview", "alerts", "action-gate", "profit-engine", "billing",
+# Commercial-ready dashboard pages. Merchants can only reach these pages; admins and
+# engineers can still access every page in valid_pages for development.
+COMMERCIAL_READY_DASHBOARD_PAGES = {
+    "overview", "command-center", "alerts", "action-gate", "profit-engine",
+    "billing", "commerce-hub", "settings",
 }
 
 from tier_manager import TierManager, TIER_LIMITS, PLAN_TO_TIER
@@ -1361,12 +1363,12 @@ def dashboard_page(page):
     }
     if page not in valid_pages:
         return redirect(url_for('dashboard'))
-    # Beta gating: merchants can only reach beta-ready pages.
-    if BETA_MODE:
-        s = get_current_user()
-        if not s or s.role not in (UserRole.ADMIN.value, UserRole.ENGINEER.value):
-            if page not in BETA_READY_DASHBOARD_PAGES:
-                return redirect(url_for('dashboard'))
+    # Commercial gating: merchants can only reach the pages that are live and
+    # backed by real data. Admins and engineers can still reach any page.
+    s = get_current_user()
+    if not s or s.role not in (UserRole.ADMIN.value, UserRole.ENGINEER.value):
+        if page not in COMMERCIAL_READY_DASHBOARD_PAGES:
+            return redirect(url_for('dashboard'))
     ctx = _dashboard_context(active_page)
     # Tier-based page gating
     if not TierManager.can_access_page(merchant["tier"], active_page):

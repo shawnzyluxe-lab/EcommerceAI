@@ -207,25 +207,28 @@ def _ai_greeting(merchant_id: Optional[str], merchant: Optional[Dict[str, Any]] 
         return f"Hi {name}, here's what's happening with your store today."
 
 
-# Beta feature gating: when BETA_MODE=true, merchants only see beta-ready pages.
-# Admins and engineers can still see every page so development can continue.
-BETA_MODE = os.environ.get("BETA_MODE", "false").lower() in ("true", "1", "yes")
-BETA_READY_PAGE_IDS = {
+# Commercial-ready feature gating: merchants only see the pages that are live and
+# backed by real data. Admins and engineers can still see every page so development
+# and internal demos can continue.
+COMMERCIAL_READY_PAGE_IDS = {
     "overview",
+    "command_center",
     "alerts",
     "action_gate",
     "profit_engine",
     "billing",
+    "commerce_hub",
+    "settings",
 }
 
 
-def _filter_nav_for_beta(nav_groups, user_role):
-    """Return a copy of nav_groups with only beta-ready pages for merchants."""
-    if not BETA_MODE or user_role in ("Admin", "Engineer"):
+def _filter_nav_for_role(nav_groups, user_role):
+    """Return a copy of nav_groups with only commercial-ready pages for merchants."""
+    if user_role in ("Admin", "Engineer"):
         return nav_groups
     filtered = []
     for group in nav_groups:
-        links = [link for link in group["links"] if link.get("id") in BETA_READY_PAGE_IDS]
+        links = [link for link in group["links"] if link.get("id") in COMMERCIAL_READY_PAGE_IDS]
         if links:
             filtered.append({**group, "links": links})
     return filtered
@@ -729,7 +732,7 @@ def context(active_page=None, merchant=None, merchant_id=None):
         for link in group["links"]:
             if link.get("id") == "alerts":
                 link["badge"] = str(len(live_alerts))
-    nav_groups = _filter_nav_for_beta(nav_groups, user_role)
+    nav_groups = _filter_nav_for_role(nav_groups, user_role)
 
     # Admin-only backend navigation.
     if user_role in ("Admin", "Engineer"):

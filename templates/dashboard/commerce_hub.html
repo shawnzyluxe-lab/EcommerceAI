@@ -30,7 +30,7 @@
         <button class="btn" style="margin-top: 10px; width: 100%; font-size: .72rem; padding: 5px 8px;" onclick="openConnectModal('{{ ch.platform }}')">{{ 'Manage' if ch.state == 'connected' else 'Connect' }}</button>
         {% endif %}
       {% else %}
-      <span class="tag tag-ghost" style="margin-top: 10px; display: inline-block;">Not available in beta</span>
+      <span class="tag tag-ghost" style="margin-top: 10px; display: inline-block;">Coming soon</span>
       {% endif %}
     </div>
     {% endfor %}
@@ -271,7 +271,7 @@ function renderChannels(channels) {
     const isBeta = betaPlatforms.includes(c.platform);
     let action;
     if (!isBeta) {
-      action = '<span class="tag tag-ghost" style="margin-top: 10px; display: inline-block;">Not available in beta</span>';
+      action = '<span class="tag tag-ghost" style="margin-top: 10px; display: inline-block;">Coming soon</span>';
     } else if (SANDBOX && c.state !== 'connected') {
       action = '<span class="tag tag-ghost" style="margin-top: 10px; display: inline-block;">Disabled in sandbox</span>';
     } else if (c.state === 'connected') {

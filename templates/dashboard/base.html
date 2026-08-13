@@ -104,7 +104,7 @@
         </div>
         {% elif merchant.sandbox_status == 'pending' %}
         <div style="background: var(--teal-bg); border: 1px solid var(--teal); color: var(--ink); padding: 12px 18px; border-radius: 10px; margin-bottom: 18px; font-size: .9rem;">
-          <strong>Account pending approval.</strong> Your beta application is under review. Live features are disabled until an admin approves your account.
+          <strong>Account pending activation.</strong> Live marketplace connections are disabled until payment is confirmed or an admin approves your account.
         </div>
         {% elif merchant.sandbox_status == 'rejected' %}
         <div style="background: var(--red-bg); border: 1px solid var(--red); color: var(--ink); padding: 12px 18px; border-radius: 10px; margin-bottom: 18px; font-size: .9rem;">
