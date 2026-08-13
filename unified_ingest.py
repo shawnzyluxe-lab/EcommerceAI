@@ -183,7 +183,7 @@ def record_unified_order(
             merchant_id=merchant_id,
             sku=item["sku"],
             log_date=log_date,
-            shipping_cost=shipping_cost * share,
+            ship_cost=shipping_cost * share,
             fee=fee * share,
             refund=refund * share if status in ("refunded", "cancelled") else 0.0,
             tax=tax * share,
