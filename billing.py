@@ -153,6 +153,7 @@ def create_checkout_session(
     params = {
         "customer": customer_id,
         "mode": "subscription",
+        "managed_payments": {"enabled": False},
         "line_items": line_items,
         "metadata": {
             "merchant_id": merchant_id,
