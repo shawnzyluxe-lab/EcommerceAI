@@ -622,7 +622,7 @@ def context(active_page=None, merchant=None, merchant_id=None):
     # Action Gate: draft approvals from open alerts.
     pending_actions = []
     action_history = []
-    if merchant_id and (active_page == "action_gate" or active_page is None):
+    if merchant_id and (active_page in ("overview", "action_gate") or active_page is None):
         try:
             pending_actions = [action_gate.action_to_dict(a) for a in action_gate.list_pending_actions(merchant_id)]
             action_history = [action_gate.action_to_dict(a) for a in action_gate.list_action_history(merchant_id)]
