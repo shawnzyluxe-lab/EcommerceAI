@@ -81,3 +81,23 @@ services:
         sync: false
       - key: OAUTH_REDIRECT_URI
         value: https://vantavcommerce.com
+      # Alert channels (comma-separated for ALERT_EMAIL)
+      - key: ALERT_EMAIL
+        sync: false
+      - key: ALERT_PHONE
+        sync: false
+      - key: DISCORD_WEBHOOK_URL
+        sync: false
+      - key: SLA_WEBHOOK_URL
+        sync: false
+      # SLA thresholds (defaults are set in monitoring.py)
+      - key: SLA_SLOW_P95_MS
+        sync: false
+      - key: SLA_ERROR_RATE_THRESHOLD
+        sync: false
+      - key: SLA_MAX_PENDING_ACTIONS
+        sync: false
+      - key: SLA_MAX_CHANNEL_SYNC_AGE_SECONDS
+        sync: false
+      - key: SLA_DB_LATENCY_MS
+        sync: false

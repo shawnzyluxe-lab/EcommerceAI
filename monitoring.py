@@ -21,14 +21,15 @@ logger = logging.getLogger("shawnzyluxe_core.monitoring")
 
 MAX_REQUEST_SAMPLES = 1000
 
-# Thresholds (overridable by env)
-SLOW_P95_MS = float(os.environ.get("SLA_SLOW_P95_MS", "500"))
-ERROR_RATE_THRESHOLD = float(os.environ.get("SLA_ERROR_RATE_THRESHOLD", "5.0"))
+# Finalized SLA thresholds (overridable by env for tuning)
+SLOW_P95_MS = float(os.environ.get("SLA_SLOW_P95_MS", "1000"))
+ERROR_RATE_THRESHOLD = float(os.environ.get("SLA_ERROR_RATE_THRESHOLD", "1.0"))
 MAX_PENDING_ACTIONS = int(os.environ.get("SLA_MAX_PENDING_ACTIONS", "50"))
 MAX_CHANNEL_SYNC_AGE_SECONDS = int(os.environ.get("SLA_MAX_CHANNEL_SYNC_AGE_SECONDS", "3600"))
-DB_LATENCY_MS_THRESHOLD = float(os.environ.get("SLA_DB_LATENCY_MS", "200"))
+DB_LATENCY_MS_THRESHOLD = float(os.environ.get("SLA_DB_LATENCY_MS", "300"))
 
-ALERT_EMAIL = os.environ.get("ALERT_EMAIL", "")
+# Alert channel configuration. ALERT_EMAIL supports comma-separated addresses.
+ALERT_EMAILS = [e.strip() for e in os.environ.get("ALERT_EMAIL", "").split(",") if e.strip()]
 ALERT_PHONE = os.environ.get("ALERT_PHONE", "")
 DISCORD_WEBHOOK_URL = os.environ.get("DISCORD_WEBHOOK_URL", "")
 SLA_WEBHOOK_URL = os.environ.get("SLA_WEBHOOK_URL", "")
@@ -317,12 +318,13 @@ def send_alert(alert: Dict[str, Any]) -> bool:
         "timestamp": datetime.utcnow().isoformat(),
     }
 
-    if ALERT_EMAIL:
-        try:
-            _send_email(ALERT_EMAIL, subject, body)
-            success = True
-        except Exception as e:
-            logger.error(f"Alert email failed: {e}")
+    if ALERT_EMAILS:
+        for email in ALERT_EMAILS:
+            try:
+                _send_email(email, subject, body)
+                success = True
+            except Exception as e:
+                logger.error(f"Alert email to {email} failed: {e}")
 
     if ALERT_PHONE:
         try:

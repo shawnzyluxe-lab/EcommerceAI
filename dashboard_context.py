@@ -20,6 +20,7 @@ import action_gate
 import channels as channels_module
 import channel_analytics
 import tracking
+import monitoring as monitoring_module
 
 
 from zoneinfo import ZoneInfo
@@ -845,6 +846,19 @@ def context(active_page=None, merchant=None, merchant_id=None):
         "billing_account": billing_account,
         "tier_limits": tier_limits,
         "team_users": [],
+        "thresholds": {
+            "slow_p95_ms": monitoring_module.SLOW_P95_MS,
+            "error_rate_threshold": monitoring_module.ERROR_RATE_THRESHOLD,
+            "db_latency_ms": monitoring_module.DB_LATENCY_MS_THRESHOLD,
+            "max_pending_actions": monitoring_module.MAX_PENDING_ACTIONS,
+            "max_channel_sync_age_seconds": monitoring_module.MAX_CHANNEL_SYNC_AGE_SECONDS,
+        },
+        "alert_config": {
+            "email": ", ".join(monitoring_module.ALERT_EMAILS) or None,
+            "phone": monitoring_module.ALERT_PHONE or None,
+            "discord": bool(monitoring_module.DISCORD_WEBHOOK_URL),
+            "webhook": bool(monitoring_module.SLA_WEBHOOK_URL),
+        },
         "generated": now.strftime("%A, %d %b %Y · %H:%M %Z"),
     }
 

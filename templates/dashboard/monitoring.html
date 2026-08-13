@@ -14,14 +14,38 @@
   <div class="card"><div class="card-head"><h3>DB latency</h3></div><div class="metric" id="db-p95" style="font-size: 2rem; font-weight: 800; color: var(--ink);">—</div></div>
 </div>
 
-<div class="grid grid-2" style="align-items: start;">
+<div class="grid grid-3" style="align-items: start; margin-bottom: 18px;">
   <div class="card">
-    <div class="card-head"><h3>Channel sync status</h3></div>
-    <div id="channel-status" style="color: var(--ink-2); font-size: .9rem;">Loading…</div>
+    <div class="card-head"><h3>SLA thresholds</h3></div>
+    <ul style="font-size: .85rem; color: var(--ink-2); line-height: 1.8; margin: 0; padding-left: 1.2rem;">
+      <li>P95 latency: &lt; {{ thresholds.slow_p95_ms }} ms</li>
+      <li>Error rate: &lt; {{ thresholds.error_rate_threshold }}%</li>
+      <li>DB latency: &lt; {{ thresholds.db_latency_ms }} ms</li>
+      <li>Pending actions: &lt; {{ thresholds.max_pending_actions }}</li>
+      <li>Channel sync: &lt; {{ thresholds.max_channel_sync_age_seconds }} s</li>
+    </ul>
+  </div>
+  <div class="card">
+    <div class="card-head"><h3>Alert channels</h3></div>
+    <ul style="font-size: .85rem; color: var(--ink-2); line-height: 1.8; margin: 0; padding-left: 1.2rem;">
+      <li>Email: {{ alert_config.email or 'Not configured' }}</li>
+      <li>SMS: {{ alert_config.phone or 'Not configured' }}</li>
+      <li>Discord: {{ 'Configured' if alert_config.discord else 'Not configured' }}</li>
+      <li>Webhook: {{ 'Configured' if alert_config.webhook else 'Not configured' }}</li>
+    </ul>
+    <button class="btn" onclick="sendTestAlert()" style="margin-top: 12px; font-size: .75rem; padding: 6px 12px;">Send test alert</button>
+    <div id="test-alert-result" style="font-size: .8rem; margin-top: 6px;"></div>
   </div>
   <div class="card">
     <div class="card-head"><h3>SLA alerts</h3></div>
     <div id="sla-alerts" style="color: var(--ink-2); font-size: .9rem;">Loading…</div>
+  </div>
+</div>
+
+<div class="grid grid-2" style="align-items: start;">
+  <div class="card">
+    <div class="card-head"><h3>Channel sync status</h3></div>
+    <div id="channel-status" style="color: var(--ink-2); font-size: .9rem;">Loading…</div>
   </div>
 </div>
 
@@ -49,7 +73,7 @@ async function loadMetrics() {
 
     document.getElementById('req-rate').textContent = metrics.requests_per_minute ?? '—';
     document.getElementById('error-rate').textContent = (metrics.error_rate_percent != null ? metrics.error_rate_percent + '%' : '—');
-    document.getElementById('error-rate').style.color = (metrics.error_rate_percent > 5) ? 'var(--red)' : 'var(--ink)';
+    document.getElementById('error-rate').style.color = (metrics.error_rate_percent > {{ thresholds.error_rate_threshold }}) ? 'var(--red)' : 'var(--ink)';
     document.getElementById('p95').textContent = (metrics.latency_ms?.p95 != null ? metrics.latency_ms.p95 + ' ms' : '—');
     document.getElementById('db-p95').textContent = (metrics.db_latency_ms?.p95 != null ? metrics.db_latency_ms.p95 + ' ms' : '—');
 
@@ -83,6 +107,25 @@ async function loadMetrics() {
     }
   } catch (e) {
     console.error('Monitoring load failed', e);
+  }
+}
+
+async function sendTestAlert() {
+  const el = document.getElementById('test-alert-result');
+  el.textContent = 'Sending…';
+  try {
+    const res = await fetch('/api/v1/monitoring/alert-test', {method: 'POST', credentials: 'same-origin'});
+    if (res.ok) {
+      el.textContent = 'Test alert dispatched.';
+      el.style.color = 'var(--green)';
+    } else {
+      const data = await res.json().catch(() => ({}));
+      el.textContent = data.detail || 'Failed to dispatch test alert.';
+      el.style.color = 'var(--red)';
+    }
+  } catch (e) {
+    el.textContent = 'Network error.';
+    el.style.color = 'var(--red)';
   }
 }
 
