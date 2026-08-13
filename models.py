@@ -414,8 +414,8 @@ class BusinessMemory(db.Model):
     autopilot_enabled = db.Column(db.Boolean, nullable=False, default=False)
     autopilot_max_order_value = db.Column(db.Numeric(12, 4), nullable=False, default=500.00)
     autopilot_max_action_cost = db.Column(db.Numeric(12, 4), nullable=False, default=100.00)
-    auto_approve_action_types = db.Column(db.JSON, default=lambda: ["reorder", "refund"])
-    required_approval_action_types = db.Column(db.JSON, default=lambda: ["ad_adjust"])
+    auto_approve_action_types = db.Column(db.JSON, default=lambda: ["reorder"])
+    required_approval_action_types = db.Column(db.JSON, default=lambda: ["refund", "ad_adjust"])
     learned_preferences = db.Column(db.JSON, default=dict)
 
     forbidden_discount_skus = db.Column(db.JSON, default=list)
