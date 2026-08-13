@@ -2676,6 +2676,7 @@ def auth_signup():
             account_tier=tier,
             password_hash=generate_password_hash(password, method="pbkdf2:sha256"),
         ))
+        db.session.flush()
         db.session.add(SaaSBilling(
             merchant_id=merchant_id,
             stripe_customer_id=f"cus_{merchant_id}",
@@ -2752,6 +2753,7 @@ def auth_provision_node():
             account_tier=tier,
             password_hash=generate_password_hash(password, method="pbkdf2:sha256"),
         ))
+        db.session.flush()
         db.session.add(SaaSBilling(
             merchant_id=merchant_id,
             stripe_customer_id=f"cus_{merchant_id}",
@@ -2918,6 +2920,7 @@ def create_stripe_checkout():
             sandbox_status="pending",
             live_access_enabled=0,
         ))
+        db.session.flush()
         db.session.add(SaaSBilling(
             merchant_id=merchant_id,
             current_plan="Basic Tier",
@@ -3792,6 +3795,7 @@ def register_merchant():
             admin_email=admin_email,
             password_hash=password_hash,
         ))
+        db.session.flush()
         db.session.add(MerchantMetric(
             merchant_id=new_merchant_id,
             total_unified_balance=0.00,
@@ -3830,6 +3834,7 @@ def generate_magic_link():
                 admin_email=email,
                 account_tier=selected_tier,
             ))
+            db.session.flush()
             db.session.add(SaaSBilling(merchant_id=merchant_id, current_plan=selected_tier))
             db.session.add(BusinessMetric(
                 merchant_id=merchant_id,
