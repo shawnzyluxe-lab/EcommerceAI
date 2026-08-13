@@ -63,7 +63,12 @@
       <tr>
         <td>Action execution</td>
         <td class="cross">Manual edits, no guardrails, high risk of mistakes.</td>
-        <td class="check">Approval-first action gate with business-memory guardrails.</td>
+        <td class="check">Approval-first action gate with business-memory guardrails and live write-backs to Shopify, TikTok, and Amazon.</td>
+      </tr>
+      <tr>
+        <td>Billing & subscriptions</td>
+        <td class="cross">No in-app plans, no self-serve upgrades, manual invoicing.</td>
+        <td class="check">Stripe Checkout, Billing Portal, usage tracking, and tiered plans ($249/mo Beta, $348/mo Beta + Startup Pack).</td>
       </tr>
       <tr>
         <td>Forecasting</td>
@@ -109,15 +114,21 @@
     <li>Performance benchmarks passed: rules engine ~9.6 µs per SKU, COO diagnostic ~0.013 ms per SKU.</li>
   </ul>
 
+  <h2>Billing & subscriptions</h2>
+  <p>The dashboard Billing page now shows the active plan, real usage against tier limits, accrued invoice balance, and one-click access to the Stripe Customer Portal. New merchants can subscribe through a public checkout page, and upgrades are handled by Stripe Checkout with webhook tier synchronization.</p>
+
+  <h2>Live channel write-backs</h2>
+  <p>Approved actions are no longer local-only. A dedicated outbound layer attempts real updates to connected marketplaces: Shopify inventory and price updates, TikTok Shop and Amazon inventory queues, and ad budget targets. Missing credentials are skipped safely and logged.</p>
+
   <h2>What’s next</h2>
   <ul>
-    <li>Billing and payment pages for paid tiers.</li>
-    <li>Real marketplace write-backs for ad spend, inventory, and purchase orders.</li>
     <li>Public beta waitlist flow and admin approval gates.</li>
+    <li>Hide non-beta sidebar placeholders before public testing.</li>
+    <li>Production hardening, monitoring, and SLA alerts.</li>
   </ul>
 
   <div class="footer">
-    <p><strong>System rating:</strong> 8.5/10 — the data, profit, evidence, rules, forecasting, approval, and learning layers are in place. The remaining gap before full commercial launch is billing/subscription infrastructure and live channel write-backs.</p>
+    <p><strong>System rating:</strong> 9/10 — billing, subscription, and live write-back infrastructure are now in place. The remaining work is beta-launch gating and production hardening.</p>
     <p class="small">© 2026 Vantav Inc. — vantavcommerce.com</p>
   </div>
 </body>
