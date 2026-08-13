@@ -33,6 +33,7 @@
       display: flex; align-items: center; justify-content: space-between;
       padding: 1.25rem 1.5rem;
       border-bottom: 1px solid var(--line);
+      flex-wrap: wrap; gap: .75rem;
     }
     .brand { display: flex; align-items: center; gap: .6rem; font-weight: 800; letter-spacing: -0.02em; }
     .brand-mark {
@@ -109,16 +110,19 @@
     }
     footer { border-top: 1px solid var(--line); padding: 1.5rem; text-align: center; color: var(--muted); font-size: .8rem; }
     @media (max-width: 600px) {
-      .nav { display: none; }
-      h1 { font-size: 2.3rem; max-width: 100%; }
+      .nav { display: flex; width: 100%; justify-content: center; gap: .75rem; margin-top: .25rem; }
+      .nav a { flex: 1; text-align: center; }
+      h1 { font-size: 2rem; max-width: 100%; word-break: break-word; }
+      .hero p { font-size: 1rem; }
+      .ctas { flex-direction: column; align-items: stretch; }
+      .ctas a { width: 100%; text-align: center; }
     }
     @media (max-width: 480px) {
       .hero { padding: 3rem 1rem 2.5rem; }
       .wrap { padding: 0 1rem; }
       .proof { grid-template-columns: 1fr; }
-      .ctas { flex-direction: column; align-items: stretch; }
-      .ctas a { width: 100%; text-align: center; }
-      h1 { font-size: 1.9rem; }
+      h1 { font-size: 1.75rem; line-height: 1.1; }
+      .hero p { font-size: .95rem; }
     }
   </style>
 </head>
