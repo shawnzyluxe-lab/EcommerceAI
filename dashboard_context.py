@@ -731,6 +731,15 @@ def context(active_page=None, merchant=None, merchant_id=None):
                 link["badge"] = str(len(live_alerts))
     nav_groups = _filter_nav_for_beta(nav_groups, user_role)
 
+    # Admin-only backend navigation.
+    if user_role in ("Admin", "Engineer"):
+        nav_groups.append({
+            "label": "Admin",
+            "links": [
+                {"id": "admin_merchants", "label": "Merchants", "url": "/admin/merchants", "icon": "⚙"},
+            ],
+        })
+
     # Action Gate: draft approvals from open alerts.
     pending_actions = []
     action_history = []

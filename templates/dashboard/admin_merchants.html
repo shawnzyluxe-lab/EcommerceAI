@@ -1,0 +1,91 @@
+{% extends 'dashboard/base.html' %}
+{% block title %}Admin — Merchants{% endblock %}
+{% block content %}
+
+<section class="page-header">
+  <h1>Merchant Operations</h1>
+  <p>Backend overview of every tenant: tier, sync status, and open actions.</p>
+</section>
+
+<div class="card">
+  <div class="card-head" style="display:flex; justify-content:space-between; align-items:center;">
+    <h3>All merchants ({{ merchants|length }})</h3>
+    <button class="btn" style="font-size:.75rem; padding:6px 12px;" onclick="window.location.reload()">Refresh</button>
+  </div>
+  <div class="table-wrap" style="overflow-x:auto;">
+    <table>
+      <thead>
+        <tr>
+          <th>Merchant</th>
+          <th>Tier</th>
+          <th>Plan</th>
+          <th>Sandbox</th>
+          <th>Channels</th>
+          <th>Last sync</th>
+          <th>Sync status</th>
+          <th>Pending actions</th>
+          <th>Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for m in merchants %}
+        <tr>
+          <td>
+            <div style="font-weight:600; color:var(--ink);">{{ m.business_name }}</div>
+            <div style="font-size:.75rem; color:var(--ink-3);">{{ m.merchant_id }}</div>
+            <div style="font-size:.75rem; color:var(--ink-2);">{{ m.admin_email }}</div>
+          </td>
+          <td><span class="tag tag-ghost">{{ m.account_tier }}</span></td>
+          <td>
+            <div>{{ m.current_plan }}</div>
+            {% if m.concierge %}<div class="tag tag-blue" style="margin-top:4px;">Concierge</div>{% endif %}
+          </td>
+          <td>
+            {% if m.sandbox_status == 'approved' %}<span style="color:var(--green);">Approved</span>
+            {% elif m.sandbox_status == 'sandbox' %}<span style="color:var(--amber);">Sandbox</span>
+            {% elif m.sandbox_status == 'expired' %}<span style="color:var(--red);">Expired</span>
+            {% elif m.sandbox_status == 'rejected' %}<span style="color:var(--red);">Rejected</span>
+            {% else %}<span style="color:var(--ink-3);">{{ m.sandbox_status | title }}</span>
+            {% endif %}
+          </td>
+          <td>{{ m.channels }}</td>
+          <td>
+            {% if m.last_sync %}{{ m.last_sync[:19] | replace('T',' ') }}{% else %}—{% endif %}
+          </td>
+          <td>
+            {% if m.sync_status == 'OK' %}<span style="color:var(--green);">OK</span>
+            {% elif m.sync_status == 'Stale' %}<span style="color:var(--amber);">Stale</span>
+            {% else %}<span style="color:var(--ink-3);">{{ m.sync_status }}</span>{% endif %}
+          </td>
+          <td>
+            {% if m.pending_actions %}<strong style="color:var(--red);">{{ m.pending_actions }}</strong>{% else %}{{ m.pending_actions }}{% endif %}
+          </td>
+          <td>
+            <div style="display:flex; gap:6px; flex-wrap:wrap;">
+              <button class="btn" style="font-size:.7rem; padding:4px 8px;" onclick="syncChannel('{{ m.merchant_id }}', 'shopify')">Sync Shopify</button>
+              <button class="btn" style="font-size:.7rem; padding:4px 8px;" onclick="syncChannel('{{ m.merchant_id }}', 'tiktok')">Sync TikTok</button>
+              <button class="btn" style="font-size:.7rem; padding:4px 8px;" onclick="syncChannel('{{ m.merchant_id }}', 'amazon')">Sync Amazon</button>
+            </div>
+          </td>
+        </tr>
+        {% else %}
+        <tr><td colspan="9" style="text-align:center; color:var(--ink-3);">No merchants found.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<script>
+async function syncChannel(merchantId, platform) {
+  try {
+    const res = await fetch(`/api/admin/${platform}/sync/${merchantId}`, { method: 'POST', credentials: 'same-origin' });
+    const data = await res.json();
+    alert(res.ok ? `${platform} sync queued for ${merchantId}` : (data.detail || 'Sync failed'));
+  } catch (e) {
+    alert('Network error');
+  }
+}
+</script>
+
+{% endblock %}

@@ -2181,6 +2181,74 @@ def api_admin_sync_amazon(merchant_id):
         return jsonify({"detail": str(e)}), 400
 
 
+@app.route('/admin/merchants')
+@require_roles([UserRole.ADMIN])
+def admin_merchants():
+    """Backend admin view of all merchants, tiers, sync status, and pending actions."""
+    ctx = _dashboard_context('admin_merchants')
+    merchants = []
+    now = datetime.utcnow()
+    for p in MerchantProfile.query.order_by(MerchantProfile.created_at.desc()).all():
+        billing = SaaSBilling.query.get(p.merchant_id)
+        channels = MerchantChannel.query.filter_by(merchant_id=p.merchant_id).all()
+        tokens = TenantOAuthToken.query.filter_by(merchant_id=p.merchant_id).order_by(TenantOAuthToken.updated_at.desc()).all()
+        last_sync = max([t.updated_at for t in tokens if t.updated_at], default=None)
+        sync_status = "No channels"
+        if last_sync:
+            age = (now - last_sync).total_seconds()
+            sync_status = "OK" if age <= monitoring_module.MAX_CHANNEL_SYNC_AGE_SECONDS else "Stale"
+        pending_actions = PendingAction.query.filter_by(merchant_id=p.merchant_id, status='pending').count()
+        merchants.append({
+            "merchant_id": p.merchant_id,
+            "business_name": p.business_name or p.merchant_id,
+            "admin_email": p.admin_email or "—",
+            "account_tier": (p.account_tier or "").replace("AI Tier", "Plan").strip(),
+            "current_plan": billing.current_plan if billing else p.account_tier,
+            "sandbox_status": p.sandbox_status or "pending",
+            "live_access": bool(p.live_access_enabled),
+            "concierge": bool(billing and isinstance(billing.add_ons, list) and "concierge_bundle" in billing.add_ons),
+            "channels": len(channels),
+            "last_sync": last_sync.isoformat() if last_sync else None,
+            "sync_status": sync_status,
+            "pending_actions": pending_actions,
+        })
+    ctx["merchants"] = merchants
+    return render_template('dashboard/admin_merchants.html', **ctx)
+
+
+@app.route('/api/admin/merchants', methods=['GET'])
+@require_roles([UserRole.ADMIN])
+def api_admin_merchants():
+    """JSON list of merchants for admin monitoring."""
+    now = datetime.utcnow()
+    out = []
+    for p in MerchantProfile.query.order_by(MerchantProfile.created_at.desc()).all():
+        billing = SaaSBilling.query.get(p.merchant_id)
+        channels = MerchantChannel.query.filter_by(merchant_id=p.merchant_id).all()
+        tokens = TenantOAuthToken.query.filter_by(merchant_id=p.merchant_id).order_by(TenantOAuthToken.updated_at.desc()).all()
+        last_sync = max([t.updated_at for t in tokens if t.updated_at], default=None)
+        sync_status = "No channels"
+        if last_sync:
+            age = (now - last_sync).total_seconds()
+            sync_status = "OK" if age <= monitoring_module.MAX_CHANNEL_SYNC_AGE_SECONDS else "Stale"
+        pending_actions = PendingAction.query.filter_by(merchant_id=p.merchant_id, status='pending').count()
+        out.append({
+            "merchant_id": p.merchant_id,
+            "business_name": p.business_name or p.merchant_id,
+            "admin_email": p.admin_email or "—",
+            "account_tier": (p.account_tier or "").replace("AI Tier", "Plan").strip(),
+            "current_plan": billing.current_plan if billing else p.account_tier,
+            "sandbox_status": p.sandbox_status or "pending",
+            "live_access": bool(p.live_access_enabled),
+            "concierge": bool(billing and isinstance(billing.add_ons, list) and "concierge_bundle" in billing.add_ons),
+            "channels": len(channels),
+            "last_sync": last_sync.isoformat() if last_sync else None,
+            "sync_status": sync_status,
+            "pending_actions": pending_actions,
+        })
+    return jsonify({"merchants": out, "count": len(out)}), 200
+
+
 @app.route('/api/v1/channels/writeback', methods=['POST'])
 @require_roles([UserRole.ADMIN, UserRole.MERCHANT, UserRole.ENGINEER])
 def api_channel_writeback():
