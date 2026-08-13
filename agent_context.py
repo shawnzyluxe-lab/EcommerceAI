@@ -8,7 +8,7 @@ import alert_matrix
 import action_gate
 import channels as channels_module
 import tiktok_studio
-from models import MerchantProfile, MerchantSetting, db
+from models import MerchantProfile, MerchantSetting, PendingAction, db
 
 
 def _get_products(merchant_id: str) -> List[Dict[str, Any]]:
@@ -45,7 +45,10 @@ def get_snapshot(merchant_id: str) -> Dict[str, Any]:
     breakdown = profit_feed.get_profit_breakdown(merchant_id)
     recent_orders = profit_feed.get_recent_orders(merchant_id, limit=20)
     alerts = alert_matrix.get_alerts(merchant_id, limit=10)
-    actions = action_gate.list_pending_actions(merchant_id)
+    # Query pending actions directly to avoid recursive refresh when Action Gate is building evidence.
+    actions = PendingAction.query.filter_by(
+        merchant_id=merchant_id, status="pending"
+    ).order_by(PendingAction.created_at.desc()).limit(10).all()
     channels = _get_channels(merchant_id)
     products = _get_products(merchant_id)
     tiktok_state = tiktok_studio.get_state(merchant_id)
