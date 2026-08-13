@@ -11,7 +11,7 @@ from datetime import datetime, timedelta, timezone
 from decimal import Decimal
 from typing import Any, Dict, List, Optional
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, ConfigDict
 
 logger = logging.getLogger(__name__)
 
@@ -20,6 +20,8 @@ import action_gate
 
 
 class BusinessMemoryProfile(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+
     max_cac_threshold: float = 18.00
     floor_margin_percentage: int = 20
     max_daily_ad_spend: float = 500.00
@@ -29,6 +31,8 @@ class BusinessMemoryProfile(BaseModel):
 
 
 class SKUTelemetry(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+
     sku: str
     revenue_24h: float = 0.0
     cogs_24h: float = 0.0
@@ -228,7 +232,7 @@ def _on_hand_inventory(merchant_id: str, sku: str) -> int:
 
 def aggregate_telemetry(merchant_id: str, sku: str = "ALL", window_hours: int = 24) -> SKUTelemetry:
     """Aggregate multi-channel sales data into a telemetry snapshot."""
-    since = datetime.now(timezone.utc) - timedelta(hours=window_hours)
+    since = datetime.utcnow() - timedelta(hours=window_hours)
 
     orders = ProfitFeedOrder.query.filter(
         ProfitFeedOrder.merchant_id == merchant_id,
