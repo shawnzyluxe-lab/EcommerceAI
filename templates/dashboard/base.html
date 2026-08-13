@@ -165,5 +165,150 @@
     })();
   </script>
   {% block scripts %}{% endblock %}
+
+  {% if active_page != 'overview' %}
+  <!-- AI Assistant floating popup (all dashboard pages except Overview) -->
+  <div class="ai-float" data-page="{{ active_page }}">
+    <div id="ai-popup" class="ai-popup">
+      <div class="ai-popup-head">
+        <h4><span class="status-dot"></span>AI Assistant</h4>
+        <button class="ai-popup-close" onclick="toggleAIPopup()">&times;</button>
+      </div>
+      <div class="ai-popup-body" id="ai-popup-body">
+        <div id="ai-hero-card" class="hero-card" style="display:none;">
+          <div class="hero-title" id="ai-hero-title"></div>
+          <div class="hero-detail" id="ai-hero-detail"></div>
+          <ul id="ai-hero-evidence" style="margin:8px 0 0 16px; font-size:.78rem; color:var(--ink-2); line-height:1.5;"></ul>
+          <div class="hero-actions">
+            <button class="btn btn-primary" id="ai-hero-approve" style="padding:5px 10px; font-size:.74rem;">Approve</button>
+            <button class="btn" id="ai-hero-dismiss" style="padding:5px 10px; font-size:.74rem;">Dismiss</button>
+          </div>
+        </div>
+        <div id="ai-chat-log" class="ai-chat-log"></div>
+      </div>
+      <div class="ai-popup-prompt">
+        <div class="prompt" style="padding:8px 10px;">
+          <span style="color:var(--purple); flex:none;">&#9673;</span>
+          <input id="ai-popup-input" placeholder="Ask anything about your business..." autocomplete="off" style="min-width:0; color:var(--ink);">
+          <button class="btn btn-primary" onclick="sendAIPopupMessage()" style="flex:none; padding:6px 12px; font-size:.78rem;">Run</button>
+        </div>
+        <div class="chips" id="ai-popup-chips"></div>
+      </div>
+    </div>
+    <button class="ai-float-btn" id="ai-float-btn" onclick="toggleAIPopup()" title="Open AI Assistant">&#10022;</button>
+  </div>
+
+  <script>
+  (function(){
+    const popup = document.getElementById('ai-popup');
+    const btn = document.getElementById('ai-float-btn');
+    const log = document.getElementById('ai-chat-log');
+    const input = document.getElementById('ai-popup-input');
+    const heroCard = document.getElementById('ai-hero-card');
+    const chips = document.getElementById('ai-popup-chips');
+    const page = document.querySelector('.ai-float')?.dataset.page || 'default';
+
+    const PAGE_CONTEXT = {
+      profit_engine: { chips: ['Show my profit waterfall', 'Which SKU is least profitable', 'Forecast stockouts'], types: ['ad_adjust','reorder','price','margin'] },
+      commerce_hub: { chips: ['Check channel margins', 'Sync all channels', 'Connect TikTok Shop'], types: ['channel','sync','connect'] },
+      action_gate: { chips: ['Approve top action', 'Run analysis', 'Show pending actions'], types: [] },
+      alerts: { chips: ['Why is the top alert firing', 'What should I do first', 'Run assistant analysis'], types: [] },
+      billing: { chips: ['Show my plan', 'What features can I unlock', 'Upgrade when ready'], types: [] },
+      settings: { chips: ['Set my margin floor', 'Update business rules', 'Invite team member'], types: [] },
+      default: { chips: ['Run assistant analysis', 'Show my top profit drain', 'What needs my attention'], types: [] }
+    };
+    const ctx = PAGE_CONTEXT[page] || PAGE_CONTEXT.default;
+
+    function renderChips(){
+      chips.innerHTML = '';
+      ctx.chips.forEach(text => {
+        const span = document.createElement('span');
+        span.className = 'chip';
+        span.textContent = text;
+        span.onclick = () => useAIPopupChip(span);
+        chips.appendChild(span);
+      });
+    }
+    renderChips();
+
+    window.toggleAIPopup = function(){
+      popup.classList.toggle('open');
+      if(popup.classList.contains('open')){
+        btn.classList.remove('pulse');
+        loadAIHero();
+      }
+    };
+
+    async function loadAIHero(){
+      try{
+        const res = await fetch('/api/actions', {credentials:'same-origin'});
+        if(!res.ok) return;
+        const data = await res.json();
+        let pending = (data.pending || []);
+        if(ctx.types.length){
+          const filtered = pending.filter(a => ctx.types.includes(a.action_type));
+          if(filtered.length) pending = filtered;
+        }
+        if(pending.length === 0){ heroCard.style.display='none'; return; }
+        const hero = pending[0];
+        document.getElementById('ai-hero-title').textContent = hero.title;
+        document.getElementById('ai-hero-detail').textContent = hero.detail || '';
+        const evList = document.getElementById('ai-hero-evidence');
+        evList.innerHTML = '';
+        (hero.evidence || []).forEach(e => {
+          const li = document.createElement('li'); li.textContent = e; evList.appendChild(li);
+        });
+        heroCard.style.display='block';
+        document.getElementById('ai-hero-approve').onclick = () => runHeroAction(hero.id, 'approve');
+        document.getElementById('ai-hero-dismiss').onclick = () => runHeroAction(hero.id, 'deny');
+        if(!popup.classList.contains('open')) btn.classList.add('pulse');
+      }catch(e){ console.error(e); }
+    }
+
+    async function runHeroAction(id, verb){
+      const url = verb === 'approve' ? `/api/actions/${id}/approve` : `/api/actions/${id}/deny`;
+      try{
+        const opts = {method:'POST', credentials:'same-origin', headers:{}};
+        if(verb === 'deny'){ opts.headers['Content-Type']='application/json'; opts.body=JSON.stringify({reason:'dismissed from assistant popup'}); }
+        const res = await fetch(url, opts);
+        if(res.ok){
+          addMessage('assistant', verb === 'approve' ? 'Action approved and executed.' : 'Action dismissed.');
+          heroCard.style.display='none';
+        } else {
+          const data = await res.json();
+          addMessage('assistant', 'Failed: ' + (data.detail || 'unknown'));
+        }
+      }catch(e){ addMessage('assistant', 'Network error.'); }
+    }
+    window.runHeroAction = runHeroAction;
+
+    function addMessage(role, text){
+      const div = document.createElement('div');
+      div.className = 'ai-chat-msg ' + role;
+      div.textContent = text;
+      log.appendChild(div);
+      log.scrollTop = log.scrollHeight;
+    }
+
+    window.sendAIPopupMessage = async function(){
+      const q = input.value.trim();
+      if(!q) return;
+      addMessage('user', q);
+      input.value='';
+      try{
+        const res = await fetch('/api/command', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({q}), credentials:'same-origin'});
+        const data = await res.json();
+        addMessage('assistant', data.answer || 'Done.');
+      }catch(e){ addMessage('assistant', 'Something went wrong. Please try again.'); }
+    };
+
+    input?.addEventListener('keydown', e => { if(e.key==='Enter') sendAIPopupMessage(); });
+
+    window.useAIPopupChip = function(el){ input.value = el.textContent; sendAIPopupMessage(); };
+
+    loadAIHero();
+  })();
+  </script>
+  {% endif %}
 </body>
 </html>
