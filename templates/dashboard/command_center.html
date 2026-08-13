@@ -25,7 +25,6 @@
       <button class="btn" id="clear-thread" style="font-size:.7rem; padding:4px 8px;">Clear conversation</button>
     </div>
     <p id="cmdanswer" style="margin-top: 8px; color: var(--ink); white-space: pre-wrap;"></p>
-    <div id="cmddid" class="chips" style="margin-top: 10px;"></div>
   </div>
 </div>
 
@@ -53,7 +52,6 @@
 const out = document.getElementById('cmdout');
 const input = document.getElementById('cmd');
 const answer = document.getElementById('cmdanswer');
-const didBox = document.getElementById('cmddid');
 const recentBox = document.getElementById('recent-commands');
 const chipBox = document.getElementById('chips');
 
@@ -68,7 +66,6 @@ const responses = {
 async function run(q){
   if(!q) return;
   answer.textContent = 'Thinking…';
-  didBox.innerHTML = '';
   out.style.display = 'block';
   try {
     const res = await fetch('/api/command', {
@@ -78,9 +75,6 @@ async function run(q){
     });
     const data = await res.json();
     answer.textContent = data.answer || 'Done.';
-    if (data.did && data.did.length) {
-      didBox.innerHTML = data.did.map(s => `<span class="chip">${s}</span>`).join('');
-    }
     addRecent(q);
   } catch (e) {
     answer.textContent = 'Something went wrong. Please try again.';
@@ -115,7 +109,6 @@ document.getElementById('clear-thread').addEventListener('click', async () => {
   try {
     await fetch('/api/v1/assistant/thread', {method: 'DELETE'});
     answer.textContent = 'Conversation cleared.';
-    didBox.innerHTML = '';
   } catch (e) { alert('Could not clear conversation.'); }
 });
 </script>

@@ -78,7 +78,6 @@
     <div class="card" id="ov-cmdout" style="margin-top: 14px; display: none;">
       <span class="tag tag-blue">Answer</span>
       <p id="ov-cmdanswer" style="margin-top: 8px; white-space: pre-wrap;"></p>
-      <div id="ov-cmddid" class="chips" style="margin-top: 10px;"></div>
     </div>
   </div>
 </div>
@@ -200,19 +199,16 @@ async function runOverviewCommand() {
   const input = document.getElementById('ov-cmd');
   const out = document.getElementById('ov-cmdout');
   const answer = document.getElementById('ov-cmdanswer');
-  const didBox = document.getElementById('ov-cmddid');
   const q = input.value.trim();
   if (!q) return;
   answer.textContent = 'Thinking…';
   out.style.display = 'block';
-  didBox.innerHTML = '';
   try {
     const res = await fetch('/api/command', {method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({q}), credentials: 'same-origin'});
     const data = await res.json();
     answer.textContent = data.answer || 'Done.';
-    if (data.did && data.did.length) {
-      didBox.innerHTML = data.did.map(s => `<span class="chip">${s}</span>`).join('');
-    }
+    // Tool-call detail intentionally omitted from the UI.
+
   } catch (e) {
     answer.textContent = 'Something went wrong. Please try again.';
   }
