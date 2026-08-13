@@ -9,6 +9,7 @@ API: the numbers are illustrative sample data, clearly labelled in the UI.
 import copy
 import os
 from datetime import datetime, timedelta, timezone
+from typing import Any, Dict, List, Optional
 
 from flask import Flask, render_template, request, jsonify
 from models import PredictiveLogistics, MerchantSetting
@@ -39,6 +40,39 @@ def _merchant_now(merchant_id=None):
         return datetime.now(ZoneInfo(tz_name))
     except Exception:
         return datetime.now(timezone.utc)
+
+
+def _evidence_for_action(action: Dict[str, Any]) -> List[str]:
+    """Build human-readable evidence bullets from a pending action dict."""
+    evidence: List[str] = []
+    payload = action.get("payload") or {}
+    action_type = action.get("action_type", "")
+    if action_type == "ad_adjust":
+        evidence.append(f"Platform: {payload.get('platform', 'ads')}")
+        adj = payload.get("adjustment")
+        if adj is not None:
+            evidence.append(f"Recommended change: {adj}% budget")
+    elif action_type == "reorder":
+        evidence.append(f"SKU: {payload.get('sku', 'unknown')}")
+        evidence.append(f"Quantity: {payload.get('quantity', 'N/A')}")
+        evidence.append(f"Supplier: {payload.get('supplier', 'N/A')} ({payload.get('lead_days', 'N/A')}-day lead)")
+    elif action_type == "refund":
+        evidence.append(f"Order: {payload.get('order_id', 'unknown')}")
+    else:
+        for k, v in payload.items():
+            evidence.append(f"{k.replace('_', ' ').title()}: {v}")
+    if not evidence:
+        evidence.append("AI evaluated this as a high-impact opportunity")
+    return evidence
+
+
+def _hero_action(pending_actions: List[Dict[str, Any]]) -> Optional[Dict[str, Any]]:
+    """Return the top pending action decorated with evidence for the overview."""
+    if not pending_actions:
+        return None
+    hero = dict(pending_actions[0])
+    hero["evidence"] = _evidence_for_action(hero)
+    return hero
 
 
 def _greeting_for(merchant=None):
@@ -594,6 +628,7 @@ def context(active_page=None, merchant=None, merchant_id=None):
             action_history = [action_gate.action_to_dict(a) for a in action_gate.list_action_history(merchant_id)]
         except Exception:
             pass
+    hero_action = _hero_action(pending_actions)
 
     # Channel list from persistent connections.
     try:
@@ -650,6 +685,7 @@ def context(active_page=None, merchant=None, merchant_id=None):
         "mobile_actions": MOBILE_ACTIONS,
         "pending_actions": pending_actions,
         "action_history": action_history,
+        "hero_action": hero_action,
         "generated": now.strftime("%A, %d %b %Y · %H:%M %Z"),
     }
 
