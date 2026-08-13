@@ -54,7 +54,7 @@ if SENTRY_DSN:
     except Exception as e:
         print(f"[SENTRY] Init failed: {e}")
 
-from models import db, Tenant, ConnectedChannel, ActiveSession, BusinessMetric, CommerceChannel, MerchantChannel, SupportMetric, MarketingStudio, PredictiveLogistics, OutboundTransmission, SaaSBilling, LocalProductCatalog, MerchantProfile, TenantOAuthToken, MerchantMetric, SystemExceptionLog, ProcessedWebhookEvent, AdSpendAnalytic, GeneratedPurchaseOrder, AIAgent, AgentMessage, MerchantDecisionLog, MagicLoginToken, TrendingProduct, ProductFinancialLedger, MerchantSetting, ProfitFeedOrder, AdSpendFeed, Alert, BetaWaitlistApplication, PendingAction, StartupPackProject
+from models import db, Tenant, ConnectedChannel, ActiveSession, BusinessMetric, CommerceChannel, MerchantChannel, SupportMetric, MarketingStudio, PredictiveLogistics, OutboundTransmission, SaaSBilling, LocalProductCatalog, MerchantProfile, TenantOAuthToken, MerchantMetric, SystemExceptionLog, ProcessedWebhookEvent, AdSpendAnalytic, GeneratedPurchaseOrder, AIAgent, AgentMessage, MerchantDecisionLog, MagicLoginToken, TrendingProduct, ProductFinancialLedger, MerchantSetting, ProfitFeedOrder, AdSpendFeed, Alert, BetaWaitlistApplication, PendingAction, StartupPackProject, BusinessMemory
 import profit_feed
 import billing as billing_module
 import alert_matrix
@@ -2358,6 +2358,44 @@ def api_merchant_set_business_name():
     profile.business_name = new_name
     db.session.commit()
     return jsonify({"updated": True, "business_name": new_name}), 200
+
+
+@app.route('/api/v1/merchant/business-memory', methods=['GET', 'POST'])
+@require_roles([UserRole.ADMIN, UserRole.MERCHANT, UserRole.ENGINEER])
+def api_merchant_business_memory():
+    """Get or update the merchant's business memory guardrails."""
+    merchant = get_merchant_context()
+    if not merchant:
+        return jsonify({"error": "No merchant context"}), 403
+    merchant_id = merchant["id"]
+    import action_gate
+    memory = action_gate.get_business_memory(merchant_id)
+
+    if request.method == 'POST':
+        data = request.get_json(silent=True) or {}
+        if "max_cac_threshold" in data:
+            memory.max_cac_threshold = data["max_cac_threshold"]
+        if "floor_margin_percentage" in data:
+            memory.floor_margin_percentage = data["floor_margin_percentage"]
+        if "max_daily_ad_spend" in data:
+            memory.max_daily_ad_spend = data["max_daily_ad_spend"]
+        if "forbidden_discount_skus" in data:
+            memory.forbidden_discount_skus = data["forbidden_discount_skus"]
+        if "preferred_supplier_ids" in data:
+            memory.preferred_supplier_ids = data["preferred_supplier_ids"]
+        if "auto_escalation_rules" in data:
+            memory.auto_escalation_rules = data["auto_escalation_rules"]
+        db.session.commit()
+
+    return jsonify({
+        "merchant_id": memory.merchant_id,
+        "max_cac_threshold": float(memory.max_cac_threshold),
+        "floor_margin_percentage": memory.floor_margin_percentage,
+        "max_daily_ad_spend": float(memory.max_daily_ad_spend),
+        "forbidden_discount_skus": memory.forbidden_discount_skus or [],
+        "preferred_supplier_ids": memory.preferred_supplier_ids or {},
+        "auto_escalation_rules": memory.auto_escalation_rules or {},
+    }), 200
 
 
 @app.route('/api/v1/tiktok-studio/posts', methods=['POST'])

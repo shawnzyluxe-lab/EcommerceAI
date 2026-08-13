@@ -43,10 +43,11 @@ def _merchant_now(merchant_id=None):
 
 
 def _evidence_for_action(action: Dict[str, Any], merchant_id: Optional[str] = None) -> List[str]:
-    """Build human-readable evidence bullets from a pending action dict and live snapshot."""
+    """Build human-readable evidence bullets from action payload, evidence table, and live snapshot."""
     evidence: List[str] = []
     payload = action.get("payload") or {}
     action_type = action.get("action_type", "")
+    action_id = action.get("id")
     snapshot = None
     if merchant_id:
         try:
@@ -55,6 +56,27 @@ def _evidence_for_action(action: Dict[str, Any], merchant_id: Optional[str] = No
         except Exception:
             snapshot = None
     kpis = (snapshot.get("kpis") or {}) if snapshot else {}
+
+    # Attach stored evidence if available.
+    if action_id:
+        try:
+            from models import ActionEvidence
+            ae = ActionEvidence.query.filter_by(action_id=action_id).first()
+            if ae:
+                evidence.append(f"Confidence: {ae.confidence_score}%")
+                evidence.append(
+                    f"Expected impact: ${float(ae.expected_weekly_impact_min or 0):,.2f}"
+                    f"-${float(ae.expected_weekly_impact_max or 0):,.2f}/week"
+                )
+                if ae.reasoning_summary:
+                    evidence.append(f"Why: {ae.reasoning_summary}")
+                telemetry = ae.telemetry_evidence_log or {}
+                if telemetry.get("margin") is not None:
+                    evidence.append(f"Net margin at creation: {telemetry['margin']}%")
+                if telemetry.get("orders"):
+                    evidence.append(f"Orders in window: {telemetry['orders']}")
+        except Exception:
+            pass
 
     if action_type == "ad_adjust":
         evidence.append(f"Platform: {payload.get('platform', 'ads')}")

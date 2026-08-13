@@ -226,13 +226,17 @@ def run_proactive(merchant_id: str) -> List[Dict[str, Any]]:
     margin = kpis.get("net_margin", 0)
     new_actions: List[PendingAction] = []
     if isinstance(margin, (int, float)) and margin < 15:
-        new_actions.append(PendingAction(
-            merchant_id=merchant_id,
-            action_type="ad_adjust",
-            title="Review low-margin ad spend",
-            detail=f"Overall margin is {margin:.1f}%. Consider pausing underperforming campaigns or raising prices.",
-            payload=json.dumps({"adjustment": -15.0, "platform": "tiktok"}),
-        ))
+        try:
+            new_actions.append(action_gate.create_action(
+                merchant_id=merchant_id,
+                action_type="ad_adjust",
+                title="Review low-margin ad spend",
+                detail=f"Overall margin is {margin:.1f}%. Consider pausing underperforming campaigns or raising prices.",
+                payload={"adjustment": -15.0, "platform": "tiktok"},
+                snapshot=snap,
+            ))
+        except ValueError as e:
+            logger.warning(f"[Assistant Proactive] Guardrail blocked rule action: {e}")
 
     # LLM-based proactive recommendations if available.
     if _llm_client():
@@ -250,17 +254,19 @@ def run_proactive(merchant_id: str) -> List[Dict[str, Any]]:
                 text = text.strip().strip("`").replace("json\n", "").replace("json", "")
                 recommendations = json.loads(text)
                 for rec in recommendations:
-                    new_actions.append(PendingAction(
-                        merchant_id=merchant_id,
-                        action_type=rec.get("action_type", "reorder"),
-                        title=rec.get("title", "AI recommended action"),
-                        detail=rec.get("detail", ""),
-                        payload=json.dumps(rec.get("payload", {})),
-                    ))
+                    try:
+                        action = action_gate.create_action(
+                            merchant_id=merchant_id,
+                            action_type=rec.get("action_type", "reorder"),
+                            title=rec.get("title", "AI recommended action"),
+                            detail=rec.get("detail", ""),
+                            payload=rec.get("payload", {}),
+                            snapshot=snap,
+                        )
+                        new_actions.append(action)
+                    except ValueError as e:
+                        logger.warning(f"[Assistant Proactive] Guardrail blocked LLM action: {e}")
         except Exception as e:
             logger.error(f"[Assistant Proactive] LLM failed: {e}")
 
-    for pa in new_actions:
-        db.session.add(pa)
-    db.session.commit()
     return [{"id": pa.id, "title": pa.title, "type": pa.action_type} for pa in new_actions]

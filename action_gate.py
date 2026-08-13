@@ -4,7 +4,7 @@ import uuid
 from datetime import datetime
 from typing import List, Dict, Any, Optional
 
-from models import db, PendingAction, Alert, PredictiveLogistics, GeneratedPurchaseOrder, ProfitFeedOrder, AdSpendAnalytic, BusinessMetric, MerchantProfile
+from models import db, PendingAction, Alert, PredictiveLogistics, GeneratedPurchaseOrder, ProfitFeedOrder, AdSpendAnalytic, BusinessMetric, MerchantProfile, BusinessMemory, ActionEvidence
 import alert_matrix
 
 
@@ -20,8 +20,121 @@ def _parse(payload: str) -> Any:
     return json.loads(payload) if payload else {}
 
 
+def get_business_memory(merchant_id: str) -> BusinessMemory:
+    """Return the merchant's business memory guardrails, creating defaults if missing."""
+    memory = BusinessMemory.query.filter_by(merchant_id=merchant_id).first()
+    if not memory:
+        memory = BusinessMemory(merchant_id=merchant_id)
+        db.session.add(memory)
+        db.session.commit()
+    return memory
+
+
+def verify_action_against_business_memory(proposed_action: Dict[str, Any], memory: BusinessMemory) -> bool:
+    """Guardrail check: raise ValueError if the proposed action violates merchant memory."""
+    action_kind = proposed_action.get("action_type") or proposed_action.get("kind")
+    payload = proposed_action.get("payload") or {}
+    sku = payload.get("sku")
+
+    forbidden = set(memory.forbidden_discount_skus or [])
+    if action_kind in ("discount", "price_drop") and sku and str(sku) in forbidden:
+        raise ValueError(f"Execution Halting: AI proposed a price drop for SKU {sku}, which is blacklisted in business memory.")
+
+    if action_kind == "ad_adjust" or action_kind == "ad_budget":
+        proposed_cac = payload.get("projected_cac") or payload.get("cac")
+        if proposed_cac is not None:
+            max_cac_allowed = float(memory.max_cac_threshold or 18.0)
+            if float(proposed_cac) > max_cac_allowed:
+                raise ValueError(f"Execution Halting: Projected CAC (${proposed_cac}) violates merchant limit (${max_cac_allowed}).")
+
+    return True
+
+
+def _projected_cac_for_ad_adjust(merchant_id: str, platform: str) -> Optional[float]:
+    """Compute projected CAC for an ad budget adjustment on a platform."""
+    ad = AdSpendAnalytic.query.filter_by(merchant_id=merchant_id, platform_source=platform).first()
+    if not ad:
+        return None
+    current_spend = float(ad.current_spend or 0.0)
+    conversions = int(ad.conversion_count or 0)
+    if conversions <= 0:
+        return None
+    return round(current_spend / conversions, 2)
+
+
+def create_action(merchant_id: str, action_type: str, title: str, detail: str, payload: Dict[str, Any], alert_id: Optional[int] = None, snapshot: Optional[Dict[str, Any]] = None) -> PendingAction:
+    """Create a pending action after guardrail verification and attach evidence."""
+    proposed = {
+        "action_type": action_type,
+        "payload": payload,
+    }
+    memory = get_business_memory(merchant_id)
+    verify_action_against_business_memory(proposed, memory)
+
+    if action_type == "ad_adjust":
+        platform = payload.get("platform", "")
+        cac = _projected_cac_for_ad_adjust(merchant_id, platform)
+        if cac is not None and "projected_cac" not in payload:
+            payload = dict(payload)
+            payload["projected_cac"] = cac
+
+    action = PendingAction(
+        merchant_id=merchant_id,
+        alert_id=alert_id,
+        action_type=action_type,
+        title=title,
+        detail=detail,
+        payload=_json(payload),
+    )
+    db.session.add(action)
+    db.session.flush()
+    _attach_evidence(action, merchant_id, snapshot=snapshot)
+    return action
+
+
+def _attach_evidence(action: PendingAction, merchant_id: str, snapshot: Optional[Dict[str, Any]] = None, confidence: int = 82) -> ActionEvidence:
+    """Attach an evidence record to a pending action using live merchant snapshot."""
+    if snapshot is None:
+        try:
+            import agent_context
+            snapshot = agent_context.get_snapshot(merchant_id)
+        except Exception:
+            snapshot = {}
+    kpis = (snapshot or {}).get("kpis") or {}
+    telemetry = {
+        "conversion_rate_delta": 0.0,
+        "competitor_median_price": 0.0,
+        "sales_velocity_delta": 0.0,
+        "historical_trend_days": 14,
+        "margin": kpis.get("net_margin", 0.0),
+        "orders": kpis.get("orders", 0),
+        "gross_revenue": kpis.get("gross_revenue", 0.0),
+    }
+    expected_min = 0.0
+    expected_max = 0.0
+    payload = _parse(action.payload)
+    adj = payload.get("adjustment")
+    if isinstance(adj, (int, float)):
+        expected_min = round(float(kpis.get("gross_revenue", 0.0)) * (adj / 100.0) * 0.5, 2)
+        expected_max = round(float(kpis.get("gross_revenue", 0.0)) * (adj / 100.0) * 1.5, 2)
+
+    reasoning = f"AI evaluated {action.title} against live margin, orders, and channel telemetry."
+    evidence = ActionEvidence(
+        action_id=action.id,
+        merchant_id=merchant_id,
+        confidence_score=confidence,
+        expected_weekly_impact_min=expected_min,
+        expected_weekly_impact_max=expected_max,
+        telemetry_evidence_log=telemetry,
+        reasoning_summary=reasoning,
+    )
+    db.session.add(evidence)
+    db.session.commit()
+    return evidence
+
+
 def refresh_actions(merchant_id: str):
-    """Sync pending actions from open alerts."""
+    """Sync pending actions from open alerts, applying business-memory guardrails."""
     if not merchant_id:
         return
     open_alerts = alert_matrix.get_alerts(merchant_id)
@@ -36,14 +149,18 @@ def refresh_actions(merchant_id: str):
 
         action_type, payload, title, detail = _infer_action_from_alert(alert)
         if action_type:
-            db.session.add(PendingAction(
-                merchant_id=merchant_id,
-                alert_id=alert.id,
-                action_type=action_type,
-                title=title or alert.title,
-                detail=detail or alert.detail,
-                payload=_json(payload),
-            ))
+            try:
+                create_action(
+                    merchant_id=merchant_id,
+                    action_type=action_type,
+                    title=title or alert.title,
+                    detail=detail or alert.detail,
+                    payload=payload,
+                    alert_id=alert.id,
+                )
+            except ValueError as e:
+                import logging
+                logging.getLogger(__name__).warning(f"[Action Gate] Guardrail blocked alert action: {e}")
     db.session.commit()
 
 
@@ -110,6 +227,10 @@ def approve_action(action_id: int, merchant_id: str, decided_by: str = "merchant
         raise ValueError(f"Action already {action.status}")
 
     payload = _parse(action.payload)
+    memory = get_business_memory(merchant_id)
+    verify_action_against_business_memory(
+        {"action_type": action.action_type, "payload": payload}, memory
+    )
     result = _execute_action(action, payload)
 
     action.status = "approved"

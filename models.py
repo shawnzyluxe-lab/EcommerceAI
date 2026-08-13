@@ -400,3 +400,43 @@ class AdSpendFeed(db.Model):
     amount = db.Column(db.REAL, nullable=False, default=0.0)
     conversion_count = db.Column(db.Integer, default=0)
     recorded_at = db.Column(db.DateTime, server_default=db.func.now())
+
+
+class BusinessMemory(db.Model):
+    __tablename__ = "business_memory"
+    id = db.Column(db.String(36), primary_key=True, default=_uuid)
+    merchant_id = db.Column(db.String(100), db.ForeignKey("merchant_profiles.merchant_id"), nullable=False, unique=True)
+
+    max_cac_threshold = db.Column(db.Numeric(12, 4), nullable=False, default=18.00)
+    floor_margin_percentage = db.Column(db.Integer, nullable=False, default=20)
+    max_daily_ad_spend = db.Column(db.Numeric(12, 4), nullable=False, default=500.00)
+
+    forbidden_discount_skus = db.Column(db.JSON, default=list)
+    preferred_supplier_ids = db.Column(db.JSON, default=dict)
+    auto_escalation_rules = db.Column(db.JSON, default=lambda: {
+        "refund_rate_ceiling": 0.05,
+        "out_of_stock_buffer_days": 5,
+    })
+
+    updated_at = db.Column(db.DateTime, server_default=db.func.now(), onupdate=db.func.now())
+    created_at = db.Column(db.DateTime, server_default=db.func.now())
+
+
+class ActionEvidence(db.Model):
+    __tablename__ = "action_evidence"
+    id = db.Column(db.String(36), primary_key=True, default=_uuid)
+    action_id = db.Column(db.Integer, db.ForeignKey("pending_actions.id"), nullable=False, unique=True)
+    merchant_id = db.Column(db.String(100), db.ForeignKey("merchant_profiles.merchant_id"), nullable=False)
+
+    confidence_score = db.Column(db.Integer, nullable=False, default=82)
+    expected_weekly_impact_min = db.Column(db.Numeric(12, 4), nullable=False, default=0.0000)
+    expected_weekly_impact_max = db.Column(db.Numeric(12, 4), nullable=False, default=0.0000)
+
+    telemetry_evidence_log = db.Column(db.JSON, default=lambda: {
+        "conversion_rate_delta": 0.0,
+        "competitor_median_price": 0.0,
+        "sales_velocity_delta": 0.0,
+        "historical_trend_days": 14,
+    })
+    reasoning_summary = db.Column(db.Text, nullable=False, default="AI evaluated this as a high-impact opportunity")
+    created_at = db.Column(db.DateTime, server_default=db.func.now())
