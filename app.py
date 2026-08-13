@@ -60,6 +60,7 @@ import billing as billing_module
 import alert_matrix
 import vetted_operator
 import action_gate
+import rules_engine
 import channels as channels_module
 import shopify_sync
 import tiktok_sync
@@ -2262,6 +2263,30 @@ def api_assistant_proactive():
         return jsonify({"created": actions}), 200
     except Exception as e:
         logger.error(f"[Assistant] Proactive run failed: {e}")
+        return jsonify({"detail": str(e)}), 500
+
+
+@app.route('/api/v1/rules/evaluate', methods=['POST'])
+@require_roles([UserRole.ADMIN, UserRole.MERCHANT, UserRole.ENGINEER])
+def api_rules_evaluate():
+    """Run the deterministic rule engine against merchant telemetry.
+
+    Accepts explicit SKU telemetry or evaluates the merchant's 24h aggregate.
+    """
+    merchant = get_merchant_context()
+    if not merchant:
+        return jsonify({"error": "No merchant context"}), 403
+    data = request.get_json(silent=True) or {}
+    telemetry = data.get("telemetry")
+    window_hours = int(data.get("window_hours", 24) or 24)
+    try:
+        if telemetry:
+            created = rules_engine.run_for_sku(merchant["id"], telemetry)
+        else:
+            created = rules_engine.run_for_merchant(merchant["id"], window_hours=window_hours)
+        return jsonify({"created": created}), 200
+    except Exception as e:
+        logger.error(f"[Rules Engine] Evaluate failed: {e}")
         return jsonify({"detail": str(e)}), 500
 
 

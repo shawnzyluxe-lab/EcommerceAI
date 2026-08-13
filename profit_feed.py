@@ -7,6 +7,7 @@ from datetime import datetime, timedelta, timezone
 from collections import defaultdict
 
 import tracking
+import rules_engine
 from models import db, ProfitFeedOrder, AdSpendFeed
 
 logger = logging.getLogger(__name__)
@@ -98,6 +99,10 @@ def record_order(merchant_id, channel, order_id, gross_revenue, items=1, state="
     order.net_profit = _compute_net(order, 0.0)
     db.session.add(order)
     db.session.commit()
+    try:
+        rules_engine.run_for_merchant(merchant_id)
+    except Exception as e:
+        logger.warning(f"[RULES ENGINE] record_order run failed: {e}")
     return order
 
 
@@ -123,6 +128,10 @@ def record_ad_spend(merchant_id, platform, amount, conversion_count=0):
     )
     db.session.add(spend)
     db.session.commit()
+    try:
+        rules_engine.run_for_merchant(merchant_id)
+    except Exception as e:
+        logger.warning(f"[RULES ENGINE] record_ad_spend run failed: {e}")
     return spend
 
 
