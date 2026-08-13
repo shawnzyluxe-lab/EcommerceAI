@@ -165,7 +165,6 @@ def create_checkout_session(
         "allow_promotion_codes": True,
         "success_url": success_url or "https://vantavcommerce.com/dashboard/billing?checkout=success",
         "cancel_url": cancel_url or "https://vantavcommerce.com/subscribe?canceled=1",
-        "automatic_tax": {"enabled": True},
     }
 
     session = stripe.checkout.Session.create(**params)
