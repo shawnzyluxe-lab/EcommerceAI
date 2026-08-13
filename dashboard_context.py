@@ -752,7 +752,7 @@ def context(active_page=None, merchant=None, merchant_id=None):
             pass
 
     # Billing context for the dashboard Billing page.
-    billing_account = None
+    billing_account = {"approved_actions": 0}
     tier_limits = {}
     if merchant_id:
         try:
@@ -760,18 +760,17 @@ def context(active_page=None, merchant=None, merchant_id=None):
             billing = SaaSBilling.query.get(merchant_id)
             tier_key = (merchant_obj.get("tier") or "Basic Tier").replace("AI Tier", "Plan").strip()
             meta = TierManager.get_tier_meta(tier_key)
-            if billing:
-                billing_account = {
-                    "current_plan": billing.current_plan or tier_key,
-                    "add_ons": billing.add_ons or [],
-                    "concierge_bundle": "concierge_bundle" in (billing.add_ons or []),
-                    "stripe_customer_id": billing.stripe_customer_id or "",
-                    "stripe_subscription_id": billing.stripe_subscription_item_id or "",
-                    "metered_usage_units": billing.metered_usage_units or 0,
-                    "approved_actions": TierManager.current_action_count(merchant_id),
-                    "accrued_invoice_value": billing.accrued_invoice_value or 0.0,
-                    "billing_cycle_end": billing.billing_cycle_end or "",
-                }
+            billing_account = {
+                "current_plan": billing.current_plan if billing else tier_key,
+                "add_ons": billing.add_ons if billing else [],
+                "concierge_bundle": "concierge_bundle" in (billing.add_ons if billing else []),
+                "stripe_customer_id": billing.stripe_customer_id if billing else "",
+                "stripe_subscription_id": billing.stripe_subscription_item_id if billing else "",
+                "metered_usage_units": billing.metered_usage_units if billing else 0,
+                "approved_actions": TierManager.current_action_count(merchant_id),
+                "accrued_invoice_value": billing.accrued_invoice_value if billing else 0.0,
+                "billing_cycle_end": billing.billing_cycle_end if billing else "",
+            }
             tier_limits = {
                 "orders": meta.get("monthly_order_limit", 500),
                 "actions": meta.get("max_monthly_actions", 50),
