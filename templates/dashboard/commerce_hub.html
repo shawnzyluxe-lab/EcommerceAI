@@ -66,7 +66,7 @@
     <div class="card-head"><h3>Connect Manually</h3></div>
     <form id="connect-form" onsubmit="submitConnect(event)">
       <label style="font-size: .75rem; color: var(--ink-3); font-weight: 600;">Platform</label>
-      <select id="platform" style="width: 100%; padding: 10px; margin: 6px 0 12px; border: 1px solid var(--line); border-radius: 8px; background: #fff;" onchange="toggleFields()">
+      <select id="platform" style="width: 100%; padding: 10px; margin: 6px 0 12px; border: 1px solid var(--line); border-radius: 8px; background: var(--surface); color: var(--ink);" onchange="toggleFields()">
         <option value="shopify">Shopify</option>
         <option value="tiktok">TikTok Shop</option>
         <option value="amazon">Amazon SP-API</option>
@@ -74,41 +74,41 @@
 
       <div id="shopify-fields">
         <label style="font-size: .75rem; color: var(--ink-3); font-weight: 600;">Store domain</label>
-        <input id="shopify-shop" type="text" placeholder="store.myshopify.com" style="width: 100%; padding: 10px; margin: 6px 0 12px; border: 1px solid var(--line); border-radius: 8px; background: #fff;">
+        <input id="shopify-shop" type="text" placeholder="store.myshopify.com" style="width: 100%; padding: 10px; margin: 6px 0 12px; border: 1px solid var(--line); border-radius: 8px; background: var(--surface); color: var(--ink);">
         <label style="font-size: .75rem; color: var(--ink-3); font-weight: 600;">Access token</label>
-        <input id="shopify-token" type="password" placeholder="shpat_…" style="width: 100%; padding: 10px; margin: 6px 0 12px; border: 1px solid var(--line); border-radius: 8px; background: #fff;">
+        <input id="shopify-token" type="password" placeholder="shpat_…" style="width: 100%; padding: 10px; margin: 6px 0 12px; border: 1px solid var(--line); border-radius: 8px; background: var(--surface); color: var(--ink);">
       </div>
 
       <div id="tiktok-fields" style="display:none;">
         <label style="font-size: .75rem; color: var(--ink-3); font-weight: 600;">Shop / Seller ID</label>
-        <input id="tiktok-seller" type="text" placeholder="Your TikTok shop ID" style="width: 100%; padding: 10px; margin: 6px 0 12px; border: 1px solid var(--line); border-radius: 8px; background: #fff;">
+        <input id="tiktok-seller" type="text" placeholder="Your TikTok shop ID" style="width: 100%; padding: 10px; margin: 6px 0 12px; border: 1px solid var(--line); border-radius: 8px; background: var(--surface); color: var(--ink);">
         <label style="font-size: .75rem; color: var(--ink-3); font-weight: 600;">App key</label>
-        <input id="tiktok-key" type="text" style="width: 100%; padding: 10px; margin: 6px 0 12px; border: 1px solid var(--line); border-radius: 8px; background: #fff;">
+        <input id="tiktok-key" type="text" style="width: 100%; padding: 10px; margin: 6px 0 12px; border: 1px solid var(--line); border-radius: 8px; background: var(--surface); color: var(--ink);">
         <label style="font-size: .75rem; color: var(--ink-3); font-weight: 600;">App secret</label>
-        <input id="tiktok-secret" type="password" style="width: 100%; padding: 10px; margin: 6px 0 12px; border: 1px solid var(--line); border-radius: 8px; background: #fff;">
+        <input id="tiktok-secret" type="password" style="width: 100%; padding: 10px; margin: 6px 0 12px; border: 1px solid var(--line); border-radius: 8px; background: var(--surface); color: var(--ink);">
         <label style="font-size: .75rem; color: var(--ink-3); font-weight: 600;">Access token <span style="color:var(--ink-3);font-weight:400">(from TikTok OAuth)</span></label>
-        <input id="tiktok-access-token" type="password" style="width: 100%; padding: 10px; margin: 6px 0 12px; border: 1px solid var(--line); border-radius: 8px; background: #fff;">
+        <input id="tiktok-access-token" type="password" style="width: 100%; padding: 10px; margin: 6px 0 12px; border: 1px solid var(--line); border-radius: 8px; background: var(--surface); color: var(--ink);">
         <label style="font-size: .75rem; color: var(--ink-3); font-weight: 600;">Shop cipher <span style="color:var(--ink-3);font-weight:400">(optional)</span></label>
-        <input id="tiktok-shop-cipher" type="text" style="width: 100%; padding: 10px; margin: 6px 0 12px; border: 1px solid var(--line); border-radius: 8px; background: #fff;">
+        <input id="tiktok-shop-cipher" type="text" style="width: 100%; padding: 10px; margin: 6px 0 12px; border: 1px solid var(--line); border-radius: 8px; background: var(--surface); color: var(--ink);">
       </div>
 
       <div id="amazon-fields" style="display:none;">
         <label style="font-size: .75rem; color: var(--ink-3); font-weight: 600;">Seller ID</label>
-        <input id="amazon-seller" type="text" style="width: 100%; padding: 10px; margin: 6px 0 12px; border: 1px solid var(--line); border-radius: 8px; background: #fff;">
+        <input id="amazon-seller" type="text" style="width: 100%; padding: 10px; margin: 6px 0 12px; border: 1px solid var(--line); border-radius: 8px; background: var(--surface); color: var(--ink);">
         <label style="font-size: .75rem; color: var(--ink-3); font-weight: 600;">AWS Access Key</label>
-        <input id="amazon-access" type="text" style="width: 100%; padding: 10px; margin: 6px 0 12px; border: 1px solid var(--line); border-radius: 8px; background: #fff;">
+        <input id="amazon-access" type="text" style="width: 100%; padding: 10px; margin: 6px 0 12px; border: 1px solid var(--line); border-radius: 8px; background: var(--surface); color: var(--ink);">
         <label style="font-size: .75rem; color: var(--ink-3); font-weight: 600;">AWS Secret Key</label>
-        <input id="amazon-secret" type="password" style="width: 100%; padding: 10px; margin: 6px 0 12px; border: 1px solid var(--line); border-radius: 8px; background: #fff;">
+        <input id="amazon-secret" type="password" style="width: 100%; padding: 10px; margin: 6px 0 12px; border: 1px solid var(--line); border-radius: 8px; background: var(--surface); color: var(--ink);">
         <label style="font-size: .75rem; color: var(--ink-3); font-weight: 600;">Region</label>
-        <input id="amazon-region" type="text" placeholder="us-east-1" style="width: 100%; padding: 10px; margin: 6px 0 12px; border: 1px solid var(--line); border-radius: 8px; background: #fff;">
+        <input id="amazon-region" type="text" placeholder="us-east-1" style="width: 100%; padding: 10px; margin: 6px 0 12px; border: 1px solid var(--line); border-radius: 8px; background: var(--surface); color: var(--ink);">
         <label style="font-size: .75rem; color: var(--ink-3); font-weight: 600;">LWA refresh token</label>
-        <input id="amazon-refresh-token" type="password" style="width: 100%; padding: 10px; margin: 6px 0 12px; border: 1px solid var(--line); border-radius: 8px; background: #fff;">
+        <input id="amazon-refresh-token" type="password" style="width: 100%; padding: 10px; margin: 6px 0 12px; border: 1px solid var(--line); border-radius: 8px; background: var(--surface); color: var(--ink);">
         <label style="font-size: .75rem; color: var(--ink-3); font-weight: 600;">LWA client ID</label>
-        <input id="amazon-lwa-client-id" type="text" style="width: 100%; padding: 10px; margin: 6px 0 12px; border: 1px solid var(--line); border-radius: 8px; background: #fff;">
+        <input id="amazon-lwa-client-id" type="text" style="width: 100%; padding: 10px; margin: 6px 0 12px; border: 1px solid var(--line); border-radius: 8px; background: var(--surface); color: var(--ink);">
         <label style="font-size: .75rem; color: var(--ink-3); font-weight: 600;">LWA client secret</label>
-        <input id="amazon-lwa-client-secret" type="password" style="width: 100%; padding: 10px; margin: 6px 0 12px; border: 1px solid var(--line); border-radius: 8px; background: #fff;">
+        <input id="amazon-lwa-client-secret" type="password" style="width: 100%; padding: 10px; margin: 6px 0 12px; border: 1px solid var(--line); border-radius: 8px; background: var(--surface); color: var(--ink);">
         <label style="font-size: .75rem; color: var(--ink-3); font-weight: 600;">Role ARN <span style="color:var(--ink-3);font-weight:400">(optional)</span></label>
-        <input id="amazon-role-arn" type="text" style="width: 100%; padding: 10px; margin: 6px 0 12px; border: 1px solid var(--line); border-radius: 8px; background: #fff;">
+        <input id="amazon-role-arn" type="text" style="width: 100%; padding: 10px; margin: 6px 0 12px; border: 1px solid var(--line); border-radius: 8px; background: var(--surface); color: var(--ink);">
       </div>
 
       <button class="btn btn-primary" style="width: 100%;" type="submit" {% if merchant.sandbox_status == 'sandbox' %}disabled{% endif %}>{% if merchant.sandbox_status == 'sandbox' %}Live connect disabled in sandbox{% else %}Encrypt &amp; Save Connection{% endif %}</button>

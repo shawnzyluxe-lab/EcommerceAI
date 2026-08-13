@@ -34,6 +34,8 @@ def run_migrations():
             ("sandbox_expires_at", "TIMESTAMP"),
             ("live_access_enabled", "INTEGER"),
             ("approved_at", "TIMESTAMP"),
+            ("brand_color", "VARCHAR(7)"),
+            ("brand_color_secondary", "VARCHAR(7)"),
         ]:
             _run(f"merchant_profiles.{col}", f"ALTER TABLE merchant_profiles ADD COLUMN IF NOT EXISTS {col} {typ}")
 

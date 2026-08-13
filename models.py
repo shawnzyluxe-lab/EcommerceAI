@@ -143,6 +143,8 @@ class MerchantProfile(db.Model):
     sandbox_expires_at = db.Column(db.DateTime)
     live_access_enabled = db.Column(db.Integer, default=0)  # 0 = false, 1 = true
     approved_at = db.Column(db.DateTime)
+    brand_color = db.Column(db.String(7))
+    brand_color_secondary = db.Column(db.String(7))
     created_at = db.Column(db.DateTime, server_default=db.func.now())
 
 

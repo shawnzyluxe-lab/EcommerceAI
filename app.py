@@ -568,6 +568,8 @@ def get_merchant_context():
         "live_access_enabled": bool(profile.live_access_enabled) and not sandbox_expired,
         "sandbox_expires_at": profile.sandbox_expires_at.isoformat() if profile.sandbox_expires_at else None,
         "sandbox_expired": sandbox_expired,
+        "brand_color": profile.brand_color or "#8b5cf6",
+        "brand_color_secondary": profile.brand_color_secondary or "#a78bfa",
         "role": s.role,
     }
 

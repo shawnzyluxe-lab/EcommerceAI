@@ -22,7 +22,7 @@
     <div class="card-head"><h3>Hook Generator</h3></div>
     <div style="padding: 0 16px 16px;">
       <label style="font-size:.75rem; color:var(--ink-3); font-weight:600;">Product or benefit</label>
-      <input id="hook-input" type="text" placeholder="e.g., a heatless silk hair curler" style="width:100%; padding:10px; margin:6px 0 12px; border:1px solid var(--line); border-radius:8px; background:#fff;">
+      <input id="hook-input" type="text" placeholder="e.g., a heatless silk hair curler" style="width:100%; padding:10px; margin:6px 0 12px; border:1px solid var(--line); border-radius:8px; background:var(--surface); color:var(--ink);">
       <button class="btn" onclick="generateHooks()">Generate hooks</button>
       <ul id="hook-list" style="margin-top:14px; padding-left:18px; font-size:.85rem; line-height:1.6; color:var(--ink);"></ul>
     </div>
@@ -32,11 +32,11 @@
     <div class="card-head"><h3>Creator Brief Builder</h3></div>
     <div style="padding: 0 16px 16px;">
       <label style="font-size:.75rem; color:var(--ink-3); font-weight:600;">Product angle</label>
-      <input id="brief-angle" type="text" placeholder="e.g., solves a daily problem" style="width:100%; padding:10px; margin:6px 0 10px; border:1px solid var(--line); border-radius:8px; background:#fff;">
+      <input id="brief-angle" type="text" placeholder="e.g., solves a daily problem" style="width:100%; padding:10px; margin:6px 0 10px; border:1px solid var(--line); border-radius:8px; background:var(--surface); color:var(--ink);">
       <label style="font-size:.75rem; color:var(--ink-3); font-weight:600;">Target creator niche</label>
-      <input id="brief-niche" type="text" placeholder="e.g., skincare, fitness, mom life" style="width:100%; padding:10px; margin:6px 0 10px; border:1px solid var(--line); border-radius:8px; background:#fff;">
+      <input id="brief-niche" type="text" placeholder="e.g., skincare, fitness, mom life" style="width:100%; padding:10px; margin:6px 0 10px; border:1px solid var(--line); border-radius:8px; background:var(--surface); color:var(--ink);">
       <label style="font-size:.75rem; color:var(--ink-3); font-weight:600;">CTA</label>
-      <input id="brief-cta" type="text" placeholder="e.g., Shop now, Link in bio" style="width:100%; padding:10px; margin:6px 0 12px; border:1px solid var(--line); border-radius:8px; background:#fff;">
+      <input id="brief-cta" type="text" placeholder="e.g., Shop now, Link in bio" style="width:100%; padding:10px; margin:6px 0 12px; border:1px solid var(--line); border-radius:8px; background:var(--surface); color:var(--ink);">
       <button class="btn btn-primary" style="width:100%;" onclick="saveBrief()">Create brief</button>
       <div id="briefs-list" style="margin-top:14px; font-size:.8rem;"></div>
     </div>
@@ -75,9 +75,9 @@
     <div id="post-queue" style="font-size:.85rem;"></div>
     <div style="margin-top:16px; border-top:1px solid var(--line); padding-top:12px;">
       <label style="font-size:.75rem; color:var(--ink-3); font-weight:600;">Add to queue</label>
-      <input id="post-caption" type="text" placeholder="Caption preview..." style="width:100%; padding:10px; margin:6px 0 10px; border:1px solid var(--line); border-radius:8px; background:#fff;">
+      <input id="post-caption" type="text" placeholder="Caption preview..." style="width:100%; padding:10px; margin:6px 0 10px; border:1px solid var(--line); border-radius:8px; background:var(--surface); color:var(--ink);">
       <div style="display:flex; gap:10px;">
-        <input id="post-scheduled" type="datetime-local" style="flex:1; padding:10px; border:1px solid var(--line); border-radius:8px; background:#fff;">
+        <input id="post-scheduled" type="datetime-local" style="flex:1; padding:10px; border:1px solid var(--line); border-radius:8px; background:var(--surface); color:var(--ink);">
         <button class="btn" onclick="addPost()">Queue</button>
       </div>
     </div>
@@ -201,7 +201,7 @@ function renderBriefs() {
     return;
   }
   el.innerHTML = briefs.map(b => `
-    <div style="padding:8px; border:1px solid var(--line); border-radius:8px; margin-bottom:6px; background:#fff;">
+    <div style="padding:8px; border:1px solid var(--line); border-radius:8px; margin-bottom:6px; background:var(--surface); color:var(--ink);">
       <div style="font-weight:600; font-size:.8rem;">${b.product_angle}</div>
       <div style="font-size:.72rem; color:var(--ink-3);">${b.niche} • CTA: ${b.cta}</div>
     </div>
