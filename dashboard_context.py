@@ -42,22 +42,43 @@ def _merchant_now(merchant_id=None):
         return datetime.now(timezone.utc)
 
 
-def _evidence_for_action(action: Dict[str, Any]) -> List[str]:
-    """Build human-readable evidence bullets from a pending action dict."""
+def _evidence_for_action(action: Dict[str, Any], merchant_id: Optional[str] = None) -> List[str]:
+    """Build human-readable evidence bullets from a pending action dict and live snapshot."""
     evidence: List[str] = []
     payload = action.get("payload") or {}
     action_type = action.get("action_type", "")
+    snapshot = None
+    if merchant_id:
+        try:
+            import agent_context
+            snapshot = agent_context.get_snapshot(merchant_id)
+        except Exception:
+            snapshot = None
+    kpis = (snapshot.get("kpis") or {}) if snapshot else {}
+
     if action_type == "ad_adjust":
         evidence.append(f"Platform: {payload.get('platform', 'ads')}")
         adj = payload.get("adjustment")
         if adj is not None:
             evidence.append(f"Recommended change: {adj}% budget")
+        margin = kpis.get("net_margin")
+        if margin is not None:
+            evidence.append(f"Current net margin: {margin}%")
+        revenue = kpis.get("gross_revenue")
+        if revenue is not None:
+            evidence.append(f"Gross revenue: ${revenue:,.0f}")
     elif action_type == "reorder":
         evidence.append(f"SKU: {payload.get('sku', 'unknown')}")
         evidence.append(f"Quantity: {payload.get('quantity', 'N/A')}")
         evidence.append(f"Supplier: {payload.get('supplier', 'N/A')} ({payload.get('lead_days', 'N/A')}-day lead)")
+        orders = kpis.get("orders")
+        if orders is not None:
+            evidence.append(f"Recent orders: {orders}")
     elif action_type == "refund":
         evidence.append(f"Order: {payload.get('order_id', 'unknown')}")
+        margin = kpis.get("net_margin")
+        if margin is not None:
+            evidence.append(f"Current net margin: {margin}%")
     else:
         for k, v in payload.items():
             evidence.append(f"{k.replace('_', ' ').title()}: {v}")
@@ -66,12 +87,12 @@ def _evidence_for_action(action: Dict[str, Any]) -> List[str]:
     return evidence
 
 
-def _hero_action(pending_actions: List[Dict[str, Any]]) -> Optional[Dict[str, Any]]:
+def _hero_action(pending_actions: List[Dict[str, Any]], merchant_id: Optional[str] = None) -> Optional[Dict[str, Any]]:
     """Return the top pending action decorated with evidence for the overview."""
     if not pending_actions:
         return None
     hero = dict(pending_actions[0])
-    hero["evidence"] = _evidence_for_action(hero)
+    hero["evidence"] = _evidence_for_action(hero, merchant_id)
     return hero
 
 
@@ -628,7 +649,7 @@ def context(active_page=None, merchant=None, merchant_id=None):
             action_history = [action_gate.action_to_dict(a) for a in action_gate.list_action_history(merchant_id)]
         except Exception:
             pass
-    hero_action = _hero_action(pending_actions)
+    hero_action = _hero_action(pending_actions, merchant_id)
 
     # Channel list from persistent connections.
     try:
