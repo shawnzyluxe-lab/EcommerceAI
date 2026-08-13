@@ -62,6 +62,7 @@ import vetted_operator
 import action_gate
 import rules_engine
 import forecaster
+import channel_analytics
 import channels as channels_module
 import shopify_sync
 import tiktok_sync
@@ -1767,6 +1768,23 @@ def api_profit_breakdown():
     })
 
 
+@app.route('/api/analytics/channels', methods=['GET'])
+@require_roles([UserRole.ADMIN, UserRole.MERCHANT, UserRole.ENGINEER])
+def api_channel_analytics():
+    """Return true-profit summary per sales channel."""
+    merchant = get_merchant_context()
+    if not merchant:
+        return jsonify({"error": "No merchant context"}), 403
+    days = int(request.args.get("days", 30) or 30)
+    try:
+        summary = channel_analytics.summarize_channels(merchant["id"], days=days)
+        totals = channel_analytics.channel_totals(merchant["id"], days=days)
+        return jsonify({"channels": summary, "totals": totals, "days": days}), 200
+    except Exception as e:
+        logger.error(f"[Channel Analytics] Failed: {e}")
+        return jsonify({"detail": str(e)}), 500
+
+
 @app.route('/api/kpis')
 def api_kpis():
     """Real-time profit KPI feed for the dashboard and external consumers."""
@@ -1916,6 +1934,38 @@ def api_modify_action(action_id):
     except Exception as e:
         logger.error(f"[Action Gate] Modify failed: {e}")
         return jsonify({"detail": str(e)}), 400
+
+
+@app.route('/api/actions/<int:action_id>/verify', methods=['POST'])
+@require_roles([UserRole.ADMIN, UserRole.MERCHANT, UserRole.ENGINEER])
+def api_verify_action(action_id):
+    """Re-capture KPIs for an executed action and produce a verification report."""
+    merchant = get_merchant_context()
+    if not merchant:
+        return jsonify({"error": "No merchant context"}), 403
+    try:
+        result = action_gate.verify_action(action_id, merchant["id"])
+        return jsonify(result), 200
+    except Exception as e:
+        logger.error(f"[Action Gate] Verify failed: {e}")
+        return jsonify({"detail": str(e)}), 400
+
+
+@app.route('/api/actions/verify-cron', methods=['POST'])
+@require_roles([UserRole.ADMIN, UserRole.MERCHANT, UserRole.ENGINEER])
+def api_verify_actions_cron():
+    """CRON-style endpoint to verify all executed actions older than the configured window."""
+    merchant = get_merchant_context()
+    if not merchant:
+        return jsonify({"error": "No merchant context"}), 403
+    data = request.get_json(silent=True) or {}
+    hours = int(data.get("hours", 48) or 48)
+    try:
+        results = action_gate.verify_overdue_actions(merchant["id"], hours=hours)
+        return jsonify({"verified": len(results), "results": results}), 200
+    except Exception as e:
+        logger.error(f"[Action Gate] Verify-cron failed: {e}")
+        return jsonify({"detail": str(e)}), 500
 
 
 # ============================================================

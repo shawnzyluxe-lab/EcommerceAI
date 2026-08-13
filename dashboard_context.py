@@ -17,6 +17,7 @@ import profit_feed
 import alert_matrix
 import action_gate
 import channels as channels_module
+import channel_analytics
 import tracking
 
 
@@ -677,6 +678,16 @@ def context(active_page=None, merchant=None, merchant_id=None):
             pass
     hero_action = _hero_action(pending_actions, merchant_id)
 
+    # Channel true-profit analytics.
+    channel_summary = []
+    channel_totals = {}
+    if merchant_id:
+        try:
+            channel_summary = channel_analytics.summarize_channels(merchant_id, days=30)
+            channel_totals = channel_analytics.channel_totals(merchant_id, days=30)
+        except Exception:
+            pass
+
     # Channel list from persistent connections.
     try:
         channel_data = channels_module.list_channels(merchant_id) if merchant_id else CHANNELS
@@ -733,6 +744,8 @@ def context(active_page=None, merchant=None, merchant_id=None):
         "pending_actions": pending_actions,
         "action_history": action_history,
         "hero_action": hero_action,
+        "channel_summary": channel_summary,
+        "channel_totals": channel_totals,
         "generated": now.strftime("%A, %d %b %Y · %H:%M %Z"),
     }
 

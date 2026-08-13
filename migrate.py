@@ -152,6 +152,12 @@ def run_migrations():
             "ALTER TABLE profit_feed_orders ADD CONSTRAINT _profit_order_merchant_uc UNIQUE (merchant_id, order_id)",
         )
 
+        for col, typ in [
+            ("verified_at", "TIMESTAMP"),
+            ("verification_report", "TEXT"),
+        ]:
+            _run(f"action_evidence.{col}", f"ALTER TABLE action_evidence ADD COLUMN IF NOT EXISTS {col} {typ}")
+
 
 if __name__ == "__main__":
     run_migrations()

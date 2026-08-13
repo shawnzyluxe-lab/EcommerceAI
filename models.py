@@ -450,6 +450,8 @@ class ActionEvidence(db.Model):
     before_metrics = db.Column(db.JSON, default=dict)
     after_metrics = db.Column(db.JSON, default=dict)
     execution_report = db.Column(db.Text)
+    verified_at = db.Column(db.DateTime)
+    verification_report = db.Column(db.Text)
 
     created_at = db.Column(db.DateTime, server_default=db.func.now())
 

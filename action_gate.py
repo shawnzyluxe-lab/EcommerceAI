@@ -2,7 +2,7 @@
 import json
 import logging
 import uuid
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import List, Dict, Any, Optional
 
 from models import db, PendingAction, Alert, PredictiveLogistics, GeneratedPurchaseOrder, ProfitFeedOrder, AdSpendAnalytic, BusinessMetric, MerchantProfile, BusinessMemory, ActionEvidence
@@ -256,6 +256,65 @@ def _record_execution_report(action: PendingAction, evidence: ActionEvidence, be
         f"Net profit moved from ${before_net:,.2f} to ${after_net:,.2f} ({delta:+.2f})."
     )
     db.session.commit()
+
+
+def verify_action(action_id: int, merchant_id: Optional[str] = None) -> Dict[str, Any]:
+    """Re-capture metrics for an already-executed action and produce a verification report."""
+    action = get_action(action_id, merchant_id)
+    if not action:
+        raise ValueError("Action not found")
+    if action.status not in ("approved", "executed"):
+        raise ValueError(f"Action is {action.status}; verification requires approved or executed")
+
+    evidence = ActionEvidence.query.filter_by(action_id=action.id).first()
+    if not evidence:
+        raise ValueError("No evidence record for action")
+
+    before = evidence.before_metrics or {}
+    after = _capture_snapshot(action.merchant_id)
+    evidence.after_metrics = after.get("kpis") or {}
+
+    before_net = float((before or {}).get("net_profit", 0.0) or 0.0)
+    after_net = float((after.get("kpis") or {}).get("net_profit", 0.0) or 0.0)
+    delta = round(after_net - before_net, 2)
+
+    evidence.verified_at = _now()
+    evidence.verification_report = (
+        f"Verified after execution: {action.result_summary}. "
+        f"Net profit moved from ${before_net:,.2f} to ${after_net:,.2f} ({delta:+.2f})."
+    )
+    db.session.commit()
+
+    return {
+        "status": "verified",
+        "action_id": action.id,
+        "verified_at": evidence.verified_at.isoformat() if evidence.verified_at else None,
+        "report": evidence.verification_report,
+        "before_metrics": evidence.before_metrics,
+        "after_metrics": evidence.after_metrics,
+    }
+
+
+def verify_overdue_actions(merchant_id: Optional[str] = None, hours: int = 48) -> List[Dict[str, Any]]:
+    """Run verification on executed actions older than the threshold that have not been verified."""
+    since = _now() - timedelta(hours=hours)
+    q = PendingAction.query.filter(
+        PendingAction.status.in_(("approved", "executed")),
+        PendingAction.decided_at <= since,
+    )
+    if merchant_id:
+        q = q.filter_by(merchant_id=merchant_id)
+
+    results = []
+    for action in q.all():
+        evidence = ActionEvidence.query.filter_by(action_id=action.id).first()
+        if not evidence or evidence.verified_at:
+            continue
+        try:
+            results.append(verify_action(action.id, merchant_id))
+        except Exception as e:
+            logger.warning(f"[Action Gate] Verification failed for action {action.id}: {e}")
+    return results
 
 
 def _attach_evidence(action: PendingAction, merchant_id: str, snapshot: Optional[Dict[str, Any]] = None, confidence: int = 82) -> ActionEvidence:

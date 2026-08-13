@@ -88,12 +88,12 @@
       {% endif %}
     </div>
 
-    <!-- 3. WHAT SHOULD I DO -->
+    <!-- 3. AI ACTIONS -->
     <div class="card" id="action-gate-card">
       <div class="card-head" style="align-items: center; margin-bottom: 14px;">
         <div style="display: flex; align-items: center; gap: 10px;">
           <div style="width: 28px; height: 28px; border-radius: 8px; background: var(--success); color: #fff; display: grid; place-items: center; font-size: .8rem; font-weight: 800;">3</div>
-          <h2 style="font-size: 1rem; margin: 0;">What Should I Do</h2>
+          <h2 style="font-size: 1rem; margin: 0;">AI Actions</h2>
         </div>
         <span class="spacer"></span>
         <a href="/dashboard/action-gate" class="btn btn-ghost">Open Action Gate</a>
@@ -208,6 +208,51 @@
     </div>
   </div>
 </div>
+
+<!-- Channel true-profit comparison -->
+{% if channel_summary %}
+<div class="card" style="margin-bottom: 24px;">
+  <div class="card-head" style="margin-bottom: 14px;">
+    <h3>Channel Performance</h3>
+    <p style="color: var(--ink-2); font-size: .85rem; margin: 0;">True profit by sales channel — revenue minus all costs.</p>
+    <span class="spacer"></span>
+    <a href="/dashboard/commerce-hub" class="btn btn-ghost">Manage channels</a>
+  </div>
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th>Channel</th>
+          <th class="num">Orders</th>
+          <th class="num">Revenue</th>
+          <th class="num">Net Profit</th>
+          <th class="num">Margin</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for c in channel_summary %}
+        <tr>
+          <td class="b" style="text-transform: capitalize;">{{ c.channel }}</td>
+          <td class="num mono">{{ c.orders }}</td>
+          <td class="num mono">${{ '{:,.2f}'.format(c.revenue) }}</td>
+          <td class="num mono">${{ '{:,.2f}'.format(c.net_profit) }}</td>
+          <td class="num mono">{{ c.margin_pct }}%</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+      <tfoot style="border-top: 2px solid var(--line);">
+        <tr style="font-weight: 700;">
+          <td>Total</td>
+          <td class="num mono">{{ channel_totals.orders }}</td>
+          <td class="num mono">${{ '{:,.2f}'.format(channel_totals.revenue) }}</td>
+          <td class="num mono">${{ '{:,.2f}'.format(channel_totals.net_profit) }}</td>
+          <td class="num mono">{{ channel_totals.margin_pct }}%</td>
+        </tr>
+      </tfoot>
+    </table>
+  </div>
+</div>
+{% endif %}
 
 <script>
 async function runAssistantAnalysis() {
