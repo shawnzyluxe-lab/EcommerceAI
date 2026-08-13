@@ -2181,6 +2181,72 @@ def api_admin_sync_amazon(merchant_id):
         return jsonify({"detail": str(e)}), 400
 
 
+@app.route('/api/admin/provision-demo', methods=['POST'])
+@require_roles([UserRole.ADMIN])
+def admin_provision_demo():
+    """Create or reset a demo/review merchant with full live access for partnership testing."""
+    data = request.get_json(silent=True) or {}
+    email = (data.get("email") or "").strip().lower()
+    business_name = (data.get("business_name") or "Partnership Test Store").strip()
+    tier = (data.get("tier") or "Vantav Scale").strip()
+    if not email:
+        return jsonify({"detail": "Email is required."}), 400
+
+    # Generate a strong temporary password for the reviewer.
+    temp_password = secrets.token_urlsafe(12)
+    password_hash = generate_password_hash(temp_password, method="pbkdf2:sha256")
+    now = datetime.utcnow()
+
+    profile = MerchantProfile.query.filter_by(admin_email=email).first()
+    if profile:
+        profile.password_hash = password_hash
+        profile.account_tier = tier
+        profile.sandbox_status = "approved"
+        profile.live_access_enabled = 1
+        profile.approved_at = now
+        profile.business_name = business_name
+        merchant_id = profile.merchant_id
+    else:
+        merchant_id = f"demo_{secrets.token_hex(4)}"
+        db.session.add(MerchantProfile(
+            merchant_id=merchant_id,
+            business_name=business_name,
+            admin_email=email,
+            account_tier=tier,
+            password_hash=password_hash,
+            sandbox_status="approved",
+            live_access_enabled=1,
+            approved_at=now,
+            created_at=now,
+        ))
+
+    billing = SaaSBilling.query.get(merchant_id)
+    if not billing:
+        billing = SaaSBilling(merchant_id=merchant_id)
+        db.session.add(billing)
+    billing.current_plan = tier
+    billing.billing_cycle_end = (now + timedelta(days=30)).strftime('%Y-%m-%d')
+
+    if not MerchantMetric.query.filter_by(merchant_id=merchant_id).first():
+        db.session.add(MerchantMetric(
+            merchant_id=merchant_id,
+            total_unified_balance=0.0,
+            true_net_profit=0.0,
+            gross_revenue=0.0,
+            ai_briefing="Demo account for partnership review.",
+        ))
+
+    db.session.commit()
+    return jsonify({
+        "merchant_id": merchant_id,
+        "email": email,
+        "password": temp_password,
+        "tier": tier,
+        "live_access": True,
+        "sandbox_status": "approved",
+    }), 200
+
+
 @app.route('/admin/merchants')
 @require_roles([UserRole.ADMIN])
 def admin_merchants():
