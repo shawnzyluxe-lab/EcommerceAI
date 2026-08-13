@@ -19,15 +19,15 @@ import channels as channels_module
 import startup_pack
 
 DEMO_ORDERS = [
-    ("shopify", 2, 128.00, "shipped"),
-    ("tiktok", 1, 64.00, "shipped"),
-    ("amazon", 1, 82.00, "packed"),
-    ("shopify", 3, 214.50, "shipped"),
-    ("etsy", 2, 96.40, "delayed"),
-    ("shopify", 1, 58.00, "refunded"),
-    ("tiktok", 2, 132.00, "shipped"),
-    ("amazon", 1, 49.99, "shipped"),
-    ("shopify", 1, 89.00, "delayed"),
+    ("shopify", 2, 128.00, "shipped", "1Z999AA10123456784", "ups"),
+    ("tiktok", 1, 64.00, "shipped", "9400111899223456789012", "usps"),
+    ("amazon", 1, 82.00, "packed", "TBA123456789012", "amazon"),
+    ("shopify", 3, 214.50, "shipped", "449044304137821", "fedex"),
+    ("etsy", 2, 96.40, "delayed", "LX1234567890", "lasership"),
+    ("shopify", 1, 58.00, "refunded", "", ""),
+    ("tiktok", 2, 132.00, "shipped", "JJD0001123456789", "dhl"),
+    ("amazon", 1, 49.99, "shipped", "TBC987654321098", "amazon"),
+    ("shopify", 1, 89.00, "delayed", "C12345678901234", "ontrac"),
 ]
 
 DEMO_AD_SPEND = [
@@ -122,9 +122,9 @@ def seed_sandbox_demo(merchant_id, business_name="", force=False):
         _clear_demo_data(merchant_id)
 
     suffix = _order_suffix(merchant_id)
-    for i, (channel, items, gross, state) in enumerate(DEMO_ORDERS):
+    for i, (channel, items, gross, state, tracking_number, carrier) in enumerate(DEMO_ORDERS):
         order_id = f"DEMO-{suffix}-{i + 1001}"
-        profit_feed.record_order(merchant_id, channel, order_id, gross, items=items, state=state)
+        profit_feed.record_order(merchant_id, channel, order_id, gross, items=items, state=state, tracking_number=tracking_number, carrier=carrier)
 
     for platform, amount, conv in DEMO_AD_SPEND:
         profit_feed.record_ad_spend(merchant_id, platform, amount, conv)

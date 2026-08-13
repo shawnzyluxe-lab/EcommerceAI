@@ -132,6 +132,17 @@ def run_migrations():
         except Exception as e:
             print(f"[migrate] active_sessions.last_seen add skipped: {e}")
 
+        # Tracking numbers for Profit Feed orders.
+        for col, typ in [
+            ("tracking_number", "VARCHAR(100)"),
+            ("carrier", "VARCHAR(50)"),
+        ]:
+            try:
+                conn.execute(text(f"ALTER TABLE profit_feed_orders ADD COLUMN IF NOT EXISTS {col} {typ}"))
+                print(f"[migrate] Ensured profit_feed_orders.{col}")
+            except Exception as e:
+                print(f"[migrate] profit_feed_orders.{col} add skipped: {e}")
+
         # Create the beta waitlist applications table if missing.
         conn.execute(text("""
             CREATE TABLE IF NOT EXISTS beta_waitlist_applications (

@@ -6,6 +6,7 @@ import logging
 from datetime import datetime, timedelta, timezone
 from collections import defaultdict
 
+import tracking
 from models import db, ProfitFeedOrder, AdSpendFeed
 
 logger = logging.getLogger(__name__)
@@ -48,7 +49,7 @@ def _normalize_channel(channel):
     return (channel or "").lower().replace(" shop", "").replace(" shop", "").replace(" marketplace", "").strip()
 
 
-def record_order(merchant_id, channel, order_id, gross_revenue, items=1, state="shipped", refund_amount=0.0):
+def record_order(merchant_id, channel, order_id, gross_revenue, items=1, state="shipped", refund_amount=0.0, tracking_number="", carrier=""):
     """Record a channel order and compute its true net profit.
 
     Returns the created/updated ProfitFeedOrder or None if already recorded.
@@ -60,9 +61,12 @@ def record_order(merchant_id, channel, order_id, gross_revenue, items=1, state="
 
     existing = ProfitFeedOrder.query.filter_by(merchant_id=merchant_id, order_id=order_id).first()
     if existing:
-        # Idempotent update for state/refund changes from webhooks.
+        # Idempotent update for state/refund/tracking changes from webhooks.
         existing.state = state
         existing.refund_amount = float(refund_amount or 0.0)
+        if tracking_number:
+            existing.tracking_number = tracking.normalize_tracking_number(tracking_number)
+            existing.carrier = (carrier or tracking.detect_carrier(existing.tracking_number)).lower()
         existing.net_profit = _compute_net(existing, existing.ad_spend_attributed)
         db.session.commit()
         return existing
@@ -74,6 +78,8 @@ def record_order(merchant_id, channel, order_id, gross_revenue, items=1, state="
     shipping = defaults["shipping"] * max(int(items or 1), 1)
     refund = float(refund_amount or 0.0)
 
+    clean_tracking = tracking.normalize_tracking_number(tracking_number or "")
+    detected_carrier = (carrier or tracking.detect_carrier(clean_tracking) or "").lower()
     order = ProfitFeedOrder(
         merchant_id=merchant_id,
         order_id=order_id,
@@ -86,6 +92,8 @@ def record_order(merchant_id, channel, order_id, gross_revenue, items=1, state="
         ad_spend_attributed=0.0,
         refund_amount=round(refund, 2),
         state=state,
+        tracking_number=clean_tracking,
+        carrier=detected_carrier,
     )
     order.net_profit = _compute_net(order, 0.0)
     db.session.add(order)
@@ -173,6 +181,9 @@ def _orders_with_ad_attribution(merchant_id, limit=50, since=None):
             "profit": net,
             "margin": margin,
             "state": o.state,
+            "tracking_number": o.tracking_number or "",
+            "carrier": o.carrier or "",
+            "tracking_url": tracking.tracking_url(o.tracking_number or "", o.carrier or ""),
             "recorded_at": o.recorded_at.isoformat() if o.recorded_at else None,
         })
     return result

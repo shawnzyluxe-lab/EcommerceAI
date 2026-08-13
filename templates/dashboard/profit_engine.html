@@ -34,7 +34,7 @@
     </div>
     <div class="table-wrap">
       <table>
-        <thead><tr><th>Order</th><th>Channel</th><th class="num">Revenue</th><th class="num">Profit</th><th class="num">Margin</th><th>State</th></tr></thead>
+        <thead><tr><th>Order</th><th>Channel</th><th class="num">Revenue</th><th class="num">Profit</th><th class="num">Margin</th><th>State</th><th>Tracking</th></tr></thead>
         <tbody id="orders-body">
           {% for o in orders %}
           <tr>
@@ -44,6 +44,11 @@
             <td class="num mono {{ 'up' if o.profit > 0 else 'down' }}">${{ '%.2f'|format(o.profit) }}</td>
             <td class="num mono">{{ o.margin }}%</td>
             <td><span class="tag {{ {'shipped':'tag-green','delayed':'tag-amber','refunded':'tag-red','packed':'tag-blue'}[o.state] }}">{{ o.state }}</span></td>
+            <td>
+              {% if o.tracking_url %}
+              <a href="{{ o.tracking_url }}" target="_blank" rel="noopener" class="btn btn-ghost" style="padding: 4px 8px; font-size: .78rem;">Track</a>
+              {% else %}—{% endif %}
+            </td>
           </tr>
           {% endfor %}
         </tbody>
@@ -83,6 +88,9 @@
         <td class="num mono ${o.profit > 0 ? 'up' : 'down'}">$${fmt(o.profit)}</td>
         <td class="num mono">${o.margin}%</td>
         <td><span class="tag ${stateClass[o.state] || 'tag-amber'}">${o.state}</span></td>
+        <td>
+          ${o.tracking_url ? `<a href="${o.tracking_url}" target="_blank" rel="noopener" class="btn btn-ghost" style="padding: 4px 8px; font-size: .78rem;">Track</a>` : '—'}
+        </td>
       </tr>
     `).join('');
   }

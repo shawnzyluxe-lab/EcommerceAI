@@ -44,7 +44,7 @@
   <div class="table-wrap">
     <table>
       <thead>
-        <tr><th>Order #</th><th>Channel</th><th>Customer</th><th class="num">Items</th><th class="num">Total</th><th>Status</th><th>Date</th></tr>
+        <tr><th>Order #</th><th>Channel</th><th>Customer</th><th class="num">Items</th><th class="num">Total</th><th>Status</th><th>Date</th><th>Tracking</th></tr>
       </thead>
       <tbody>
         {% for o in orders %}
@@ -56,6 +56,11 @@
           <td class="num mono">${{ '%.2f'|format(o.revenue) }}</td>
           <td><span class="tag {{ {'shipped':'tag-green','delayed':'tag-amber','refunded':'tag-red','packed':'tag-blue'}[o.state] }}">{{ o.state | title }}</span></td>
           <td>Jun {{ 12 - loop.index0 }}, 2025</td>
+          <td>
+            {% if o.tracking_url %}
+            <a href="{{ o.tracking_url }}" target="_blank" rel="noopener" class="btn btn-ghost" style="padding: 4px 8px; font-size: .78rem;">Track</a>
+            {% else %}—{% endif %}
+          </td>
         </tr>
         {% endfor %}
       </tbody>

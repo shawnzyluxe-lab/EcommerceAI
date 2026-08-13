@@ -386,6 +386,8 @@ class ProfitFeedOrder(db.Model):
     refund_amount = db.Column(db.REAL, nullable=False, default=0.0)
     net_profit = db.Column(db.REAL, nullable=False, default=0.0)
     state = db.Column(db.String(50), default="shipped")  # shipped, delayed, refunded, packed, cancelled
+    tracking_number = db.Column(db.String(100))
+    carrier = db.Column(db.String(50))
     recorded_at = db.Column(db.DateTime, server_default=db.func.now())
     __table_args__ = (db.UniqueConstraint('merchant_id', 'order_id', name='_profit_order_merchant_uc'),)
 
