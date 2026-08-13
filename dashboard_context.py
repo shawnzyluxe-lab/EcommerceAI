@@ -152,10 +152,6 @@ BETA_READY_PAGE_IDS = {
     "action_gate",
     "profit_engine",
     "billing",
-    "startup_pack",
-    "commerce_hub",
-    "tiktok_studio",
-    "command_center",
 }
 
 
