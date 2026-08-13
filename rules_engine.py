@@ -45,6 +45,7 @@ class SKUTelemetry(BaseModel):
     daily_sales_velocity: float = 0.0
     refund_count_24h: int = 0
     total_orders_24h: int = 0
+    lead_days: int = 14
 
 
 def _to_float(v: Any) -> float:
@@ -132,7 +133,8 @@ class VantaRulesEngine:
         # Diagnostic Class B: Inventory Stock Runway
         if data.daily_sales_velocity > 0:
             inventory_runway_days = data.on_hand_inventory / data.daily_sales_velocity
-            if 0 < inventory_runway_days <= self.memory.out_of_stock_buffer_days:
+            days_until_reorder = inventory_runway_days - data.lead_days
+            if days_until_reorder <= self.memory.out_of_stock_buffer_days:
                 event_id = self._source_id(data.sku, "inventory_runout")
                 generated_events.append({
                     "alert": {
@@ -141,8 +143,8 @@ class VantaRulesEngine:
                         "title": "Inventory Stock Runway Failure",
                         "detail": (
                             f"SKU {data.sku} has {data.on_hand_inventory} units and is selling at "
-                            f"{data.daily_sales_velocity:.1f}/day. Runway is {inventory_runway_days:.1f} days, "
-                            f"below your {self.memory.out_of_stock_buffer_days}-day buffer."
+                            f"{data.daily_sales_velocity:.1f}/day. Stockout in {inventory_runway_days:.1f} days "
+                            f"with {data.lead_days}-day supplier lead time; buffer is {self.memory.out_of_stock_buffer_days} days."
                         ),
                         "entity_ref": f"product://{data.sku}",
                         "source_id": event_id,
@@ -157,9 +159,9 @@ class VantaRulesEngine:
                         ),
                         "payload": {
                             "sku": data.sku,
-                            "quantity": max(int(data.daily_sales_velocity * 30), 100),
+                            "quantity": max(int(data.daily_sales_velocity * (data.lead_days + self.memory.out_of_stock_buffer_days)), 100),
                             "supplier": "Supplier C",
-                            "lead_days": 6,
+                            "lead_days": data.lead_days,
                             "priority": "critical",
                             "reason": f"inventory runs out in {inventory_runway_days:.1f} days",
                         },
@@ -268,6 +270,12 @@ def get_sku_telemetry_from_unified(merchant_id: str, sku: str, window_hours: int
 
     forecast = forecaster.forecast_sku(merchant_id, sku, days=max(window_hours // 24, 14))
 
+    product = Product.query.filter_by(sku=sku).first()
+    supplier = None
+    if product and product.supplier_id:
+        supplier = Supplier.query.filter_by(id=product.supplier_id).first()
+    lead_days = supplier.lead_days if supplier else 14
+
     return SKUTelemetry(
         sku=sku,
         revenue_24h=round(float(line_rows.revenue or 0), 2),
@@ -281,6 +289,7 @@ def get_sku_telemetry_from_unified(merchant_id: str, sku: str, window_hours: int
         daily_sales_velocity=forecast.predicted_daily_velocity,
         refund_count_24h=int(order_counts.refund_count or 0),
         total_orders_24h=int(order_counts.total or 0),
+        lead_days=lead_days,
     )
 
 
