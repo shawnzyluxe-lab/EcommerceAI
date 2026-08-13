@@ -116,6 +116,7 @@ class SaaSBilling(db.Model):
     stripe_customer_id = db.Column(db.String(100))
     stripe_subscription_item_id = db.Column(db.String(100))
     current_plan = db.Column(db.String(100))
+    add_ons = db.Column(db.JSON, default=list)
     metered_usage_units = db.Column(db.Integer, default=0)
     accrued_invoice_value = db.Column(db.REAL, default=0.0)
     billing_cycle_end = db.Column(db.String(20))

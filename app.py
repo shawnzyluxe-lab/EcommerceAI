@@ -191,91 +191,18 @@ BETA_READY_DASHBOARD_PAGES = {
     "overview", "alerts", "action-gate", "profit-engine", "billing",
 }
 
-TIER_LIMITS = {
-    "Basic Tier": {
-        "monthly_order_limit": 500,
-        "max_monthly_operations": 500,
-        "max_store_connections": 2,
-        "sync_frequency_seconds": 900,
-        "advanced_automation": False,
-        "features_allowed": ["shopify", "support"],
-    },
-    "Beta Tier": {
-        "monthly_order_limit": 5000,
-        "max_monthly_operations": 5000,
-        "max_store_connections": 999999,
-        "sync_frequency_seconds": 300,
-        "advanced_automation": True,
-        "features_allowed": ["shopify", "tiktok", "amazon", "support", "marketing"],
-    },
-    "Beta + Startup Pack": {
-        "monthly_order_limit": 5000,
-        "max_monthly_operations": 5000,
-        "max_store_connections": 999999,
-        "sync_frequency_seconds": 300,
-        "advanced_automation": True,
-        "features_allowed": ["shopify", "tiktok", "amazon", "support", "marketing"],
-    },
-    "Pro Tier": {
-        "monthly_order_limit": 5000,
-        "max_monthly_operations": 5000,
-        "max_store_connections": 999999,
-        "sync_frequency_seconds": 300,
-        "advanced_automation": True,
-        "features_allowed": ["shopify", "tiktok", "support", "marketing"],
-    },
-    "Enterprise AI Tier": {
-        "monthly_order_limit": 999999,
-        "max_monthly_operations": 999999,
-        "max_store_connections": 999999,
-        "sync_frequency_seconds": 0,
-        "advanced_automation": True,
-        "features_allowed": ["shopify", "tiktok", "amazon", "support", "marketing"],
-    },
+from tier_manager import TierManager, TIER_LIMITS, PLAN_TO_TIER
+
+# Backwards-compatible friendly name mapping used by auth signup/provision forms.
+TIER_NAME_MAP = {
+    "Starter": "Basic Tier",
+    "Operator": "Vantav Operator",
+    "Growth": "Vantav Growth",
+    "Scale": "Vantav Scale",
+    "Pro": "Vantav Growth",
+    "Enterprise": "Vantav Scale",
+    "Concierge": "Concierge Bundle",
 }
-
-
-class TierManager:
-    """Enforces tenant tier limits and feature flags for order automation."""
-
-    @staticmethod
-    def get_tier_meta(tier: str) -> dict:
-        return TIER_LIMITS.get(tier, TIER_LIMITS["Basic Tier"])
-
-    @staticmethod
-    def verify_operational_allowance(merchant_id: str, current_usage: int) -> tuple[bool, str]:
-        """Validate volume capacity before spinning up background workers."""
-        profile = MerchantProfile.query.get(merchant_id)
-        if not profile:
-            return False, "Unknown merchant"
-        account = SaaSBilling.query.get(merchant_id)
-        if not account:
-            return False, "No billing record"
-
-        tier = profile.account_tier or "Basic Tier"
-        meta = TierManager.get_tier_meta(tier)
-        monthly_order_limit = meta["monthly_order_limit"]
-
-        if current_usage >= monthly_order_limit:
-            return False, f"LIMIT EXCEEDED: Brand has consumed its allotment of {monthly_order_limit} orders for this billing cycle. Please upgrade."
-        return True, "OK"
-
-    @staticmethod
-    def route_order_automation(merchant_id: str, order_data: dict) -> dict:
-        """Enforce feature flags based on tier level."""
-        profile = MerchantProfile.query.get(merchant_id)
-        if not profile:
-            return {"status": "SKIPPED", "reason": "Unknown merchant"}
-
-        tier = profile.account_tier or "Basic Tier"
-        meta = TierManager.get_tier_meta(tier)
-
-        if not meta["advanced_automation"]:
-            logger.info(f"[TIER POLICY] Automation skipped for {merchant_id}. {tier} accounts must route orders manually.")
-            return {"status": "SKIPPED", "reason": "Upgrade required for autonomous MCF routing."}
-
-        logger.info(f"[TIER POLICY] Executing automated routing rule for {merchant_id} ({tier}).")
-        return {"status": "DISPATCHED", "destination": "Amazon_FBA_Warehouse", "order_id": order_data.get("order_id")}
 
 
 class UserRole(str, Enum):
@@ -553,15 +480,22 @@ def get_merchant_context():
     if not profile:
         return None
     tier = (profile.account_tier or "Basic Tier").replace("AI Tier", "Plan").replace("AI", "").strip()
+    tier_meta = TierManager.get_tier_meta(tier)
     sandbox_status = profile.sandbox_status or "pending"
     sandbox_expired = False
     if sandbox_status == "sandbox" and profile.sandbox_expires_at and profile.sandbox_expires_at <= now:
         sandbox_status = "expired"
         sandbox_expired = True
     display_name = profile.business_name or (profile.admin_email.split("@")[0] if profile.admin_email and "@" in profile.admin_email else s.merchant_id)
+    billing = SaaSBilling.query.get(s.merchant_id)
+    concierge_bundle = False
+    if billing and billing.add_ons:
+        concierge_bundle = "concierge_bundle" in (billing.add_ons if isinstance(billing.add_ons, list) else [])
     return {
         "id": s.merchant_id,
         "tier": tier,
+        "tier_meta": tier_meta,
+        "concierge_bundle": concierge_bundle,
         "name": display_name,
         "email": profile.admin_email,
         "sandbox_status": sandbox_status,
@@ -1434,6 +1368,18 @@ def dashboard_page(page):
             if page not in BETA_READY_DASHBOARD_PAGES:
                 return redirect(url_for('dashboard'))
     ctx = _dashboard_context(active_page)
+    # Tier-based page gating
+    if not TierManager.can_access_page(merchant["tier"], active_page):
+        target = TierManager.page_upgrade_target(active_page)
+        lock_content = (
+            f'<div style="text-align:center; padding: 40px 20px;">'
+            f'<p style="margin-bottom:24px; color:var(--ink-2);">This module is included in <strong>{target}</strong>.</p>'
+            f'<a href="/dashboard/billing" class="btn btn-primary">Upgrade plan</a></div>'
+        )
+        return render_template('dashboard/page.html', **ctx,
+                               page_title='Upgrade required',
+                               page_description=f'Unlock this module with {target}.',
+                               page_content=lock_content)
     template = 'dashboard/{}.html'.format(page.replace('-', '_'))
     try:
         return render_template(template, **ctx)
@@ -2903,7 +2849,7 @@ def auth_signup():
         "message": "Multi-tenant engine environment provisioned flawlessly.",
         "tenant_id": merchant_id,
         "assigned_tier": tier,
-        "monthly_order_limit": TIER_LIMITS[tier]["monthly_order_limit"],
+        "monthly_order_limit": TierManager.get_order_limit(tier),
     }))
     response.set_cookie(
         SESSION_COOKIE_NAME,
@@ -2973,7 +2919,7 @@ def auth_provision_node():
         "status": "PROVISIONED",
         "email": email,
         "assigned_role": role,
-        "allocated_volume_allowance": TIER_LIMITS[tier]["monthly_order_limit"],
+        "allocated_volume_allowance": TierManager.get_order_limit(tier),
         "tenant_id": merchant_id,
     }), 201
 
@@ -3088,13 +3034,13 @@ def ad_spend_feed():
 
 @app.route('/api/v1/stripe/create-checkout', methods=['POST'])
 def create_stripe_checkout():
-    """Create a Stripe Checkout session for the beta plan plus optional startup add-on."""
+    """Create a Stripe Checkout session for a Vantav tier plus optional Concierge Bundle."""
     data = request.get_json(silent=True) or request.form or {}
     email = (data.get("email") or "").strip().lower()
     business_name = (data.get("business_name") or "").strip() or email
     password = data.get("password", "")
-    include_startup_addon = bool(data.get("include_startup_addon"))
-    plan = (data.get("plan") or "beta").lower().strip()
+    concierge_bundle = bool(data.get("concierge_bundle"))
+    plan = (data.get("plan") or "operator").lower().strip()
 
     if not email or not password or len(password) < 8:
         return jsonify({"detail": "A valid email and a password of at least 8 characters are required."}), 400
@@ -3131,7 +3077,7 @@ def create_stripe_checkout():
             merchant_id,
             email,
             business_name,
-            include_startup_addon=include_startup_addon,
+            concierge_bundle=concierge_bundle,
             plan=plan,
             success_url=success_url,
             cancel_url=cancel_url,
@@ -3164,8 +3110,8 @@ def stripe_upgrade_session():
     if not merchant:
         return jsonify({"detail": "Authentication required."}), 403
     data = request.get_json(silent=True) or {}
-    plan = (data.get("plan") or "beta").lower().strip()
-    include_startup_addon = bool(data.get("include_startup_addon"))
+    plan = (data.get("plan") or "operator").lower().strip()
+    concierge_bundle = bool(data.get("concierge_bundle"))
     try:
         success_url = url_for('dashboard_page', page='billing', _external=True, _scheme='https') + '?checkout=success'
         cancel_url = url_for('dashboard_page', page='billing', _external=True, _scheme='https') + '?checkout=canceled'
@@ -3173,7 +3119,7 @@ def stripe_upgrade_session():
             merchant["id"],
             merchant.get("email") or "",
             merchant.get("name") or merchant.get("email") or "",
-            include_startup_addon=include_startup_addon,
+            concierge_bundle=concierge_bundle,
             plan=plan,
             success_url=success_url,
             cancel_url=cancel_url,
@@ -3602,8 +3548,8 @@ def stripe_billing_webhook():
             stripe_cust_id = session_obj.get("customer")
             metadata = session_obj.get("metadata", {})
             merchant_target = metadata.get("merchant_id", "merchant_shawn_01")
-            chosen_tier = metadata.get("selected_tier", "Beta Tier")
-            startup_addon = metadata.get("startup_addon") == "true"
+            chosen_tier = metadata.get("selected_tier", "Vantav Operator")
+            concierge_bundle = metadata.get("concierge_bundle") == "true"
 
             profile = MerchantProfile.query.get(merchant_target)
             if profile:
@@ -3613,15 +3559,23 @@ def stripe_billing_webhook():
                 profile.live_access_enabled = 1
                 profile.approved_at = datetime.utcnow()
             saas_billing = SaaSBilling.query.get(merchant_target)
-            if saas_billing:
-                saas_billing.current_plan = chosen_tier
-                saas_billing.stripe_customer_id = stripe_cust_id
-                # Persist the subscription ID if available.
-                subscription_id = session_obj.get("subscription")
-                if subscription_id:
-                    saas_billing.stripe_subscription_item_id = subscription_id
+            if not saas_billing:
+                saas_billing = SaaSBilling(merchant_id=merchant_target)
+                db.session.add(saas_billing)
+            saas_billing.current_plan = chosen_tier
+            saas_billing.stripe_customer_id = stripe_cust_id
+            current_addons = set(saas_billing.add_ons or [])
+            if concierge_bundle:
+                current_addons.add("concierge_bundle")
+            else:
+                current_addons.discard("concierge_bundle")
+            saas_billing.add_ons = list(current_addons)
+            # Persist the subscription ID if available.
+            subscription_id = session_obj.get("subscription")
+            if subscription_id:
+                saas_billing.stripe_subscription_item_id = subscription_id
             db.session.commit()
-            logger.info(f"[Stripe Pipeline] Merchant {merchant_target} upgraded to {chosen_tier}; addon={startup_addon}")
+            logger.info(f"[Stripe Pipeline] Merchant {merchant_target} upgraded to {chosen_tier}; concierge={concierge_bundle}")
             return jsonify({"status": "tier_synchronized"}), 200
 
         if event_type == "customer.subscription.deleted":

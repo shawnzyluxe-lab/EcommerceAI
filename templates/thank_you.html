@@ -4,7 +4,7 @@
   <link rel="icon" type="image/x-icon" href="/static/images/favicon.ico">
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>You're In — Vantav Beta</title>
+  <title>Thank You — Vantav</title>
   <style>
     :root { --bg:#0c0c11; --card:#14141c; --ink:#f4f2f9; --muted:#c6c3d2; --line:#23232d; --accent:#8b5cf6; --accent-2:#a78bfa; --success:#34d399; }
     * { box-sizing: border-box; }
@@ -27,14 +27,14 @@
 </head>
 <body>
   <div class="wrap">
-    <div class="badge">Beta Waitlist</div>
-    <h1>Application Received</h1>
-    <p id="plan-line">We review every application within 48 hours. If you're selected, you'll get a secure checkout link and 48-hour sandbox access.</p>
+    <div class="badge" id="badge">Vantav</div>
+    <h1 id="headline">Application Received</h1>
+    <p id="plan-line">We review every application within 48 hours. If you're selected, you'll get a secure checkout link and sandbox access.</p>
 
     <div class="cards">
       <div class="card">
         <h3>Join the Discord</h3>
-        <p>Get early updates, ask questions, and see what other beta operators are building.</p>
+        <p>Get early updates, ask questions, and see what other operators are building.</p>
         <a id="discord-link" class="btn" href="#">Join Discord</a>
       </div>
       <div class="card">
@@ -43,9 +43,9 @@
         <a id="calendly-link" class="btn" href="#">Book a Call</a>
       </div>
       <div class="card">
-        <h3>Start 48-Hour Sandbox</h3>
-        <p>Already approved? Enter your sandbox and connect your first channel.</p>
-        <a class="btn primary" href="/login">Enter Sandbox</a>
+        <h3>Log In</h3>
+        <p>Already have an account? Access your dashboard.</p>
+        <a class="btn primary" href="/login">Log in</a>
       </div>
     </div>
 
@@ -59,14 +59,19 @@
   <script>
     const params = new URLSearchParams(window.location.search);
     const plan = params.get('plan');
-    if (plan === 'beta_startup') {
-      document.getElementById('plan-line').innerText = "You selected the Beta + Startup Pack. We review every application within 48 hours. If you're selected, you'll get a secure checkout link and 48-hour sandbox access.";
-    } else if (plan === 'beta_plan') {
-      document.getElementById('plan-line').innerText = "You selected the Beta Plan. We review every application within 48 hours. If you're selected, you'll get a secure checkout link and 48-hour sandbox access.";
+    const planNames = {
+      operator: 'Vantav Operator',
+      growth: 'Vantav Growth',
+      scale: 'Vantav Scale',
+      concierge_bundle: 'Concierge Bundle'
+    };
+    if (plan && planNames[plan]) {
+      document.getElementById('badge').textContent = 'Selected Plan';
+      document.getElementById('headline').textContent = 'Application Received';
+      document.getElementById('plan-line').innerText = 'You selected ' + planNames[plan] + ". We'll be in touch within 48 hours with next steps.";
     }
     const discord = document.getElementById('discord-link');
     const calendly = document.getElementById('calendly-link');
-    // Replace with real links in environment or dashboard
     if (discord.href === '#') { discord.style.opacity = '0.5'; discord.textContent = 'Discord link coming'; }
     if (calendly.href === '#') { calendly.style.opacity = '0.5'; calendly.textContent = 'Booking link coming'; }
   </script>

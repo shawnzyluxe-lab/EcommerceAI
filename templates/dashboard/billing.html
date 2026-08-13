@@ -8,7 +8,7 @@
 </section>
 
 {% set plan = billing_account.current_plan | default(merchant.tier) | default('Basic Tier') %}
-{% set is_startup = 'Startup' in plan %}
+{% set concierge = billing_account.concierge_bundle | default(false) %}
 
 {% if request.args.get('checkout') == 'success' %}
 <div class="card" style="border: 1px solid var(--green); background: var(--green-bg); margin-bottom: 18px;">
@@ -22,8 +22,9 @@
     <div class="card-head"><h3>Current Plan</h3></div>
     <div style="background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); padding: 18px; margin-bottom: 14px;">
       <div style="font-size: 1.2rem; font-weight: 700; margin-bottom: 4px; color: var(--ink);">{{ plan }}</div>
-      <div id="plan-desc" style="font-size: .85rem; color: var(--ink-2); margin-bottom: 14px;">Vantav beta access. Upgrade anytime.</div>
-      <div style="font-size: 1.6rem; font-weight: 800; margin-bottom: 4px; color: var(--ink);">${% if is_startup %}348{% else %}249{% endif %}<span style="font-size: .85rem; color: var(--ink-3);">/mo</span></div>
+      <div id="plan-desc" style="font-size: .85rem; color: var(--ink-2); margin-bottom: 14px;">{% if concierge %}Concierge Bundle included{% else %}Upgrade anytime to unlock more stores, actions, and advanced features.{% endif %}</div>
+      <div style="font-size: 1.6rem; font-weight: 800; margin-bottom: 4px; color: var(--ink);">{% if plan == 'Vantav Operator' %}$199{% elif plan == 'Vantav Growth' %}$399{% elif plan == 'Vantav Scale' %}$799{% else %}Custom{% endif %}<span style="font-size: .85rem; color: var(--ink-3);">/mo</span></div>
+      {% if concierge %}<div style="font-size: .85rem; color: var(--ink-2); margin-top: 6px;">+ Concierge Bundle $999/mo</div>{% endif %}
       {% if billing_account and billing_account.billing_cycle_end %}
       <div id="renewal-date" style="font-size: .8rem; color: var(--ink-3); margin-top: 6px;">Current cycle ends {{ billing_account.billing_cycle_end }}</div>
       {% endif %}
@@ -35,18 +36,17 @@
   </div>
 
   <div class="card">
-    <div class="card-head"><h3>{% if is_startup %}Startup Pack Included{% else %}Add Startup Pack{% endif %}</h3></div>
-    {% if is_startup %}
+    <div class="card-head"><h3>{% if concierge %}Concierge Bundle{% else %}Concierge Bundle add-on{% endif %}</h3></div>
+    {% if concierge %}
     <ul style="font-size: .9rem; color: var(--ink-2); line-height: 1.6; padding-left: 1.2rem;">
-      <li>Website & landing page build</li>
-      <li>Brand name, logo & positioning guidance</li>
-      <li>US-based manufacturer / no-inventory supplier directory</li>
-      <li>Sample product with your branding</li>
-      <li>1-year launch guidance & action plan</li>
+      <li>Custom brand build + manufacturer match</li>
+      <li>Curated ad plan (TikTok, Amazon, Meta)</li>
+      <li>SEO setup and monthly optimization</li>
+      <li>Email / Klaviyo flow setup</li>
     </ul>
     {% else %}
-    <p style="font-size: .9rem; color: var(--ink-2); line-height: 1.5;">Upgrade to the <strong>$348/mo Beta + Startup Pack</strong> to get a website/landing page build, brand creation, curated US suppliers, no-inventory fulfillment, a branded sample, and a 1-year launch plan.</p>
-    <button class="btn" style="width: 100%; margin-top: 10px;" onclick="startCheckout('beta_startup')">Add Startup Pack</button>
+    <p style="font-size: .9rem; color: var(--ink-2); line-height: 1.5;">Add the <strong>$999/mo Concierge Bundle</strong> for done-for-you launch services: brand build, curated ad plan, SEO, and email setup.</p>
+    <button class="btn" style="width: 100%; margin-top: 10px;" onclick="openUpgradeModal(true)">Add Concierge Bundle</button>
     {% endif %}
   </div>
 </div>
@@ -54,10 +54,10 @@
 <div class="card">
   <div class="card-head"><h3>Usage this cycle</h3></div>
   {% set usage = {
-    'Orders': (billing_account.metered_usage_units | default(0), tier_limits.orders | default(5000)),
-    'Products': (1250 if plan == 'Basic Tier' else (catalog | default({}) | length), tier_limits.products | default(10000)),
-    'Customers': (8750, tier_limits.customers | default(100000)),
-    'Storage': (45.6, tier_limits.storage | default(500))
+    'Orders': (billing_account.metered_usage_units | default(0), tier_limits.orders | default(1000)),
+    'Approved actions': (billing_account.approved_actions | default(0), tier_limits.actions | default(50)),
+    'Connected stores': (channels | default([]) | length, tier_limits.stores | default(2)),
+    'Team users': (team_users | default([]) | length, tier_limits.users | default(3))
   } %}
   {% for label, vals in usage.items() %}
   {% set used = vals[0] | float %}
@@ -96,22 +96,36 @@
 
 <!-- Upgrade modal -->
 <div id="upgrade-modal" style="display: none; position: fixed; inset: 0; background: rgba(0,0,0,.6); backdrop-filter: blur(4px); z-index: 100; align-items: center; justify-content: center; padding: 20px;">
-  <div style="background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); max-width: 420px; width: 100%; padding: 24px; box-shadow: var(--shadow);">
+  <div style="background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); max-width: 520px; width: 100%; padding: 24px; box-shadow: var(--shadow);">
     <h3 style="margin: 0 0 8px;">Choose a plan</h3>
     <p style="color: var(--ink-2); font-size: .85rem; margin-bottom: 16px;">Select the plan that fits your business. You will be redirected to Stripe to complete payment.</p>
     <div style="display: flex; flex-direction: column; gap: 10px; margin-bottom: 18px;">
-      <label style="display: flex; align-items: center; gap: 10px; padding: 12px; border: 1px solid var(--line); border-radius: 10px; cursor: pointer; background: var(--bg);">
-        <input type="radio" name="upgrade-plan" value="beta" checked style="accent-color: var(--purple);">
+      <label class="upgrade-plan-label" style="display: flex; align-items: center; gap: 10px; padding: 12px; border: 1px solid var(--line); border-radius: 10px; cursor: pointer; background: var(--bg);">
+        <input type="radio" name="upgrade-plan" value="operator" {% if plan == 'Vantav Operator' %}checked{% endif %} style="accent-color: var(--purple);">
         <div>
-          <div style="font-weight: 700; color: var(--ink);">Beta Plan — $249/mo</div>
-          <div style="font-size: .8rem; color: var(--ink-3);">True profit, alerts, and all channel sync</div>
+          <div style="font-weight: 700; color: var(--ink);">Vantav Operator — $199/mo</div>
+          <div style="font-size: .8rem; color: var(--ink-3);">Up to 2 stores, full core loop, standard support</div>
         </div>
       </label>
-      <label style="display: flex; align-items: center; gap: 10px; padding: 12px; border: 1px solid var(--line); border-radius: 10px; cursor: pointer; background: var(--bg);">
-        <input type="radio" name="upgrade-plan" value="beta_startup" style="accent-color: var(--purple);">
+      <label class="upgrade-plan-label" style="display: flex; align-items: center; gap: 10px; padding: 12px; border: 1px solid var(--purple); border-radius: 10px; cursor: pointer; background: var(--surface); position: relative;">
+        <input type="radio" name="upgrade-plan" value="growth" {% if plan != 'Vantav Scale' %}checked{% endif %} style="accent-color: var(--purple);">
         <div>
-          <div style="font-weight: 700; color: var(--ink);">Beta + Startup Pack — $348/mo</div>
-          <div style="font-size: .8rem; color: var(--ink-3);">Everything in Beta plus brand build and launch guidance</div>
+          <div style="font-weight: 700; color: var(--ink);">Vantav Growth — $399/mo <span style="font-size:.65rem; color:var(--purple);">MOST POPULAR</span></div>
+          <div style="font-size: .8rem; color: var(--ink-3);">Up to 5 stores, forecasting, cross-store, priority support</div>
+        </div>
+      </label>
+      <label class="upgrade-plan-label" style="display: flex; align-items: center; gap: 10px; padding: 12px; border: 1px solid var(--line); border-radius: 10px; cursor: pointer; background: var(--bg);">
+        <input type="radio" name="upgrade-plan" value="scale" {% if plan == 'Vantav Scale' %}checked{% endif %} style="accent-color: var(--purple);">
+        <div>
+          <div style="font-weight: 700; color: var(--ink);">Vantav Scale — $799/mo</div>
+          <div style="font-size: .8rem; color: var(--ink-3);">Up to 15 stores, portfolio intelligence, API access</div>
+        </div>
+      </label>
+      <label style="display: flex; align-items: flex-start; gap: 10px; padding: 12px; border: 1px dashed var(--line); border-radius: 10px; cursor: pointer; background: var(--bg); margin-top: 4px;">
+        <input type="checkbox" id="upgrade-concierge" style="width: 18px; height: 18px; accent-color: var(--purple); margin-top: 2px;">
+        <div>
+          <div style="font-weight: 700; color: var(--ink);">Add Concierge Bundle — $999/mo</div>
+          <div style="font-size: .8rem; color: var(--ink-3);">Custom brand build, curated ad plan, SEO, email setup</div>
         </div>
       </label>
     </div>
@@ -142,8 +156,9 @@ document.getElementById('portal-btn').addEventListener('click', async () => {
   }
 });
 
-function openUpgradeModal() {
+function openUpgradeModal(preselectConcierge=false) {
   document.getElementById('upgrade-modal').style.display = 'flex';
+  if (preselectConcierge) { document.getElementById('upgrade-concierge').checked = true; }
 }
 function closeUpgradeModal() {
   document.getElementById('upgrade-modal').style.display = 'none';
@@ -151,17 +166,18 @@ function closeUpgradeModal() {
 
 async function confirmUpgrade() {
   const plan = document.querySelector('input[name="upgrade-plan"]:checked').value;
-  await startCheckout(plan);
+  const concierge = document.getElementById('upgrade-concierge').checked;
+  await startCheckout(plan, concierge);
 }
 
-async function startCheckout(plan) {
+async function startCheckout(plan, concierge=false) {
   const btn = document.getElementById('upgrade-confirm') || document.getElementById('upgrade-btn');
   if (btn) { btn.disabled = true; btn.textContent = 'Redirecting...'; }
   try {
     const res = await fetch('/api/v1/stripe/upgrade-session', {
       method: 'POST',
       headers: {'Content-Type': 'application/json'},
-      body: JSON.stringify({plan}),
+      body: JSON.stringify({plan, concierge_bundle: concierge}),
       credentials: 'same-origin'
     });
     const data = await res.json();

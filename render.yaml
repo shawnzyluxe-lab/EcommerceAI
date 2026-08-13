@@ -61,6 +61,14 @@ services:
         sync: false
       - key: STRIPE_SECRET_KEY
         sync: false
+      - key: STRIPE_PRICE_OPERATOR_MONTHLY
+        sync: false
+      - key: STRIPE_PRICE_GROWTH_MONTHLY
+        sync: false
+      - key: STRIPE_PRICE_SCALE_MONTHLY
+        sync: false
+      - key: STRIPE_PRICE_CONCIERGE_BUNDLE_MONTHLY
+        sync: false
       - key: SHOPIFY_STORE_URL
         sync: false
       - key: SHOPIFY_ACCESS_TOKEN

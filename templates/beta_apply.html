@@ -4,7 +4,7 @@
   <link rel="icon" type="image/x-icon" href="/static/images/favicon.ico">
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Apply for the Vantav Closed Beta</title>
+  <title>Request a Vantav Demo</title>
   <style>
     :root {
       --bg: #0c0c11;
@@ -99,9 +99,9 @@
 </head>
 <body>
   <div class="container">
-    <div class="eyebrow">Vantav Closed Beta</div>
-    <h1>Apply for the Vantav Closed Beta</h1>
-    <p class="sub">We're hand-picking the first 15 multi-channel operators. Tell us about your store.</p>
+    <div class="eyebrow">Vantav</div>
+    <h1>Request a demo</h1>
+    <p class="sub">Tell us about your store and we'll schedule a 15-minute walkthrough.</p>
 
     <form class="form" id="apply-form">
       <div class="field">
@@ -136,9 +136,9 @@
         <label for="bottleneck">Biggest daily operational bottleneck</label>
         <textarea id="bottleneck" name="bottleneck" placeholder="e.g. I can't tell which ads are actually profitable after refunds and fees."></textarea>
       </div>
-      <button type="submit" id="submit-btn">Request Beta Access</button>
+      <button type="submit" id="submit-btn">Request a demo</button>
       <div class="message" id="message"></div>
-      <div class="muted">Or <a href="/subscribe">subscribe directly</a> to skip the waitlist.</div>
+      <div class="muted">Or <a href="/subscribe">subscribe directly</a> to get started.</div>
     </form>
   </div>
 
@@ -165,7 +165,7 @@
         });
         const data = await res.json();
         if (res.ok) {
-          msg.textContent = 'Application received. We\'ll review it and email you within 48 hours.';
+          msg.textContent = 'Demo request received. We\'ll be in touch within 48 hours.';
           msg.className = 'message success';
           document.getElementById('apply-form').reset();
         } else {

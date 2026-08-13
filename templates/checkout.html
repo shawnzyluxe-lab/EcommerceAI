@@ -20,6 +20,10 @@
     .plan .title { font-weight: 700; margin-bottom: .25rem; }
     .plan .price { color: var(--accent); font-weight: 700; }
     .plan .desc { font-size: .85rem; color: var(--muted); }
+    .bundle { border: 1px dashed var(--line); border-radius: 16px; padding: 1.25rem; margin-bottom: 1rem; cursor: pointer; transition: .2s; display: flex; align-items: flex-start; gap: 1rem; }
+    .bundle:hover { border-color: var(--accent); }
+    .bundle.selected { border-style: solid; border-color: var(--accent); background: var(--accent-bg); }
+    .bundle input { width: 20px; height: 20px; accent-color: var(--accent); margin-top: .2rem; }
     label { display: block; font-size: .7rem; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); margin-bottom: .4rem; }
     input { width: 100%; padding: .9rem 1rem; border: 1px solid var(--line); border-radius: 10px; background: #14141c; color: var(--ink); font-size: .9rem; margin-bottom: 1rem; }
     input:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-bg); }
@@ -36,25 +40,41 @@
 </head>
 <body>
   <div class="wrap">
-    <div class="topbar">Vantav Closed Beta</div>
+    <div class="topbar">Vantav</div>
     <h1>Complete your subscription</h1>
-    <p class="sub">Choose your plan and create your account. You will be redirected to Stripe to enter payment details.</p>
+    <p class="sub">Choose your plan and create your account. You'll be redirected to Stripe to enter payment details.</p>
 
     <form id="checkout-form" onsubmit="submitCheckout(event)">
-      <label class="plan selected" id="plan-beta-label">
-        <input type="radio" name="plan" value="beta" checked onchange="selectPlan(this)">
+      <label class="plan" id="plan-operator-label">
+        <input type="radio" name="plan" value="operator" onchange="selectPlan(this)">
         <div>
-          <div class="title">Beta Plan</div>
-          <div class="price">$249/mo</div>
-          <div class="desc">True profit, alerts, and all channel sync.</div>
+          <div class="title">Vantav Operator</div>
+          <div class="price">$199/mo</div>
+          <div class="desc">Full core loop: monitor, detect, recommend, approve. Up to 2 stores.</div>
         </div>
       </label>
-      <label class="plan" id="plan-beta_startup-label">
-        <input type="radio" name="plan" value="beta_startup" onchange="selectPlan(this)">
+      <label class="plan selected" id="plan-growth-label">
+        <input type="radio" name="plan" value="growth" checked onchange="selectPlan(this)">
         <div>
-          <div class="title">Beta + Startup Pack</div>
-          <div class="price">$348/mo</div>
-          <div class="desc">Everything in Beta plus brand build and launch guidance.</div>
+          <div class="title">Vantav Growth <span style="font-size:.7rem; color:var(--accent-2); font-weight:600;">MOST POPULAR</span></div>
+          <div class="price">$399/mo</div>
+          <div class="desc">Up to 5 stores, advanced forecasting, cross-store views, action verification.</div>
+        </div>
+      </label>
+      <label class="plan" id="plan-scale-label">
+        <input type="radio" name="plan" value="scale" onchange="selectPlan(this)">
+        <div>
+          <div class="title">Vantav Scale</div>
+          <div class="price">$799/mo</div>
+          <div class="desc">Up to 15 stores, portfolio intelligence, API access, custom alerts.</div>
+        </div>
+      </label>
+
+      <label class="bundle" id="bundle-concierge" onclick="toggleBundle()">
+        <input type="checkbox" id="concierge_bundle" value="concierge_bundle">
+        <div>
+          <div class="title">Add Concierge Bundle — $999/mo</div>
+          <div class="desc">Custom brand build, curated ad plan, SEO, and email setup. Combined services, one price.</div>
         </div>
       </label>
 
@@ -85,6 +105,27 @@
       document.querySelectorAll('.plan').forEach(p => p.classList.remove('selected'));
       radio.closest('.plan').classList.add('selected');
     }
+    (function initPlan() {
+      const params = new URLSearchParams(window.location.search);
+      const plan = params.get('plan') || 'growth';
+      const radios = document.querySelectorAll('input[name="plan"]');
+      radios.forEach(r => {
+        if (r.value === plan) {
+          r.checked = true;
+          selectPlan(r);
+        }
+      });
+      if (params.get('concierge_bundle') === '1') {
+        const cb = document.getElementById('concierge_bundle');
+        cb.checked = true;
+        document.getElementById('bundle-concierge').classList.add('selected');
+      }
+    })();
+    function toggleBundle() {
+      const cb = document.getElementById('concierge_bundle');
+      cb.checked = !cb.checked;
+      document.getElementById('bundle-concierge').classList.toggle('selected', cb.checked);
+    }
     async function submitCheckout(e) {
       e.preventDefault();
       const msg = document.getElementById('message');
@@ -95,6 +136,7 @@
       btn.textContent = 'Redirecting...';
       try {
         const plan = document.querySelector('input[name="plan"]:checked').value;
+        const concierge_bundle = document.getElementById('concierge_bundle').checked;
         const res = await fetch('/api/v1/stripe/create-checkout', {
           method: 'POST',
           headers: {'Content-Type': 'application/json'},
@@ -103,6 +145,7 @@
             business_name: document.getElementById('business_name').value,
             password: document.getElementById('password').value,
             plan: plan,
+            concierge_bundle: concierge_bundle,
           }),
         });
         const data = await res.json();

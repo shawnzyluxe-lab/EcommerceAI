@@ -7,7 +7,8 @@ from typing import Dict, Any, List, Optional
 
 import requests
 
-from models import db, MerchantChannel, TenantOAuthToken, CommerceChannel, ProfitFeedOrder
+from models import db, MerchantChannel, TenantOAuthToken, CommerceChannel, ProfitFeedOrder, MerchantProfile
+from tier_manager import TierManager
 
 
 def _encode_token(raw: str) -> str:
@@ -83,8 +84,17 @@ def _ensure_commerce_channel(platform: str):
         ))
 
 
+def _enforce_store_limit(merchant_id: str) -> None:
+    if not TierManager.can_add_store(merchant_id):
+        profile = MerchantProfile.query.get(merchant_id)
+        tier = profile.account_tier if profile else "Basic Tier"
+        limit = TierManager.get_store_limit(tier)
+        raise ValueError(f"Store connection limit reached. Upgrade your plan to connect more than {limit} stores.")
+
+
 def connect_shopify(merchant_id: str, shop_domain: str, access_token: str) -> Dict[str, Any]:
     """Persist a Shopify store connection."""
+    _enforce_store_limit(merchant_id)
     if not re.match(r'^[a-zA-Z0-9\-]+\.myshopify\.com$', shop_domain.lower()):
         raise ValueError("Invalid Shopify domain. Use store.myshopify.com")
 
@@ -117,6 +127,7 @@ def connect_tiktok(
     refresh_token: str = "",
 ) -> Dict[str, Any]:
     """Persist a TikTok Shop connection."""
+    _enforce_store_limit(merchant_id)
     _ensure_commerce_channel("tiktok")
     account_id = f"tiktok:{seller_id}"
     token = TenantOAuthToken.query.get(account_id)
@@ -155,6 +166,7 @@ def connect_amazon(
     role_arn: str = "",
 ) -> Dict[str, Any]:
     """Persist an Amazon SP-API connection."""
+    _enforce_store_limit(merchant_id)
     _ensure_commerce_channel("amazon")
     account_id = f"amazon:{region}:{seller_id}"
     token = TenantOAuthToken.query.get(account_id)

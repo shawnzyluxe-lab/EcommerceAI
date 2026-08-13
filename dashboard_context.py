@@ -756,26 +756,31 @@ def context(active_page=None, merchant=None, merchant_id=None):
     tier_limits = {}
     if merchant_id:
         try:
+            from tier_manager import TierManager
             billing = SaaSBilling.query.get(merchant_id)
+            tier_key = (merchant_obj.get("tier") or "Basic Tier").replace("AI Tier", "Plan").strip()
+            meta = TierManager.get_tier_meta(tier_key)
             if billing:
                 billing_account = {
-                    "current_plan": billing.current_plan or merchant_obj.get("tier", "Basic Tier"),
+                    "current_plan": billing.current_plan or tier_key,
+                    "add_ons": billing.add_ons or [],
+                    "concierge_bundle": "concierge_bundle" in (billing.add_ons or []),
                     "stripe_customer_id": billing.stripe_customer_id or "",
                     "stripe_subscription_id": billing.stripe_subscription_item_id or "",
                     "metered_usage_units": billing.metered_usage_units or 0,
+                    "approved_actions": TierManager.current_action_count(merchant_id),
                     "accrued_invoice_value": billing.accrued_invoice_value or 0.0,
                     "billing_cycle_end": billing.billing_cycle_end or "",
                 }
-            # Default usage limits by tier.
-            tier_key = (merchant_obj.get("tier") or "Basic Tier").replace("AI Tier", "Plan").strip()
-            TIER_LIMITS_LOCAL = {
-                "Basic Tier": {"orders": 500, "products": 1000, "customers": 1000, "storage": 500},
-                "Beta Tier": {"orders": 5000, "products": 10000, "customers": 100000, "storage": 500},
-                "Beta + Startup Pack": {"orders": 5000, "products": 10000, "customers": 100000, "storage": 500},
-                "Pro Tier": {"orders": 50000, "products": 50000, "customers": 500000, "storage": 2000},
-                "Enterprise Tier": {"orders": 999999, "products": 999999, "customers": 999999, "storage": 10000},
+            tier_limits = {
+                "orders": meta.get("monthly_order_limit", 500),
+                "actions": meta.get("max_monthly_actions", 50),
+                "stores": meta.get("max_store_connections", 2),
+                "users": meta.get("max_users", 1),
+                "products": 10000,
+                "customers": 100000,
+                "storage": 500,
             }
-            tier_limits = TIER_LIMITS_LOCAL.get(tier_key, TIER_LIMITS_LOCAL["Basic Tier"])
         except Exception:
             pass
 
@@ -840,6 +845,7 @@ def context(active_page=None, merchant=None, merchant_id=None):
         "channel_totals": channel_totals,
         "billing_account": billing_account,
         "tier_limits": tier_limits,
+        "team_users": [],
         "generated": now.strftime("%A, %d %b %Y · %H:%M %Z"),
     }
 

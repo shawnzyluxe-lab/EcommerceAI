@@ -145,6 +145,8 @@ def run_migrations():
             """,
         )
 
+        _run("saas_billing.add_ons", "ALTER TABLE saas_billing ADD COLUMN IF NOT EXISTS add_ons JSONB DEFAULT '[]'")
+
         for old_name in ['profit_feed_orders_order_id_key', 'profit_feed_orders_order_id_uq']:
             _run(f"drop constraint {old_name}", f"ALTER TABLE profit_feed_orders DROP CONSTRAINT IF EXISTS {old_name}")
             _run(f"drop index {old_name}", f"DROP INDEX IF EXISTS {old_name}")

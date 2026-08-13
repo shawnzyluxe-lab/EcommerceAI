@@ -6,6 +6,7 @@ from datetime import datetime, timedelta
 from typing import List, Dict, Any, Optional
 
 from models import db, PendingAction, Alert, PredictiveLogistics, GeneratedPurchaseOrder, ProfitFeedOrder, AdSpendAnalytic, BusinessMetric, MerchantProfile, BusinessMemory, ActionEvidence
+from tier_manager import TierManager
 import alert_matrix
 import competitor_intelligence
 import outbound
@@ -477,6 +478,11 @@ def approve_action(action_id: int, merchant_id: str, decided_by: str = "merchant
         raise ValueError("Action not found")
     if action.status != "pending":
         raise ValueError(f"Action already {action.status}")
+    if not TierManager.can_execute_action(merchant_id):
+        profile = MerchantProfile.query.get(merchant_id)
+        tier = profile.account_tier if profile else "Basic Tier"
+        limit = TierManager.get_action_limit(tier)
+        raise ValueError(f"Monthly approved-action limit reached ({limit}). Upgrade to execute more actions.")
 
     payload = _parse(action.payload)
     memory = get_business_memory(merchant_id)
