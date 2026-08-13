@@ -113,10 +113,23 @@ def _attach_evidence(action: PendingAction, merchant_id: str, snapshot: Optional
     expected_min = 0.0
     expected_max = 0.0
     payload = _parse(action.payload)
+    gross = float(kpis.get("gross_revenue", 0.0) or 0.0)
     adj = payload.get("adjustment")
-    if isinstance(adj, (int, float)):
-        expected_min = round(float(kpis.get("gross_revenue", 0.0)) * (adj / 100.0) * 0.5, 2)
-        expected_max = round(float(kpis.get("gross_revenue", 0.0)) * (adj / 100.0) * 1.5, 2)
+    if action.action_type == "ad_adjust" and isinstance(adj, (int, float)):
+        ad_spend = float(kpis.get("ad_spend", 0.0) or 0.0)
+        change = abs(adj) / 100.0
+        expected_min = round(ad_spend * change * 0.5, 2)
+        expected_max = round(ad_spend * change, 2)
+    elif action.action_type == "reorder":
+        quantity = payload.get("quantity") or 0
+        velocity = payload.get("velocity") or snapshot.get("inventory", {}).get("velocity") or 38.5
+        unit_price = payload.get("unit_price") or (gross / max(kpis.get("orders", 1), 1) if gross else 0.0)
+        weekly_units = min(float(quantity), float(velocity) * 7.0)
+        expected_min = round(weekly_units * float(unit_price) * 0.6, 2)
+        expected_max = round(weekly_units * float(unit_price), 2)
+    elif action.action_type == "refund":
+        expected_min = round(-gross * 0.05, 2)
+        expected_max = round(0.0, 2)
 
     reasoning = f"AI evaluated {action.title} against live margin, orders, and channel telemetry."
     evidence = ActionEvidence(
