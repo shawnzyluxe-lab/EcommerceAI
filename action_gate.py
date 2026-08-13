@@ -1,11 +1,15 @@
 """Action Gate — human-in-the-loop approval for AI-drafted operations."""
 import json
+import logging
 import uuid
 from datetime import datetime
 from typing import List, Dict, Any, Optional
 
 from models import db, PendingAction, Alert, PredictiveLogistics, GeneratedPurchaseOrder, ProfitFeedOrder, AdSpendAnalytic, BusinessMetric, MerchantProfile, BusinessMemory, ActionEvidence
 import alert_matrix
+import competitor_intelligence
+
+logger = logging.getLogger(__name__)
 
 
 def _now():
@@ -62,8 +66,128 @@ def _projected_cac_for_ad_adjust(merchant_id: str, platform: str) -> Optional[fl
     return round(current_spend / conversions, 2)
 
 
+def _action_cost_estimate(action_type: str, payload: Dict[str, Any], merchant_id: str) -> float:
+    """Estimate the immediate cost/risk exposure of an action."""
+    if action_type == "reorder":
+        quantity = int(payload.get("quantity", 0) or 0)
+        sku = payload.get("sku", "")
+        # Estimate unit cost from recent order COGS if available.
+        orders = ProfitFeedOrder.query.filter_by(merchant_id=merchant_id).order_by(ProfitFeedOrder.recorded_at.desc()).limit(20).all()
+        avg_cogs = 0.0
+        if orders:
+            total_items = max(sum(o.items or 1 for o in orders), 1)
+            avg_cogs = sum(float(o.cost_of_goods_sold or 0.0) for o in orders) / total_items
+        unit_cost = avg_cogs if avg_cogs > 0 else 10.0
+        return round(quantity * unit_cost, 2)
+
+    if action_type == "refund":
+        order_id = payload.get("order_id", "")
+        order = ProfitFeedOrder.query.filter_by(order_id=order_id, merchant_id=merchant_id).first()
+        if order:
+            return float(order.gross_revenue or 0.0)
+        return 0.0
+
+    if action_type == "ad_adjust":
+        ad = AdSpendAnalytic.query.filter_by(merchant_id=merchant_id, platform_source=payload.get("platform", "")).first()
+        if ad and ad.budget_allocated:
+            return abs(float(ad.budget_allocated or 0.0) * (payload.get("adjustment", 0) or 0) / 100.0)
+        return 0.0
+
+    return 0.0
+
+
+def _action_value_estimate(action_type: str, payload: Dict[str, Any], snapshot: Dict[str, Any]) -> float:
+    """Estimate the merchant-value (revenue at risk / recovery) of an action."""
+    kpis = (snapshot or {}).get("kpis") or {}
+    gross = float(kpis.get("gross_revenue", 0.0) or 0.0)
+    if action_type == "refund":
+        return gross * 0.05
+    if action_type == "reorder":
+        quantity = int(payload.get("quantity", 0) or 0)
+        unit_price = gross / max(kpis.get("orders", 1), 1) if gross else 10.0
+        return round(quantity * unit_price, 2)
+    return gross
+
+
+def _merchant_approval_stats(merchant_id: str, action_type: str, key: Optional[str] = None) -> Dict[str, Any]:
+    """Return historical approval/denial stats for this merchant and action type."""
+    q = PendingAction.query.filter(
+        PendingAction.merchant_id == merchant_id,
+        PendingAction.action_type == action_type,
+        PendingAction.status.in_(("approved", "denied", "executed")),
+    )
+    rows = q.all()
+    if not rows:
+        return {"total": 0, "approved": 0, "denied": 0, "rate": 1.0}
+    approved = sum(1 for r in rows if r.status in ("approved", "executed"))
+    denied = sum(1 for r in rows if r.status == "denied")
+    total = len(rows)
+    return {
+        "total": total,
+        "approved": approved,
+        "denied": denied,
+        "rate": approved / total if total else 1.0,
+    }
+
+
+def _confidence_with_feedback(base_confidence: int, merchant_id: str, action_type: str, payload: Dict[str, Any]) -> int:
+    """Adjust confidence score by how often this merchant approves similar actions."""
+    stats = _merchant_approval_stats(merchant_id, action_type)
+    # Weighted blend: 70% base confidence, 30% historical approval rate.
+    adjusted = int(base_confidence * 0.7 + (stats["rate"] * 100) * 0.3)
+    return max(0, min(100, adjusted))
+
+
+def _market_evidence_for_action(action_type: str, payload: Dict[str, Any]) -> Dict[str, Any]:
+    """Gather competitor/market evidence for an action's SKU or platform."""
+    sku = payload.get("sku", "")
+    platform = payload.get("platform", "")
+    if sku:
+        return competitor_intelligence.get_market_evidence(sku, platform)
+    return {}
+
+
+def _autopilot_should_execute(action_type: str, payload: Dict[str, Any], memory: BusinessMemory, merchant_id: str, snapshot: Optional[Dict[str, Any]]) -> bool:
+    """Return True if the action is safe enough to execute without human approval."""
+    if not memory.autopilot_enabled:
+        return False
+
+    # Required-approval types always stop for a human.
+    required = set(memory.required_approval_action_types or [])
+    if action_type in required:
+        return False
+
+    # Only auto-execute explicitly allowed types.
+    allowed = set(memory.auto_approve_action_types or [])
+    if action_type not in allowed:
+        return False
+
+    cost = _action_cost_estimate(action_type, payload, merchant_id)
+    value = _action_value_estimate(action_type, payload, snapshot or {})
+    max_cost = float(memory.autopilot_max_action_cost or 0.0)
+    max_value = float(memory.autopilot_max_order_value or 0.0)
+
+    if max_cost > 0 and cost > max_cost:
+        return False
+    if max_value > 0 and value > max_value:
+        return False
+
+    # Extra safety: ad actions must not blow the CAC cap.
+    if action_type == "ad_adjust":
+        cac = payload.get("projected_cac") or payload.get("cac")
+        if cac and float(cac) > float(memory.max_cac_threshold or 18.0):
+            return False
+
+    # Historical feedback safety: if merchant denies this type >50%, don't autopilot.
+    stats = _merchant_approval_stats(merchant_id, action_type)
+    if stats["total"] >= 3 and stats["rate"] < 0.5:
+        return False
+
+    return True
+
+
 def create_action(merchant_id: str, action_type: str, title: str, detail: str, payload: Dict[str, Any], alert_id: Optional[int] = None, snapshot: Optional[Dict[str, Any]] = None) -> PendingAction:
-    """Create a pending action after guardrail verification and attach evidence."""
+    """Create a pending action after guardrail verification, attach evidence, and optionally auto-execute."""
     proposed = {
         "action_type": action_type,
         "payload": payload,
@@ -88,54 +212,84 @@ def create_action(merchant_id: str, action_type: str, title: str, detail: str, p
     )
     db.session.add(action)
     db.session.flush()
-    _attach_evidence(action, merchant_id, snapshot=snapshot)
+    evidence = _attach_evidence(action, merchant_id, snapshot=snapshot)
+
+    # Autopilot: if safe, execute immediately.
+    if _autopilot_should_execute(action_type, _parse(action.payload), memory, merchant_id, snapshot):
+        logger.info(f"[Action Gate] Autopilot executing action {action.id} for {merchant_id}")
+        before = snapshot or _capture_snapshot(merchant_id)
+        result = _execute_action(action, _parse(action.payload))
+        action.status = "executed"
+        action.decided_at = _now()
+        action.decision_by = "autopilot"
+        action.result_summary = result["message"]
+        _record_execution_report(action, evidence, before)
+        if action.alert_id:
+            alert = Alert.query.get(action.alert_id)
+            if alert and alert.status == "open":
+                alert.status = "resolved"
+                alert.resolved_at = _now()
+        db.session.commit()
+
     return action
 
 
+def _capture_snapshot(merchant_id: str) -> Dict[str, Any]:
+    try:
+        import agent_context
+        return agent_context.get_snapshot(merchant_id)
+    except Exception:
+        return {}
+
+
+def _record_execution_report(action: PendingAction, evidence: ActionEvidence, before: Dict[str, Any]) -> None:
+    """Capture before/after metrics and a human-readable execution report."""
+    after = _capture_snapshot(action.merchant_id)
+    evidence.before_metrics = before.get("kpis") or {}
+    evidence.after_metrics = after.get("kpis") or {}
+
+    before_net = float((before.get("kpis") or {}).get("net_profit", 0.0) or 0.0)
+    after_net = float((after.get("kpis") or {}).get("net_profit", 0.0) or 0.0)
+    delta = round(after_net - before_net, 2)
+    evidence.execution_report = (
+        f"Autopilot executed: {action.result_summary}. "
+        f"Net profit moved from ${before_net:,.2f} to ${after_net:,.2f} ({delta:+.2f})."
+    )
+    db.session.commit()
+
+
 def _attach_evidence(action: PendingAction, merchant_id: str, snapshot: Optional[Dict[str, Any]] = None, confidence: int = 82) -> ActionEvidence:
-    """Attach an evidence record to a pending action using live merchant snapshot."""
+    """Attach an evidence record to a pending action using live merchant snapshot and market data."""
     if snapshot is None:
-        try:
-            import agent_context
-            snapshot = agent_context.get_snapshot(merchant_id)
-        except Exception:
-            snapshot = {}
+        snapshot = _capture_snapshot(merchant_id)
     kpis = (snapshot or {}).get("kpis") or {}
+    payload = _parse(action.payload)
+
+    market = _market_evidence_for_action(action.action_type, payload)
+    base_confidence = _confidence_with_feedback(confidence, merchant_id, action.action_type, payload)
+
     telemetry = {
         "conversion_rate_delta": 0.0,
-        "competitor_median_price": 0.0,
-        "sales_velocity_delta": 0.0,
+        "competitor_median_price": market.get("competitor_median_price", 0.0),
+        "sales_velocity_delta": market.get("sales_velocity_delta", 0.0),
         "historical_trend_days": 14,
         "margin": kpis.get("net_margin", 0.0),
         "orders": kpis.get("orders", 0),
         "gross_revenue": kpis.get("gross_revenue", 0.0),
+        "market_trend": market.get("market_trend", "flat"),
+        "price_gap_pct": market.get("price_gap_pct", 0.0),
     }
-    expected_min = 0.0
-    expected_max = 0.0
-    payload = _parse(action.payload)
-    gross = float(kpis.get("gross_revenue", 0.0) or 0.0)
-    adj = payload.get("adjustment")
-    if action.action_type == "ad_adjust" and isinstance(adj, (int, float)):
-        ad_spend = float(kpis.get("ad_spend", 0.0) or 0.0)
-        change = abs(adj) / 100.0
-        expected_min = round(ad_spend * change * 0.5, 2)
-        expected_max = round(ad_spend * change, 2)
-    elif action.action_type == "reorder":
-        quantity = payload.get("quantity") or 0
-        velocity = payload.get("velocity") or snapshot.get("inventory", {}).get("velocity") or 38.5
-        unit_price = payload.get("unit_price") or (gross / max(kpis.get("orders", 1), 1) if gross else 0.0)
-        weekly_units = min(float(quantity), float(velocity) * 7.0)
-        expected_min = round(weekly_units * float(unit_price) * 0.6, 2)
-        expected_max = round(weekly_units * float(unit_price), 2)
-    elif action.action_type == "refund":
-        expected_min = round(-gross * 0.05, 2)
-        expected_max = round(0.0, 2)
 
-    reasoning = f"AI evaluated {action.title} against live margin, orders, and channel telemetry."
+    expected_min, expected_max = _estimate_impact(action.action_type, payload, kpis)
+
+    reasoning = f"AI evaluated {action.title} against live margin, orders, channel telemetry, and market data."
+    if market:
+        reasoning += f" Market: {market['market_trend']} ({market['sales_velocity_delta']:+.1f}% velocity)."
+
     evidence = ActionEvidence(
         action_id=action.id,
         merchant_id=merchant_id,
-        confidence_score=confidence,
+        confidence_score=base_confidence,
         expected_weekly_impact_min=expected_min,
         expected_weekly_impact_max=expected_max,
         telemetry_evidence_log=telemetry,
@@ -144,6 +298,31 @@ def _attach_evidence(action: PendingAction, merchant_id: str, snapshot: Optional
     db.session.add(evidence)
     db.session.commit()
     return evidence
+
+
+def _estimate_impact(action_type: str, payload: Dict[str, Any], kpis: Dict[str, Any]) -> tuple:
+    expected_min = 0.0
+    expected_max = 0.0
+    gross = float(kpis.get("gross_revenue", 0.0) or 0.0)
+    ad_spend = float(kpis.get("ad_spend", 0.0) or 0.0)
+    adj = payload.get("adjustment")
+
+    if action_type == "ad_adjust" and isinstance(adj, (int, float)):
+        change = abs(adj) / 100.0
+        expected_min = round(ad_spend * change * 0.5, 2)
+        expected_max = round(ad_spend * change, 2)
+    elif action_type == "reorder":
+        quantity = int(payload.get("quantity", 0) or 0)
+        velocity = float(payload.get("velocity") or 38.5)
+        unit_price = gross / max(kpis.get("orders", 1), 1) if gross else 10.0
+        weekly_units = min(quantity, velocity * 7.0)
+        expected_min = round(weekly_units * unit_price * 0.6, 2)
+        expected_max = round(weekly_units * unit_price, 2)
+    elif action_type == "refund":
+        expected_min = round(-gross * 0.05, 2)
+        expected_max = round(0.0, 2)
+
+    return expected_min, expected_max
 
 
 def refresh_actions(merchant_id: str):
@@ -172,9 +351,7 @@ def refresh_actions(merchant_id: str):
                     alert_id=alert.id,
                 )
             except ValueError as e:
-                import logging
-                logging.getLogger(__name__).warning(f"[Action Gate] Guardrail blocked alert action: {e}")
-    db.session.commit()
+                logger.warning(f"[Action Gate] Guardrail blocked alert action: {e}")
 
 
 def _infer_action_from_alert(alert: Alert):
@@ -185,6 +362,7 @@ def _infer_action_from_alert(alert: Alert):
             "quantity": 240,
             "supplier": "Supplier C",
             "lead_days": 6,
+            "velocity": 38.5,
         }, f"Reorder {alert.source_id}", alert.detail
 
     if alert.alert_type == "fraud_risk":
@@ -206,6 +384,7 @@ def _infer_action_from_alert(alert: Alert):
             "quantity": 450,
             "supplier": "Supplier C",
             "lead_days": 6,
+            "velocity": 38.5,
         }, f"Create PO for {alert.source_id}", alert.detail
 
     return None, {}, alert.title, alert.detail
@@ -244,6 +423,12 @@ def approve_action(action_id: int, merchant_id: str, decided_by: str = "merchant
     verify_action_against_business_memory(
         {"action_type": action.action_type, "payload": payload}, memory
     )
+
+    evidence = ActionEvidence.query.filter_by(action_id=action.id).first()
+    before = _capture_snapshot(merchant_id)
+    if evidence:
+        evidence.before_metrics = before.get("kpis") or {}
+
     result = _execute_action(action, payload)
 
     action.status = "approved"
@@ -251,6 +436,19 @@ def approve_action(action_id: int, merchant_id: str, decided_by: str = "merchant
     action.decision_by = decided_by
     action.result_summary = result["message"]
     db.session.commit()
+
+    # Capture after metrics for the report card.
+    after = _capture_snapshot(merchant_id)
+    if evidence:
+        evidence.after_metrics = after.get("kpis") or {}
+        before_net = float((before.get("kpis") or {}).get("net_profit", 0.0) or 0.0)
+        after_net = float((after.get("kpis") or {}).get("net_profit", 0.0) or 0.0)
+        delta = round(after_net - before_net, 2)
+        evidence.execution_report = (
+            f"Approved action: {action.result_summary}. "
+            f"Net profit moved from ${before_net:,.2f} to ${after_net:,.2f} ({delta:+.2f})."
+        )
+        db.session.commit()
 
     # Resolve the linked alert if present
     if action.alert_id:
@@ -372,6 +570,9 @@ def action_to_dict(action: PendingAction) -> Dict[str, Any]:
                 "expected_weekly_impact_max": float(ae.expected_weekly_impact_max or 0),
                 "reasoning_summary": ae.reasoning_summary,
                 "telemetry_evidence_log": ae.telemetry_evidence_log or {},
+                "before_metrics": ae.before_metrics or {},
+                "after_metrics": ae.after_metrics or {},
+                "execution_report": ae.execution_report,
             }
     except Exception:
         pass

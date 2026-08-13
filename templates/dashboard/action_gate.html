@@ -27,8 +27,20 @@
           {% if action.evidence and action.evidence.confidence_score %}
             <span style="margin-right:12px;"><strong>Confidence:</strong> {{ action.evidence.confidence_score }}%</span>
             <span style="margin-right:12px;"><strong>Expected impact:</strong> ${{ '{:,.2f}'.format(action.evidence.expected_weekly_impact_min) }}-${{ '{:,.2f}'.format(action.evidence.expected_weekly_impact_max) }}/week</span>
+            {% set telemetry = action.evidence.telemetry_evidence_log or {} %}
+            {% if telemetry.competitor_median_price %}
+              <span style="margin-right:12px;"><strong>Market:</strong> median ${{ '{:,.2f}'.format(telemetry.competitor_median_price) }}, {{ telemetry.market_trend or 'flat' }}</span>
+            {% endif %}
+          {% endif %}
+          {% if action.status == 'executed' %}
+            <span class="tag tag-green" style="margin-left:8px;">Autopilot</span>
           {% endif %}
         </div>
+        {% if action.evidence and action.evidence.execution_report %}
+        <div class="alert-detail" style="font-size:.78rem; color:var(--ink-3); margin-top:4px;">
+          <strong>Report:</strong> {{ action.evidence.execution_report }}
+        </div>
+        {% endif %}
       </div>
       <div class="alert-actions" style="align-items:center; gap:6px;">
         <button class="btn btn-primary" style="padding: 5px 12px; font-size: .76rem;" onclick="approveAction({{ action.id }})">Approve</button>

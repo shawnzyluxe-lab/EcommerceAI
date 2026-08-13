@@ -2373,18 +2373,21 @@ def api_merchant_business_memory():
 
     if request.method == 'POST':
         data = request.get_json(silent=True) or {}
-        if "max_cac_threshold" in data:
-            memory.max_cac_threshold = data["max_cac_threshold"]
-        if "floor_margin_percentage" in data:
-            memory.floor_margin_percentage = data["floor_margin_percentage"]
-        if "max_daily_ad_spend" in data:
-            memory.max_daily_ad_spend = data["max_daily_ad_spend"]
-        if "forbidden_discount_skus" in data:
-            memory.forbidden_discount_skus = data["forbidden_discount_skus"]
-        if "preferred_supplier_ids" in data:
-            memory.preferred_supplier_ids = data["preferred_supplier_ids"]
-        if "auto_escalation_rules" in data:
-            memory.auto_escalation_rules = data["auto_escalation_rules"]
+        for field in [
+            "max_cac_threshold",
+            "floor_margin_percentage",
+            "max_daily_ad_spend",
+            "autopilot_enabled",
+            "autopilot_max_order_value",
+            "autopilot_max_action_cost",
+            "auto_approve_action_types",
+            "required_approval_action_types",
+            "forbidden_discount_skus",
+            "preferred_supplier_ids",
+            "auto_escalation_rules",
+        ]:
+            if field in data:
+                setattr(memory, field, data[field])
         db.session.commit()
 
     return jsonify({
@@ -2392,6 +2395,11 @@ def api_merchant_business_memory():
         "max_cac_threshold": float(memory.max_cac_threshold),
         "floor_margin_percentage": memory.floor_margin_percentage,
         "max_daily_ad_spend": float(memory.max_daily_ad_spend),
+        "autopilot_enabled": bool(memory.autopilot_enabled),
+        "autopilot_max_order_value": float(memory.autopilot_max_order_value),
+        "autopilot_max_action_cost": float(memory.autopilot_max_action_cost),
+        "auto_approve_action_types": memory.auto_approve_action_types or [],
+        "required_approval_action_types": memory.required_approval_action_types or [],
         "forbidden_discount_skus": memory.forbidden_discount_skus or [],
         "preferred_supplier_ids": memory.preferred_supplier_ids or {},
         "auto_escalation_rules": memory.auto_escalation_rules or {},

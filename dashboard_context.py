@@ -75,6 +75,14 @@ def _evidence_for_action(action: Dict[str, Any], merchant_id: Optional[str] = No
                     evidence.append(f"Net margin at creation: {telemetry['margin']}%")
                 if telemetry.get("orders"):
                     evidence.append(f"Orders in window: {telemetry['orders']}")
+                if telemetry.get("competitor_median_price"):
+                    trend = telemetry.get("market_trend", "flat")
+                    evidence.append(
+                        f"Market: median ${telemetry['competitor_median_price']:.2f}, "
+                        f"trend {trend}, velocity {telemetry.get('sales_velocity_delta', 0):+.1f}%"
+                    )
+                if ae.execution_report:
+                    evidence.append(f"Report: {ae.execution_report}")
         except Exception:
             pass
 

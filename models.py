@@ -411,6 +411,13 @@ class BusinessMemory(db.Model):
     floor_margin_percentage = db.Column(db.Integer, nullable=False, default=20)
     max_daily_ad_spend = db.Column(db.Numeric(12, 4), nullable=False, default=500.00)
 
+    autopilot_enabled = db.Column(db.Boolean, nullable=False, default=False)
+    autopilot_max_order_value = db.Column(db.Numeric(12, 4), nullable=False, default=500.00)
+    autopilot_max_action_cost = db.Column(db.Numeric(12, 4), nullable=False, default=100.00)
+    auto_approve_action_types = db.Column(db.JSON, default=lambda: ["reorder", "refund"])
+    required_approval_action_types = db.Column(db.JSON, default=lambda: ["ad_adjust"])
+    learned_preferences = db.Column(db.JSON, default=dict)
+
     forbidden_discount_skus = db.Column(db.JSON, default=list)
     preferred_supplier_ids = db.Column(db.JSON, default=dict)
     auto_escalation_rules = db.Column(db.JSON, default=lambda: {
@@ -439,4 +446,9 @@ class ActionEvidence(db.Model):
         "historical_trend_days": 14,
     })
     reasoning_summary = db.Column(db.Text, nullable=False, default="AI evaluated this as a high-impact opportunity")
+
+    before_metrics = db.Column(db.JSON, default=dict)
+    after_metrics = db.Column(db.JSON, default=dict)
+    execution_report = db.Column(db.Text)
+
     created_at = db.Column(db.DateTime, server_default=db.func.now())
