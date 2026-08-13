@@ -15,6 +15,10 @@ from models import db, Product, UnifiedOrder, OrderItem, DailyCost, BusinessMemo
 import action_gate
 import competitor_intelligence
 
+# Re-export the deterministic rules-engine components so the COO mesh can be
+# addressed as a single import surface for benchmarks and integrations.
+from rules_engine import VantaRulesEngine, SKUTelemetry, BusinessMemoryProfile
+
 
 class BusinessConstraints(BaseModel):
     merchant_id: str
