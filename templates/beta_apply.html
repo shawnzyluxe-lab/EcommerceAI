@@ -7,15 +7,16 @@
   <title>Apply for the Vantav Closed Beta</title>
   <style>
     :root {
-      --bg: #050505;
-      --card: #0f0f0f;
-      --ink: #f5f5f5;
-      --muted: #888;
-      --line: #222;
-      --accent: #d4af37;
+      --bg: #0c0c11;
+      --card: #14141c;
+      --ink: #f4f2f9;
+      --muted: #c6c3d2;
+      --line: #23232d;
+      --accent: #8b5cf6;
       --accent-2: #a78bfa;
-      --danger: #ef4444;
-      --success: #22c55e;
+      --accent-bg: rgba(139,92,246,0.12);
+      --danger: #fb7185;
+      --success: #34d399;
     }
     * { box-sizing: border-box; }
     html, body {
@@ -44,7 +45,7 @@
       letter-spacing: -0.03em;
       text-align: center;
       margin: 0 0 .5rem;
-      background: linear-gradient(90deg, #fff, #a8a8a8);
+      background: linear-gradient(90deg, #f4f2f9, #a78bfa);
       -webkit-background-clip: text;
       background-clip: text;
       -webkit-text-fill-color: transparent;
@@ -68,19 +69,19 @@
       padding: .85rem 1rem;
       border-radius: 10px;
       border: 1px solid var(--line);
-      background: #050505;
+      background: #14141c;
       color: var(--ink);
       font-size: .95rem;
     }
-    input:focus, textarea:focus, select:focus { outline: none; border-color: var(--accent); }
+    input:focus, textarea:focus, select:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-bg); }
     textarea { min-height: 90px; resize: vertical; }
     .checkbox-group { display: flex; flex-wrap: wrap; gap: .6rem; margin-top: .4rem; }
-    .checkbox { display: flex; align-items: center; gap: .4rem; font-size: .9rem; color: #bbb; }
+    .checkbox { display: flex; align-items: center; gap: .4rem; font-size: .9rem; color: var(--muted); }
     .checkbox input { width: auto; }
     .checkbox label { margin: 0; text-transform: none; letter-spacing: 0; font-size: .9rem; color: var(--ink); }
     button {
-      background: var(--accent);
-      color: #050505;
+      background: linear-gradient(135deg, var(--accent) 0%, #0c0c11 100%);
+      color: var(--ink);
       border: none;
       font-weight: 800;
       cursor: pointer;

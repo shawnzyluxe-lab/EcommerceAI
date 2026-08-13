@@ -14,7 +14,7 @@
                         onyx: '#0D0D11',
                         slateDark: '#16161F',
                         borderMuted: '#262636',
-                        accentGold: '#D4AF37'
+                        accentPurple: '#8b5cf6'
                     },
                     fontFamily: {
                         mono: ['Courier New', 'Courier', 'monospace']
@@ -24,14 +24,14 @@
         }
     </script>
     <style>
-        .glow-ring { box-shadow: 0 0 15px rgba(212, 175, 55, 0.15); }
+        .glow-ring { box-shadow: 0 0 15px rgba(139, 92, 246, 0.15); }
     </style>
 </head>
-<body class="bg-onyx text-gray-100 font-sans antialiased min-h-screen flex flex-col selection:bg-accentGold selection:text-onyx">
+<body class="bg-onyx text-gray-100 font-sans antialiased min-h-screen flex flex-col selection:bg-accentPurple selection:text-onyx">
 
     <header class="border-b border-borderMuted bg-onyx/80 backdrop-blur-md px-6 py-4 flex items-center justify-between">
         <div class="flex items-center space-x-3">
-            <div class="w-3 h-3 bg-accentGold rounded-full glow-ring"></div>
+            <div class="w-3 h-3 bg-accentPurple rounded-full glow-ring"></div>
             <span class="font-mono text-sm tracking-[0.3em] font-bold text-white">VANTAV</span>
         </div>
         <a href="/dashboard" class="text-xs tracking-widest text-gray-400 hover:text-white uppercase transition">Dashboard</a>
@@ -39,17 +39,17 @@
 
     <main class="flex-grow flex flex-col items-center justify-center text-center px-4 max-w-5xl mx-auto py-16">
         <div class="mb-4">
-            <span class="text-xs uppercase tracking-[0.4em] text-accentGold font-mono font-semibold bg-accentGold/10 px-3 py-1 border border-accentGold/20 rounded-full">
+            <span class="text-xs uppercase tracking-[0.4em] text-accentPurple font-mono font-semibold bg-accentPurple/10 px-3 py-1 border border-accentPurple/20 rounded-full">
                 Staging
             </span>
         </div>
         <h1 class="text-4xl md:text-5xl font-bold tracking-tight text-white mb-6 uppercase max-w-4xl leading-tight">
-            Home Page
+            Vantav
         </h1>
         <p class="text-gray-400 text-base md:text-lg max-w-2xl mb-12 leading-relaxed">
-            This is the placeholder for the Vantav home/landing layout. Upload a clean <code class="font-mono text-accentGold">index.html</code> and we’ll wire it in behind the existing security gate.
+            Multi-channel commerce operations. True profit, alerts, and actions in one dashboard.
         </p>
-        <a href="/dashboard" class="border border-accentGold/50 hover:border-accentGold text-accentGold px-6 py-3 text-xs tracking-widest uppercase transition rounded-sm font-mono">
+        <a href="/dashboard" class="border border-accentPurple/50 hover:border-accentPurple text-accentPurple px-6 py-3 text-xs tracking-widest uppercase transition rounded-sm font-mono">
             Back to Dashboard
         </a>
     </main>

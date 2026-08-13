@@ -115,7 +115,7 @@ function renderWeeklyPlan(plan) {
   el.innerHTML = `
     <div style="display:grid; grid-template-columns: repeat(7, 1fr); gap:8px;">
       ${plan.map(d => `
-        <div style="border:1px solid var(--line); border-radius:10px; padding:10px; text-align:center; background:${d.status==='Live' ? 'rgba(59,91,219,.08)' : '#fff'};">
+        <div style="border:1px solid var(--line); border-radius:10px; padding:10px; text-align:center; background:${d.status==='Live' ? 'var(--accent-bg-subtle)' : 'var(--surface)'};">
           <div style="font-size:.75rem; color:var(--ink-3); margin-bottom:4px;">${d.day}</div>
           <div style="font-size:.65rem; color:var(--ink-3);">${d.date}</div>
           <div style="font-size:.8rem; font-weight:600; margin:8px 0;">${d.status}</div>
