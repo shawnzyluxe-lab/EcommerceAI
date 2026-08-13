@@ -76,3 +76,14 @@ xrandr --output VNC-0 --mode 1600x1200
 - `verify_captcha_v3` returns `1.0` when `RECAPTCHA_SECRET_KEY` is empty, so the Google test key badge can be hidden via `document.querySelector('.grecaptcha-badge').style.display='none'` if it appears in the recording.
 - Seed `merchant_ivor_demo` (or another sandbox merchant) with `ivonderhaff@gmail.com` / `Pqk57Qa9Weo` and matching orders/channels before recording so the dashboard KPIs read `$4,582` revenue and `$1,394` net profit.
 - The `computer` `left_click` action may not register on page elements in this environment; use `Ctrl+L` address-bar navigation and `browser_console`/`Return` for form submission and in-page generators.
+
+## Live deployed E2E testing (Render / https://vantavcommerce.com)
+
+- Use the test merchant `test_rules_engine@example.com` / `TestPass123!`.
+- The beta login flow collects a reCAPTCHA token if `grecaptcha` is present but continues without it; the live endpoint does not enforce a captcha score.
+- `POST /api/v1/forecast/cron` returns SKU-level forecasts and, if a source-id bucket is free, creates `inventory_runout`/`reorder` alerts via `rules_engine.evaluate_products`.
+- `GET /api/analytics/channels?days=30` returns per-channel true-profit JSON; the dashboard Overview renders it in the **Channel Performance** table.
+- `/dashboard/action-gate` lists pending actions with evidence (confidence, expected impact, market) and **Approve/Modify/Deny** buttons.
+- `POST /api/actions/<id>/approve` executes the action and moves it to the **Recent Decisions** table.
+- `POST /api/actions/<id>/verify` returns `before_metrics`/`after_metrics`; note that `action_gate.action_to_dict` currently omits `verification_report` and `verified_at`, so the Action Gate UI does not surface the verification text.
+- To make POST API calls visible in a recording, inject a temporary DOM overlay from `browser_console` and display the JSON response before navigating away.

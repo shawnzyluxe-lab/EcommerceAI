@@ -632,6 +632,8 @@ def action_to_dict(action: PendingAction) -> Dict[str, Any]:
                 "before_metrics": ae.before_metrics or {},
                 "after_metrics": ae.after_metrics or {},
                 "execution_report": ae.execution_report,
+                "verified_at": ae.verified_at.isoformat() if ae.verified_at else None,
+                "verification_report": ae.verification_report,
             }
     except Exception:
         pass

@@ -146,7 +146,10 @@ function renderActions(pending, history) {
         <td style="padding:10px;">${h.title}</td>
         <td style="padding:10px;">${h.action_type}</td>
         <td style="padding:10px;"><span class="tag ${h.status === 'approved' ? 'tag-green' : 'tag-red'}">${h.status}</span></td>
-        <td style="padding:10px; color:var(--ink-3);">${h.result_summary || '-'}</td>
+        <td style="padding:10px; color:var(--ink-3);">
+          ${h.result_summary || '-'}
+          ${h.evidence && h.evidence.verification_report ? `<div style="font-size:.75rem; color:var(--success); margin-top:2px;">Verified ${h.evidence.verified_at || ''}: ${h.evidence.verification_report}</div>` : ''}
+        </td>
         <td style="padding:10px; color:var(--ink-3); font-size:.8rem;">${h.decided_at || h.created_at}</td>
       </tr>
     `).join('')}</tbody>
