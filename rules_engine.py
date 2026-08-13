@@ -285,7 +285,7 @@ def save_events(merchant_id: str, events: List[Dict[str, Any]]) -> List[Dict[str
 
         existing = Alert.query.filter_by(
             merchant_id=merchant_id,
-            alert_type=alert_type,
+            source_id=source_id,
             status="open",
         ).first()
         if existing:
