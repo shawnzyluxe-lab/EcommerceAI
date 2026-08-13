@@ -1,0 +1,93 @@
+{% extends 'dashboard/base.html' %}
+{% block title %}Monitoring — {{ brand.name }} {{ brand.product }}{% endblock %}
+{% block content %}
+
+<section class="page-header">
+  <h1>Monitoring & SLA</h1>
+  <p>Live platform health, request metrics, and SLA alerts.</p>
+</section>
+
+<div class="grid grid-4" id="metric-cards" style="margin-bottom: 18px;">
+  <div class="card"><div class="card-head"><h3>Requests / min</h3></div><div class="metric" id="req-rate" style="font-size: 2rem; font-weight: 800; color: var(--ink);">—</div></div>
+  <div class="card"><div class="card-head"><h3>Error rate</h3></div><div class="metric" id="error-rate" style="font-size: 2rem; font-weight: 800; color: var(--ink);">—</div></div>
+  <div class="card"><div class="card-head"><h3>P95 latency</h3></div><div class="metric" id="p95" style="font-size: 2rem; font-weight: 800; color: var(--ink);">—</div></div>
+  <div class="card"><div class="card-head"><h3>DB latency</h3></div><div class="metric" id="db-p95" style="font-size: 2rem; font-weight: 800; color: var(--ink);">—</div></div>
+</div>
+
+<div class="grid grid-2" style="align-items: start;">
+  <div class="card">
+    <div class="card-head"><h3>Channel sync status</h3></div>
+    <div id="channel-status" style="color: var(--ink-2); font-size: .9rem;">Loading…</div>
+  </div>
+  <div class="card">
+    <div class="card-head"><h3>SLA alerts</h3></div>
+    <div id="sla-alerts" style="color: var(--ink-2); font-size: .9rem;">Loading…</div>
+  </div>
+</div>
+
+<div class="card" style="margin-top: 18px;">
+  <div class="card-head" style="display: flex; justify-content: space-between; align-items: center;">
+    <h3>Top routes</h3>
+    <button class="btn" onclick="loadMetrics()" style="font-size: .75rem; padding: 6px 12px;">Refresh</button>
+  </div>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Route</th><th class="num">Count</th></tr></thead>
+      <tbody id="top-routes"></tbody>
+    </table>
+  </div>
+</div>
+
+<script>
+async function loadMetrics() {
+  try {
+    const [metrics, health, alerts] = await Promise.all([
+      fetch('/api/v1/monitoring/metrics').then(r => r.json()),
+      fetch('/api/v1/monitoring/health').then(r => r.json()),
+      fetch('/api/v1/monitoring/alerts').then(r => r.json())
+    ]);
+
+    document.getElementById('req-rate').textContent = metrics.requests_per_minute ?? '—';
+    document.getElementById('error-rate').textContent = (metrics.error_rate_percent != null ? metrics.error_rate_percent + '%' : '—');
+    document.getElementById('error-rate').style.color = (metrics.error_rate_percent > 5) ? 'var(--red)' : 'var(--ink)';
+    document.getElementById('p95').textContent = (metrics.latency_ms?.p95 != null ? metrics.latency_ms.p95 + ' ms' : '—');
+    document.getElementById('db-p95').textContent = (metrics.db_latency_ms?.p95 != null ? metrics.db_latency_ms.p95 + ' ms' : '—');
+
+    const tbody = document.getElementById('top-routes');
+    tbody.innerHTML = '';
+    const routes = metrics.top_routes || {};
+    Object.entries(routes).sort((a,b) => b[1] - a[1]).forEach(([route, count]) => {
+      const tr = document.createElement('tr');
+      tr.innerHTML = `<td>${route}</td><td class="num mono">${count}</td>`;
+      tbody.appendChild(tr);
+    });
+
+    const chEl = document.getElementById('channel-status');
+    if (health.channels && health.channels.length) {
+      chEl.innerHTML = health.channels.map(c => {
+        const color = c.stale ? 'var(--red)' : 'var(--green)';
+        const age = c.age_seconds != null ? Math.round(c.age_seconds) + 's' : 'never';
+        return `<div style="margin-bottom: 8px;"><span style="color: ${color};">●</span> ${c.channel} (${c.merchant_id}) — ${age}</div>`;
+      }).join('');
+    } else {
+      chEl.textContent = 'No connected channels.';
+    }
+
+    const alertEl = document.getElementById('sla-alerts');
+    if (alerts.alerts && alerts.alerts.length) {
+      alertEl.innerHTML = alerts.alerts.map(a =>
+        `<div style="margin-bottom: 8px; padding: 8px; border-radius: 6px; background: ${a.severity === 'crit' ? 'var(--red-bg)' : 'var(--amber-bg)'}; color: var(--ink);">${a.severity.toUpperCase()}: ${a.message}</div>`
+      ).join('');
+    } else {
+      alertEl.innerHTML = '<span style="color: var(--green);">All SLA checks passing.</span>';
+    }
+  } catch (e) {
+    console.error('Monitoring load failed', e);
+  }
+}
+
+loadMetrics();
+setInterval(loadMetrics, 30000);
+</script>
+
+{% endblock %}

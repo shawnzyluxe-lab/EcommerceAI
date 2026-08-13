@@ -3,8 +3,8 @@ services:
     name: shawnzyluxe
     runtime: python
     buildCommand: pip install -r requirements.txt
-    startCommand: python migrate.py && gunicorn -w 1 -b 0.0.0.0:$PORT --timeout 120 app:app
-    healthCheckPath: /
+    startCommand: python migrate.py && gunicorn -w 1 -b 0.0.0.0:$PORT --timeout 120 --access-logfile - --error-logfile - --log-level info app:app
+    healthCheckPath: /health
     domains:
       - vantavcommerce.com
       - www.vantavcommerce.com

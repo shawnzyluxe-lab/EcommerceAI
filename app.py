@@ -69,6 +69,7 @@ import shopify_sync
 import tiktok_sync
 import amazon_sync
 import outbound
+import monitoring as monitoring_module
 import tiktok_studio
 import assistant_engine
 import startup_pack
@@ -137,6 +138,9 @@ GENERATED_DIR = "generated"
 os.makedirs(GENERATED_DIR, exist_ok=True)
 
 db.init_app(app)
+
+# Register production monitoring hooks (request logging, security headers, SLA checks).
+monitoring_module.register_app(app)
 sock = Sock(app)
 
 
@@ -1416,7 +1420,8 @@ def dashboard_page(page):
         'marketing', 'support', 'automations', 'team-ai', 'health-score',
         'mobile-copilot', 'store-catalog', 'products', 'orders', 'customers',
         'inventory', 'shipments', 'returns', 'analytics', 'discounts', 'apps',
-        'themes', 'reports', 'billing', 'integrations', 'settings', 'tiktok-studio'
+        'themes', 'reports', 'billing', 'integrations', 'settings', 'tiktok-studio',
+        'monitoring'
     }
     if page not in valid_pages:
         return redirect(url_for('dashboard'))
@@ -4752,6 +4757,46 @@ def api_live_access_check():
         return jsonify({"error": "No merchant context"}), 403
     result = vetted_operator.gate_check(merchant["id"], request.args.get("feature", "live_sync"))
     return jsonify(result), 200
+
+
+# ============================================================
+# MONITORING & SLA
+# ============================================================
+
+@app.route('/api/v1/monitoring/metrics', methods=['GET'])
+@require_roles([UserRole.ADMIN, UserRole.ENGINEER])
+def api_monitoring_metrics():
+    """Return rolling request metrics and database latency."""
+    return jsonify(monitoring_module.current_metrics()), 200
+
+
+@app.route('/api/v1/monitoring/health', methods=['GET'])
+@require_roles([UserRole.ADMIN, UserRole.ENGINEER])
+def api_monitoring_health():
+    """Return deep health status including database, storage, and channel sync."""
+    return jsonify(monitoring_module.deep_health()), 200
+
+
+@app.route('/api/v1/monitoring/alerts', methods=['GET'])
+@require_roles([UserRole.ADMIN, UserRole.ENGINEER])
+def api_monitoring_alerts():
+    """Run SLA checks and return active alerts."""
+    alerts = monitoring_module.check_sla()
+    return jsonify({"alerts": alerts, "count": len(alerts)}), 200
+
+
+@app.route('/api/v1/monitoring/alert-test', methods=['POST'])
+@require_roles([UserRole.ADMIN])
+def api_monitoring_alert_test():
+    """Send a test alert through configured channels."""
+    monitoring_module.send_alert({
+        "severity": "warn",
+        "type": "test_alert",
+        "message": "This is a test SLA alert from Vantav monitoring.",
+        "value": 0,
+        "threshold": 0,
+    })
+    return jsonify({"status": "alert_dispatched"}), 200
 
 
 if __name__ == '__main__':

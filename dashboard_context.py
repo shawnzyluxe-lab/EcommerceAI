@@ -605,6 +605,7 @@ NAV_GROUPS = [
             {"id": "team_ai", "label": "Team", "url": "/dashboard/team-ai", "icon": "✦"},
             {"id": "health_score", "label": "Health Score", "url": "/dashboard/health-score", "icon": "♥"},
             {"id": "mobile_copilot", "label": "Vanta Mobile", "url": "/dashboard/mobile-copilot", "icon": "☎"},
+            {"id": "monitoring", "label": "Monitoring", "url": "/dashboard/monitoring", "icon": "◈"},
         ],
     },
     {
