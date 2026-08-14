@@ -164,6 +164,56 @@ def run_migrations():
 
         _run("suppliers.email", "ALTER TABLE suppliers ADD COLUMN IF NOT EXISTS email VARCHAR(255)")
 
+        _run(
+            "marketing_campaigns table",
+            """
+            CREATE TABLE IF NOT EXISTS marketing_campaigns (
+                id VARCHAR(36) PRIMARY KEY,
+                merchant_id VARCHAR(100) NOT NULL,
+                channel VARCHAR(50) NOT NULL,
+                external_campaign_id VARCHAR(255) NOT NULL UNIQUE,
+                campaign_name VARCHAR(255) NOT NULL,
+                campaign_type VARCHAR(50) NOT NULL DEFAULT 'SPARK_ADS',
+                sku_target VARCHAR(100),
+                daily_budget NUMERIC(12, 4) NOT NULL DEFAULT 0.0000,
+                current_spend_24h NUMERIC(12, 4) NOT NULL DEFAULT 0.0000,
+                attributed_revenue_24h NUMERIC(12, 4) NOT NULL DEFAULT 0.0000,
+                platform_coupons_cost NUMERIC(12, 4) NOT NULL DEFAULT 0.0000,
+                affiliate_commissions_cost NUMERIC(12, 4) NOT NULL DEFAULT 0.0000,
+                active_roas NUMERIC(6, 2) NOT NULL DEFAULT 0.00,
+                status VARCHAR(50) NOT NULL DEFAULT 'active',
+                updated_at TIMESTAMP DEFAULT NOW(),
+                created_at TIMESTAMP DEFAULT NOW()
+            )
+            """,
+        )
+        _run(
+            "marketing_campaigns.index",
+            "CREATE INDEX IF NOT EXISTS idx_marketing_attribution ON marketing_campaigns(merchant_id, channel, status)",
+        )
+
+        _run(
+            "shop_affiliates table",
+            """
+            CREATE TABLE IF NOT EXISTS shop_affiliates (
+                id VARCHAR(36) PRIMARY KEY,
+                merchant_id VARCHAR(100) NOT NULL,
+                creator_handle VARCHAR(150) NOT NULL,
+                creator_uid VARCHAR(255) NOT NULL,
+                commission_rate_percentage INTEGER NOT NULL DEFAULT 10,
+                gmv_generated_30d NUMERIC(12, 4) NOT NULL DEFAULT 0.0000,
+                sample_fulfillment_status VARCHAR(50) NOT NULL DEFAULT 'none',
+                reliability_rating INTEGER NOT NULL DEFAULT 100,
+                last_active_at TIMESTAMP DEFAULT NOW(),
+                created_at TIMESTAMP DEFAULT NOW()
+            )
+            """,
+        )
+        _run(
+            "shop_affiliates.index",
+            "CREATE INDEX IF NOT EXISTS idx_affiliate_creators ON shop_affiliates(merchant_id, creator_uid)",
+        )
+
 
 if __name__ == "__main__":
     run_migrations()

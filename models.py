@@ -524,3 +524,39 @@ class DailyCost(db.Model):
     refund = db.Column(db.Numeric(12, 4), nullable=False, default=0.0000)
     tax = db.Column(db.Numeric(12, 4), nullable=False, default=0.0000)
     __table_args__ = (db.UniqueConstraint("sku", "log_date", name="unique_sku_date"),)
+
+
+class MarketingCampaign(db.Model):
+    __tablename__ = "marketing_campaigns"
+    id = db.Column(db.String(36), primary_key=True, default=_uuid)
+    merchant_id = db.Column(db.String(100), db.ForeignKey("merchant_profiles.merchant_id"), nullable=False, index=True)
+    channel = db.Column(db.String(50), nullable=False)  # tiktok_ads, meta_ads
+    external_campaign_id = db.Column(db.String(255), nullable=False, unique=True)
+    campaign_name = db.Column(db.String(255), nullable=False)
+    campaign_type = db.Column(db.String(50), nullable=False, default="SPARK_ADS")  # GMV_MAX_PRO, SPARK_ADS
+    sku_target = db.Column(db.String(100), nullable=True)
+    daily_budget = db.Column(db.Numeric(12, 4), nullable=False, default=0.0000)
+    current_spend_24h = db.Column(db.Numeric(12, 4), nullable=False, default=0.0000)
+    attributed_revenue_24h = db.Column(db.Numeric(12, 4), nullable=False, default=0.0000)
+    platform_coupons_cost = db.Column(db.Numeric(12, 4), nullable=False, default=0.0000)
+    affiliate_commissions_cost = db.Column(db.Numeric(12, 4), nullable=False, default=0.0000)
+    active_roas = db.Column(db.Numeric(6, 2), nullable=False, default=0.00)
+    status = db.Column(db.String(50), nullable=False, default="active")
+    updated_at = db.Column(db.DateTime, server_default=db.func.now(), onupdate=db.func.now())
+    created_at = db.Column(db.DateTime, server_default=db.func.now())
+    __table_args__ = (db.Index("idx_marketing_attribution", "merchant_id", "channel", "status"),)
+
+
+class ShopAffiliate(db.Model):
+    __tablename__ = "shop_affiliates"
+    id = db.Column(db.String(36), primary_key=True, default=_uuid)
+    merchant_id = db.Column(db.String(100), db.ForeignKey("merchant_profiles.merchant_id"), nullable=False, index=True)
+    creator_handle = db.Column(db.String(150), nullable=False)
+    creator_uid = db.Column(db.String(255), nullable=False)
+    commission_rate_percentage = db.Column(db.Integer, nullable=False, default=10)
+    gmv_generated_30d = db.Column(db.Numeric(12, 4), nullable=False, default=0.0000)
+    sample_fulfillment_status = db.Column(db.String(50), nullable=False, default="none")
+    reliability_rating = db.Column(db.Integer, nullable=False, default=100)
+    last_active_at = db.Column(db.DateTime, server_default=db.func.now(), onupdate=db.func.now())
+    created_at = db.Column(db.DateTime, server_default=db.func.now())
+    __table_args__ = (db.Index("idx_affiliate_creators", "merchant_id", "creator_uid"),)

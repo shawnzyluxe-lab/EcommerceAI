@@ -71,6 +71,7 @@ import amazon_sync
 import outbound
 import monitoring as monitoring_module
 import tiktok_studio
+import tiktok_marketing_studio
 import assistant_engine
 import startup_pack
 import sandbox_demo
@@ -2147,6 +2148,51 @@ def api_admin_sync_tiktok(merchant_id):
         return jsonify({"status": "synced", "merchant_id": merchant_id, **result}), 200
     except Exception as e:
         logger.error(f"[Admin TikTok Sync] Failed for {merchant_id}: {e}")
+        return jsonify({"detail": str(e)}), 400
+
+
+@app.route('/api/admin/tiktok/marketing/sync/<merchant_id>', methods=['POST'])
+@require_roles([UserRole.ADMIN])
+def api_admin_sync_tiktok_marketing(merchant_id):
+    """Admin-triggered TikTok ad campaign sync."""
+    try:
+        studio = tiktok_marketing_studio.TikTokMarketingStudio(merchant_id)
+        result = studio.sync_campaigns()
+        return jsonify({"status": "synced", "merchant_id": merchant_id, **result}), 200
+    except Exception as e:
+        logger.error(f"[Admin TikTok Marketing Sync] Failed for {merchant_id}: {e}")
+        return jsonify({"detail": str(e)}), 400
+
+
+@app.route('/api/admin/tiktok/marketing/evaluate/<merchant_id>', methods=['POST'])
+@require_roles([UserRole.ADMIN])
+def api_admin_evaluate_tiktok_marketing(merchant_id):
+    """Admin-triggered TikTok marketing overhead evaluation and action drafting."""
+    try:
+        studio = tiktok_marketing_studio.TikTokMarketingStudio(merchant_id)
+        sync = studio.sync_campaigns()
+        evaluations = studio.evaluate_all_active_campaigns()
+        return jsonify({"status": "ok", "merchant_id": merchant_id, "sync": sync, "evaluations": evaluations}), 200
+    except Exception as e:
+        logger.error(f"[Admin TikTok Marketing Evaluate] Failed for {merchant_id}: {e}")
+        return jsonify({"detail": str(e)}), 400
+
+
+@app.route('/api/admin/tiktok/marketing/creative-refresh/<merchant_id>', methods=['POST'])
+@require_roles([UserRole.ADMIN])
+def api_admin_tiktok_creative_refresh(merchant_id):
+    """Queue a TikTok creative refresh for an SKU."""
+    data = request.get_json() or {}
+    sku = data.get("sku", "")
+    brief = data.get("brief", "")
+    if not sku:
+        return jsonify({"detail": "sku is required"}), 400
+    try:
+        studio = tiktok_marketing_studio.TikTokMarketingStudio(merchant_id)
+        result = studio.trigger_creative_refresh(sku, brief)
+        return jsonify({"status": "ok", "merchant_id": merchant_id, **result}), 200
+    except Exception as e:
+        logger.error(f"[Admin TikTok Creative Refresh] Failed for {merchant_id}: {e}")
         return jsonify({"detail": str(e)}), 400
 
 

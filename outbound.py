@@ -172,14 +172,14 @@ def amazon_update_inventory(merchant_id: str, sku: str, quantity: int) -> Dict[s
     return amazon_sync.update_inventory(merchant_id, sku, quantity)
 
 
-def ad_platform_update_budget(platform: str, merchant_id: str, new_budget: float) -> Dict[str, Any]:
+def ad_platform_update_budget(platform: str, merchant_id: str, new_budget: float, campaign_id: Optional[str] = None) -> Dict[str, Any]:
     """Push an ad budget adjustment to the target platform.
 
     Currently records the target budget locally; live ad API integrations
     (Meta, Google, TikTok Ads) require separate OAuth scopes not yet wired.
     """
-    logger.info(f"[Outbound] Ad budget update queued for {platform}: ${new_budget}")
-    return {"status": "pending", "channel": platform, "new_budget": new_budget}
+    logger.info(f"[Outbound] Ad budget update queued for {platform}: ${new_budget} (campaign={campaign_id})")
+    return {"status": "pending", "channel": platform, "new_budget": float(new_budget), "campaign_id": campaign_id}
 
 
 def _resolve_supplier_for_po(

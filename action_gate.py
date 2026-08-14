@@ -5,7 +5,7 @@ import uuid
 from datetime import datetime, timedelta
 from typing import List, Dict, Any, Optional, Tuple
 
-from models import db, PendingAction, Alert, PredictiveLogistics, GeneratedPurchaseOrder, ProfitFeedOrder, AdSpendAnalytic, BusinessMetric, MerchantProfile, BusinessMemory, ActionEvidence, Product, Supplier
+from models import db, PendingAction, Alert, PredictiveLogistics, GeneratedPurchaseOrder, ProfitFeedOrder, AdSpendAnalytic, BusinessMetric, MerchantProfile, BusinessMemory, ActionEvidence, Product, Supplier, MarketingCampaign
 from tier_manager import TierManager
 import alert_matrix
 import competitor_intelligence
@@ -633,7 +633,27 @@ def _execute_action(action: PendingAction, payload: Dict[str, Any]) -> Dict[str,
 
     if action_type == "ad_adjust":
         platform = payload.get("platform", "")
+        campaign_id = payload.get("campaign_id")
         adjustment = float(payload.get("adjustment", -20.0))
+
+        # If a campaign_id is provided, target the granular MarketingCampaign record.
+        if campaign_id:
+            campaign = MarketingCampaign.query.filter_by(
+                merchant_id=merchant_id, external_campaign_id=campaign_id
+            ).first()
+            if campaign:
+                current_budget = float(campaign.daily_budget or 0.0)
+                new_budget = max(0.0, current_budget * (1 + adjustment / 100.0))
+                campaign.daily_budget = new_budget
+                db.session.commit()
+                writeback = outbound.ad_platform_update_budget(
+                    platform or campaign.channel, merchant_id, new_budget, campaign_id=campaign_id
+                )
+                return {
+                    "message": f"{campaign.campaign_name or campaign_id} ad budget adjusted by {adjustment}% to ${new_budget:,.2f}.",
+                    "writeback": writeback,
+                }
+
         ad = AdSpendAnalytic.query.filter_by(merchant_id=merchant_id, platform_source=platform).first()
         if ad:
             new_budget = ad.budget_allocated * (1 + adjustment / 100.0) if ad.budget_allocated else 0.0
