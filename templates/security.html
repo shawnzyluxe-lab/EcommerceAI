@@ -1,11 +1,12 @@
 {% extends 'legal.html' %}
-{% block legal_title %}Security Policy{% endblock %}
+{% block legal_title %}Security and Privacy Policy{% endblock %}
 {% block legal_content %}
-<h1>Security Policy</h1>
+<h1>Security and Privacy Policy</h1>
 <p><strong>Effective date:</strong> August 14, 2026</p>
 <p><strong>Contact:</strong> <a href="mailto:security@vantavcommerce.com">security@vantavcommerce.com</a></p>
+<p><strong>Published at:</strong> <a href="https://vantavcommerce.com/security">https://vantavcommerce.com/security</a></p>
 
-<p>This policy describes the security controls Vantav LLC uses to protect the Vantav platform, merchant data, and connected sales channels.</p>
+<p>This policy describes the security, privacy, and data protection controls Vantav LLC uses to protect the Vantav platform, merchant data, and connected sales channels.</p>
 
 <h2>1. Security Program</h2>
 <p>Vantav LLC maintains a security program that covers:</p>
@@ -17,7 +18,61 @@
   <li>Periodic review of access, secrets, and vendor integrations.</li>
 </ul>
 
-<h2>2. Infrastructure &amp; Network Security</h2>
+<h2>2. Security Baseline for Daily Operations</h2>
+<p>Company personnel follow a security baseline that includes:</p>
+<ul>
+  <li>Automatic screen locking and strong device passwords or biometrics.</li>
+  <li>Multi-factor authentication (MFA) for critical services and production accounts.</li>
+  <li>Unique, complex passwords managed through a password manager.</li>
+  <li>Clear-desk and clear-screen practices.</li>
+  <li>Approved, up-to-date devices only; automatic security updates enabled.</li>
+</ul>
+
+<h2>3. Access Control and Least Privilege</h2>
+<p>Access to Vantav systems and data is governed by the principle of least privilege:</p>
+<ul>
+  <li>Production access is restricted to authorized personnel with a business need.</li>
+  <li>Roles and permissions are tiered (merchant, admin, engineer) and enforced in code.</li>
+  <li>Database access is scoped per merchant through PostgreSQL Row-Level Security (RLS).</li>
+  <li>Secrets, API keys, and credentials are stored in a secret manager and never committed to source control.</li>
+</ul>
+
+<h2>4. Data Classification and Encryption</h2>
+<p>Vantav classifies data by sensitivity:</p>
+<ul>
+  <li><strong>Sensitive:</strong> merchant credentials, payment and channel API tokens, personal data.</li>
+  <li><strong>Confidential:</strong> business metrics, order history, customer lists.</li>
+  <li><strong>Public:</strong> published policies and marketing content.</li>
+</ul>
+<p>Controls:</p>
+<ul>
+  <li>All web traffic and API calls are encrypted in transit using TLS.</li>
+  <li>Database connections use authenticated, encrypted transport.</li>
+  <li>Sensitive credentials are stored as secrets and not logged.</li>
+  <li>Data at rest is encrypted by the managed database and cloud storage providers used by Render/AWS.</li>
+  <li>Data retention follows the published Privacy Policy; merchants may request deletion.</li>
+</ul>
+
+<h2>5. Incident Response</h2>
+<p>Vantav has an incident response process with defined roles and communication channels:</p>
+<ul>
+  <li>Incidents are detected through automated monitoring (Sentry, application logs, health checks) and manual reports.</li>
+  <li>Response is coordinated by the Vantav engineering/security lead.</li>
+  <li>Affected merchants or partners are notified promptly when required by law or contract.</li>
+  <li>Post-incident reviews are conducted and controls are updated as needed.</li>
+  <li>Report incidents to <a href="mailto:security@vantavcommerce.com">security@vantavcommerce.com</a>.</li>
+</ul>
+
+<h2>6. Vulnerability and Threat Management</h2>
+<p>Vantav maintains a vulnerability management program:</p>
+<ul>
+  <li>Dependencies are reviewed regularly and updated when security patches are available.</li>
+  <li>Webhooks and API endpoints use HMAC signature verification and rate limiting.</li>
+  <li>Security scans and code review are part of the deployment workflow.</li>
+  <li>Third-party reports are handled through the vulnerability disclosure process.</li>
+</ul>
+
+<h2>7. Infrastructure &amp; Network Security</h2>
 <ul>
   <li>The application is hosted on Render and AWS cloud infrastructure.</li>
   <li>Network traffic is encrypted with TLS/HTTPS.</li>
@@ -26,7 +81,7 @@
   <li>Rate limiting and request throttling protect public endpoints.</li>
 </ul>
 
-<h2>3. Application Security</h2>
+<h2>8. Application Security</h2>
 <ul>
   <li>All merchant credentials are hashed using <code>pbkdf2:sha256</code>.</li>
   <li>Site-wall and session endpoints use cryptographically random tokens and <code>HttpOnly</code>, <code>Secure</code>, <code>SameSite=Lax</code> cookies.</li>
@@ -36,15 +91,18 @@
   <li>Account tiers and role checks restrict access to admin and engineer endpoints.</li>
 </ul>
 
-<h2>4. Data Protection</h2>
+<h2>9. Data Protection and Privacy</h2>
 <ul>
-  <li>Data is encrypted in transit via TLS.</li>
-  <li>Database connections use authenticated, encrypted transport.</li>
-  <li>Merchant channel credentials are stored as secrets and not logged.</li>
-  <li>Data retention follows the published Privacy Policy; merchants may request deletion.</li>
+  <li>Vantav maintains an internal personal data protection policy and a published Privacy Policy at <a href="https://vantavcommerce.com/privacy">https://vantavcommerce.com/privacy</a>.</li>
+  <li>Both policies are reviewed and updated as the platform and regulations evolve.</li>
+  <li>Merchants and users can request access, correction, deletion, or portability of their data by contacting <a href="mailto:support@vantavcommerce.com">support@vantavcommerce.com</a>.</li>
+  <li>At the end of a contractual relationship, Vantav deletes or anonymizes collected customer data upon request, except where retention is required by law.</li>
 </ul>
 
-<h2>5. Endpoint Security</h2>
+<h2>10. Breach Notification</h2>
+<p>Vantav has a notification process to alert affected merchants and relevant authorities of suspected or confirmed data breaches in accordance with applicable law and contractual obligations.</p>
+
+<h2>11. Endpoint Security</h2>
 <ul>
   <li>Company endpoints use modern operating systems with built-in anti-malware/endpoint protection.</li>
   <li>Automatic security updates are enabled.</li>
@@ -52,9 +110,9 @@
   <li>Secrets and API keys are managed through a secret store, not committed to source control.</li>
 </ul>
 
-<h2>6. Vulnerability Disclosure</h2>
+<h2>12. Vulnerability Disclosure</h2>
 <p>If you believe you have found a security issue, please email <a href="mailto:security@vantavcommerce.com">security@vantavcommerce.com</a> with a description and reproduction steps. We will investigate and respond as quickly as possible.</p>
 
-<h2>7. Changes to This Policy</h2>
+<h2>13. Changes to This Policy</h2>
 <p>We may update this policy as our security practices evolve. The latest version is always available at <a href="https://vantavcommerce.com/security">https://vantavcommerce.com/security</a>.</p>
 {% endblock %}
