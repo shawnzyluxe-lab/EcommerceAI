@@ -668,7 +668,7 @@ NAV_GROUPS = [
             {"id": "discounts", "label": "Discounts", "url": "/dashboard/discounts", "icon": "%"},
             {"id": "support", "label": "Support", "url": "/dashboard/support", "icon": "✉"},
             {"id": "automations", "label": "Automations", "url": "/dashboard/automations", "icon": "⏵"},
-            {"id": "team_ai", "label": "Team", "url": "/dashboard/team-ai", "icon": "✦"},
+            {"id": "team_ai", "label": "AI Assistant", "url": "/dashboard/team-ai", "icon": "✦"},
             {"id": "health_score", "label": "Health Score", "url": "/dashboard/health-score", "icon": "♥"},
             {"id": "mobile", "label": "Vantav Mobile", "url": "/dashboard/mobile", "icon": "☎"},
             {"id": "monitoring", "label": "Monitoring", "url": "/dashboard/monitoring", "icon": "◈"},
