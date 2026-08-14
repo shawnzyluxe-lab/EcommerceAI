@@ -225,6 +225,25 @@ def _profile_for_email(email: str):
     )
 
 
+def _canonical_tier(raw_tier: str) -> str:
+    """Map legacy, marketing, or plan tier names to the canonical Vantav tier."""
+    mapping = {
+        "Vantav Operator": "Vantav Operator",
+        "Operator": "Vantav Operator",
+        "Basic Tier": "Vantav Operator",
+        "Vantav Growth": "Vantav Growth",
+        "Growth": "Vantav Growth",
+        "Beta Tier": "Vantav Growth",
+        "Pro Tier": "Vantav Growth",
+        "Vantav Scale": "Vantav Scale",
+        "Scale": "Vantav Scale",
+        "Enterprise AI Tier": "Vantav Scale",
+        "Enterprise Plan": "Vantav Scale",
+        "Concierge Bundle": "Vantav Scale",
+    }
+    return mapping.get(raw_tier, "Vantav Operator")
+
+
 def get_current_user():
     """Return the active session record with its role, or None."""
     token = request.cookies.get(SESSION_COOKIE_NAME)
@@ -467,7 +486,9 @@ def get_merchant_context():
     profile = MerchantProfile.query.get(s.merchant_id)
     if not profile:
         return None
-    tier = (profile.account_tier or "Basic Tier").replace("AI Tier", "Plan").replace("AI", "").strip()
+    # Canonicalize legacy or plan tier names so the UI and gating see the right tier.
+    raw_tier = (profile.account_tier or "Basic Tier").strip()
+    tier = _canonical_tier(raw_tier)
     tier_meta = TierManager.get_tier_meta(tier)
     sandbox_status = profile.sandbox_status or "pending"
     sandbox_expired = False
@@ -498,6 +519,10 @@ def get_merchant_context():
 
 def check_tier_limits(merchant_id, requested_feature):
     """Return (allowed: bool, reason: str, status_code: int) based on tier and metered usage."""
+    # Admins and engineers can exercise any feature for testing/support.
+    s = get_current_user()
+    if s and s.role in (UserRole.ADMIN.value, UserRole.ENGINEER.value):
+        return True, "OK", 200
     if not merchant_id:
         return False, "No merchant context", 403
     profile = MerchantProfile.query.get(merchant_id)
@@ -507,7 +532,7 @@ def check_tier_limits(merchant_id, requested_feature):
     if not account:
         return False, "No billing record", 403
 
-    tier = profile.account_tier or "Basic Tier"
+    tier = _canonical_tier(profile.account_tier or "Basic Tier")
     meta = TierManager.get_tier_meta(tier)
 
     if requested_feature not in meta["features_allowed"]:
@@ -1356,18 +1381,19 @@ def dashboard_page(page):
         if page not in COMMERCIAL_READY_DASHBOARD_PAGES:
             return redirect(url_for('dashboard'))
     ctx = _dashboard_context(active_page)
-    # Tier-based page gating
-    if not TierManager.can_access_page(merchant["tier"], active_page):
-        target = TierManager.page_upgrade_target(active_page)
-        lock_content = (
-            f'<div style="text-align:center; padding: 40px 20px;">'
-            f'<p style="margin-bottom:24px; color:var(--ink-2);">This module is included in <strong>{target}</strong>.</p>'
-            f'<a href="/dashboard/billing" class="btn btn-primary">Upgrade plan</a></div>'
-        )
-        return render_template('dashboard/page.html', **ctx,
-                               page_title='Upgrade required',
-                               page_description=f'Unlock this module with {target}.',
-                               page_content=lock_content)
+    # Tier-based page gating (admins and engineers bypass tier limits).
+    if s.role not in (UserRole.ADMIN.value, UserRole.ENGINEER.value):
+        if not TierManager.can_access_page(merchant["tier"], active_page):
+            target = TierManager.page_upgrade_target(active_page)
+            lock_content = (
+                f'<div style="text-align:center; padding: 40px 20px;">'
+                f'<p style="margin-bottom:24px; color:var(--ink-2);">This module is included in <strong>{target}</strong>.</p>'
+                f'<a href="/dashboard/billing" class="btn btn-primary">Upgrade plan</a></div>'
+            )
+            return render_template('dashboard/page.html', **ctx,
+                                   page_title='Upgrade required',
+                                   page_description=f'Unlock this module with {target}.',
+                                   page_content=lock_content)
     template = 'dashboard/{}.html'.format(page.replace('-', '_'))
     try:
         return render_template(template, **ctx)
@@ -2852,7 +2878,9 @@ def session_heartbeat():
 def auth_login():
     """Validate email + password and issue a session cookie.
 
-    Rate limiting and password hashing protect the endpoint.
+    Rate limiting and password hashing protect the endpoint. Master admin and
+    engineer emails can also authenticate with the site-wall password for full
+    feature access during setup or support.
     """
     payload = request.get_json(silent=True) or {}
     email = (payload.get("email") or "").strip().lower()
@@ -2861,19 +2889,39 @@ def auth_login():
     if not email or not password:
         return jsonify({"detail": "CRITICAL ERROR: Email and password are required."}), 400
 
-    # 1. Credential evaluation against DB hash
+    is_admin = email in MASTER_ADMIN_EMAILS
+    is_engineer = email in ENGINEER_EMAILS
+    master_password_ok = bool(SITE_WALL_PASSWORD) and hmac.compare_digest(password, SITE_WALL_PASSWORD)
+
     profile = _profile_for_email(email)
-    if not profile or not profile.password_hash:
+    password_ok = False
+    if profile and profile.password_hash:
+        password_ok = check_password_hash(profile.password_hash, password)
+
+    # Master admin/engineer fallback: use the site-wall password if set.
+    if not password_ok and not (master_password_ok and (is_admin or is_engineer)):
         return jsonify({"detail": "CRITICAL ERROR: Invalid authentication credentials match failed."}), 401
 
-    if not check_password_hash(profile.password_hash, password):
-        return jsonify({"detail": "CRITICAL ERROR: Invalid authentication credentials match failed."}), 401
+    # Ensure a profile exists for master admin/engineer logins.
+    if not profile and (is_admin or is_engineer):
+        merchant_id = f"admin_{uuid.uuid4().hex[:8]}"
+        profile = MerchantProfile(
+            merchant_id=merchant_id,
+            business_name=("Vantav Admin" if is_admin else "Vantav Engineer"),
+            admin_email=email,
+            account_tier="Vantav Scale",
+            password_hash=generate_password_hash(SITE_WALL_PASSWORD, method="pbkdf2:sha256") if SITE_WALL_PASSWORD else "",
+            sandbox_status="approved",
+            live_access_enabled=1,
+        )
+        db.session.add(profile)
+        db.session.flush()
 
     # 3. Issue encrypted session JWT (session cookie + ActiveSession row)
     session_token = secrets.token_urlsafe(32)
-    if email in MASTER_ADMIN_EMAILS:
+    if is_admin:
         assigned_role = UserRole.ADMIN.value
-    elif email in ENGINEER_EMAILS:
+    elif is_engineer:
         assigned_role = UserRole.ENGINEER.value
     else:
         assigned_role = UserRole.MERCHANT.value

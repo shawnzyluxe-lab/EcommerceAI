@@ -179,8 +179,15 @@ TIER_LIMITS: Dict[str, Dict[str, Any]] = {
 
 TIER_ORDER = {
     "Basic Tier": 0,
+    "Operator": 1,
     "Vantav Operator": 1,
+    "Beta Tier": 2,
+    "Pro Tier": 2,
+    "Growth": 2,
     "Vantav Growth": 2,
+    "Scale": 3,
+    "Enterprise AI Tier": 3,
+    "Enterprise Plan": 3,
     "Vantav Scale": 3,
     "Concierge Bundle": 3,
 }
