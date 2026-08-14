@@ -9,7 +9,7 @@ from werkzeug.security import generate_password_hash
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from app import app
-from models import db, MerchantProfile, SaaSBilling, BusinessMemory, WorkspaceSeat, Product
+from models import db, MerchantProfile, SaaSBilling, BusinessMemory, WorkspaceSeat, Product, BusinessMetric
 
 MERCHANT_ID = os.environ.get("MERCHANT_ID", "merchant_shawn_01")
 EMAIL = os.environ.get("MERCHANT_EMAIL", "local@vantavcommerce.com")
@@ -64,6 +64,15 @@ def seed():
                 unit_cost=35.0,
                 on_hand=500,
                 reorder_point=50,
+            ))
+
+        if not BusinessMetric.query.filter_by(merchant_id=MERCHANT_ID).first():
+            db.session.add(BusinessMetric(
+                merchant_id=MERCHANT_ID,
+                total_unified_balance=20560.00,
+                true_net_profit=1394.00,
+                gross_revenue=4582.00,
+                ai_briefing="Local test baseline.",
             ))
 
         db.session.commit()

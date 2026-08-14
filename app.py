@@ -128,6 +128,8 @@ if DATABASE_URL.startswith("postgresql://"):
     DATABASE_URL = "postgresql+psycopg" + DATABASE_URL[len("postgresql"):]
 app.config["SQLALCHEMY_DATABASE_URI"] = DATABASE_URL
 app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
+if DATABASE_URL.startswith("sqlite"):
+    app.config["SQLALCHEMY_ENGINE_OPTIONS"] = {"connect_args": {"check_same_thread": False}}
 
 LIMITER_STORAGE_URI = os.environ.get("LIMITER_STORAGE_URI", "memory://")
 limiter = Limiter(
