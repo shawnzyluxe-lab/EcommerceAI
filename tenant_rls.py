@@ -23,7 +23,10 @@ def set_tenant_scope(merchant_id: Optional[str]) -> None:
     if not raw_url or raw_url.startswith("sqlite"):
         return
     value = merchant_id or ""
-    db.session.execute(text("SET LOCAL app.current_merchant_id = :mid"), {"mid": value})
+    db.session.execute(
+        text("SELECT set_config('app.current_merchant_id', :mid, true)"),
+        {"mid": value},
+    )
 
 
 def reset_tenant_scope() -> None:
@@ -31,7 +34,9 @@ def reset_tenant_scope() -> None:
     raw_url = os.environ.get("DATABASE_URL", "")
     if not raw_url or raw_url.startswith("sqlite"):
         return
-    db.session.execute(text("RESET LOCAL app.current_merchant_id"))
+    db.session.execute(
+        text("SELECT set_config('app.current_merchant_id', '', true)")
+    )
 
 
 @contextmanager

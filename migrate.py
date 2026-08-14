@@ -332,42 +332,26 @@ def run_migrations():
                 f"GRANT SELECT, INSERT, UPDATE, DELETE ON {rls_table} TO vanta_saas_app_user",
             )
 
-        _run(
-            "rls.policy.merchant_profiles",
-            """
-            CREATE POLICY IF NOT EXISTS merchant_isolation_policy ON merchant_profiles
-                FOR ALL
-                TO vanta_saas_app_user
-                USING (merchant_id = NULLIF(current_setting('app.current_merchant_id', true), ''))
-            """,
-        )
-        _run(
-            "rls.policy.business_memory",
-            """
-            CREATE POLICY IF NOT EXISTS business_memory_isolation_policy ON business_memory
-                FOR ALL
-                TO vanta_saas_app_user
-                USING (merchant_id = NULLIF(current_setting('app.current_merchant_id', true), ''))
-            """,
-        )
-        _run(
-            "rls.policy.products",
-            """
-            CREATE POLICY IF NOT EXISTS products_isolation_policy ON products
-                FOR ALL
-                TO vanta_saas_app_user
-                USING (merchant_id = NULLIF(current_setting('app.current_merchant_id', true), ''))
-            """,
-        )
-        _run(
-            "rls.policy.orders",
-            """
-            CREATE POLICY IF NOT EXISTS orders_isolation_policy ON orders
-                FOR ALL
-                TO vanta_saas_app_user
-                USING (merchant_id = NULLIF(current_setting('app.current_merchant_id', true), ''))
-            """,
-        )
+        for table_name in ["merchant_profiles", "business_memory", "products", "orders"]:
+            policy_name = f"{table_name}_isolation_policy"
+            _run(
+                f"rls.policy.{table_name}",
+                f"""
+                DO $$
+                BEGIN
+                    IF NOT EXISTS (
+                        SELECT 1 FROM pg_policies
+                        WHERE schemaname = 'public' AND tablename = '{table_name}' AND policyname = '{policy_name}'
+                    ) THEN
+                        CREATE POLICY {policy_name} ON {table_name}
+                            FOR ALL
+                            TO vanta_saas_app_user
+                            USING (merchant_id = NULLIF(current_setting('app.current_merchant_id', true), ''));
+                    END IF;
+                END
+                $$
+                """,
+            )
 
 
 if __name__ == "__main__":
