@@ -214,6 +214,27 @@ def run_migrations():
             "CREATE INDEX IF NOT EXISTS idx_affiliate_creators ON shop_affiliates(merchant_id, creator_uid)",
         )
 
+        _run(
+            "generated_marketing_assets table",
+            """
+            CREATE TABLE IF NOT EXISTS generated_marketing_assets (
+                id VARCHAR(36) PRIMARY KEY,
+                merchant_id VARCHAR(100) NOT NULL,
+                sku VARCHAR(100) NOT NULL,
+                asset_id VARCHAR(50) NOT NULL UNIQUE,
+                kind VARCHAR(50) NOT NULL,
+                copy_payload JSONB DEFAULT '{}',
+                state VARCHAR(50) NOT NULL DEFAULT 'draft',
+                created_at TIMESTAMP DEFAULT NOW(),
+                updated_at TIMESTAMP DEFAULT NOW()
+            )
+            """,
+        )
+        _run(
+            "generated_marketing_assets.index",
+            "CREATE INDEX IF NOT EXISTS idx_marketing_assets_merchant ON generated_marketing_assets(merchant_id, state)",
+        )
+
 
 if __name__ == "__main__":
     run_migrations()

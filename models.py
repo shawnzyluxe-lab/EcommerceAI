@@ -560,3 +560,17 @@ class ShopAffiliate(db.Model):
     last_active_at = db.Column(db.DateTime, server_default=db.func.now(), onupdate=db.func.now())
     created_at = db.Column(db.DateTime, server_default=db.func.now())
     __table_args__ = (db.Index("idx_affiliate_creators", "merchant_id", "creator_uid"),)
+
+
+class GeneratedMarketingAsset(db.Model):
+    __tablename__ = "generated_marketing_assets"
+    id = db.Column(db.String(36), primary_key=True, default=_uuid)
+    merchant_id = db.Column(db.String(100), db.ForeignKey("merchant_profiles.merchant_id"), nullable=False, index=True)
+    sku = db.Column(db.String(100), nullable=False, index=True)
+    asset_id = db.Column(db.String(50), nullable=False, unique=True)
+    kind = db.Column(db.String(50), nullable=False)  # tiktok_description, sms_blast, email_sequence
+    copy_payload = db.Column(db.JSON, nullable=False, default=dict)
+    state = db.Column(db.String(50), nullable=False, default="draft")  # draft, approved, rejected, sent
+    created_at = db.Column(db.DateTime, server_default=db.func.now())
+    updated_at = db.Column(db.DateTime, server_default=db.func.now(), onupdate=db.func.now())
+    __table_args__ = (db.Index("idx_marketing_assets_merchant", "merchant_id", "state"),)

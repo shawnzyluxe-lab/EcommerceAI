@@ -72,6 +72,7 @@ import outbound
 import monitoring as monitoring_module
 import tiktok_studio
 import tiktok_marketing_studio
+import marketing_studio as marketing_studio_module
 import assistant_engine
 import startup_pack
 import sandbox_demo
@@ -2193,6 +2194,64 @@ def api_admin_tiktok_creative_refresh(merchant_id):
         return jsonify({"status": "ok", "merchant_id": merchant_id, **result}), 200
     except Exception as e:
         logger.error(f"[Admin TikTok Creative Refresh] Failed for {merchant_id}: {e}")
+        return jsonify({"detail": str(e)}), 400
+
+
+@app.route('/api/admin/marketing/generate/<merchant_id>', methods=['POST'])
+@require_roles([UserRole.ADMIN, UserRole.MERCHANT])
+def api_admin_generate_marketing_assets(merchant_id):
+    """Generate and persist marketing asset drafts for a product."""
+    data = request.get_json() or {}
+    sku = data.get("sku", "")
+    viral_velocity_score = int(data.get("viral_velocity_score", 0) or 0)
+    target_demographic = data.get("target_demographic", "Gen Z")
+    if not sku:
+        return jsonify({"detail": "sku is required"}), 400
+    try:
+        ctx = marketing_studio_module.VantavMarketingStudio.build_context_from_product(
+            merchant_id, sku, viral_velocity_score, target_demographic
+        )
+        if not ctx:
+            return jsonify({"detail": "Product not found"}), 404
+        profile = MerchantProfile.query.filter_by(merchant_id=merchant_id).first()
+        store_url = getattr(profile, "brand_url", None) if profile else None
+        drafts = marketing_studio_module.VantavMarketingStudio.generate_viral_campaign_drafts(
+            ctx, merchant_id=merchant_id, store_url=store_url
+        )
+        return jsonify({"status": "ok", "merchant_id": merchant_id, "assets": [d.dict() for d in drafts]}), 200
+    except Exception as e:
+        logger.error(f"[Marketing Studio] Failed for {merchant_id}: {e}")
+        return jsonify({"detail": str(e)}), 400
+
+
+@app.route('/api/admin/marketing/drafts/<merchant_id>', methods=['GET'])
+@require_roles([UserRole.ADMIN, UserRole.MERCHANT])
+def api_admin_list_marketing_drafts(merchant_id):
+    """List generated marketing asset drafts for a merchant."""
+    state = request.args.get("state")
+    try:
+        drafts = marketing_studio_module.VantavMarketingStudio.list_drafts(merchant_id, state)
+        return jsonify({"status": "ok", "merchant_id": merchant_id, "drafts": drafts}), 200
+    except Exception as e:
+        logger.error(f"[Marketing Studio] Failed listing drafts for {merchant_id}: {e}")
+        return jsonify({"detail": str(e)}), 400
+
+
+@app.route('/api/admin/marketing/drafts/<asset_id>/state', methods=['POST'])
+@require_roles([UserRole.ADMIN, UserRole.MERCHANT])
+def api_admin_update_marketing_draft_state(asset_id):
+    """Update a marketing asset state (approve, reject, sent)."""
+    data = request.get_json() or {}
+    new_state = data.get("state", "")
+    if not new_state:
+        return jsonify({"detail": "state is required"}), 400
+    try:
+        result = marketing_studio_module.VantavMarketingStudio.update_asset_state(asset_id, new_state)
+        if not result:
+            return jsonify({"detail": "Asset not found"}), 404
+        return jsonify({"status": "ok", **result}), 200
+    except Exception as e:
+        logger.error(f"[Marketing Studio] Failed updating asset {asset_id}: {e}")
         return jsonify({"detail": str(e)}), 400
 
 
