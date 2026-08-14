@@ -1,18 +1,5 @@
 {% extends 'dashboard/base.html' %}
 {% block title %}Overview — {{ brand.name }} {{ brand.product }}{% endblock %}
-{% block head %}
-<link rel="stylesheet" href="{{ url_for('static', filename='ai-assistant/assets/index.css') }}">
-<style>
-.assistant-embedded {
-  height: 420px;
-  border-radius: 12px;
-  overflow: hidden;
-  border: 1px solid var(--line);
-  margin-top: 22px;
-}
-.assistant-embedded #root { height: 100%; }
-</style>
-{% endblock %}
 {% block content %}
 
 <section class="page-header" style="margin-bottom: 8px;">
@@ -185,9 +172,14 @@
   <div style="font-size: .85rem; color: var(--ink-3); margin-top: 6px;">Vantav is watching.</div>
 </div>
 
-<!-- AI Assistant embedded chat -->
-<div class="assistant-embedded">
-  <div id="root"></div>
+<!-- AI operator banner -->
+<div class="ai-banner">
+  <div class="ai-avatar">🤖</div>
+  <div style="flex: 1;">
+    <div style="font-weight: 700; color: var(--ink); font-size: .95rem;">Vantav is your AI operations layer.</div>
+    <div style="font-size: .82rem; color: var(--ink-2); margin-top: 3px;">We monitor. We analyze. We recommend. You approve. We execute.</div>
+  </div>
+  <a href="/dashboard/commerce-hub" class="btn btn-primary" style="flex: none;">Connect More Channels</a>
 </div>
 
 <!-- Channel true-profit comparison -->
@@ -328,8 +320,4 @@ async function dismissHeroAction(actionId) {
   }
 })();
 </script>
-{% endblock %}
-
-{% block scripts %}
-<script type="module" src="{{ url_for('static', filename='ai-assistant/assets/index.js') }}"></script>
 {% endblock %}
