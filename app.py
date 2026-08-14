@@ -193,11 +193,15 @@ RECAPTCHA_VERIFY_URL = "https://www.google.com/recaptcha/api/siteverify"
 SESSION_COOKIE_NAME = "vantav_session_token"
 # Aegis-style idle timeout: default 5 minutes (300 seconds) so sessions do not stay
 # open for hours when the browser is left unattended.
-AEGIS_SESSION_TIMEOUT_SECONDS = int(os.environ.get("AEGIS_SESSION_TIMEOUT_SECONDS", "300"))
+_aegis_timeout_env = os.environ.get("AEGIS_SESSION_TIMEOUT_SECONDS")
+AEGIS_SESSION_TIMEOUT_SECONDS = int(_aegis_timeout_env or "300")
 SESSION_TIMEOUT_DAYS = int(os.environ.get("SESSION_TIMEOUT_DAYS", "7"))
-SESSION_IDLE_TIMEOUT_MINUTES = int(
-    os.environ.get("SESSION_IDLE_TIMEOUT_MINUTES", str(AEGIS_SESSION_TIMEOUT_SECONDS // 60))
-)
+# AEGIS_SESSION_TIMEOUT_SECONDS takes precedence over the older
+# SESSION_IDLE_TIMEOUT_MINUTES env var when explicitly set.
+if _aegis_timeout_env:
+    SESSION_IDLE_TIMEOUT_MINUTES = AEGIS_SESSION_TIMEOUT_SECONDS // 60
+else:
+    SESSION_IDLE_TIMEOUT_MINUTES = int(os.environ.get("SESSION_IDLE_TIMEOUT_MINUTES", "30"))
 SESSION_MAX_AGE_HOURS = int(os.environ.get("SESSION_MAX_AGE_HOURS", "12"))
 
 # Production detection drives the Secure cookie flag exactly like Aegis.
