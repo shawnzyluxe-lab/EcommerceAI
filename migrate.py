@@ -5,7 +5,9 @@ from sqlalchemy import create_engine, text
 
 
 def run_migrations():
-    raw_url = os.environ.get("DATABASE_URL")
+    # Use an admin/owner connection for DDL when available so the app can run
+    # with a separate, RLS-restricted application role.
+    raw_url = os.environ.get("DATABASE_URL_ADMIN") or os.environ.get("DATABASE_URL")
     if not raw_url:
         print("DATABASE_URL not set; skipping migrations.")
         return
@@ -21,9 +23,9 @@ def run_migrations():
 
     engine = create_engine(url)
     with engine.connect().execution_options(isolation_level="AUTOCOMMIT") as conn:
-        def _run(label, stmt):
+        def _run(label, stmt, params=None):
             try:
-                conn.execute(text(stmt))
+                conn.execute(text(stmt), params or {})
                 print(f"[migrate] {label}: ok")
             except Exception as e:
                 print(f"[migrate] {label}: {e}")
@@ -320,6 +322,36 @@ def run_migrations():
             END
             $$
             """,
+        )
+
+        # If a password is configured for the restricted app role, ensure it is set.
+        rls_password = os.environ.get("RLS_APP_USER_PASSWORD")
+        if rls_password:
+            _run(
+                "rls.set_password",
+                "ALTER ROLE vanta_saas_app_user WITH PASSWORD :pw",
+                {"pw": rls_password},
+            )
+
+        # Grant the restricted app role the privileges it needs for runtime queries.
+        # Existing per-table grants are broadened to all tables/sequences and defaults.
+        _run("rls.grant.connect", "GRANT CONNECT ON DATABASE current_database() TO vanta_saas_app_user")
+        _run("rls.grant.usage_schema", "GRANT USAGE ON SCHEMA public TO vanta_saas_app_user")
+        _run(
+            "rls.grant.all_tables",
+            "GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public TO vanta_saas_app_user",
+        )
+        _run(
+            "rls.grant.all_sequences",
+            "GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA public TO vanta_saas_app_user",
+        )
+        _run(
+            "rls.default_privs.tables",
+            "ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT SELECT, INSERT, UPDATE, DELETE ON TABLES TO vanta_saas_app_user",
+        )
+        _run(
+            "rls.default_privs.sequences",
+            "ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT USAGE, SELECT ON SEQUENCES TO vanta_saas_app_user",
         )
 
         for rls_table in ["merchant_profiles", "business_memory", "products", "orders"]:
