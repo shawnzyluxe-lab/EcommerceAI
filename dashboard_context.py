@@ -210,15 +210,14 @@ def _ai_greeting(merchant_id: Optional[str], merchant: Optional[Dict[str, Any]] 
 # Commercial-ready feature gating: merchants only see the pages that are live and
 # backed by real data. Admins and engineers can still see every page so development
 # and internal demos can continue.
+# Beta launch scope: overview, profit engine, alerts, billing, settings, and the
+# regression chart. All other sidebar pages are hidden from merchant nav.
 COMMERCIAL_READY_PAGE_IDS = {
     "overview",
-    "command_center",
     "alerts",
-    "action_gate",
     "profit_engine",
     "regression_chart",
     "billing",
-    "commerce_hub",
     "settings",
 }
 

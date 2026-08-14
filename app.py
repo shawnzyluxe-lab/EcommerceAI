@@ -73,6 +73,7 @@ import amazon_sync
 import outbound
 import monitoring as monitoring_module
 import profit_regression
+import seed_regression_sku
 import tiktok_studio
 import tiktok_marketing_studio
 import marketing_studio as marketing_studio_module
@@ -196,9 +197,10 @@ SESSION_MAX_AGE_HOURS = int(os.environ.get("SESSION_MAX_AGE_HOURS", "12"))
 
 # Commercial-ready dashboard pages. Merchants can only reach these pages; admins and
 # engineers can still access every page in valid_pages for development.
+# Beta launch scope: overview, profit engine, alerts, billing, settings, and the
+# regression chart. All other sidebar pages are hidden from merchant nav.
 COMMERCIAL_READY_DASHBOARD_PAGES = {
-    "overview", "command_center", "alerts", "action_gate", "profit_engine",
-    "billing", "commerce_hub", "settings",
+    "overview", "alerts", "profit_engine", "billing", "settings",
 }
 
 from tier_manager import TierManager, TIER_LIMITS, PLAN_TO_TIER
@@ -2403,6 +2405,20 @@ def admin_provision_demo():
         "live_access": True,
         "sandbox_status": "approved",
     }), 200
+
+
+@app.route('/api/admin/seed-regression-demo/<merchant_id>', methods=['POST'])
+@require_roles([UserRole.ADMIN])
+def api_admin_seed_regression_demo(merchant_id):
+    """Backfill 14 days of realistic revenue and cost data for the regression demo SKU."""
+    try:
+        sku = request.args.get('sku', 'SKU-404-PODS')
+        days = int(request.args.get('days', 14))
+        result = seed_regression_sku.seed_sku_for_regression(merchant_id, sku=sku, days=days)
+        return jsonify(result), 200
+    except Exception as e:
+        logger.error(f"[Seed Regression Demo] {merchant_id}: {e}")
+        return jsonify({"detail": str(e)}), 500
 
 
 @app.route('/admin/merchants')
