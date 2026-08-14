@@ -203,7 +203,7 @@ SESSION_MAX_AGE_HOURS = int(os.environ.get("SESSION_MAX_AGE_HOURS", "12"))
 # Production detection drives the Secure cookie flag exactly like Aegis.
 IS_PRODUCTION = (
     os.environ.get("AEGIS_ENV", "development") == "production"
-    or os.environ.get("RENDER", "0") == "1"
+    or os.environ.get("RENDER", "").lower() == "true"
 )
 
 app.config.update(
