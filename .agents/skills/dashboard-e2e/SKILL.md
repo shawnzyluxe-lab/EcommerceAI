@@ -87,3 +87,10 @@ xrandr --output VNC-0 --mode 1600x1200
 - `POST /api/actions/<id>/approve` executes the action and moves it to the **Recent Decisions** table.
 - `POST /api/actions/<id>/verify` returns `before_metrics`/`after_metrics`; note that `action_gate.action_to_dict` currently omits `verification_report` and `verified_at`, so the Action Gate UI does not surface the verification text.
 - To make POST API calls visible in a recording, inject a temporary DOM overlay from `browser_console` and display the JSON response before navigating away.
+
+## Regression chart CSP
+
+- `/regression-chart?sku=SKU-404-PODS` loads Chart.js from `https://cdn.jsdelivr.net/npm/chart.js`.
+- The CSP `script-src` in `monitoring.py` must include `https://cdn.jsdelivr.net`; otherwise the canvas stays blank even though the API returns the DEGRADED text.
+- To test the chart end-to-end locally, run the app with a CSP middleware that allows the CDN or temporarily patch `monitoring.py` during testing only.
+- Use `seed_regression_sku.py` (or a temporary deterministic seed) to populate `SKU-404-PODS` data for the target merchant; `sqlite:///shawnzyluxe.db` resolves to `instance/shawnzyluxe.db` in this repo.

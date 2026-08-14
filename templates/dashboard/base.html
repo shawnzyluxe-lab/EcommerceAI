@@ -255,7 +255,20 @@
         document.getElementById('ai-hero-detail').textContent = hero.detail || '';
         const evList = document.getElementById('ai-hero-evidence');
         evList.innerHTML = '';
-        (hero.evidence || []).forEach(e => {
+        // evidence can be an array of strings or an object from action_to_dict
+        let bullets = [];
+        const evidence = hero.evidence || {};
+        if (Array.isArray(evidence)) {
+          bullets = evidence;
+        } else {
+          if (evidence.confidence_score) bullets.push('Confidence: ' + evidence.confidence_score + '%');
+          if (evidence.reasoning_summary) bullets.push('Why: ' + evidence.reasoning_summary);
+          if (evidence.expected_weekly_impact_min != null && evidence.expected_weekly_impact_max != null) {
+            bullets.push('Expected impact: $' + evidence.expected_weekly_impact_min + '-' + evidence.expected_weekly_impact_max + '/week');
+          }
+          if (evidence.execution_report) bullets.push(evidence.execution_report);
+        }
+        bullets.forEach(e => {
           const li = document.createElement('li'); li.textContent = e; evList.appendChild(li);
         });
         heroCard.style.display='block';
