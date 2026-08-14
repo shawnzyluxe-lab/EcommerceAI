@@ -428,8 +428,24 @@ class BusinessMemory(db.Model):
         "out_of_stock_buffer_days": 5,
     })
 
+    # Seat allocation and Stripe billing indices
+    max_authorized_seats = db.Column(db.Integer, nullable=False, default=1)
+    current_active_seats = db.Column(db.Integer, nullable=False, default=1)
+    stripe_customer_id = db.Column(db.String(255), nullable=True)
+    stripe_subscription_id = db.Column(db.String(255), nullable=True)
+
     updated_at = db.Column(db.DateTime, server_default=db.func.now(), onupdate=db.func.now())
     created_at = db.Column(db.DateTime, server_default=db.func.now())
+
+
+class WorkspaceSeat(db.Model):
+    __tablename__ = "merchant_workspace_seats"
+    id = db.Column(db.String(36), primary_key=True, default=_uuid)
+    merchant_id = db.Column(db.String(100), db.ForeignKey("merchant_profiles.merchant_id", ondelete="CASCADE"), nullable=False, index=True)
+    user_email = db.Column(db.String(255), nullable=False)
+    role = db.Column(db.String(50), nullable=False, default="merchant")  # admin, engineer, merchant
+    created_at = db.Column(db.DateTime, server_default=db.func.now())
+    __table_args__ = (db.UniqueConstraint("merchant_id", "user_email", name="unique_merchant_email"),)
 
 
 class ActionEvidence(db.Model):

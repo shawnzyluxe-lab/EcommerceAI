@@ -235,6 +235,32 @@ def run_migrations():
             "CREATE INDEX IF NOT EXISTS idx_marketing_assets_merchant ON generated_marketing_assets(merchant_id, state)",
         )
 
+        for col, typ in [
+            ("max_authorized_seats", "INTEGER NOT NULL DEFAULT 1"),
+            ("current_active_seats", "INTEGER NOT NULL DEFAULT 1"),
+            ("stripe_customer_id", "VARCHAR(255)"),
+            ("stripe_subscription_id", "VARCHAR(255)"),
+        ]:
+            _run(f"business_memory.{col}", f"ALTER TABLE business_memory ADD COLUMN IF NOT EXISTS {col} {typ}")
+
+        _run(
+            "merchant_workspace_seats table",
+            """
+            CREATE TABLE IF NOT EXISTS merchant_workspace_seats (
+                id VARCHAR(36) PRIMARY KEY,
+                merchant_id VARCHAR(100) NOT NULL,
+                user_email VARCHAR(255) NOT NULL,
+                role VARCHAR(50) NOT NULL DEFAULT 'merchant',
+                created_at TIMESTAMP DEFAULT NOW(),
+                UNIQUE (merchant_id, user_email)
+            )
+            """,
+        )
+        _run(
+            "merchant_workspace_seats.index",
+            "CREATE INDEX IF NOT EXISTS idx_workspace_seats ON merchant_workspace_seats(merchant_id, user_email)",
+        )
+
 
 if __name__ == "__main__":
     run_migrations()

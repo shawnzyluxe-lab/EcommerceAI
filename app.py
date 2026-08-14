@@ -54,7 +54,7 @@ if SENTRY_DSN:
     except Exception as e:
         print(f"[SENTRY] Init failed: {e}")
 
-from models import db, Tenant, ConnectedChannel, ActiveSession, BusinessMetric, CommerceChannel, MerchantChannel, SupportMetric, MarketingStudio, PredictiveLogistics, OutboundTransmission, SaaSBilling, LocalProductCatalog, MerchantProfile, TenantOAuthToken, MerchantMetric, SystemExceptionLog, ProcessedWebhookEvent, AdSpendAnalytic, GeneratedPurchaseOrder, AIAgent, AgentMessage, MerchantDecisionLog, MagicLoginToken, TrendingProduct, ProductFinancialLedger, MerchantSetting, ProfitFeedOrder, AdSpendFeed, Alert, BetaWaitlistApplication, PendingAction, StartupPackProject, BusinessMemory
+from models import db, Tenant, ConnectedChannel, ActiveSession, BusinessMetric, CommerceChannel, MerchantChannel, SupportMetric, MarketingStudio, PredictiveLogistics, OutboundTransmission, SaaSBilling, LocalProductCatalog, MerchantProfile, TenantOAuthToken, MerchantMetric, SystemExceptionLog, ProcessedWebhookEvent, AdSpendAnalytic, GeneratedPurchaseOrder, AIAgent, AgentMessage, MerchantDecisionLog, MagicLoginToken, TrendingProduct, ProductFinancialLedger, MerchantSetting, ProfitFeedOrder, AdSpendFeed, Alert, BetaWaitlistApplication, PendingAction, StartupPackProject, BusinessMemory, WorkspaceSeat
 import profit_feed
 import billing as billing_module
 import alert_matrix
@@ -462,6 +462,29 @@ def site_wall_authenticated(refresh=True):
         s.last_seen = now
         db.session.commit()
     return True
+
+
+def verify_workspace_seat_allowance(merchant_id: str, new_user_email: Optional[str] = None) -> bool:
+    """Block new workspace members if the merchant has no open seat allocations."""
+    memory = BusinessMemory.query.filter_by(merchant_id=merchant_id).first()
+    max_seats = memory.max_authorized_seats if memory else 1
+    active_seats = WorkspaceSeat.query.filter_by(merchant_id=merchant_id).count()
+    if active_seats >= max_seats:
+        raise ValueError(
+            f"Workspace Allocation Error: Your subscription tier is capped at {max_seats} seats. "
+            "Upgrade your billing tier to authorize additional users."
+        )
+    return True
+
+
+def sync_workspace_seat_count(merchant_id: str) -> int:
+    """Recalculate and persist the current active seat count for a merchant."""
+    memory = BusinessMemory.query.filter_by(merchant_id=merchant_id).first()
+    if not memory:
+        return 0
+    memory.current_active_seats = WorkspaceSeat.query.filter_by(merchant_id=merchant_id).count()
+    db.session.commit()
+    return memory.current_active_seats
 
 
 def get_merchant_context():
@@ -3108,9 +3131,19 @@ def auth_signup():
             gross_revenue=0.0,
             ai_briefing="System initialized. Complete onboarding to activate multi-channel engine.",
         ))
+        db.session.flush()
+
+        # Initialize seat allocation for the workspace owner.
+        tier_meta = TierManager.get_tier_meta(tier)
+        memory = BusinessMemory(merchant_id=merchant_id)
+        memory.max_authorized_seats = int(tier_meta.get("max_users", 1))
+        memory.current_active_seats = 1
+        db.session.add(memory)
+        db.session.add(WorkspaceSeat(merchant_id=merchant_id, user_email=email, role="admin"))
         db.session.commit()
     except Exception as e:
         logger.error(f"[SIGNUP] Failed to provision {email}: {e}")
+        db.session.rollback()
         return jsonify({"detail": "Tenant provisioning failed. Please retry."}), 500
 
     # 4. Issue session cookie
@@ -3185,9 +3218,18 @@ def auth_provision_node():
             gross_revenue=0.0,
             ai_briefing=f"Provisioned {role} account. Activate multi-channel engine.",
         ))
+        db.session.flush()
+
+        tier_meta = TierManager.get_tier_meta(tier)
+        memory = BusinessMemory(merchant_id=merchant_id)
+        memory.max_authorized_seats = int(tier_meta.get("max_users", 1))
+        memory.current_active_seats = 1
+        db.session.add(memory)
+        db.session.add(WorkspaceSeat(merchant_id=merchant_id, user_email=email, role=role.lower() if role in ("ADMIN", "ENGINEER", "MERCHANT") else "merchant"))
         db.session.commit()
     except Exception as e:
         logger.error(f"[PROVISION] Failed to provision {email}: {e}")
+        db.session.rollback()
         return jsonify({"detail": "Tenant provisioning failed. Please retry."}), 500
 
     return jsonify({
@@ -3196,6 +3238,51 @@ def auth_provision_node():
         "assigned_role": role,
         "allocated_volume_allowance": TierManager.get_order_limit(tier),
         "tenant_id": merchant_id,
+    }), 201
+
+
+@app.route('/api/v1/workspace/invite', methods=['POST'])
+@require_roles([UserRole.ADMIN, UserRole.MERCHANT])
+def api_workspace_invite():
+    """Invite a new user to the merchant workspace, enforcing the seat cap."""
+    merchant = get_merchant_context()
+    if not merchant:
+        return jsonify({"detail": "No merchant context"}), 403
+    merchant_id = merchant["id"]
+
+    data = request.get_json(silent=True) or {}
+    email = (data.get("email") or "").strip().lower()
+    role = (data.get("role") or "merchant").strip().lower()
+    if not email:
+        return jsonify({"detail": "email is required"}), 400
+    if role not in ("admin", "engineer", "merchant"):
+        return jsonify({"detail": "Invalid role. Use admin, engineer, or merchant."}), 400
+
+    try:
+        verify_workspace_seat_allowance(merchant_id, email)
+    except ValueError as e:
+        return jsonify({"detail": str(e)}), 422
+
+    existing = WorkspaceSeat.query.filter_by(merchant_id=merchant_id, user_email=email).first()
+    if existing:
+        return jsonify({"detail": "User is already a workspace member."}), 409
+
+    try:
+        seat = WorkspaceSeat(merchant_id=merchant_id, user_email=email, role=role)
+        db.session.add(seat)
+        db.session.commit()
+        sync_workspace_seat_count(merchant_id)
+    except Exception as e:
+        db.session.rollback()
+        logger.error(f"[Workspace Invite] Failed to invite {email} to {merchant_id}: {e}")
+        return jsonify({"detail": "Invite failed."}), 500
+
+    return jsonify({
+        "status": "invited",
+        "email": email,
+        "role": role,
+        "merchant_id": merchant_id,
+        "seats_used": WorkspaceSeat.query.filter_by(merchant_id=merchant_id).count(),
     }), 201
 
 
@@ -3807,7 +3894,7 @@ def amazon_orders_webhook():
 
 @app.route('/api/v1/webhooks/stripe-billing', methods=['POST'])
 def stripe_billing_webhook():
-    """Verify and process Stripe checkout/subscription events to upgrade merchant tier live."""
+    """Verify and process Stripe checkout/subscription events to upgrade merchant tier and seats live."""
     sig_header = request.headers.get("Stripe-Signature")
     if not sig_header:
         logger.warning("Dropped Stripe frame: missing signature.")
@@ -3821,9 +3908,11 @@ def stripe_billing_webhook():
         if event_type in ("checkout.session.completed", "customer.subscription.updated"):
             session_obj = event.get("data", {}).get("object", {})
             stripe_cust_id = session_obj.get("customer")
+            stripe_sub_id = session_obj.get("id") or session_obj.get("subscription")
             metadata = session_obj.get("metadata", {})
             merchant_target = metadata.get("merchant_id", "merchant_shawn_01")
-            chosen_tier = metadata.get("selected_tier", "Vantav Operator")
+            chosen_tier = metadata.get("selected_tier") or metadata.get("plan_tier_key") or "Vantav Operator"
+            chosen_tier = _canonical_tier(chosen_tier)
             concierge_bundle = metadata.get("concierge_bundle") == "true"
 
             profile = MerchantProfile.query.get(merchant_target)
@@ -3839,18 +3928,24 @@ def stripe_billing_webhook():
                 db.session.add(saas_billing)
             saas_billing.current_plan = chosen_tier
             saas_billing.stripe_customer_id = stripe_cust_id
+            saas_billing.stripe_subscription_id = stripe_sub_id
             current_addons = set(saas_billing.add_ons or [])
             if concierge_bundle:
                 current_addons.add("concierge_bundle")
             else:
                 current_addons.discard("concierge_bundle")
             saas_billing.add_ons = list(current_addons)
-            # Persist the subscription ID if available.
-            subscription_id = session_obj.get("subscription")
-            if subscription_id:
-                saas_billing.stripe_subscription_item_id = subscription_id
+
+            # Sync seat limits and Stripe indices into business memory.
+            memory = action_gate.get_business_memory(merchant_target)
+            tier_meta = TierManager.get_tier_meta(chosen_tier)
+            memory.max_authorized_seats = int(tier_meta.get("max_users", 1))
+            memory.current_active_seats = WorkspaceSeat.query.filter_by(merchant_id=merchant_target).count() or 1
+            memory.stripe_customer_id = stripe_cust_id
+            memory.stripe_subscription_id = stripe_sub_id
+
             db.session.commit()
-            logger.info(f"[Stripe Pipeline] Merchant {merchant_target} upgraded to {chosen_tier}; concierge={concierge_bundle}")
+            logger.info(f"[Stripe Pipeline] Merchant {merchant_target} upgraded to {chosen_tier}; seats={memory.max_authorized_seats}; concierge={concierge_bundle}")
             return jsonify({"status": "tier_synchronized"}), 200
 
         if event_type == "customer.subscription.deleted":
@@ -3863,6 +3958,9 @@ def stripe_billing_webhook():
                     if profile:
                         profile.account_tier = "Basic Tier"
                     saas_billing.current_plan = "Basic Tier"
+                    memory = BusinessMemory.query.filter_by(merchant_id=saas_billing.merchant_id).first()
+                    if memory:
+                        memory.max_authorized_seats = 0
                     db.session.commit()
             return jsonify({"status": "subscription_cancelled"}), 200
 
