@@ -1,0 +1,68 @@
+version: '3.8'
+
+services:
+  vanta_postgres_db:
+    image: postgres:15-alpine
+    container_name: vanta_postgres_db
+    environment:
+      POSTGRES_USER: vantav
+      POSTGRES_PASSWORD: vantav_local
+      POSTGRES_DB: vantav_db
+    volumes:
+      - vanta_postgres_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    networks:
+      - vanta_network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U vantav -d vantav_db"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  vanta_saas_frontend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: vanta_saas_frontend
+    command: ["gunicorn", "-k", "eventlet", "-w", "1", "-b", "0.0.0.0:8000", "app:app"]
+    environment:
+      - APP_ENV=local
+      - DATABASE_URL=postgresql+psycopg://vantav:vantav_local@vanta_postgres_db:5432/vantav_db
+      - SECRET_KEY=local-dev-secret-change-in-production
+      - STRIPE_WEBHOOK_SECRET=whsec_test_secret
+      - SITE_WALL_PASSWORD=${SITE_WALL_PASSWORD:-}
+    ports:
+      - "8000:8000"
+    depends_on:
+      vanta_postgres_db:
+        condition: service_healthy
+    networks:
+      - vanta_network
+    restart: unless-stopped
+
+  vanta_coo_engine:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: vanta_coo_engine
+    command: ["python", "scripts/coo_engine_worker.py"]
+    environment:
+      - APP_ENV=local
+      - DATABASE_URL=postgresql+psycopg://vantav:vantav_local@vanta_postgres_db:5432/vantav_db
+      - SECRET_KEY=local-dev-secret-change-in-production
+      - COO_ENGINE_INTERVAL=60
+    depends_on:
+      vanta_postgres_db:
+        condition: service_healthy
+    networks:
+      - vanta_network
+    restart: unless-stopped
+
+networks:
+  vanta_network:
+    driver: bridge
+
+volumes:
+  vanta_postgres_data:
+    driver: local
