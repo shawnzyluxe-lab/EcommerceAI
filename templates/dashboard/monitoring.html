@@ -65,10 +65,11 @@
 <script>
 async function loadMetrics() {
   try {
+    const pollHeaders = { 'X-Session-Refresh': 'false' };
     const [metrics, health, alerts] = await Promise.all([
-      fetch('/api/v1/monitoring/metrics').then(r => r.json()),
-      fetch('/api/v1/monitoring/health').then(r => r.json()),
-      fetch('/api/v1/monitoring/alerts').then(r => r.json())
+      fetch('/api/v1/monitoring/metrics', { headers: pollHeaders }).then(r => r.json()),
+      fetch('/api/v1/monitoring/health', { headers: pollHeaders }).then(r => r.json()),
+      fetch('/api/v1/monitoring/alerts', { headers: pollHeaders }).then(r => r.json())
     ]);
 
     document.getElementById('req-rate').textContent = metrics.requests_per_minute ?? '—';

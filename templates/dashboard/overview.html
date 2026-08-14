@@ -315,12 +315,18 @@ async function dismissHeroAction(actionId) {
   }
 }
 
-// Show the personalized AI greeting once per session
+// Show the personalized AI greeting once per browser session (flag is cleared on login).
 (function(){
   const banner = document.getElementById('ai-greeting');
-  if (banner && !sessionStorage.getItem('vantav_greeting_shown')) {
+  if (!banner) return;
+  try {
+    if (!sessionStorage.getItem('vantav_greeting_shown')) {
+      banner.style.display = 'flex';
+      sessionStorage.setItem('vantav_greeting_shown', '1');
+    }
+  } catch (e) {
+    // sessionStorage may be disabled in some contexts; show the banner anyway.
     banner.style.display = 'flex';
-    sessionStorage.setItem('vantav_greeting_shown', '1');
   }
 })();
 </script>

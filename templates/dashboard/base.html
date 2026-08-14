@@ -125,7 +125,7 @@
     (function keepAlive() {
       setInterval(async () => {
         try {
-          const res = await fetch('/api/session/heartbeat', { method: 'POST', credentials: 'same-origin' });
+          const res = await fetch('/api/session/heartbeat', { method: 'POST', credentials: 'same-origin', headers: { 'X-Session-Refresh': 'false' } });
           if (res.status === 401) {
             window.location.href = '/login?error=session_expired';
           }

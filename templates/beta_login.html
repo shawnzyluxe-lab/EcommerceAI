@@ -176,6 +176,9 @@
   <script>
     const recaptchaSiteKey = "{{ recaptcha_site_key }}";
 
+    // Reset the dashboard AI greeting so it displays again after this login.
+    try { sessionStorage.removeItem('vantav_greeting_shown'); } catch (e) {}
+
     (function handleQueryMessages() {
       const params = new URLSearchParams(window.location.search);
       const err = params.get('error');

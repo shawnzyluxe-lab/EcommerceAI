@@ -257,7 +257,7 @@ async function syncChannel(platform) {
 
 async function loadChannels() {
   try {
-    const res = await fetch('/api/v1/channels');
+    const res = await fetch('/api/v1/channels', { headers: { 'X-Session-Refresh': 'false' } });
     if (!res.ok) return;
     const data = await res.json();
     renderChannels(data.channels);

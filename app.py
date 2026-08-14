@@ -191,7 +191,7 @@ RECAPTCHA_SECRET_KEY = os.environ.get("RECAPTCHA_SECRET_KEY", "")
 RECAPTCHA_VERIFY_URL = "https://www.google.com/recaptcha/api/siteverify"
 SESSION_COOKIE_NAME = "vantav_session_token"
 SESSION_TIMEOUT_DAYS = int(os.environ.get("SESSION_TIMEOUT_DAYS", "7"))
-SESSION_IDLE_TIMEOUT_MINUTES = int(os.environ.get("SESSION_IDLE_TIMEOUT_MINUTES", "120"))
+SESSION_IDLE_TIMEOUT_MINUTES = int(os.environ.get("SESSION_IDLE_TIMEOUT_MINUTES", "30"))
 SESSION_MAX_AGE_HOURS = int(os.environ.get("SESSION_MAX_AGE_HOURS", "12"))
 
 # Commercial-ready dashboard pages. Merchants can only reach these pages; admins and
@@ -261,15 +261,20 @@ def get_current_user():
     if not s:
         return None
     now = datetime.utcnow()
-    if s.created_at < now - timedelta(days=SESSION_TIMEOUT_DAYS):
+    # Enforce absolute and idle session lifetime.
+    max_age = min(timedelta(days=SESSION_TIMEOUT_DAYS), timedelta(hours=SESSION_MAX_AGE_HOURS))
+    if s.created_at < now - max_age:
+        db.session.delete(s)
+        db.session.commit()
         return None
     if s.last_seen and s.last_seen < now - timedelta(minutes=SESSION_IDLE_TIMEOUT_MINUTES):
         db.session.delete(s)
         db.session.commit()
         return None
-    # Refresh idle timestamp on every authenticated request.
-    s.last_seen = now
-    db.session.commit()
+    # Background polls can opt out of bumping the idle window.
+    if request.headers.get('X-Session-Refresh') != 'false':
+        s.last_seen = now
+        db.session.commit()
     return s
 
 
@@ -462,7 +467,8 @@ def site_wall_authenticated(refresh=True):
         db.session.delete(s)
         db.session.commit()
         return False
-    if refresh:
+    # Background polls can opt out of bumping the idle window.
+    if refresh and request.headers.get('X-Session-Refresh') != 'false':
         # Bump the idle timestamp on real user activity, but do not issue a
         # persistent cookie; the session cookie is cleared when the browser closes.
         s.last_seen = now
@@ -503,7 +509,8 @@ def get_merchant_context():
     if not s or not s.merchant_id:
         return None
     # Enforce absolute and idle session lifetime for merchant sessions.
-    if s.created_at < now - timedelta(days=SESSION_TIMEOUT_DAYS):
+    max_age = min(timedelta(days=SESSION_TIMEOUT_DAYS), timedelta(hours=SESSION_MAX_AGE_HOURS))
+    if s.created_at < now - max_age:
         db.session.delete(s)
         db.session.commit()
         return None
@@ -511,9 +518,10 @@ def get_merchant_context():
         db.session.delete(s)
         db.session.commit()
         return None
-    # Keep the session alive while the merchant is active.
-    s.last_seen = now
-    db.session.commit()
+    # Background polls can opt out of bumping the idle window.
+    if request.headers.get('X-Session-Refresh') != 'false':
+        s.last_seen = now
+        db.session.commit()
     # Bind the database session to this tenant for RLS when using the restricted app role.
     tenant_rls.set_tenant_scope(s.merchant_id)
     profile = MerchantProfile.query.get(s.merchant_id)
