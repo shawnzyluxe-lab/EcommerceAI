@@ -39,6 +39,9 @@ class ChannelTelemetrySnapshot(BaseModel):
     refunds_filed_count: int
     on_hand_inventory: int
     competitor_median_price: float
+    carrier: Optional[str] = None
+    origin_region: Optional[str] = None
+    destination_region: Optional[str] = None
 
 
 class EvaluatedActionDraft(BaseModel):
@@ -73,28 +76,95 @@ class FinanceAgent:
         }
 
 
+class CarrierRouteDelayMetrics(BaseModel):
+    """Historical carrier delivery performance for a single route."""
+
+    carrier_name: str
+    origin_region: str
+    destination_region: str
+    historical_average_delay_days: float
+    recent_transit_failure_rate: float  # 0.0 - 1.0
+
+
 class LogisticsAgent:
     """Agent tracking supply velocity, stock exhaustion horizons, and vendor anomalies."""
+
+    def __init__(self, carrier_database: Optional[List[CarrierRouteDelayMetrics]] = None):
+        self.carrier_database = carrier_database or []
+
+    def find_route_risk(self, carrier: str, origin: str, dest: str) -> float:
+        """Return the historical average delay for a carrier/origin/destination route."""
+        for route in self.carrier_database:
+            if route.carrier_name == carrier and route.origin_region == origin:
+                return route.historical_average_delay_days
+        return 0.0
+
+    def recalculate_procurement_runway(
+        self,
+        base_lead_days: int,
+        carrier: str,
+        origin: str,
+        dest: str,
+        sales_velocity: float,
+    ) -> Dict:
+        """Dynamically adjust reorder points based on carrier delay risk."""
+        historical_delay = self.find_route_risk(carrier, origin, dest)
+
+        safety_buffer_days = 2
+        if any(
+            r.recent_transit_failure_rate >= 0.15
+            for r in self.carrier_database
+            if r.carrier_name == carrier
+        ):
+            safety_buffer_days += 4
+
+        adjusted_lead_time_days = base_lead_days + historical_delay + safety_buffer_days
+        revised_reorder_trigger_units = int(sales_velocity * adjusted_lead_time_days)
+
+        return {
+            "calculated_delay_lag": historical_delay,
+            "allocated_safety_buffer": safety_buffer_days,
+            "total_adjusted_lead_days": adjusted_lead_time_days,
+            "dynamic_reorder_point_units": revised_reorder_trigger_units,
+        }
 
     def inspect_runway(self, data: ChannelTelemetrySnapshot, lead_days: int = 12) -> Dict:
         velocity = max(0.5, data.units_sold_24h)
         days_runway = data.on_hand_inventory / velocity
 
-        return {
+        result = {
             "days_runway": round(days_runway, 2),
             "is_critical_stockout": days_runway <= 5,
             "requires_replenishment": days_runway <= lead_days,
             "recommended_order_qty": int(velocity * 30),
         }
 
+        # If carrier routing data is supplied, layer in delay-aware reorder math.
+        if data.carrier and data.origin_region:
+            runway = self.recalculate_procurement_runway(
+                base_lead_days=lead_days,
+                carrier=data.carrier,
+                origin=data.origin_region,
+                dest=data.destination_region or "",
+                sales_velocity=velocity,
+            )
+            result.update(runway)
+            result["dynamic_reorder_point"] = runway["dynamic_reorder_point_units"]
+
+        return result
+
 
 class AICOOController:
     """Synthesizes telemetry from specialist agents and drafts validated actions."""
 
-    def __init__(self, constraints: BusinessConstraints):
+    def __init__(
+        self,
+        constraints: BusinessConstraints,
+        carrier_database: Optional[List[CarrierRouteDelayMetrics]] = None,
+    ):
         self.constraints = constraints
         self.finance_dept = FinanceAgent()
-        self.logistics_dept = LogisticsAgent()
+        self.logistics_dept = LogisticsAgent(carrier_database=carrier_database)
 
     def run_autonomous_diagnostic(self, matrix: List[ChannelTelemetrySnapshot]) -> List[EvaluatedActionDraft]:
         staged_actions: List[EvaluatedActionDraft] = []
@@ -140,8 +210,12 @@ class AICOOController:
                         payload={
                             "sku": telemetry.sku,
                             "channel": telemetry.channel,
-                            "suggested_units": log["recommended_order_qty"],
-                            "estimated_capital_overhead": round(log["recommended_order_qty"] * telemetry.cogs_unit, 2),
+                            "suggested_units": log.get("dynamic_reorder_point_units") or log["recommended_order_qty"],
+                            "estimated_capital_overhead": round(
+                                (log.get("dynamic_reorder_point_units") or log["recommended_order_qty"]) * telemetry.cogs_unit, 2
+                            ),
+                            "carrier_delay_lag_days": log.get("calculated_delay_lag", 0.0),
+                            "safety_buffer_days": log.get("allocated_safety_buffer", 2),
                         },
                         evidence={
                             "confidence_score": 94,

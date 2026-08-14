@@ -308,6 +308,67 @@ def run_migrations():
             "CREATE INDEX IF NOT EXISTS idx_secure_credentials ON secure_channel_credentials(integration_link_id)",
         )
 
+        # Row-level security (RLS) for multi-tenant isolation
+        _run(
+            "rls.app_role",
+            """
+            DO $$
+            BEGIN
+                IF NOT EXISTS (SELECT FROM pg_roles WHERE rolname = 'vanta_saas_app_user') THEN
+                    CREATE ROLE vanta_saas_app_user NOINHERIT LOGIN;
+                END IF;
+            END
+            $$
+            """,
+        )
+
+        for rls_table in ["merchant_profiles", "business_memory", "products", "orders"]:
+            _run(
+                f"rls.enable.{rls_table}",
+                f"ALTER TABLE {rls_table} ENABLE ROW LEVEL SECURITY",
+            )
+            _run(
+                f"rls.grant.{rls_table}",
+                f"GRANT SELECT, INSERT, UPDATE, DELETE ON {rls_table} TO vanta_saas_app_user",
+            )
+
+        _run(
+            "rls.policy.merchant_profiles",
+            """
+            CREATE POLICY IF NOT EXISTS merchant_isolation_policy ON merchant_profiles
+                FOR ALL
+                TO vanta_saas_app_user
+                USING (merchant_id = NULLIF(current_setting('app.current_merchant_id', true), ''))
+            """,
+        )
+        _run(
+            "rls.policy.business_memory",
+            """
+            CREATE POLICY IF NOT EXISTS business_memory_isolation_policy ON business_memory
+                FOR ALL
+                TO vanta_saas_app_user
+                USING (merchant_id = NULLIF(current_setting('app.current_merchant_id', true), ''))
+            """,
+        )
+        _run(
+            "rls.policy.products",
+            """
+            CREATE POLICY IF NOT EXISTS products_isolation_policy ON products
+                FOR ALL
+                TO vanta_saas_app_user
+                USING (merchant_id = NULLIF(current_setting('app.current_merchant_id', true), ''))
+            """,
+        )
+        _run(
+            "rls.policy.orders",
+            """
+            CREATE POLICY IF NOT EXISTS orders_isolation_policy ON orders
+                FOR ALL
+                TO vanta_saas_app_user
+                USING (merchant_id = NULLIF(current_setting('app.current_merchant_id', true), ''))
+            """,
+        )
+
 
 if __name__ == "__main__":
     run_migrations()

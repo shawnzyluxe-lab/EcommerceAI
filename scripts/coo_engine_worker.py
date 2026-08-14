@@ -16,6 +16,7 @@ import time
 from app import app
 from models import db, MerchantProfile
 from action_gate import refresh_actions, verify_executed_actions
+import tenant_rls
 
 logger = logging.getLogger("vantav_coo_engine")
 logging.basicConfig(level=os.environ.get("LOG_LEVEL", "INFO").upper())
@@ -26,6 +27,7 @@ INTERVAL_SECONDS = int(os.environ.get("COO_ENGINE_INTERVAL", "60"))
 def run_coo_cycle() -> None:
     merchants = db.session.query(MerchantProfile.merchant_id).all()
     for (merchant_id,) in merchants:
+        tenant_rls.set_tenant_scope(merchant_id)
         try:
             refresh_actions(merchant_id)
             logger.info(f"[COO Engine] Refreshed actions for {merchant_id}")

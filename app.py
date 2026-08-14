@@ -61,6 +61,7 @@ import alert_matrix
 import vetted_operator
 import action_gate
 import channel_auth
+import tenant_rls
 import rules_engine
 import forecaster
 import channel_analytics
@@ -512,6 +513,8 @@ def get_merchant_context():
     # Keep the session alive while the merchant is active.
     s.last_seen = now
     db.session.commit()
+    # Bind the database session to this tenant for RLS when using the restricted app role.
+    tenant_rls.set_tenant_scope(s.merchant_id)
     profile = MerchantProfile.query.get(s.merchant_id)
     if not profile:
         return None
@@ -3618,6 +3621,7 @@ def shopify_orders_webhook():
         hmac_header = request.headers.get("X-Shopify-Hmac-SHA256")
         event_id = request.headers.get("X-Shopify-Webhook-Id")
         merchant_target = request.args.get("merchant_id", "merchant_shawn_01")
+        tenant_rls.set_tenant_scope(merchant_target)
 
         if SHOPIFY_WEBHOOK_SECRET:
             if not hmac_header:
@@ -3787,6 +3791,7 @@ def tiktok_orders_webhook():
     """Ingest TikTok Shop order events into the isolated merchant channel."""
     event_id = request.headers.get("X-Tiktok-Event-Id") or request.headers.get("X-TikTok-Event-Id")
     merchant_target = request.args.get("merchant_id", "merchant_shawn_01")
+    tenant_rls.set_tenant_scope(merchant_target)
     blocked = enforce_tier_limits(merchant_target, "tiktok")
     if blocked:
         return blocked
@@ -3841,6 +3846,7 @@ def amazon_orders_webhook():
     """Ingest Amazon Seller Central order events into the isolated merchant channel."""
     event_id = request.headers.get("X-Amazon-Sqs-Message-Id")
     merchant_target = request.args.get("merchant_id", "merchant_shawn_01")
+    tenant_rls.set_tenant_scope(merchant_target)
     blocked = enforce_tier_limits(merchant_target, "amazon")
     if blocked:
         return blocked
