@@ -215,6 +215,7 @@ TIER_PAGE_ACCESS = {
     "alerts": "Vantav Operator",
     "action_gate": "Vantav Operator",
     "profit_engine": "Vantav Operator",
+    "regression_chart": "Vantav Operator",
     "billing": "Vantav Operator",
     "commerce_hub": "Vantav Operator",
     "command_center": "Vantav Growth",

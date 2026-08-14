@@ -5,6 +5,7 @@ profit points and translates a structurally degraded trend into a corrective
 draft action for the Action Gate.
 """
 
+import datetime
 import math
 from datetime import date, timedelta
 from decimal import Decimal
@@ -177,6 +178,9 @@ def build_waterfall_dataset(
         day = row.order_date
         if day is None:
             continue
+        if isinstance(day, str):
+            day = datetime.date.fromisoformat(day)
+
         revenue_by_date[day] = _to_float(row.revenue)
         cogs_by_date[day] = _to_float(row.cogs)
 
@@ -204,6 +208,61 @@ def analyze_sku(
     if len(dataset) < 3:
         return None
     return VantaMathematicalRegressionEngine.calculate_linear_regression(sku, dataset)
+
+
+def analyze_sku_chart(
+    merchant_id: str, sku: str, lookback_days: int = 30, projection_days: int = 7
+) -> Optional[Dict]:
+    """Run the OLS regression engine and return chart-ready historical + trend data."""
+    dataset = build_waterfall_dataset(merchant_id, sku, lookback_days=lookback_days)
+    if len(dataset) < 3:
+        return None
+    report = VantaMathematicalRegressionEngine.calculate_linear_regression(sku, dataset)
+
+    historical = sorted(
+        [
+            {
+                "days_ago": p.days_ago,
+                "label": _days_ago_label(p.days_ago),
+                "gross_revenue": round(p.gross_revenue, 2),
+                "net_profit": round(p.net_profit, 2),
+            }
+            for p in dataset
+        ],
+        key=lambda d: d["days_ago"],
+        reverse=True,
+    )
+
+    # Extend trend line from the oldest observation into the future.
+    min_days_ago = max(p["days_ago"] for p in historical)
+    max_future = -projection_days
+    trend = []
+    for days_ago in range(min_days_ago, max_future - 1, -1):
+        x = float(-days_ago)
+        predicted = report.slope_rate_of_change * x + report.intercept_baseline
+        trend.append(
+            {
+                "days_ago": days_ago,
+                "label": _days_ago_label(days_ago),
+                "predicted_net_profit": round(max(predicted, 0.0) if days_ago >= 0 else predicted, 2),
+            }
+        )
+
+    return {
+        **report.model_dump(),
+        "historical_points": historical,
+        "trend_line": trend,
+    }
+
+
+def _days_ago_label(days_ago: int) -> str:
+    if days_ago == 0:
+        return "Today"
+    if days_ago == 1:
+        return "Yesterday"
+    if days_ago < 0:
+        return f"{-days_ago}d Projection"
+    return f"{days_ago} Days Ago"
 
 
 def check_regression_and_stage_action(

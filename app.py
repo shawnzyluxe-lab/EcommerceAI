@@ -72,6 +72,7 @@ import tiktok_sync
 import amazon_sync
 import outbound
 import monitoring as monitoring_module
+import profit_regression
 import tiktok_studio
 import tiktok_marketing_studio
 import marketing_studio as marketing_studio_module
@@ -2687,6 +2688,39 @@ def api_coo_diagnostic():
     except Exception as e:
         logger.error(f"[COO Mesh] Diagnostic failed: {e}")
         return jsonify({"detail": str(e)}), 500
+
+
+@app.route('/api/v1/analytics/profit-regression', methods=['GET'])
+@require_roles([UserRole.ADMIN, UserRole.MERCHANT, UserRole.ENGINEER])
+def api_profit_regression():
+    """Return OLS regression analysis and chart-ready data for a SKU."""
+    merchant = get_merchant_context()
+    if not merchant:
+        return jsonify({"error": "No merchant context"}), 403
+    sku = request.args.get("sku", "").strip()
+    lookback_days = int(request.args.get("lookback_days", 30) or 30)
+    if not sku:
+        return jsonify({"error": "sku is required"}), 400
+    try:
+        result = profit_regression.analyze_sku_chart(
+            merchant["id"], sku, lookback_days=lookback_days
+        )
+        if not result:
+            return jsonify({"error": "Insufficient data for regression"}), 404
+        return jsonify(result), 200
+    except Exception as e:
+        logger.error(f"[Profit Regression] API failed: {e}")
+        return jsonify({"detail": str(e)}), 500
+
+
+@app.route('/regression-chart')
+@require_roles([UserRole.ADMIN, UserRole.MERCHANT, UserRole.ENGINEER])
+def regression_chart_view():
+    """Standalone regression chart view."""
+    merchant = get_merchant_context()
+    if not merchant:
+        return redirect(url_for('login'))
+    return render_template('regression-chart-view.html', merchant=merchant)
 
 
 @app.route('/api/v1/assistant/thread', methods=['DELETE'])
