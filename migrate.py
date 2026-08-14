@@ -353,6 +353,29 @@ def run_migrations():
                 """,
             )
 
+        # High-performance indexes for the True Profit Engine and AI COO Regression Engine
+        _run(
+            "idx.daily_costs.sku_date",
+            "CREATE INDEX IF NOT EXISTS idx_daily_costs_sku_date ON daily_costs (sku, log_date DESC)",
+        )
+        _run(
+            "idx.daily_costs.covering_metrics",
+            "CREATE INDEX IF NOT EXISTS idx_daily_costs_covering_metrics ON daily_costs (sku, log_date) INCLUDE (ad_spend, ship_cost, fee, refund)",
+        )
+        _run(
+            "idx.order_items.composite_lookup",
+            "CREATE INDEX IF NOT EXISTS idx_order_items_composite_lookup ON order_items (order_id, sku) INCLUDE (qty, unit_cost)",
+        )
+        _run(
+            "idx.orders.partial_fraud_exceptions",
+            "CREATE INDEX IF NOT EXISTS idx_orders_partial_fraud_exceptions ON orders (fraud_score DESC, created_at DESC) WHERE status = 'pending' AND fraud_score >= 75",
+        )
+
+        # Refresh PostgreSQL planner statistics after schema/index changes
+        _run("analyze.daily_costs", "ANALYZE daily_costs")
+        _run("analyze.order_items", "ANALYZE order_items")
+        _run("analyze.orders", "ANALYZE orders")
+
 
 if __name__ == "__main__":
     run_migrations()
