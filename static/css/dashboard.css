@@ -307,7 +307,7 @@ td.num { text-align: right; font-variant-numeric: tabular-nums; }
 /* ---------- workflow overview ---------- */
 .workflow-pillars {
   display: grid;
-  grid-template-columns: 1fr 44px 1fr 44px 1fr;
+  grid-template-columns: 1fr 1fr 1fr;
   gap: 16px;
   align-items: stretch;
 }
