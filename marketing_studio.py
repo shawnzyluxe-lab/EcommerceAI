@@ -3,6 +3,10 @@
 Generates TikTok Shop descriptions, SMS hooks, and email-sequence payloads
 and stores them in `generated_marketing_assets` with state='draft' until a
 merchant or admin approves them.
+
+All discount-bearing copy is gated on the SKU's true margin computed from
+order revenue, COGS, and daily cost records so the engine never advertises
+an unprofitable discount.
 """
 
 import datetime
@@ -11,7 +15,7 @@ from typing import Dict, List, Optional
 
 from pydantic import BaseModel
 
-from models import db, GeneratedMarketingAsset, Product, MerchantProfile
+from models import db, GeneratedMarketingAsset, Product, MerchantProfile, OrderItem, UnifiedOrder, DailyCost
 
 
 class ProductMarketingContext(BaseModel):
@@ -33,6 +37,49 @@ class GeneratedAssetDraft(BaseModel):
 
 class VantavMarketingStudio:
     """Draft customer-facing marketing assets from product performance signals."""
+
+    @staticmethod
+    def _calculate_true_margin(merchant_id: str, sku: str, days: int = 30) -> float:
+        """Return the SKU's true net margin percentage from recent order and cost data.
+
+        Margin = (revenue - all attributable costs) / revenue * 100.
+        """
+        since = datetime.datetime.utcnow() - datetime.timedelta(days=days)
+
+        items = (
+            db.session.query(OrderItem, UnifiedOrder)
+            .join(UnifiedOrder, OrderItem.order_id == UnifiedOrder.id)
+            .filter(
+                OrderItem.sku == sku,
+                UnifiedOrder.merchant_id == merchant_id,
+                UnifiedOrder.created_at >= since,
+            )
+            .all()
+        )
+
+        revenue = sum(float(i.qty or 0) * float(i.unit_price or 0.0) for i, _ in items)
+        cogs = sum(float(i.qty or 0) * float(i.unit_cost or 0.0) for i, _ in items)
+
+        costs = (
+            db.session.query(
+                db.func.coalesce(db.func.sum(DailyCost.ad_spend), 0.0),
+                db.func.coalesce(db.func.sum(DailyCost.ship_cost), 0.0),
+                db.func.coalesce(db.func.sum(DailyCost.fee), 0.0),
+                db.func.coalesce(db.func.sum(DailyCost.refund), 0.0),
+                db.func.coalesce(db.func.sum(DailyCost.tax), 0.0),
+            )
+            .filter(
+                DailyCost.sku == sku,
+                DailyCost.log_date >= since.date(),
+            )
+            .first()
+        ) or (0.0, 0.0, 0.0, 0.0, 0.0)
+        daily_cost_total = sum(float(c or 0.0) for c in costs)
+
+        total_costs = cogs + daily_cost_total
+        if revenue <= 0:
+            return 0.0
+        return round(((revenue - total_costs) / revenue) * 100.0, 2)
 
     @staticmethod
     def generate_viral_campaign_drafts(
@@ -68,7 +115,7 @@ class VantavMarketingStudio:
                 )
             )
 
-        # 2. RETENTION SMS HOOK
+        # 2. RETENTION SMS HOOK — only when margin safely covers a 15% discount.
         if product.current_margin >= 30.0:
             asset_id = f"MKT_SMS_{uuid.uuid4().hex[:6].upper()}"
             staged_assets.append(
@@ -88,8 +135,8 @@ class VantavMarketingStudio:
                 )
             )
 
-        # 3. EMAIL SEQUENCE
-        if product.viral_velocity_score > 50 or product.current_margin >= 25.0:
+        # 3. EMAIL SEQUENCE — discount-bearing, gated on true margin.
+        if product.current_margin >= 25.0:
             asset_id = f"MKT_EMAIL_{uuid.uuid4().hex[:6].upper()}"
             staged_assets.append(
                 GeneratedAssetDraft(
@@ -177,13 +224,11 @@ class VantavMarketingStudio:
         viral_velocity_score: int = 0,
         target_demographic: str = "Gen Z",
     ) -> Optional[ProductMarketingContext]:
-        """Build a marketing context from the local product catalog."""
+        """Build a marketing context from the local product catalog and true profit data."""
         product = Product.query.filter_by(sku=sku, merchant_id=merchant_id).first()
         if not product:
             return None
-        unit_cost = float(product.unit_cost or 0.0)
-        # Use a placeholder margin if we can't infer price.
-        current_margin = 40.0
+        current_margin = VantavMarketingStudio._calculate_true_margin(merchant_id, sku)
         return ProductMarketingContext(
             sku=product.sku,
             title=product.title,
