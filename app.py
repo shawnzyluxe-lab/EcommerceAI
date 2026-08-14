@@ -191,9 +191,63 @@ RECAPTCHA_SITE_KEY = os.environ.get("RECAPTCHA_SITE_KEY", "")
 RECAPTCHA_SECRET_KEY = os.environ.get("RECAPTCHA_SECRET_KEY", "")
 RECAPTCHA_VERIFY_URL = "https://www.google.com/recaptcha/api/siteverify"
 SESSION_COOKIE_NAME = "vantav_session_token"
+# Aegis-style idle timeout: default 5 minutes (300 seconds) so sessions do not stay
+# open for hours when the browser is left unattended.
+AEGIS_SESSION_TIMEOUT_SECONDS = int(os.environ.get("AEGIS_SESSION_TIMEOUT_SECONDS", "300"))
 SESSION_TIMEOUT_DAYS = int(os.environ.get("SESSION_TIMEOUT_DAYS", "7"))
-SESSION_IDLE_TIMEOUT_MINUTES = int(os.environ.get("SESSION_IDLE_TIMEOUT_MINUTES", "30"))
+SESSION_IDLE_TIMEOUT_MINUTES = int(
+    os.environ.get("SESSION_IDLE_TIMEOUT_MINUTES", str(AEGIS_SESSION_TIMEOUT_SECONDS // 60))
+)
 SESSION_MAX_AGE_HOURS = int(os.environ.get("SESSION_MAX_AGE_HOURS", "12"))
+
+# Production detection drives the Secure cookie flag exactly like Aegis.
+IS_PRODUCTION = (
+    os.environ.get("AEGIS_ENV", "development") == "production"
+    or os.environ.get("RENDER", "0") == "1"
+)
+
+app.config.update(
+    SESSION_COOKIE_NAME=SESSION_COOKIE_NAME,
+    SESSION_COOKIE_SECURE=IS_PRODUCTION,
+    SESSION_COOKIE_HTTPONLY=True,
+    SESSION_COOKIE_SAMESITE="Lax",
+    SESSION_REFRESH_EACH_REQUEST=True,
+)
+
+def _session_cookie_kwargs(secure=None, max_age=None):
+    """Return standard cookie flags for the Vantav session token.
+
+    Mirrors Aegis/Alpha: HttpOnly, SameSite=Lax, Secure in production.
+    """
+    if secure is None:
+        secure = app.config.get("SESSION_COOKIE_SECURE", IS_PRODUCTION)
+    kwargs = {
+        "httponly": app.config.get("SESSION_COOKIE_HTTPONLY", True),
+        "samesite": app.config.get("SESSION_COOKIE_SAMESITE", "Lax"),
+        "secure": secure,
+    }
+    if max_age is not None:
+        kwargs["max_age"] = max_age
+    return kwargs
+
+
+def _set_session_cookie(response, token, max_age=None):
+    """Drop the session token cookie with the Aegis-style flag set."""
+    response.set_cookie(
+        SESSION_COOKIE_NAME,
+        token,
+        **_session_cookie_kwargs(max_age=max_age),
+    )
+    return response
+
+
+def _delete_session_cookie(response):
+    """Clear the session token cookie using the same flags that set it."""
+    response.delete_cookie(
+        SESSION_COOKIE_NAME,
+        **_session_cookie_kwargs(),
+    )
+    return response
 
 # Commercial-ready dashboard pages. Merchants can only reach these pages; admins and
 # engineers can still access every page in valid_pages for development.
@@ -3032,15 +3086,7 @@ def site_login():
             db.session.add(ActiveSession(token=token, merchant_id=None, role="SiteWall", created_at=now, last_seen=now))
             db.session.commit()
             response = redirect(url_for('home'))
-            # Session cookie: cleared when the browser closes so a fresh browser
-            # always lands back at the login wall.
-            response.set_cookie(
-                SESSION_COOKIE_NAME,
-                token,
-                httponly=True,
-                samesite='Lax',
-                secure=app.config.get("SESSION_COOKIE_SECURE", os.environ.get("SESSION_COOKIE_SECURE", "true").lower() == "true"),
-            )
+            _set_session_cookie(response, token)
             return response
         error = True
     return redirect(url_for('login', error=1)) if error else redirect(url_for('login'))
@@ -3053,7 +3099,7 @@ def site_logout():
         ActiveSession.query.filter_by(token=token).delete()
         db.session.commit()
     response = redirect(url_for('home'))
-    response.delete_cookie(SESSION_COOKIE_NAME)
+    _delete_session_cookie(response)
     return response
 
 
@@ -3127,14 +3173,7 @@ def auth_login():
         "role": assigned_role,
         "merchant_id": profile.merchant_id,
     }))
-    # Session cookie: cleared when the browser closes so a new browser requires login.
-    response.set_cookie(
-        SESSION_COOKIE_NAME,
-        session_token,
-        httponly=True,
-        samesite="Lax",
-        secure=app.config.get("SESSION_COOKIE_SECURE", os.environ.get("SESSION_COOKIE_SECURE", "true").lower() == "true"),
-    )
+    _set_session_cookie(response, session_token)
     return response, 200
 
 
@@ -3224,14 +3263,7 @@ def auth_signup():
         "assigned_tier": tier,
         "monthly_order_limit": TierManager.get_order_limit(tier),
     }))
-    # Session cookie: cleared when the browser closes so a new browser requires login.
-    response.set_cookie(
-        SESSION_COOKIE_NAME,
-        session_token,
-        httponly=True,
-        samesite="Lax",
-        secure=app.config.get("SESSION_COOKIE_SECURE", os.environ.get("SESSION_COOKIE_SECURE", "true").lower() == "true"),
-    )
+    _set_session_cookie(response, session_token)
     return response, 201
 
 
@@ -4588,15 +4620,8 @@ def magic_login():
     db.session.add(active)
     db.session.commit()
 
-    # Session cookie: cleared when the browser closes so a new browser requires login.
     response = make_response(redirect("/"))
-    response.set_cookie(
-        SESSION_COOKIE_NAME,
-        session_token,
-        httponly=True,
-        samesite="Lax",
-        secure=app.config.get("SESSION_COOKIE_SECURE", os.environ.get("SESSION_COOKIE_SECURE", "true").lower() == "true"),
-    )
+    _set_session_cookie(response, session_token)
     return response
 
 
