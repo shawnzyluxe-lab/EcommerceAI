@@ -1,0 +1,60 @@
+{% extends 'legal.html' %}
+{% block legal_title %}Security Policy{% endblock %}
+{% block legal_content %}
+<h1>Security Policy</h1>
+<p><strong>Effective date:</strong> August 14, 2026</p>
+<p><strong>Contact:</strong> <a href="mailto:security@vantavcommerce.com">security@vantavcommerce.com</a></p>
+
+<p>This policy describes the security controls Vantav LLC uses to protect the Vantav platform, merchant data, and connected sales channels.</p>
+
+<h2>1. Security Program</h2>
+<p>Vantav LLC maintains a security program that covers:</p>
+<ul>
+  <li>Secure software development and code review.</li>
+  <li>Role-based access control for production systems.</li>
+  <li>Regular dependency and vulnerability review.</li>
+  <li>Incident monitoring through Sentry and application logs.</li>
+  <li>Periodic review of access, secrets, and vendor integrations.</li>
+</ul>
+
+<h2>2. Infrastructure &amp; Network Security</h2>
+<ul>
+  <li>The application is hosted on Render and AWS cloud infrastructure.</li>
+  <li>Network traffic is encrypted with TLS/HTTPS.</li>
+  <li>Internal services and databases are not exposed to the public internet.</li>
+  <li>Each merchant’s data is isolated at the application layer and enforced by PostgreSQL Row-Level Security (RLS).</li>
+  <li>Rate limiting and request throttling protect public endpoints.</li>
+</ul>
+
+<h2>3. Application Security</h2>
+<ul>
+  <li>All merchant credentials are hashed using <code>pbkdf2:sha256</code>.</li>
+  <li>Site-wall and session endpoints use cryptographically random tokens and <code>HttpOnly</code>, <code>Secure</code>, <code>SameSite=Lax</code> cookies.</li>
+  <li>Webhook signatures are verified with HMAC-SHA256 before processing.</li>
+  <li>A Content Security Policy (CSP) mitigates XSS and unauthorized script execution.</li>
+  <li>SQL queries are parameterized through SQLAlchemy to prevent injection.</li>
+  <li>Account tiers and role checks restrict access to admin and engineer endpoints.</li>
+</ul>
+
+<h2>4. Data Protection</h2>
+<ul>
+  <li>Data is encrypted in transit via TLS.</li>
+  <li>Database connections use authenticated, encrypted transport.</li>
+  <li>Merchant channel credentials are stored as secrets and not logged.</li>
+  <li>Data retention follows the published Privacy Policy; merchants may request deletion.</li>
+</ul>
+
+<h2>5. Endpoint Security</h2>
+<ul>
+  <li>Company endpoints use modern operating systems with built-in anti-malware/endpoint protection.</li>
+  <li>Automatic security updates are enabled.</li>
+  <li>Access to production systems is restricted to authorized personnel.</li>
+  <li>Secrets and API keys are managed through a secret store, not committed to source control.</li>
+</ul>
+
+<h2>6. Vulnerability Disclosure</h2>
+<p>If you believe you have found a security issue, please email <a href="mailto:security@vantavcommerce.com">security@vantavcommerce.com</a> with a description and reproduction steps. We will investigate and respond as quickly as possible.</p>
+
+<h2>7. Changes to This Policy</h2>
+<p>We may update this policy as our security practices evolve. The latest version is always available at <a href="https://vantavcommerce.com/security">https://vantavcommerce.com/security</a>.</p>
+{% endblock %}

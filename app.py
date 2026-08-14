@@ -1440,6 +1440,12 @@ def legal_refund():
     return render_template('refund.html')
 
 
+@app.route('/security')
+@limiter.exempt
+def legal_security():
+    return render_template('security.html')
+
+
 @app.route('/dashboard')
 def dashboard():
     merchant = get_merchant_context()
