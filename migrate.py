@@ -327,11 +327,10 @@ def run_migrations():
         # If a password is configured for the restricted app role, ensure it is set.
         rls_password = os.environ.get("RLS_APP_USER_PASSWORD")
         if rls_password:
-            _run(
-                "rls.set_password",
-                "ALTER ROLE vanta_saas_app_user WITH PASSWORD :pw",
-                {"pw": rls_password},
-            )
+            # PostgreSQL ALTER ROLE does not accept parameter placeholders for the
+            # password, so we escape any single quotes and build the literal safely.
+            safe_pw = rls_password.replace("'", "''")
+            _run("rls.set_password", f"ALTER ROLE vanta_saas_app_user WITH PASSWORD '{safe_pw}'")
 
         # Grant the restricted app role the privileges it needs for runtime queries.
         # Existing per-table grants are broadened to all tables/sequences and defaults.
