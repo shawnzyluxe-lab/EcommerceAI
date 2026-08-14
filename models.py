@@ -464,6 +464,7 @@ class Supplier(db.Model):
     id = db.Column(db.String(36), primary_key=True, default=_uuid)
     merchant_id = db.Column(db.String(100), db.ForeignKey("merchant_profiles.merchant_id"), nullable=False, index=True)
     name = db.Column(db.String(255), nullable=False)
+    email = db.Column(db.String(255), nullable=True)
     lead_days = db.Column(db.Integer, nullable=False, default=14)
     defect_rate = db.Column(db.Numeric(5, 4), nullable=False, default=0.0000)
     refund_rate = db.Column(db.Numeric(5, 4), nullable=False, default=0.0000)

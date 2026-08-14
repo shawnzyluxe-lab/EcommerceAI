@@ -162,6 +162,8 @@ def run_migrations():
         ]:
             _run(f"action_evidence.{col}", f"ALTER TABLE action_evidence ADD COLUMN IF NOT EXISTS {col} {typ}")
 
+        _run("suppliers.email", "ALTER TABLE suppliers ADD COLUMN IF NOT EXISTS email VARCHAR(255)")
+
 
 if __name__ == "__main__":
     run_migrations()

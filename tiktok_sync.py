@@ -287,6 +287,64 @@ def get_products(merchant_id: str) -> List[Dict[str, Any]]:
         return []
 
 
+def update_inventory(merchant_id: str, sku: str, quantity: int) -> Dict[str, Any]:
+    """Push an inventory update to TikTok Shop for the matching SKU."""
+    creds = _get_credentials(merchant_id)
+    if not creds or not creds.get("access_token"):
+        return {"status": "skipped", "reason": "TikTok Shop not connected"}
+
+    def _find_product(catalog: List[Dict[str, Any]]) -> Optional[Dict[str, Any]]:
+        for product in catalog:
+            if str(product.get("sku", "")).strip().upper() == sku.upper():
+                return product
+        return None
+
+    catalog = get_products(merchant_id)
+    product = _find_product(catalog)
+    if not product:
+        try:
+            sync_products(merchant_id)
+        except Exception as e:
+            logger.warning(f"[TikTok Sync] Product sync failed for inventory update: {e}")
+        catalog = get_products(merchant_id)
+        product = _find_product(catalog)
+
+    if not product:
+        return {"status": "skipped", "reason": f"SKU {sku} not found in TikTok Shop"}
+
+    sku_id = product.get("variant_id") or product.get("sku_id")
+    product_id = product.get("product_id")
+    if not sku_id or not product_id:
+        return {"status": "skipped", "reason": "TikTok product mapping incomplete"}
+
+    body = {
+        "skus": [
+            {
+                "id": str(sku_id),
+                "inventory": [{"quantity": int(quantity)}],
+            }
+        ]
+    }
+    try:
+        _request(
+            "POST",
+            f"/product/{VERSION}/products/{product_id}/inventory/update",
+            creds,
+            body=body,
+        )
+        return {
+            "status": "ok",
+            "channel": "tiktok",
+            "sku": sku,
+            "quantity": quantity,
+            "product_id": product_id,
+            "sku_id": sku_id,
+        }
+    except Exception as e:
+        logger.warning(f"[TikTok Sync] Inventory update failed for {sku}: {e}")
+        return {"status": "failed", "reason": str(e)}
+
+
 def build_auth_url(
     service_id: str,
     app_key: str,

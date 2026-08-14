@@ -7,11 +7,16 @@ is always created.
 """
 import json
 import logging
+import os
+import smtplib
+from datetime import datetime
+from email.mime.text import MIMEText
+from email.mime.multipart import MIMEMultipart
 from typing import Any, Dict, List, Optional, Tuple
 
 import requests
 
-from models import db, GeneratedPurchaseOrder
+from models import db, GeneratedPurchaseOrder, MerchantProfile, MerchantSetting, OutboundTransmission, Product, Supplier
 import channels as channels_module
 import shopify_sync
 import tiktok_sync
@@ -158,23 +163,13 @@ def shopify_update_price(merchant_id: str, sku: str, price: float) -> Dict[str, 
 
 
 def tiktok_update_inventory(merchant_id: str, sku: str, quantity: int) -> Dict[str, Any]:
-    """Push an inventory update to TikTok Shop if credentials are configured."""
-    creds = tiktok_sync._get_credentials(merchant_id)
-    if not creds or not creds.get("access_token"):
-        return {"status": "skipped", "reason": "TikTok Shop not connected"}
-    # TikTok product update requires product_id/sku_id resolution that we do not
-    # currently cache locally. Log intent and return pending.
-    logger.info(f"[Outbound] TikTok inventory update queued: {sku} -> {quantity}")
-    return {"status": "pending", "channel": "tiktok", "sku": sku, "quantity": quantity}
+    """Push an inventory update to TikTok Shop, resolving SKU to product/sku_id."""
+    return tiktok_sync.update_inventory(merchant_id, sku, quantity)
 
 
 def amazon_update_inventory(merchant_id: str, sku: str, quantity: int) -> Dict[str, Any]:
-    """Push an inventory update to Amazon if SP-API credentials are configured."""
-    creds = amazon_sync._get_credentials(merchant_id)
-    if not creds:
-        return {"status": "skipped", "reason": "Amazon not connected"}
-    logger.info(f"[Outbound] Amazon inventory update queued: {sku} -> {quantity}")
-    return {"status": "pending", "channel": "amazon", "sku": sku, "quantity": quantity}
+    """Push an inventory update to Amazon via SP-API patchListingsItem."""
+    return amazon_sync.update_inventory(merchant_id, sku, quantity)
 
 
 def ad_platform_update_budget(platform: str, merchant_id: str, new_budget: float) -> Dict[str, Any]:
@@ -187,17 +182,186 @@ def ad_platform_update_budget(platform: str, merchant_id: str, new_budget: float
     return {"status": "pending", "channel": platform, "new_budget": new_budget}
 
 
-def send_supplier_po(merchant_id: str, po: GeneratedPurchaseOrder) -> Dict[str, Any]:
-    """Transmit a purchase order to the supplier channel configured for the merchant."""
-    logger.info(
-        f"[Outbound] PO {po.po_reference} queued for merchant {merchant_id}: "
-        f"{po.units_ordered} units of {po.variant_sku}"
+def _resolve_supplier_for_po(
+    merchant_id: str,
+    sku: str,
+    fallback_supplier_name: str = "Supplier",
+) -> Tuple[str, Optional[str]]:
+    """Return the best supplier name and email for a purchase order."""
+    product = Product.query.filter_by(sku=sku, merchant_id=merchant_id).first()
+    if product and product.supplier_id:
+        supplier = Supplier.query.filter_by(id=product.supplier_id, merchant_id=merchant_id).first()
+        if supplier:
+            return (supplier.name or fallback_supplier_name), supplier.email
+
+    setting = MerchantSetting.query.filter_by(merchant_id=merchant_id, setting_key="supplier_email").first()
+    if setting and setting.setting_value:
+        return fallback_supplier_name, setting.setting_value.strip()
+
+    env_email = os.environ.get("SUPPLIER_EMAIL", "")
+    if env_email:
+        return fallback_supplier_name, env_email
+
+    return fallback_supplier_name, None
+
+
+def _log_email(transmission_type: str, recipient: str, status: str, summary: str) -> None:
+    """Persist an outbound email transmission record."""
+    try:
+        db.session.add(OutboundTransmission(
+            transmission_type=transmission_type,
+            recipient_address=recipient,
+            status_chip=status,
+            payload_summary=summary,
+        ))
+        db.session.commit()
+    except Exception:
+        logger.exception("[Outbound] Failed to log email transmission")
+
+
+def _send_email(to: str, subject: str, html_body: str, bcc: Optional[str] = None, text_body: Optional[str] = None) -> bool:
+    """Send a transactional email via Mailgun or SMTP fallback."""
+    mailgun_key = os.environ.get("MAILGUN_API_KEY", "")
+    mailgun_domain = os.environ.get("MAILGUN_DOMAIN", "")
+    recipients = [to] + ([bcc] if bcc else [])
+
+    if mailgun_key and mailgun_domain:
+        try:
+            data = {
+                "from": f"Vantav <postmaster@{mailgun_domain}>",
+                "to": to,
+                "subject": subject,
+                "html": html_body,
+            }
+            if bcc:
+                data["bcc"] = bcc
+            resp = requests.post(
+                f"https://api.mailgun.net/v3/{mailgun_domain}/messages",
+                auth=("api", mailgun_key),
+                data=data,
+                timeout=10,
+            )
+            if resp.status_code == 200:
+                for r in recipients:
+                    _log_email("EMAIL", r, "DELIVERED", subject)
+                return True
+            err = f"Mailgun {resp.status_code}: {resp.text[:500]}"
+            for r in recipients:
+                _log_email("EMAIL", r, "FAILED_ROUTING", err)
+            return False
+        except Exception as e:
+            for r in recipients:
+                _log_email("EMAIL", r, "FAILED_ROUTING", str(e))
+            return False
+
+    smtp_server = os.environ.get("SMTP_SERVER", "smtp.mailgun.org")
+    smtp_port = int(os.environ.get("SMTP_PORT", "587"))
+    smtp_user = os.environ.get("SMTP_USERNAME", "")
+    smtp_pass = os.environ.get("SMTP_PASSWORD", "")
+    if not smtp_user or not smtp_pass:
+        _log_email("EMAIL", to, "NO_CREDENTIALS", "No Mailgun or SMTP credentials configured")
+        return False
+
+    try:
+        msg = MIMEMultipart("alternative")
+        msg["Subject"] = subject
+        msg["From"] = f"Vantav <{smtp_user}>"
+        msg["To"] = to
+        if bcc:
+            msg["Bcc"] = bcc
+        if text_body:
+            msg.attach(MIMEText(text_body, "plain"))
+        msg.attach(MIMEText(html_body, "html"))
+
+        with smtplib.SMTP(smtp_server, smtp_port) as server:
+            server.starttls()
+            server.login(smtp_user, smtp_pass)
+            server.sendmail(smtp_user, recipients, msg.as_string())
+
+        for r in recipients:
+            _log_email("EMAIL", r, "DELIVERED", subject)
+        return True
+    except Exception as e:
+        _log_email("EMAIL", to, "FAILED_ROUTING", str(e))
+        return False
+
+
+def send_supplier_po(
+    merchant_id: str,
+    po: GeneratedPurchaseOrder,
+    supplier_name: Optional[str] = None,
+    supplier_email: Optional[str] = None,
+    lead_days: int = 7,
+) -> Dict[str, Any]:
+    """Transmit a purchase order to the supplier and notify the merchant."""
+    profile = MerchantProfile.query.get(merchant_id)
+    business_name = (profile.business_name or "Your Store") if profile else "Your Store"
+    merchant_email = (profile.admin_email or "") if profile else ""
+
+    resolved_name, resolved_email = _resolve_supplier_for_po(
+        merchant_id, po.variant_sku, fallback_supplier_name=supplier_name or "Supplier"
     )
+    supplier_name = supplier_name or resolved_name or "Supplier"
+    supplier_email = supplier_email or resolved_email
+
+    to_email = supplier_email or merchant_email
+    bcc_email = merchant_email if to_email and to_email != merchant_email else None
+
+    if not to_email:
+        logger.warning(f"[Outbound] No supplier or merchant email for PO {po.po_reference}")
+        return {
+            "status": "pending",
+            "po_reference": po.po_reference,
+            "sku": po.variant_sku,
+            "units": po.units_ordered,
+            "reason": "No email recipient configured",
+        }
+
+    subject = f"Purchase Order {po.po_reference} — {business_name}"
+    text_body = (
+        f"Hi {supplier_name},\n\n"
+        f"Please find a new purchase order from {business_name}:\n\n"
+        f"PO Reference: {po.po_reference}\n"
+        f"SKU: {po.variant_sku}\n"
+        f"Quantity: {po.units_ordered}\n"
+        f"Requested lead time: {lead_days} days\n\n"
+        f"Please confirm receipt and estimated ship date.\n\n"
+        f"Thank you,\nVantav on behalf of {business_name}"
+    )
+    html_body = f"""<!DOCTYPE html>
+<html>
+<body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333;">
+  <p>Hi {supplier_name},</p>
+  <p>Please find a new purchase order from <strong>{business_name}</strong>:</p>
+  <table style="border-collapse: collapse; width: 100%; max-width: 500px;">
+    <tr><td style="padding: 8px; border: 1px solid #ddd;"><strong>PO Reference</strong></td><td style="padding: 8px; border: 1px solid #ddd;">{po.po_reference}</td></tr>
+    <tr><td style="padding: 8px; border: 1px solid #ddd;"><strong>SKU</strong></td><td style="padding: 8px; border: 1px solid #ddd;">{po.variant_sku}</td></tr>
+    <tr><td style="padding: 8px; border: 1px solid #ddd;"><strong>Quantity</strong></td><td style="padding: 8px; border: 1px solid #ddd;">{po.units_ordered}</td></tr>
+    <tr><td style="padding: 8px; border: 1px solid #ddd;"><strong>Lead time</strong></td><td style="padding: 8px; border: 1px solid #ddd;">{lead_days} days</td></tr>
+  </table>
+  <p>Please confirm receipt and estimated ship date.</p>
+  <p>Thank you,<br>Vantav on behalf of {business_name}</p>
+</body>
+</html>"""
+
+    sent = _send_email(to_email, subject, html_body, bcc=bcc_email, text_body=text_body)
+
+    if sent:
+        po.fulfillment_status = "PO_SENT"
+        po.updated_at = datetime.utcnow()
+        try:
+            db.session.commit()
+        except Exception:
+            logger.exception("[Outbound] Failed to update PO status after email")
+
     return {
-        "status": "pending",
+        "status": "ok" if sent else "failed",
         "po_reference": po.po_reference,
         "sku": po.variant_sku,
         "units": po.units_ordered,
+        "to": to_email,
+        "bcc": bcc_email,
+        "supplier": supplier_name,
     }
 
 
@@ -220,7 +384,6 @@ def dispatch_action(action_type: str, merchant_id: str, payload: Dict[str, Any])
         price = payload.get("price") or payload.get("new_price")
         if sku and price is not None:
             results.append(shopify_update_price(merchant_id, sku, float(price)))
-            results.append(tiktok_update_inventory(merchant_id, sku, -1))  # placeholder
 
     elif action_type == "reorder":
         sku = payload.get("sku", "")

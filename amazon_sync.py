@@ -8,6 +8,7 @@ from datetime import datetime, timedelta
 from typing import Any, Dict, List, Optional
 
 from sp_api.api import Orders, Reports
+from sp_api.api.listings_items.listings_items_2021_08_01 import ListingsItemsV20210801 as ListingsItems
 from sp_api.base import Marketplaces, SellingApiException
 from sp_api.base.reportTypes import ReportType
 
@@ -235,3 +236,62 @@ def get_products(merchant_id: str) -> List[Dict[str, Any]]:
         return json.loads(setting.setting_value)
     except json.JSONDecodeError:
         return []
+
+
+def update_inventory(merchant_id: str, sku: str, quantity: int) -> Dict[str, Any]:
+    """Push an inventory update to Amazon for the matching seller SKU."""
+    creds = _get_credentials(merchant_id)
+    if not creds:
+        return {"status": "skipped", "reason": "Amazon not connected"}
+
+    seller_id = creds.get("seller_id") or creds.get("merchant_id")
+    if not seller_id:
+        return {"status": "pending", "reason": "Missing Amazon seller_id in credentials"}
+
+    credentials = _sp_api_credentials(creds)
+    missing = [k for k, v in credentials.items() if not v and k in ("lwa_app_id", "lwa_client_secret", "refresh_token", "aws_access_key", "aws_secret_key")]
+    if missing:
+        return {"status": "pending", "reason": f"Amazon credentials incomplete: {', '.join(missing)}"}
+
+    region = creds.get("region", "us-east-1")
+    marketplace = _marketplace(region)
+    marketplace_id = marketplace.marketplace_id
+
+    body = {
+        "productType": "PRODUCT",
+        "patches": [
+            {
+                "op": "replace",
+                "path": "/attributes/fulfillment_availability",
+                "value": [
+                    {
+                        "fulfillment_channel_code": "DEFAULT",
+                        "quantity": int(quantity),
+                    }
+                ],
+            }
+        ],
+    }
+
+    try:
+        res = ListingsItems(credentials=credentials, marketplace=marketplace).patch_listings_item(
+            sellerId=seller_id,
+            sku=sku,
+            body=body,
+            marketplaceIds=marketplace_id,
+            issueLocale="en_US",
+        )
+        return {
+            "status": "ok",
+            "channel": "amazon",
+            "sku": sku,
+            "quantity": quantity,
+            "marketplace_id": marketplace_id,
+            "response": res.payload,
+        }
+    except SellingApiException as e:
+        logger.warning(f"[Amazon Sync] Inventory update failed for {sku}: {e}")
+        return {"status": "failed", "reason": str(e)}
+    except Exception as e:
+        logger.warning(f"[Amazon Sync] Inventory update error for {sku}: {e}")
+        return {"status": "failed", "reason": str(e)}

@@ -3,9 +3,9 @@ import json
 import logging
 import uuid
 from datetime import datetime, timedelta
-from typing import List, Dict, Any, Optional
+from typing import List, Dict, Any, Optional, Tuple
 
-from models import db, PendingAction, Alert, PredictiveLogistics, GeneratedPurchaseOrder, ProfitFeedOrder, AdSpendAnalytic, BusinessMetric, MerchantProfile, BusinessMemory, ActionEvidence
+from models import db, PendingAction, Alert, PredictiveLogistics, GeneratedPurchaseOrder, ProfitFeedOrder, AdSpendAnalytic, BusinessMetric, MerchantProfile, BusinessMemory, ActionEvidence, Product, Supplier
 from tier_manager import TierManager
 import alert_matrix
 import competitor_intelligence
@@ -24,6 +24,16 @@ def _json(payload: Any) -> str:
 
 def _parse(payload: str) -> Any:
     return json.loads(payload) if payload else {}
+
+
+def _resolve_supplier(merchant_id: str, sku: str, fallback_name: str = "Supplier") -> Tuple[str, Optional[str]]:
+    """Return supplier name and email for a SKU using Product/Supplier records."""
+    product = Product.query.filter_by(sku=sku, merchant_id=merchant_id).first()
+    if product and product.supplier_id:
+        supplier = Supplier.query.filter_by(id=product.supplier_id, merchant_id=merchant_id).first()
+        if supplier:
+            return (supplier.name or fallback_name), supplier.email
+    return fallback_name, None
 
 
 def get_business_memory(merchant_id: str) -> BusinessMemory:
@@ -418,10 +428,12 @@ def refresh_actions(merchant_id: str):
 def _infer_action_from_alert(alert: Alert):
     """Map an alert to a draft action."""
     if alert.alert_type == "inventory_runout":
+        supplier_name, supplier_email = _resolve_supplier(alert.merchant_id, alert.source_id)
         return "reorder", {
             "sku": alert.source_id,
             "quantity": 240,
-            "supplier": "Supplier C",
+            "supplier": supplier_name,
+            "supplier_email": supplier_email,
             "lead_days": 6,
             "velocity": 38.5,
         }, f"Reorder {alert.source_id}", alert.detail
@@ -440,10 +452,12 @@ def _infer_action_from_alert(alert: Alert):
         }, f"Reduce {alert.source_id} ad budget", alert.detail
 
     if alert.alert_type == "low_inventory":
+        supplier_name, supplier_email = _resolve_supplier(alert.merchant_id, alert.source_id)
         return "reorder", {
             "sku": alert.source_id,
             "quantity": 450,
-            "supplier": "Supplier C",
+            "supplier": supplier_name,
+            "supplier_email": supplier_email,
             "lead_days": 6,
             "velocity": 38.5,
         }, f"Create PO for {alert.source_id}", alert.detail
@@ -563,7 +577,8 @@ def _execute_action(action: PendingAction, payload: Dict[str, Any]) -> Dict[str,
     if action_type == "reorder":
         sku = payload.get("sku", "UNKNOWN")
         quantity = int(payload.get("quantity", 240))
-        supplier = payload.get("supplier", "Supplier C")
+        supplier = payload.get("supplier", "Supplier")
+        supplier_email = payload.get("supplier_email")
         lead_days = int(payload.get("lead_days", 6))
         po_ref = f"PO-{sku.replace(' ', '-')}-{uuid.uuid4().hex[:6].upper()}"
 
@@ -590,7 +605,13 @@ def _execute_action(action: PendingAction, payload: Dict[str, Any]) -> Dict[str,
             ai_briefing=f"Action Gate approved: {po_ref} created for {quantity} units of {sku} from {supplier} ({lead_days}-day lead).",
         ))
         db.session.commit()
-        writeback = outbound.send_supplier_po(merchant_id, po)
+        writeback = outbound.send_supplier_po(
+            merchant_id,
+            po,
+            supplier_name=supplier,
+            supplier_email=supplier_email,
+            lead_days=lead_days,
+        )
         return {
             "message": f"Created {po_ref} for {quantity} units of {sku}.",
             "po_reference": po_ref,
