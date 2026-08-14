@@ -415,7 +415,8 @@ def site_wall_authenticated(refresh=True):
     """Check whether the browser has a valid, non-expired session token.
 
     Enforces an absolute max age and an idle timeout. If refresh=True, touching a
-    protected route bumps the idle window and resets the cookie expiry.
+    protected route bumps the idle window. The cookie is a browser-session cookie,
+    so a fresh browser always requires re-authentication.
     """
     token = request.cookies.get(SESSION_COOKIE_NAME)
     if token is None:
@@ -435,25 +436,10 @@ def site_wall_authenticated(refresh=True):
         db.session.commit()
         return False
     if refresh:
+        # Bump the idle timestamp on real user activity, but do not issue a
+        # persistent cookie; the session cookie is cleared when the browser closes.
         s.last_seen = now
         db.session.commit()
-        # Refresh the cookie sliding window on protected activity.
-        if hasattr(request, "session_cookie_refreshed"):
-            pass
-        else:
-            request.session_cookie_refreshed = True
-            @after_this_request
-            def _refresh_cookie(response):
-                max_age = SESSION_IDLE_TIMEOUT_MINUTES * 60
-                response.set_cookie(
-                    SESSION_COOKIE_NAME,
-                    token,
-                    max_age=max_age,
-                    httponly=True,
-                    samesite='Lax',
-                    secure=app.config.get("SESSION_COOKIE_SECURE", os.environ.get("SESSION_COOKIE_SECURE", "true").lower() == "true"),
-                )
-                return response
     return True
 
 
@@ -2827,10 +2813,11 @@ def site_login():
             db.session.add(ActiveSession(token=token, merchant_id=None, role="SiteWall", created_at=now, last_seen=now))
             db.session.commit()
             response = redirect(url_for('home'))
+            # Session cookie: cleared when the browser closes so a fresh browser
+            # always lands back at the login wall.
             response.set_cookie(
                 SESSION_COOKIE_NAME,
                 token,
-                max_age=SESSION_IDLE_TIMEOUT_MINUTES * 60,
                 httponly=True,
                 samesite='Lax',
                 secure=app.config.get("SESSION_COOKIE_SECURE", os.environ.get("SESSION_COOKIE_SECURE", "true").lower() == "true"),
@@ -2854,8 +2841,8 @@ def site_logout():
 @app.route('/api/session/heartbeat', methods=['POST'])
 @limiter.exempt
 def session_heartbeat():
-    """Keep session alive while the user is active; return remaining seconds."""
-    if not site_wall_authenticated(refresh=True):
+    """Report session validity without extending the idle window."""
+    if not site_wall_authenticated(refresh=False):
         return jsonify({"valid": False, "detail": "Session expired or invalid"}), 401
     return jsonify({"valid": True, "expires_in": SESSION_IDLE_TIMEOUT_MINUTES * 60}), 200
 
@@ -2899,10 +2886,10 @@ def auth_login():
         "role": assigned_role,
         "merchant_id": profile.merchant_id,
     }))
+    # Session cookie: cleared when the browser closes so a new browser requires login.
     response.set_cookie(
         SESSION_COOKIE_NAME,
         session_token,
-        max_age=SESSION_TIMEOUT_DAYS * 86400,
         httponly=True,
         samesite="Lax",
         secure=app.config.get("SESSION_COOKIE_SECURE", os.environ.get("SESSION_COOKIE_SECURE", "true").lower() == "true"),
@@ -2986,10 +2973,10 @@ def auth_signup():
         "assigned_tier": tier,
         "monthly_order_limit": TierManager.get_order_limit(tier),
     }))
+    # Session cookie: cleared when the browser closes so a new browser requires login.
     response.set_cookie(
         SESSION_COOKIE_NAME,
         session_token,
-        max_age=SESSION_TIMEOUT_DAYS * 86400,
         httponly=True,
         samesite="Lax",
         secure=app.config.get("SESSION_COOKIE_SECURE", os.environ.get("SESSION_COOKIE_SECURE", "true").lower() == "true"),
@@ -4282,18 +4269,11 @@ def magic_login():
     db.session.add(active)
     db.session.commit()
 
-    # Tie cookie lifetime to the sandbox window when applicable.
-    if profile.sandbox_status == "sandbox" and profile.sandbox_expires_at:
-        remaining = int((profile.sandbox_expires_at - now).total_seconds())
-        max_age = min(remaining, SESSION_TIMEOUT_DAYS * 86400)
-    else:
-        max_age = SESSION_TIMEOUT_DAYS * 86400
-
+    # Session cookie: cleared when the browser closes so a new browser requires login.
     response = make_response(redirect("/"))
     response.set_cookie(
         SESSION_COOKIE_NAME,
         session_token,
-        max_age=max_age,
         httponly=True,
         samesite="Lax",
         secure=app.config.get("SESSION_COOKIE_SECURE", os.environ.get("SESSION_COOKIE_SECURE", "true").lower() == "true"),

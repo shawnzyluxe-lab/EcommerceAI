@@ -121,7 +121,7 @@
       document.getElementById('sidebar').classList.toggle('open');
     });
 
-    // Keep the session alive while the tab is open; redirect if it expires.
+    // Poll session status; the server now expires idle sessions and will return 401.
     (function keepAlive() {
       setInterval(async () => {
         try {
