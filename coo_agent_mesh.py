@@ -14,6 +14,7 @@ from pydantic import BaseModel, Field
 from models import db, Product, UnifiedOrder, OrderItem, DailyCost, BusinessMemory
 import action_gate
 import competitor_intelligence
+import profit_regression
 
 # Re-export the deterministic rules-engine components so the COO mesh can be
 # addressed as a single import surface for benchmarks and integrations.
@@ -350,33 +351,42 @@ def run_diagnostic(merchant_id: str, days: int = 1, create_actions: bool = True)
     )
 
     snapshots = _build_snapshots(merchant_id, days=days)
-    if not snapshots:
-        return []
-
-    coo = AICOOController(constraints)
-    drafts = coo.run_autonomous_diagnostic(snapshots)
 
     staged: List[Dict] = []
-    for draft in drafts:
-        evidence = draft.evidence or {}
-        detail = evidence.get("reason", "Vantav identified an operational issue.")
 
-        if create_actions:
-            try:
-                action = action_gate.create_action(
-                    merchant_id=merchant_id,
-                    action_type=draft.kind,
-                    title=draft.title,
-                    detail=detail,
-                    payload=draft.payload,
-                    snapshot={"kpis": {"net_margin": 0.0, "gross_revenue": 0.0}},
-                )
-                staged.append(action_gate.action_to_dict(action))
-            except ValueError as e:
-                # Guardrail blocked the draft.
-                staged.append({"blocked": True, "draft": draft.model_dump(), "reason": str(e)})
-        else:
-            staged.append(draft.model_dump())
+    if snapshots:
+        coo = AICOOController(constraints)
+        drafts = coo.run_autonomous_diagnostic(snapshots)
+
+        for draft in drafts:
+            evidence = draft.evidence or {}
+            detail = evidence.get("reason", "Vantav identified an operational issue.")
+
+            if create_actions:
+                try:
+                    action = action_gate.create_action(
+                        merchant_id=merchant_id,
+                        action_type=draft.kind,
+                        title=draft.title,
+                        detail=detail,
+                        payload=draft.payload,
+                        snapshot={"kpis": {"net_margin": 0.0, "gross_revenue": 0.0}},
+                    )
+                    staged.append(action_gate.action_to_dict(action))
+                except ValueError as e:
+                    # Guardrail blocked the draft.
+                    staged.append({"blocked": True, "draft": draft.model_dump(), "reason": str(e)})
+            else:
+                staged.append(draft.model_dump())
+
+    # Layer in mathematical profit regression actions across the merchant catalog.
+    try:
+        regression_actions = profit_regression.run_regression_for_merchant(
+            merchant_id, lookback_days=30, create_actions=create_actions
+        )
+        staged.extend(regression_actions)
+    except Exception as e:
+        staged.append({"blocked": True, "draft": "profit_regression", "reason": str(e)})
 
     return staged
 
