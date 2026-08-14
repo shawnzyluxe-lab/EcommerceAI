@@ -19,7 +19,7 @@ The dev server runs on `http://127.0.0.1:3000`.
 
 - If `SITE_WALL_PASSWORD` is set, the lock screen at `/` requires that password.
 - If `.env` is empty or missing, the wall is disabled and `/dashboard` is public.
-- Valid wall login creates an `aegis_session_token` cookie tied to `merchant_shawn_01`.
+- Valid wall login creates a `vantav_session_token` cookie tied to `merchant_shawn_01`.
 
 ## Quick verification checklist
 

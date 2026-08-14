@@ -96,7 +96,7 @@ def test_executive_digest_generation(client):
     db.session.add(ActiveSession(token=session_token, merchant_id="merchant_shawn_01", created_at=datetime.utcnow()))
     db.session.commit()
 
-    client.set_cookie("aegis_session_token", session_token)
+    client.set_cookie("vantav_session_token", session_token)
     r = client.post("/api/v1/tenant/compile-executive-digest")
     assert r.status_code == 201
     data = r.get_json()
