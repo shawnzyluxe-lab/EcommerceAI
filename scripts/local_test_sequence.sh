@@ -23,7 +23,8 @@ export MERCHANT_EMAIL="${MERCHANT_EMAIL:-local@vantavcommerce.com}"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ROOT_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
 TEST_DB="$ROOT_DIR/.local_test.db"
-export DATABASE_URL="sqlite:///$TEST_DB"
+DEFAULT_SQLITE_URL="sqlite:///$TEST_DB"
+DEFAULT_POSTGRES_URL="postgresql+psycopg://vantav:vantav_local@localhost:5432/vantav_db"
 PORT="${PORT:-8000}"
 
 # Remove any stale local test DB so the schema is created fresh.
@@ -33,8 +34,10 @@ rm -f "$TEST_DB"
 if curl -s "http://localhost:$PORT/health" >/dev/null 2>&1; then
     BASE_URL="http://localhost:$PORT"
     DOCKER_MODE=true
+    export DATABASE_URL="${DATABASE_URL:-$DEFAULT_POSTGRES_URL}"
 else
     DOCKER_MODE=false
+    export DATABASE_URL="${DATABASE_URL:-$DEFAULT_SQLITE_URL}"
 fi
 
 if [ "$DOCKER_MODE" = false ]; then
