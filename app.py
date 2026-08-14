@@ -1367,7 +1367,7 @@ def dashboard_page(page):
         'overview', 'command_center', 'commerce_hub', 'alerts', 'action_gate', 'profit_engine', 'startup_pack',
         'predictions', 'product_research', 'fulfillment', 'fraud', 'suppliers',
         'marketing', 'support', 'automations', 'team_ai', 'health_score',
-        'mobile_copilot', 'store_catalog', 'products', 'orders', 'customers',
+        'mobile', 'store_catalog', 'products', 'orders', 'customers',
         'inventory', 'shipments', 'returns', 'analytics', 'discounts', 'apps',
         'themes', 'reports', 'billing', 'integrations', 'settings', 'tiktok_studio',
         'monitoring'

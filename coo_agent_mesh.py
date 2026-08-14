@@ -285,7 +285,7 @@ def run_diagnostic(merchant_id: str, days: int = 1, create_actions: bool = True)
     staged: List[Dict] = []
     for draft in drafts:
         evidence = draft.evidence or {}
-        detail = evidence.get("reason", "AI COO identified an operational issue.")
+        detail = evidence.get("reason", "Vantav identified an operational issue.")
 
         if create_actions:
             try:
