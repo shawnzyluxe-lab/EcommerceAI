@@ -261,6 +261,53 @@ def run_migrations():
             "CREATE INDEX IF NOT EXISTS idx_workspace_seats ON merchant_workspace_seats(merchant_id, user_email)",
         )
 
+        # Dual-auth credential schema: integration links and secure token store
+        _run(
+            "integration_links table",
+            """
+            CREATE TABLE IF NOT EXISTS integration_links (
+                id VARCHAR(36) PRIMARY KEY,
+                merchant_id VARCHAR(100) NOT NULL,
+                platform VARCHAR(50) NOT NULL,
+                shopify_shop_domain VARCHAR(255),
+                amazon_seller_id VARCHAR(100),
+                amazon_region VARCHAR(20) DEFAULT 'us-east-1',
+                status VARCHAR(50) DEFAULT 'active',
+                created_at TIMESTAMP DEFAULT NOW(),
+                updated_at TIMESTAMP DEFAULT NOW()
+            )
+            """,
+        )
+        for col, typ in [
+            ("shopify_shop_domain", "VARCHAR(255)"),
+            ("amazon_seller_id", "VARCHAR(100)"),
+            ("amazon_region", "VARCHAR(20) DEFAULT 'us-east-1'"),
+        ]:
+            _run(f"integration_links.{col}", f"ALTER TABLE integration_links ADD COLUMN IF NOT EXISTS {col} {typ}")
+        _run(
+            "integration_links.index",
+            "CREATE INDEX IF NOT EXISTS idx_integration_links_merchant ON integration_links(merchant_id, platform)",
+        )
+
+        _run(
+            "secure_channel_credentials table",
+            """
+            CREATE TABLE IF NOT EXISTS secure_channel_credentials (
+                id VARCHAR(36) PRIMARY KEY,
+                integration_link_id VARCHAR(36) NOT NULL UNIQUE,
+                encrypted_access_token TEXT NOT NULL,
+                encrypted_refresh_token TEXT,
+                tokens_expire_at TIMESTAMP WITH TIME ZONE,
+                updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (integration_link_id) REFERENCES integration_links(id) ON DELETE CASCADE
+            )
+            """,
+        )
+        _run(
+            "secure_channel_credentials.index",
+            "CREATE INDEX IF NOT EXISTS idx_secure_credentials ON secure_channel_credentials(integration_link_id)",
+        )
+
 
 if __name__ == "__main__":
     run_migrations()

@@ -54,12 +54,13 @@ if SENTRY_DSN:
     except Exception as e:
         print(f"[SENTRY] Init failed: {e}")
 
-from models import db, Tenant, ConnectedChannel, ActiveSession, BusinessMetric, CommerceChannel, MerchantChannel, SupportMetric, MarketingStudio, PredictiveLogistics, OutboundTransmission, SaaSBilling, LocalProductCatalog, MerchantProfile, TenantOAuthToken, MerchantMetric, SystemExceptionLog, ProcessedWebhookEvent, AdSpendAnalytic, GeneratedPurchaseOrder, AIAgent, AgentMessage, MerchantDecisionLog, MagicLoginToken, TrendingProduct, ProductFinancialLedger, MerchantSetting, ProfitFeedOrder, AdSpendFeed, Alert, BetaWaitlistApplication, PendingAction, StartupPackProject, BusinessMemory, WorkspaceSeat
+from models import db, Tenant, ConnectedChannel, ActiveSession, BusinessMetric, CommerceChannel, MerchantChannel, SupportMetric, MarketingStudio, PredictiveLogistics, OutboundTransmission, SaaSBilling, LocalProductCatalog, MerchantProfile, TenantOAuthToken, MerchantMetric, SystemExceptionLog, ProcessedWebhookEvent, AdSpendAnalytic, GeneratedPurchaseOrder, AIAgent, AgentMessage, MerchantDecisionLog, MagicLoginToken, TrendingProduct, ProductFinancialLedger, MerchantSetting, ProfitFeedOrder, AdSpendFeed, Alert, BetaWaitlistApplication, PendingAction, StartupPackProject, BusinessMemory, WorkspaceSeat, IntegrationLink, SecureChannelCredential
 import profit_feed
 import billing as billing_module
 import alert_matrix
 import vetted_operator
 import action_gate
+import channel_auth
 import rules_engine
 import forecaster
 import channel_analytics
@@ -140,6 +141,7 @@ GENERATED_DIR = "generated"
 os.makedirs(GENERATED_DIR, exist_ok=True)
 
 db.init_app(app)
+app.register_blueprint(channel_auth.credential_bp)
 
 # Register production monitoring hooks (request logging, security headers, SLA checks).
 monitoring_module.register_app(app)
@@ -4712,6 +4714,13 @@ def shopify_oauth_callback():
     try:
         result = channels_module.shopify_oauth_exchange(shop, code, SHOPIFY_CLIENT_ID, SHOPIFY_CLIENT_SECRET)
         channels_module.connect_shopify(merchant_id, shop, result["access_token"])
+        # Also store the offline token in the dual-auth secure vault.
+        channel_auth.store_channel_credentials(
+            merchant_id=merchant_id,
+            platform="shopify",
+            access_token=result["access_token"],
+            shopify_shop_domain=shop,
+        )
         return redirect("/dashboard/commerce-hub?oauth_sync=success")
     except Exception as e:
         logger.error(f"[Shopify OAuth] {e}")

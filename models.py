@@ -216,6 +216,34 @@ class TenantOAuthToken(db.Model):
     updated_at = db.Column(db.DateTime, server_default=db.func.now())
 
 
+class IntegrationLink(db.Model):
+    __tablename__ = "integration_links"
+    id = db.Column(db.String(36), primary_key=True, default=_uuid)
+    merchant_id = db.Column(db.String(100), db.ForeignKey("merchant_profiles.merchant_id"), nullable=False, index=True)
+    platform = db.Column(db.String(50), nullable=False)  # shopify, amazon, tiktok
+    shopify_shop_domain = db.Column(db.String(255))
+    amazon_seller_id = db.Column(db.String(100))
+    amazon_region = db.Column(db.String(20), default="us-east-1")
+    status = db.Column(db.String(50), default="active")
+    created_at = db.Column(db.DateTime, server_default=db.func.now())
+    updated_at = db.Column(db.DateTime, server_default=db.func.now(), onupdate=db.func.now())
+
+
+class SecureChannelCredential(db.Model):
+    __tablename__ = "secure_channel_credentials"
+    id = db.Column(db.String(36), primary_key=True, default=_uuid)
+    integration_link_id = db.Column(
+        db.String(36),
+        db.ForeignKey("integration_links.id", ondelete="CASCADE"),
+        nullable=False,
+        unique=True,
+    )
+    encrypted_access_token = db.Column(db.Text, nullable=False)
+    encrypted_refresh_token = db.Column(db.Text)
+    tokens_expire_at = db.Column(db.DateTime)
+    updated_at = db.Column(db.DateTime, server_default=db.func.now(), onupdate=db.func.now())
+
+
 class MerchantMetric(db.Model):
     __tablename__ = "multi_tenant_metrics"
     id = db.Column(db.Integer, primary_key=True, autoincrement=True)
