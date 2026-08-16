@@ -171,7 +171,14 @@ def get_session_context(token: str) -> Optional[Dict[str, Any]]:
         return None
 
     vault = ActiveSessionVault.query.get(token)
-    if not vault or vault.expires_at < datetime.utcnow():
+    if not vault:
+        return None
+
+    # Postgres timestamptz may return a timezone-aware datetime.
+    expires_at = vault.expires_at
+    if expires_at and expires_at.tzinfo:
+        expires_at = expires_at.replace(tzinfo=None)
+    if not expires_at or expires_at < datetime.utcnow():
         return None
 
     user = UserAuthentication.query.get(parsed["user_id"])
@@ -197,19 +204,23 @@ def require_clearance(required_level: str):
     def decorator(endpoint_function):
         @wraps(endpoint_function)
         def wrapper(*args, **kwargs):
-            token = request.headers.get("X-Session-Token")
-            if not token:
-                return jsonify({"detail": "Unauthorized: missing X-Session-Token header."}), 401
+            try:
+                token = request.headers.get("X-Session-Token")
+                if not token:
+                    return jsonify({"detail": "Unauthorized: missing X-Session-Token header."}), 401
 
-            ctx = get_session_context(token)
-            if not ctx:
-                return jsonify({"detail": "Unauthorized: invalid or expired session token."}), 401
+                ctx = get_session_context(token)
+                if not ctx:
+                    return jsonify({"detail": "Unauthorized: invalid or expired session token."}), 401
 
-            if not _has_clearance(ctx.get("clearance", ""), required_level):
-                return jsonify({"detail": f"Forbidden: {required_level} clearance required."}), 403
+                if not _has_clearance(ctx.get("clearance", ""), required_level):
+                    return jsonify({"detail": f"Forbidden: {required_level} clearance required."}), 403
 
-            g.session_ctx = ctx
-            return endpoint_function(*args, **kwargs)
+                g.session_ctx = ctx
+                return endpoint_function(*args, **kwargs)
+            except Exception as e:
+                logger.error(f"[master_auth_engine] clearance check failed: {e}")
+                return jsonify({"detail": "Unauthorized: session verification failed."}), 401
         return wrapper
     return decorator
 
