@@ -679,8 +679,13 @@ NAV_GROUPS = [
             {"id": "startup_pack", "label": "Brand Build", "url": "/dashboard/startup-pack", "icon": "☆"},
             {"id": "store_catalog", "label": "Store Catalog", "url": "/dashboard/store-catalog", "icon": "▤"},
             {"id": "apps", "label": "Apps", "url": "/dashboard/apps", "icon": "◫"},
-            {"id": "themes", "label": "Themes", "url": "/dashboard/themes", "icon": "◉"},
             {"id": "reports", "label": "Reports", "url": "/dashboard/reports", "icon": "▦"},
+        ],
+    },
+    {
+        "label": "Settings",
+        "links": [
+            {"id": "themes", "label": "Themes", "url": "/dashboard/themes", "icon": "◉"},
             {"id": "billing", "label": "Billing", "url": "/dashboard/billing", "icon": "$"},
             {"id": "integrations", "label": "Integrations", "url": "/dashboard/integrations", "icon": "∞"},
             {"id": "settings", "label": "Settings", "url": "/dashboard/settings", "icon": "⚙"},
