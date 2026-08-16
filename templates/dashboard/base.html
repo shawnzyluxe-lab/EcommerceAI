@@ -245,7 +245,7 @@
     })();
 
     // Update greeting elements to the merchant's saved timezone on first paint.
-    (function updateGreeting() {
+    function updateGreeting() {
       const name = document.body.dataset.accountHolderName || document.body.dataset.merchantName || document.querySelector('[data-account-holder-name]')?.dataset.accountHolderName || 'there';
       const tz = document.body.dataset.merchantTimezone || Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC';
       const now = new Date();
@@ -257,7 +257,9 @@
       document.querySelectorAll('.js-greeting').forEach(el => {
         el.textContent = `${salutation}, ${name}.`;
       });
-    })();
+    }
+    window.updateGreeting = updateGreeting;
+    updateGreeting();
   </script>
   {% block scripts %}{% endblock %}
 
