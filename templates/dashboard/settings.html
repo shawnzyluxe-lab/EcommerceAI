@@ -11,6 +11,7 @@
 
 <div class="settings-tabs" style="display: flex; gap: 8px; margin-bottom: 20px; border-bottom: 1px solid var(--line); padding-bottom: 8px;">
   <button class="settings-tab {% if active_tab == 'account' %}active{% endif %}" data-tab="account" onclick="switchSettingsTab('account')">Account</button>
+  <button class="settings-tab {% if active_tab == 'stores' %}active{% endif %}" data-tab="stores" onclick="switchSettingsTab('stores')">Stores</button>
   <button class="settings-tab {% if active_tab == 'billing' %}active{% endif %}" data-tab="billing" onclick="switchSettingsTab('billing')">Billing</button>
   <button class="settings-tab {% if active_tab == 'integrations' %}active{% endif %}" data-tab="integrations" onclick="switchSettingsTab('integrations')">Integrations</button>
   <button class="settings-tab {% if active_tab == 'themes' %}active{% endif %}" data-tab="themes" onclick="switchSettingsTab('themes')">Themes</button>
@@ -51,6 +52,10 @@
       {% endfor %}
     </div>
   </div>
+</div>
+
+<div class="settings-panel" id="panel-stores" {% if active_tab != 'stores' %}style="display:none;"{% endif %}>
+  {% include 'dashboard/_stores_tab.html' %}
 </div>
 
 <div class="settings-panel" id="panel-billing" {% if active_tab != 'billing' %}style="display:none;"{% endif %}>
