@@ -24,6 +24,18 @@
 </div>
 {% endif %}
 
+{% if show_onboarding and connected|length == 0 %}
+<div class="card" style="border: 1px solid var(--accent); background: var(--accent-bg); margin-bottom: 18px;">
+  <div style="display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap;">
+    <div>
+      <div style="font-weight: 700; color: var(--ink); margin-bottom: 4px;">Welcome to Vantav</div>
+      <div style="font-size: .85rem; color: var(--ink-2);">Connect your first store to start tracking true profit, alerts, and recommended actions.</div>
+    </div>
+    <a href="/dashboard/settings?tab=stores&onboarding=1" class="btn btn-primary">Connect a store</a>
+  </div>
+</div>
+{% endif %}
+
 <div class="workflow-pillars" style="margin-top: 18px;">
 
   <!-- PILLAR 01: TRUE PROFIT -->

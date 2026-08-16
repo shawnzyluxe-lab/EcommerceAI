@@ -707,7 +707,7 @@ SHOPIFY_STORE_URL = os.environ.get("SHOPIFY_STORE_URL", "")
 SHOPIFY_ACCESS_TOKEN = os.environ.get("SHOPIFY_ACCESS_TOKEN", "")
 SHOPIFY_CLIENT_ID = os.environ.get("SHOPIFY_CLIENT_ID", "")
 SHOPIFY_CLIENT_SECRET = os.environ.get("SHOPIFY_CLIENT_SECRET", "")
-OAUTH_REDIRECT_URI = os.environ.get("OAUTH_REDIRECT_URI", "https://shawnzyluxe.com")
+OAUTH_REDIRECT_URI = os.environ.get("OAUTH_REDIRECT_URI", "https://vantavcommerce.com/api/v1/auth/shopify/callback")
 
 TIKTOK_APP_KEY = os.environ.get("TIKTOK_APP_KEY", "")
 TIKTOK_APP_SECRET = os.environ.get("TIKTOK_APP_SECRET", "")
@@ -1476,6 +1476,10 @@ def dashboard():
         and request.args.get('concierge_bundle') == 'true'
         and bool(merchant.get('concierge_bundle'))
     )
+    ctx["show_onboarding"] = (
+        request.args.get('onboarding') == '1'
+        or (request.args.get('checkout') == 'success' and not ctx.get('connected'))
+    )
     return render_template('dashboard/overview.html', **ctx)
 
 
@@ -1488,6 +1492,10 @@ def _dashboard_context(active_page):
         request.args.get('checkout') == 'success'
         and request.args.get('concierge_bundle') == 'true'
         and bool(merchant and merchant.get('concierge_bundle'))
+    )
+    ctx["show_onboarding"] = (
+        request.args.get('onboarding') == '1'
+        or (request.args.get('checkout') == 'success' and not ctx.get('connected'))
     )
     return ctx
 
@@ -2073,6 +2081,21 @@ def api_verify_action(action_id):
         return jsonify(result), 200
     except Exception as e:
         logger.error(f"[Action Gate] Verify failed: {e}")
+        return jsonify({"detail": str(e)}), 400
+
+
+@app.route('/api/actions/<int:action_id>/rollback', methods=['POST'])
+@require_roles([UserRole.ADMIN, UserRole.MERCHANT, UserRole.ENGINEER])
+def api_rollback_action(action_id):
+    """Rollback an approved/executed Action Gate action using the captured audit snapshot."""
+    merchant = get_merchant_context()
+    if not merchant:
+        return jsonify({"error": "No merchant context"}), 403
+    try:
+        result = action_gate.rollback_action(action_id, merchant["id"], decided_by=merchant["id"])
+        return jsonify(result), 200
+    except Exception as e:
+        logger.error(f"[Action Gate] Rollback failed: {e}")
         return jsonify({"detail": str(e)}), 400
 
 
@@ -3622,10 +3645,14 @@ def create_stripe_checkout():
     # Find or provision the merchant account so the webhook can upgrade it.
     profile = MerchantProfile.query.filter_by(admin_email=email).first()
     if profile:
+        # Require the existing account password; do not let a stranger start a
+        # checkout with someone else's email and take over the account.
+        if not check_password_hash(profile.password_hash or "", password):
+            return jsonify({"detail": "Email already registered. Log in to upgrade or use a different email."}), 409
         merchant_id = profile.merchant_id
+        profile.business_name = business_name or profile.business_name
     else:
         merchant_id = f"tenant_{uuid.uuid4().hex[:8]}"
-        from werkzeug.security import generate_password_hash
         db.session.add(MerchantProfile(
             merchant_id=merchant_id,
             business_name=business_name,
@@ -3642,10 +3669,30 @@ def create_stripe_checkout():
             metered_usage_units=0,
             accrued_invoice_value=0.0,
         ))
+        db.session.add(MerchantMetric(
+            merchant_id=merchant_id,
+            total_unified_balance=0.0,
+            true_net_profit=0.0,
+            gross_revenue=0.0,
+            ai_briefing="System initialized. Complete onboarding to activate multi-channel engine.",
+        ))
+        tier_meta = TierManager.get_tier_meta("Basic Tier")
+        memory = BusinessMemory(merchant_id=merchant_id)
+        memory.max_authorized_seats = int(tier_meta.get("max_users", 1))
+        memory.current_active_seats = 1
+        db.session.add(memory)
+        db.session.add(WorkspaceSeat(merchant_id=merchant_id, user_email=email, role="admin"))
         db.session.commit()
 
+    # Issue a session cookie now so the merchant is already logged in when
+    # Stripe redirects them back after payment.
+    now = datetime.utcnow()
+    session_token = secrets.token_urlsafe(32)
+    db.session.add(ActiveSession(token=session_token, merchant_id=merchant_id, role=UserRole.MERCHANT.value, created_at=now, last_seen=now))
+    db.session.commit()
+
     try:
-        success_url = url_for('dashboard', _external=True, _scheme='https') + '?checkout=success'
+        success_url = url_for('dashboard', _external=True, _scheme='https') + '?checkout=success&onboarding=1'
         cancel_url = url_for('subscribe', _external=True, _scheme='https') + '?canceled=1'
         session_url, session_id, customer_id = billing_module.create_checkout_session(
             merchant_id,
@@ -3656,7 +3703,9 @@ def create_stripe_checkout():
             success_url=success_url,
             cancel_url=cancel_url,
         )
-        return jsonify({"url": session_url, "session_id": session_id, "customer_id": customer_id}), 200
+        response = make_response(jsonify({"url": session_url, "session_id": session_id, "customer_id": customer_id}), 200)
+        _set_session_cookie(response, session_token)
+        return response
     except Exception as e:
         logger.error(f"[Stripe Checkout] Failed: {e}")
         return jsonify({"detail": "Unable to start checkout session."}), 500
@@ -4927,10 +4976,10 @@ def shopify_oauth_callback():
             access_token=result["access_token"],
             shopify_shop_domain=shop,
         )
-        return redirect("/dashboard/commerce-hub?oauth_sync=success")
+        return redirect("/dashboard/settings?tab=stores&onboarding=1&oauth_sync=success")
     except Exception as e:
         logger.error(f"[Shopify OAuth] {e}")
-        return redirect("/dashboard/commerce-hub?oauth_sync=error")
+        return redirect("/dashboard/settings?tab=stores&onboarding=1&oauth_sync=error")
 
 
 @app.route('/api/v1/auth/tiktok/connect')
@@ -5005,10 +5054,10 @@ def tiktok_oauth_callback():
             shop_cipher=shop_cipher,
             refresh_token=refresh_token,
         )
-        return redirect("/dashboard/commerce-hub?oauth_sync=success")
+        return redirect("/dashboard/settings?tab=stores&onboarding=1&oauth_sync=success")
     except Exception as e:
         logger.error(f"[TikTok OAuth] {e}")
-        return redirect("/dashboard/commerce-hub?oauth_sync=error")
+        return redirect("/dashboard/settings?tab=stores&onboarding=1&oauth_sync=error")
 
 
 @app.route('/account/login')

@@ -10,6 +10,7 @@ from tier_manager import TierManager
 import alert_matrix
 import competitor_intelligence
 import outbound
+import shopify_sync
 
 logger = logging.getLogger(__name__)
 
@@ -230,7 +231,7 @@ def create_action(merchant_id: str, action_type: str, title: str, detail: str, p
     if _autopilot_should_execute(action_type, _parse(action.payload), memory, merchant_id, snapshot):
         logger.info(f"[Action Gate] Autopilot executing action {action.id} for {merchant_id}")
         before = snapshot or _capture_snapshot(merchant_id)
-        result = _execute_action(action, _parse(action.payload))
+        result = _execute_action(action, _parse(action.payload), evidence=evidence)
         action.status = "executed"
         action.decided_at = _now()
         action.decision_by = "autopilot"
@@ -257,7 +258,11 @@ def _capture_snapshot(merchant_id: str) -> Dict[str, Any]:
 def _record_execution_report(action: PendingAction, evidence: ActionEvidence, before: Dict[str, Any]) -> None:
     """Capture before/after metrics and a human-readable execution report."""
     after = _capture_snapshot(action.merchant_id)
-    evidence.before_metrics = before.get("kpis") or {}
+    kpis = before.get("kpis") or {}
+    existing = evidence.before_metrics or {}
+    if not isinstance(existing, dict):
+        existing = {}
+    evidence.before_metrics = {**existing, **kpis}
     evidence.after_metrics = after.get("kpis") or {}
 
     before_net = float((before.get("kpis") or {}).get("net_profit", 0.0) or 0.0)
@@ -509,7 +514,7 @@ def approve_action(action_id: int, merchant_id: str, decided_by: str = "merchant
     if evidence:
         evidence.before_metrics = before.get("kpis") or {}
 
-    result = _execute_action(action, payload)
+    result = _execute_action(action, payload, evidence=evidence)
 
     action.status = "approved"
     action.decided_at = _now()
@@ -570,9 +575,21 @@ def modify_action(action_id: int, merchant_id: str, payload_updates: Dict[str, A
     return {"status": "modified", "action_id": action.id, "payload": payload}
 
 
-def _execute_action(action: PendingAction, payload: Dict[str, Any]) -> Dict[str, Any]:
+def _store_rollback_snapshot(evidence: Optional[ActionEvidence], snapshot: Dict[str, Any]) -> None:
+    """Attach a rollback snapshot to the evidence audit record while preserving KPIs."""
+    if not evidence:
+        return
+    existing = evidence.before_metrics or {}
+    if not isinstance(existing, dict):
+        existing = {}
+    existing["rollback_snapshot"] = snapshot
+    evidence.before_metrics = existing
+
+
+def _execute_action(action: PendingAction, payload: Dict[str, Any], evidence: Optional[ActionEvidence] = None) -> Dict[str, Any]:
     merchant_id = action.merchant_id
     action_type = action.action_type
+    rollback_snapshot: Dict[str, Any] = {"action_type": action_type}
 
     if action_type == "reorder":
         sku = payload.get("sku", "UNKNOWN")
@@ -605,6 +622,17 @@ def _execute_action(action: PendingAction, payload: Dict[str, Any]) -> Dict[str,
             ai_briefing=f"Action Gate approved: {po_ref} created for {quantity} units of {sku} from {supplier} ({lead_days}-day lead).",
         ))
         db.session.commit()
+
+        rollback_snapshot.update({
+            "po_reference": po_ref,
+            "sku": sku,
+            "quantity": quantity,
+            "supplier": supplier,
+            "supplier_email": supplier_email,
+            "lead_days": lead_days,
+        })
+        _store_rollback_snapshot(evidence, rollback_snapshot)
+
         writeback = outbound.send_supplier_po(
             merchant_id,
             po,
@@ -618,10 +646,43 @@ def _execute_action(action: PendingAction, payload: Dict[str, Any]) -> Dict[str,
             "writeback": writeback,
         }
 
+    if action_type == "price":
+        sku = payload.get("sku", "")
+        new_price = float(payload.get("price") or payload.get("new_price") or 0)
+        previous_price = None
+        for product in shopify_sync.get_products(merchant_id):
+            if product.get("sku", "").upper() == sku.upper():
+                previous_price = float(product.get("price") or 0)
+                break
+        if not sku or new_price <= 0:
+            return {"message": "Price action requires a SKU and a positive new price."}
+
+        rollback_snapshot.update({
+            "sku": sku,
+            "previous_price": previous_price,
+            "new_price": new_price,
+            "channel": "shopify",
+        })
+        _store_rollback_snapshot(evidence, rollback_snapshot)
+
+        writeback = outbound.dispatch_action("price", merchant_id, {"sku": sku, "price": new_price})
+        return {
+            "message": f"Price for {sku} updated to ${new_price:,.2f} on connected channels.",
+            "writeback": writeback,
+        }
+
     if action_type == "refund":
         order_id = payload.get("order_id", "")
         order = ProfitFeedOrder.query.filter_by(order_id=order_id, merchant_id=merchant_id).first()
         if order:
+            rollback_snapshot.update({
+                "order_id": order_id,
+                "previous_state": order.state,
+                "previous_refund": float(order.refund_amount or 0),
+                "previous_net": float(order.net_profit or 0),
+            })
+            _store_rollback_snapshot(evidence, rollback_snapshot)
+
             order.state = "refunded"
             order.refund_amount = order.gross_revenue
             order.net_profit = -order.marketplace_fees - order.cost_of_goods_sold - order.shipping_costs - order.ad_spend_attributed
@@ -646,6 +707,15 @@ def _execute_action(action: PendingAction, payload: Dict[str, Any]) -> Dict[str,
                 new_budget = max(0.0, current_budget * (1 + adjustment / 100.0))
                 campaign.daily_budget = new_budget
                 db.session.commit()
+                rollback_snapshot.update({
+                    "record_type": "campaign",
+                    "campaign_id": campaign_id,
+                    "platform": platform or campaign.channel,
+                    "previous_budget": current_budget,
+                    "new_budget": new_budget,
+                    "adjustment": adjustment,
+                })
+                _store_rollback_snapshot(evidence, rollback_snapshot)
                 writeback = outbound.ad_platform_update_budget(
                     platform or campaign.channel, merchant_id, new_budget, campaign_id=campaign_id
                 )
@@ -656,9 +726,19 @@ def _execute_action(action: PendingAction, payload: Dict[str, Any]) -> Dict[str,
 
         ad = AdSpendAnalytic.query.filter_by(merchant_id=merchant_id, platform_source=platform).first()
         if ad:
-            new_budget = ad.budget_allocated * (1 + adjustment / 100.0) if ad.budget_allocated else 0.0
+            current_budget = float(ad.budget_allocated or 0.0)
+            new_budget = current_budget * (1 + adjustment / 100.0) if ad.budget_allocated else 0.0
             ad.budget_allocated = max(0.0, new_budget)
             db.session.commit()
+            rollback_snapshot.update({
+                "record_type": "ad_analytic",
+                "platform": platform,
+                "ad_analytic_id": ad.id,
+                "previous_budget": current_budget,
+                "new_budget": new_budget,
+                "adjustment": adjustment,
+            })
+            _store_rollback_snapshot(evidence, rollback_snapshot)
             writeback = outbound.ad_platform_update_budget(platform, merchant_id, new_budget)
             return {"message": f"{platform} ad budget adjusted by {adjustment}% to ${new_budget:,.2f}.", "writeback": writeback}
         writeback = outbound.ad_platform_update_budget(platform, merchant_id, 0.0)
@@ -678,16 +758,23 @@ def _execute_action(action: PendingAction, payload: Dict[str, Any]) -> Dict[str,
 
 def action_to_dict(action: PendingAction) -> Dict[str, Any]:
     evidence = {}
+    can_rollback = False
     try:
         ae = ActionEvidence.query.filter_by(action_id=action.id).first()
         if ae:
+            before_metrics = ae.before_metrics or {}
+            can_rollback = (
+                action.status in ("approved", "executed")
+                and isinstance(before_metrics, dict)
+                and bool(before_metrics.get("rollback_snapshot"))
+            )
             evidence = {
                 "confidence_score": ae.confidence_score,
                 "expected_weekly_impact_min": float(ae.expected_weekly_impact_min or 0),
                 "expected_weekly_impact_max": float(ae.expected_weekly_impact_max or 0),
                 "reasoning_summary": ae.reasoning_summary,
                 "telemetry_evidence_log": ae.telemetry_evidence_log or {},
-                "before_metrics": ae.before_metrics or {},
+                "before_metrics": before_metrics,
                 "after_metrics": ae.after_metrics or {},
                 "execution_report": ae.execution_report,
                 "verified_at": ae.verified_at.isoformat() if ae.verified_at else None,
@@ -708,5 +795,90 @@ def action_to_dict(action: PendingAction) -> Dict[str, Any]:
         "decided_at": action.decided_at.isoformat() if action.decided_at else None,
         "decision_by": action.decision_by,
         "result_summary": action.result_summary,
+        "can_rollback": can_rollback,
         "evidence": evidence,
     }
+
+
+def rollback_action(action_id: int, merchant_id: str, decided_by: str = "merchant") -> Dict[str, Any]:
+    """Revert an executed/approved action using the rollback snapshot captured at execution."""
+    action = get_action(action_id, merchant_id)
+    if not action:
+        raise ValueError("Action not found")
+    if action.status not in ("approved", "executed"):
+        raise ValueError(f"Action is {action.status}; rollback requires approved or executed")
+
+    evidence = ActionEvidence.query.filter_by(action_id=action.id).first()
+    if not evidence:
+        raise ValueError("No evidence/audit record for action")
+
+    before_metrics = evidence.before_metrics or {}
+    if not isinstance(before_metrics, dict):
+        raise ValueError("No rollback metadata available")
+    snapshot = before_metrics.get("rollback_snapshot") or {}
+    if not snapshot:
+        raise ValueError("No rollback snapshot captured for this action")
+
+    action_type = snapshot.get("action_type", action.action_type)
+    result_message = "Rolled back action."
+
+    if action_type == "reorder":
+        po_ref = snapshot.get("po_reference")
+        po = GeneratedPurchaseOrder.query.filter_by(po_reference=po_ref, merchant_id=merchant_id).first()
+        if po and po.fulfillment_status != "CANCELLED":
+            po.fulfillment_status = "CANCELLED"
+            result_message = f"Cancelled purchase order {po_ref}."
+        else:
+            result_message = f"Purchase order {po_ref} already cancelled or not found."
+
+    elif action_type == "price":
+        sku = snapshot.get("sku")
+        previous_price = snapshot.get("previous_price")
+        if sku and previous_price is not None:
+            outbound.shopify_update_price(merchant_id, sku, float(previous_price))
+            result_message = f"Restored price for {sku} to ${float(previous_price):,.2f}."
+
+    elif action_type == "refund":
+        order_id = snapshot.get("order_id")
+        order = ProfitFeedOrder.query.filter_by(order_id=order_id, merchant_id=merchant_id).first()
+        if order:
+            order.state = snapshot.get("previous_state", order.state)
+            order.refund_amount = float(snapshot.get("previous_refund", 0) or 0)
+            order.net_profit = float(snapshot.get("previous_net", order.net_profit or 0) or 0)
+            result_message = f"Restored order {order_id} to pre-refund state."
+
+    elif action_type == "ad_adjust":
+        record_type = snapshot.get("record_type")
+        previous_budget = float(snapshot.get("previous_budget", 0) or 0)
+        if record_type == "campaign":
+            campaign_id = snapshot.get("campaign_id")
+            campaign = MarketingCampaign.query.filter_by(
+                merchant_id=merchant_id, external_campaign_id=campaign_id
+            ).first()
+            if campaign:
+                campaign.daily_budget = previous_budget
+                result_message = f"Restored campaign {campaign_id} budget to ${previous_budget:,.2f}."
+        elif record_type == "ad_analytic":
+            ad_analytic_id = snapshot.get("ad_analytic_id")
+            ad = AdSpendAnalytic.query.filter_by(id=ad_analytic_id, merchant_id=merchant_id).first() if ad_analytic_id else None
+            if ad:
+                ad.budget_allocated = previous_budget
+                result_message = f"Restored {ad.platform_source} budget to ${previous_budget:,.2f}."
+
+    action.status = "rolled_back"
+    action.decided_at = _now()
+    action.decision_by = decided_by
+    action.result_summary = result_message
+    db.session.commit()
+
+    # Audit log
+    db.session.add(BusinessMetric(
+        merchant_id=merchant_id,
+        total_unified_balance=0.0,
+        true_net_profit=0.0,
+        gross_revenue=0.0,
+        ai_briefing=f"Action {action.id} rolled back by {decided_by}: {result_message}",
+    ))
+    db.session.commit()
+
+    return {"status": "rolled_back", "action_id": action.id, "message": result_message}

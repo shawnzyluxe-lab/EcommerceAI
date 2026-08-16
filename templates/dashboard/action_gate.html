@@ -118,10 +118,11 @@ function renderActions(pending, history) {
       <tr style="border-bottom:1px solid var(--line-2);">
         <td style="padding:10px;">${h.title}</td>
         <td style="padding:10px;">${h.action_type}</td>
-        <td style="padding:10px;"><span class="tag ${h.status === 'approved' ? 'tag-green' : 'tag-red'}">${h.status}</span></td>
+        <td style="padding:10px;"><span class="tag ${h.status === 'approved' ? 'tag-green' : (h.status === 'rolled_back' ? 'tag-orange' : 'tag-red')}">${h.status}</span></td>
         <td style="padding:10px; color:var(--ink-3);">
           ${h.result_summary || '-'}
           ${h.evidence && h.evidence.verification_report ? `<div style="font-size:.75rem; color:var(--success); margin-top:2px;">Verified ${h.evidence.verified_at || ''}: ${h.evidence.verification_report}</div>` : ''}
+          ${h.can_rollback ? `<button class="btn" style="padding:3px 10px;font-size:.72rem;margin-top:6px;background:var(--red-bg);color:var(--red);" onclick="rollbackAction(${h.id})">Rollback</button>` : ''}
         </td>
         <td style="padding:10px; color:var(--ink-3); font-size:.8rem;">${h.decided_at || h.created_at}</td>
       </tr>
@@ -135,6 +136,11 @@ async function approveAction(id) {
 
 async function denyAction(id) {
   await callAction(`/api/actions/${id}/deny`, 'denied');
+}
+
+async function rollbackAction(id) {
+  if (!confirm('Rollback this action?')) return;
+  await callAction(`/api/actions/${id}/rollback`, 'rolled back');
 }
 
 async function modifyAction(id) {
