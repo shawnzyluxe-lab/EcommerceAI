@@ -685,9 +685,6 @@ NAV_GROUPS = [
     {
         "label": "Settings",
         "links": [
-            {"id": "themes", "label": "Themes", "url": "/dashboard/themes", "icon": "◉"},
-            {"id": "billing", "label": "Billing", "url": "/dashboard/billing", "icon": "$"},
-            {"id": "integrations", "label": "Integrations", "url": "/dashboard/integrations", "icon": "∞"},
             {"id": "settings", "label": "Settings", "url": "/dashboard/settings", "icon": "⚙"},
         ],
     },

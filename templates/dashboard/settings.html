@@ -2,44 +2,352 @@
 {% block title %}Settings — {{ brand.name }} {{ brand.product }}{% endblock %}
 {% block content %}
 
+{% set active_tab = request.args.get('tab', 'account') %}
+
 <section class="page-header">
   <h1>Settings</h1>
-  <p>Manage your business, store, integrations, billing, notifications, and security.</p>
+  <p>Manage your account, billing, integrations, and dashboard appearance.</p>
 </section>
 
-<div class="grid grid-2">
-  <div class="card">
-    <div class="card-head"><h3>Account Profile</h3></div>
-    <form>
-      <label style="font-size: .75rem; color: var(--ink-3); font-weight: 600;">Business name</label>
-      <input type="text" value="{{ merchant.name | default('Your store') }}" style="width: 100%; padding: 10px; margin: 6px 0 14px; border: 1px solid var(--line); border-radius: 8px; background: var(--surface); color: var(--ink);">
-      <label style="font-size: .75rem; color: var(--ink-3); font-weight: 600;">Admin email</label>
-      <input type="email" value="{{ merchant.email | default('admin@example.com') }}" style="width: 100%; padding: 10px; margin: 6px 0 14px; border: 1px solid var(--line); border-radius: 8px; background: var(--surface); color: var(--ink);">
-      <label style="font-size: .75rem; color: var(--ink-3); font-weight: 600;">Account tier</label>
-      <input type="text" value="{{ merchant.tier | default('Enterprise Plan') }}" disabled style="width: 100%; padding: 10px; margin: 6px 0 14px; border: 1px solid var(--line); border-radius: 8px; background: var(--line-2);">
-      <button class="btn btn-primary">Save changes</button>
-    </form>
+<div class="settings-tabs" style="display: flex; gap: 8px; margin-bottom: 20px; border-bottom: 1px solid var(--line); padding-bottom: 8px;">
+  <button class="settings-tab {% if active_tab == 'account' %}active{% endif %}" data-tab="account" onclick="switchSettingsTab('account')">Account</button>
+  <button class="settings-tab {% if active_tab == 'billing' %}active{% endif %}" data-tab="billing" onclick="switchSettingsTab('billing')">Billing</button>
+  <button class="settings-tab {% if active_tab == 'integrations' %}active{% endif %}" data-tab="integrations" onclick="switchSettingsTab('integrations')">Integrations</button>
+  <button class="settings-tab {% if active_tab == 'themes' %}active{% endif %}" data-tab="themes" onclick="switchSettingsTab('themes')">Themes</button>
+</div>
+
+<div class="settings-panel" id="panel-account" {% if active_tab != 'account' %}style="display:none;"{% endif %}>
+  <div class="grid grid-2">
+    <div class="card">
+      <div class="card-head"><h3>Account Profile</h3></div>
+      <form>
+        <label style="font-size: .75rem; color: var(--ink-3); font-weight: 600;">Business name</label>
+        <input type="text" value="{{ merchant.name | default('Your store') }}" style="width: 100%; padding: 10px; margin: 6px 0 14px; border: 1px solid var(--line); border-radius: 8px; background: var(--surface); color: var(--ink);">
+        <label style="font-size: .75rem; color: var(--ink-3); font-weight: 600;">Admin email</label>
+        <input type="email" value="{{ merchant.email | default('admin@example.com') }}" style="width: 100%; padding: 10px; margin: 6px 0 14px; border: 1px solid var(--line); border-radius: 8px; background: var(--surface); color: var(--ink);">
+        <label style="font-size: .75rem; color: var(--ink-3); font-weight: 600;">Account tier</label>
+        <input type="text" value="{{ merchant.tier | default('Enterprise Plan') }}" disabled style="width: 100%; padding: 10px; margin: 6px 0 14px; border: 1px solid var(--line); border-radius: 8px; background: var(--line-2);">
+        <button class="btn btn-primary">Save changes</button>
+      </form>
+    </div>
+
+    <div class="card">
+      <div class="card-head"><h3>Your Plan</h3></div>
+      <div style="background: var(--accent); color: var(--ink); border-radius: var(--radius); padding: 18px; margin-bottom: 14px;">
+        <div style="font-size: 1.2rem; font-weight: 700; margin-bottom: 4px;">♛ {{ merchant.tier | default('Enterprise Plan') }}</div>
+        <div style="font-size: .85rem; color: var(--ink-2); margin-bottom: 14px;">The complete platform for high-volume businesses with advanced needs.</div>
+        <button class="btn" style="background: rgba(0,0,0,.25); color: var(--ink); border-color: rgba(0,0,0,.2);" onclick="switchSettingsTab('billing')">Manage Plan</button>
+      </div>
+      <div style="font-size: .85rem; font-weight: 600; margin-bottom: 10px;">Usage Overview</div>
+      {% for label, used, limit in [['Orders', 12450, 100000], ['Products', 1250, 10000], ['Customers', 8750, 100000], ['Storage', 45.6, 500]] %}
+      <div style="margin-bottom: 12px;">
+        <div style="display: flex; justify-content: space-between; font-size: .8rem; margin-bottom: 4px;">
+          <span>{{ label }}</span><span>{{ used }} / {{ limit }}</span>
+        </div>
+        <div style="height: 6px; border-radius: 99px; background: var(--line-2); overflow: hidden;">
+          <div style="height: 100%; border-radius: 99px; background: var(--gold); width: {{ (used / limit * 100) | round(1) }}%;"></div>
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+</div>
+
+<div class="settings-panel" id="panel-billing" {% if active_tab != 'billing' %}style="display:none;"{% endif %}>
+  {% if request.args.get('checkout') == 'success' %}
+  <div class="card" style="border: 1px solid var(--green); background: var(--green-bg); margin-bottom: 18px;">
+    <div style="font-weight: 700; color: var(--green); margin-bottom: 4px;">Payment successful</div>
+    <div style="font-size: .85rem; color: var(--ink-2);">Your subscription is active. It may take a moment for the dashboard to reflect the new plan.</div>
+  </div>
+  {% endif %}
+
+  {% set plan = billing_account.current_plan | default(merchant.tier) | default('Basic Tier') %}
+  {% set concierge = billing_account.concierge_bundle | default(false) %}
+
+  <div class="grid grid-2" style="align-items: start;">
+    <div class="card">
+      <div class="card-head"><h3>Current Plan</h3></div>
+      <div style="background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); padding: 18px; margin-bottom: 14px;">
+        <div style="font-size: 1.2rem; font-weight: 700; margin-bottom: 4px; color: var(--ink);">{{ plan }}</div>
+        <div id="plan-desc" style="font-size: .85rem; color: var(--ink-2); margin-bottom: 14px;">{% if concierge %}Concierge Bundle included{% else %}Upgrade anytime to unlock more stores, actions, and advanced features.{% endif %}</div>
+        <div style="font-size: 1.6rem; font-weight: 800; margin-bottom: 4px; color: var(--ink);">{% if plan == 'Vantav Operator' %}$199{% elif plan == 'Vantav Growth' %}$399{% elif plan == 'Vantav Scale' %}$799{% else %}Custom{% endif %}<span style="font-size: .85rem; color: var(--ink-3);">/mo</span></div>
+        {% if concierge %}<div style="font-size: .85rem; color: var(--ink-2); margin-top: 6px;">+ Concierge Bundle $999</div>{% endif %}
+        {% if billing_account and billing_account.billing_cycle_end %}
+        <div id="renewal-date" style="font-size: .8rem; color: var(--ink-3); margin-top: 6px;">Current cycle ends {{ billing_account.billing_cycle_end }}</div>
+        {% endif %}
+      </div>
+      <div style="display: flex; flex-direction: column; gap: 8px;">
+        <button id="upgrade-btn" class="btn btn-primary" style="width: 100%;" onclick="openUpgradeModal()">Upgrade or change plan</button>
+        <button id="portal-btn" class="btn" style="width: 100%;">Manage billing & invoices</button>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-head"><h3>{% if concierge %}Concierge Bundle{% else %}Concierge Bundle add-on{% endif %}</h3></div>
+      {% if concierge %}
+      <ul style="font-size: .9rem; color: var(--ink-2); line-height: 1.6; padding-left: 1.2rem;">
+        <li>Custom brand build + manufacturer match</li>
+        <li>Curated ad plan (TikTok, Amazon, Meta)</li>
+        <li>SEO setup and monthly optimization</li>
+        <li>Email / Klaviyo flow setup</li>
+      </ul>
+      {% else %}
+      <p style="font-size: .9rem; color: var(--ink-2); line-height: 1.5;">Add the <strong>$999 Concierge Bundle</strong> for done-for-you launch services: brand build, curated ad plan, SEO, and email setup.</p>
+      <button class="btn" style="width: 100%; margin-top: 10px;" onclick="openUpgradeModal(true)">Add Concierge Bundle</button>
+      {% endif %}
+    </div>
   </div>
 
   <div class="card">
-    <div class="card-head"><h3>Your Plan</h3></div>
-    <div style="background: var(--accent); color: var(--ink); border-radius: var(--radius); padding: 18px; margin-bottom: 14px;">
-      <div style="font-size: 1.2rem; font-weight: 700; margin-bottom: 4px;">♛ {{ merchant.tier | default('Enterprise Plan') }}</div>
-      <div style="font-size: .85rem; color: var(--ink-2); margin-bottom: 14px;">The complete platform for high-volume businesses with advanced needs.</div>
-      <button class="btn" style="background: rgba(0,0,0,.25); color: var(--ink); border-color: rgba(0,0,0,.2);">Manage Plan</button>
-    </div>
-    <div style="font-size: .85rem; font-weight: 600; margin-bottom: 10px;">Usage Overview</div>
-    {% for label, used, limit in [['Orders', 12450, 100000], ['Products', 1250, 10000], ['Customers', 8750, 100000], ['Storage', 45.6, 500]] %}
-    <div style="margin-bottom: 12px;">
-      <div style="display: flex; justify-content: space-between; font-size: .8rem; margin-bottom: 4px;">
-        <span>{{ label }}</span><span>{{ used }} / {{ limit }}</span>
+    <div class="card-head"><h3>Usage this cycle</h3></div>
+    {% set usage = {
+      'Orders': (billing_account.metered_usage_units | default(0), tier_limits.orders | default(1000)),
+      'Approved actions': (billing_account.approved_actions | default(0), tier_limits.actions | default(50)),
+      'Connected stores': (channels | default([]) | length, tier_limits.stores | default(2)),
+      'Team users': (team_users | default([]) | length, tier_limits.users | default(3))
+    } %}
+    {% for label, vals in usage.items() %}
+    {% set used = vals[0] | float %}
+    {% set limit = vals[1] | float %}
+    {% set raw_pct = used / limit * 100 %}
+    {% set pct = raw_pct if raw_pct < 100 else 100 %}
+    <div style="margin-bottom: 14px;">
+      <div style="display: flex; justify-content: space-between; font-size: .85rem; margin-bottom: 5px; color: var(--ink-2);">
+        <span>{{ label }}</span><span>{{ used | int }} / {{ limit | int }}</span>
       </div>
-      <div style="height: 6px; border-radius: 99px; background: var(--line-2); overflow: hidden;">
-        <div style="height: 100%; border-radius: 99px; background: var(--gold); width: {{ (used / limit * 100) | round(1) }}%;"></div>
+      <div style="height: 7px; border-radius: 99px; background: var(--line-2); overflow: hidden;">
+        <div style="height: 100%; border-radius: 99px; background: var(--purple); width: {{ pct | round(1) }}%;"></div>
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+
+  <div class="card">
+    <div class="card-head"><h3>Invoices</h3></div>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>Invoice</th><th>Date</th><th class="num">Amount</th><th>Status</th><th></th></tr></thead>
+        <tbody>
+          <tr>
+            <td class="b">Current accrued balance</td>
+            <td>—</td>
+            <td class="num mono">${{ '{:,.2f}'.format(billing_account.accrued_invoice_value | default(0.0)) }}</td>
+            <td><span class="tag tag-ghost">Open</span></td>
+            <td class="num">—</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+    <p style="font-size: .8rem; color: var(--ink-3); margin-top: 10px;">Detailed invoices are available in the Stripe Billing Portal.</p>
+  </div>
+</div>
+
+<div class="settings-panel" id="panel-integrations" {% if active_tab != 'integrations' %}style="display:none;"{% endif %}>
+  <div class="card">
+    <div class="card-head"><h3>API Keys</h3></div>
+    <div style="display: flex; flex-direction: column; gap: 12px;">
+      <div>
+        <label style="font-size: .75rem; color: var(--ink-3); font-weight: 600;">Public API key</label>
+        <input type="text" value="pk_live_51HZ...XyZ" style="width: 100%; padding: 10px; margin-top: 6px; border: 1px solid var(--line); border-radius: 8px;" disabled>
+      </div>
+      <div>
+        <label style="font-size: .75rem; color: var(--ink-3); font-weight: 600;">Secret API key</label>
+        <input type="password" value="sk_live_****************************************" style="width: 100%; padding: 10px; margin-top: 6px; border: 1px solid var(--line); border-radius: 8px;" disabled>
+      </div>
+      <div>
+        <label style="font-size: .75rem; color: var(--ink-3); font-weight: 600;">Webhook URL</label>
+        <input type="text" value="https://api.shawnzyluxe.com/webhooks/orders" style="width: 100%; padding: 10px; margin-top: 6px; border: 1px solid var(--line); border-radius: 8px;">
+      </div>
+    </div>
+    <button class="btn btn-primary" style="margin-top: 14px;">Save integrations</button>
+  </div>
+</div>
+
+<div class="settings-panel" id="panel-themes" {% if active_tab != 'themes' %}style="display:none;"{% endif %}>
+  <div class="theme-grid" id="theme-grid" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 16px;">
+    {% for t in [
+      {'slug':'prometheus-dark','name':'Prometheus Dark','active': merchant.theme == 'prometheus-dark'},
+      {'slug':'prometheus-light','name':'Prometheus Light','active': merchant.theme == 'prometheus-light'},
+      {'slug':'luxury-editorial','name':'Luxury Editorial','active': merchant.theme == 'luxury-editorial'},
+      {'slug':'minimal-clean','name':'Minimal Clean','active': merchant.theme == 'minimal-clean'}
+    ] %}
+    <div class="theme-card {% if t.active %}active{% endif %}" data-theme="{{ t.slug }}" style="border: 2px solid {% if t.active %}var(--gold){% else %}var(--line){% endif %}; border-radius: 14px; overflow: hidden; background: var(--surface);">
+      <div class="theme-preview" style="height: 120px; background: linear-gradient(135deg, {% if 'Dark' in t.name or 'Editorial' in t.name %}#16161f,#2a2a3a{% else %}#f6f8fc,#e4e8f0{% endif %});"></div>
+      <div style="padding: 14px;">
+        <div style="font-weight: 700; margin-bottom: 8px; display: flex; align-items: center; justify-content: space-between; color: var(--ink);">
+          {{ t.name }}
+          {% if t.active %}<span class="tag tag-green" style="font-size: .7rem;">Active</span>{% endif %}
+        </div>
+        <button class="btn theme-activate-btn" style="width: 100%;" data-theme="{{ t.slug }}">{% if t.active %}Customize{% else %}Activate{% endif %}</button>
       </div>
     </div>
     {% endfor %}
   </div>
 </div>
+
+<div id="upgrade-modal" style="display: none; position: fixed; inset: 0; background: rgba(0,0,0,.6); backdrop-filter: blur(4px); z-index: 100; align-items: center; justify-content: center; padding: 20px;">
+  <div style="background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); max-width: 520px; width: 100%; padding: 24px; box-shadow: var(--shadow);">
+    <h3 style="margin: 0 0 8px; color: var(--ink);">Choose a plan</h3>
+    <p style="color: var(--ink-2); font-size: .85rem; margin-bottom: 16px;">Select the plan that fits your business. You will be redirected to Stripe to complete payment.</p>
+    <div style="display: flex; flex-direction: column; gap: 10px; margin-bottom: 18px;">
+      <label class="upgrade-plan-label" style="display: flex; align-items: center; gap: 10px; padding: 12px; border: 1px solid var(--line); border-radius: 10px; cursor: pointer; background: var(--bg);">
+        <input type="radio" name="upgrade-plan" value="operator" {% if plan == 'Vantav Operator' %}checked{% endif %} style="accent-color: var(--purple);">
+        <div>
+          <div style="font-weight: 700; color: var(--ink);">Vantav Operator — $199/mo</div>
+          <div style="font-size: .8rem; color: var(--ink-3);">Up to 2 stores with recommendations, alerts, and standard support</div>
+        </div>
+      </label>
+      <label class="upgrade-plan-label" style="display: flex; align-items: center; gap: 10px; padding: 12px; border: 1px solid var(--purple); border-radius: 10px; cursor: pointer; background: var(--surface); position: relative;">
+        <input type="radio" name="upgrade-plan" value="growth" {% if plan != 'Vantav Scale' %}checked{% endif %} style="accent-color: var(--purple);">
+        <div>
+          <div style="font-weight: 700; color: var(--ink);">Vantav Growth — $399/mo <span style="font-size:.65rem; color:var(--purple);">MOST POPULAR</span></div>
+          <div style="font-size: .8rem; color: var(--ink-3);">Up to 5 stores with forecasting, cross-store reporting, and priority support</div>
+        </div>
+      </label>
+      <label class="upgrade-plan-label" style="display: flex; align-items: center; gap: 10px; padding: 12px; border: 1px solid var(--line); border-radius: 10px; cursor: pointer; background: var(--bg);">
+        <input type="radio" name="upgrade-plan" value="scale" {% if plan == 'Vantav Scale' %}checked{% endif %} style="accent-color: var(--purple);">
+        <div>
+          <div style="font-weight: 700; color: var(--ink);">Vantav Scale — $799/mo</div>
+          <div style="font-size: .8rem; color: var(--ink-3);">Up to 15 stores with portfolio reporting, API access, and priority onboarding</div>
+        </div>
+      </label>
+      <label style="display: flex; align-items: flex-start; gap: 10px; padding: 12px; border: 1px dashed var(--line); border-radius: 10px; cursor: pointer; background: var(--bg); margin-top: 4px;">
+        <input type="checkbox" id="upgrade-concierge" style="width: 18px; height: 18px; accent-color: var(--purple); margin-top: 2px;">
+        <div>
+          <div style="font-weight: 700; color: var(--ink);">Add Concierge Bundle — $999 one-time</div>
+          <div style="font-size: .8rem; color: var(--ink-3);">Custom brand build, curated ad plan, SEO, email setup</div>
+        </div>
+      </label>
+    </div>
+    <div style="display: flex; gap: 10px;">
+      <button class="btn" style="flex: 1;" onclick="closeUpgradeModal()">Cancel</button>
+      <button id="upgrade-confirm" class="btn btn-primary" style="flex: 2;" onclick="confirmUpgrade()">Continue to payment</button>
+    </div>
+  </div>
+</div>
+
+<div id="theme-toast" style="display:none; position: fixed; bottom: 24px; right: 24px; background: var(--surface-elevated); border: 1px solid var(--line); padding: 12px 18px; border-radius: 10px; box-shadow: var(--shadow); z-index: 100; color: var(--ink);"></div>
+
+<script>
+function switchSettingsTab(tab){
+  document.querySelectorAll('.settings-tab').forEach(b => b.classList.toggle('active', b.dataset.tab === tab));
+  document.querySelectorAll('.settings-panel').forEach(p => p.style.display = p.id === 'panel-' + tab ? 'block' : 'none');
+  if (history.replaceState) { history.replaceState(null, '', '?tab=' + tab); }
+}
+
+// Billing portal
+document.getElementById('portal-btn')?.addEventListener('click', async () => {
+  const btn = document.getElementById('portal-btn');
+  btn.disabled = true;
+  btn.textContent = 'Opening...';
+  try {
+    const res = await fetch('/api/v1/stripe/customer-portal', {method: 'POST', credentials: 'same-origin'});
+    const data = await res.json();
+    if (res.ok && data.url) { window.location.href = data.url; }
+    else { throw new Error(data.detail || 'Could not open portal'); }
+  } catch (e) {
+    alert(e.message);
+    btn.disabled = false;
+    btn.textContent = 'Manage billing & invoices';
+  }
+});
+
+function openUpgradeModal(preselectConcierge=false) {
+  document.getElementById('upgrade-modal').style.display = 'flex';
+  if (preselectConcierge) { document.getElementById('upgrade-concierge').checked = true; }
+}
+function closeUpgradeModal() { document.getElementById('upgrade-modal').style.display = 'none'; }
+
+async function confirmUpgrade() {
+  const plan = document.querySelector('input[name="upgrade-plan"]:checked').value;
+  const concierge = document.getElementById('upgrade-concierge').checked;
+  await startCheckout(plan, concierge);
+}
+
+async function startCheckout(plan, concierge=false) {
+  const btn = document.getElementById('upgrade-confirm') || document.getElementById('upgrade-btn');
+  if (btn) { btn.disabled = true; btn.textContent = 'Redirecting...'; }
+  try {
+    const res = await fetch('/api/v1/stripe/upgrade-session', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({plan, concierge_bundle: concierge}),
+      credentials: 'same-origin'
+    });
+    const data = await res.json();
+    if (res.ok && data.url) { window.location.href = data.url; }
+    else { throw new Error(data.detail || 'Unable to start checkout'); }
+  } catch (e) {
+    alert(e.message);
+    if (btn) { btn.disabled = false; btn.textContent = 'Continue to payment'; }
+  }
+}
+
+// Theme activation
+(function(){
+  const grid = document.getElementById('theme-grid');
+  const toast = document.getElementById('theme-toast');
+  if (!grid) return;
+
+  function showToast(msg){
+    toast.textContent = msg;
+    toast.style.display = 'block';
+    setTimeout(() => { toast.style.display = 'none'; }, 3000);
+  }
+
+  async function activateTheme(slug){
+    try {
+      const res = await fetch('/api/v1/merchant/theme', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({theme: slug}),
+        credentials: 'same-origin'
+      });
+      const data = await res.json();
+      if (!res.ok) { showToast(data.error || 'Could not activate theme.'); return; }
+      if (window.setTheme) window.setTheme(data.theme);
+      grid.querySelectorAll('.theme-card').forEach(card => {
+        const isActive = card.dataset.theme === data.theme;
+        card.classList.toggle('active', isActive);
+        card.style.borderColor = isActive ? 'var(--gold)' : 'var(--line)';
+        const badge = card.querySelector('.tag');
+        if (badge) badge.remove();
+        if (isActive) {
+          const title = card.querySelector('div > div');
+          const span = document.createElement('span');
+          span.className = 'tag tag-green';
+          span.style.fontSize = '.7rem';
+          span.textContent = 'Active';
+          title.appendChild(span);
+        }
+        const btn = card.querySelector('button');
+        btn.textContent = isActive ? 'Customize' : 'Activate';
+      });
+      showToast(data.theme.replace(/-/g, ' ').replace(/\b\w/g, l => l.toUpperCase()) + ' theme activated.');
+    } catch (e) { showToast('Network error. Please try again.'); }
+  }
+
+  grid.querySelectorAll('.theme-activate-btn').forEach(btn => {
+    btn.addEventListener('click', () => activateTheme(btn.dataset.theme));
+  });
+})();
+</script>
+
+<style>
+.settings-tabs .settings-tab {
+  background: transparent;
+  border: none;
+  color: var(--ink-3);
+  font-weight: 600;
+  padding: 8px 12px;
+  cursor: pointer;
+  border-bottom: 2px solid transparent;
+  margin-bottom: -1px;
+}
+.settings-tabs .settings-tab.active {
+  color: var(--accent);
+  border-bottom-color: var(--accent);
+}
+</style>
 
 {% endblock %}

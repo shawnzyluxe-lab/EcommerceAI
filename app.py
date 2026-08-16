@@ -1472,13 +1472,16 @@ def dashboard_page(page):
     if not merchant:
         return redirect(url_for('login'))
     active_page = page.replace('-', '_')
+    # Pages merged into the unified Settings page.
+    if active_page in ('billing', 'integrations', 'themes'):
+        return redirect(url_for('dashboard_page', page='settings', tab=active_page))
     valid_pages = {
         'overview', 'command_center', 'commerce_hub', 'alerts', 'action_gate', 'profit_engine', 'startup_pack',
         'predictions', 'product_research', 'fulfillment', 'fraud', 'suppliers',
         'marketing', 'support', 'automations', 'team_ai', 'health_score',
         'mobile', 'store_catalog', 'products', 'orders', 'customers',
         'inventory', 'shipments', 'returns', 'analytics', 'discounts', 'apps',
-        'themes', 'reports', 'billing', 'integrations', 'settings', 'tiktok_studio',
+        'reports', 'settings', 'tiktok_studio',
         'monitoring'
     }
     if active_page not in valid_pages:
