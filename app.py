@@ -34,7 +34,7 @@ logging.basicConfig(
 )
 logger = logging.getLogger("shawnzyluxe_core")
 from urllib.parse import urlencode
-from flask import Flask, render_template, request, redirect, url_for, session, flash, jsonify, send_file, make_response, after_this_request
+from flask import Flask, render_template, request, redirect, url_for, session, flash, jsonify, send_file, make_response, after_this_request, current_app
 from flask_sock import Sock
 from dotenv import load_dotenv
 
@@ -81,6 +81,7 @@ import tiktok_marketing_studio
 import marketing_studio as marketing_studio_module
 import assistant_engine
 import startup_pack
+import initial_sync
 import sandbox_demo
 import migrate as migrate_module
 from dashboard_context import (
@@ -2184,6 +2185,18 @@ def api_channel_display_name(platform):
     return jsonify({"updated": True, "platform": platform, "display_name": name}), 200
 
 
+def _trigger_initial_sync(merchant_id: str, channel: str) -> None:
+    """Start the 14-day historical pull + diagnostic audit in the background."""
+    try:
+        initial_sync.start_initial_sync(
+            merchant_id,
+            channel,
+            current_app._get_current_object(),
+        )
+    except Exception as e:
+        logger.error(f"[Initial Sync] Failed to start background audit for {merchant_id}: {e}")
+
+
 @app.route('/api/v1/channels/shopify', methods=['POST'])
 @require_roles([UserRole.ADMIN, UserRole.MERCHANT, UserRole.ENGINEER])
 def api_connect_shopify():
@@ -2200,7 +2213,8 @@ def api_connect_shopify():
         return jsonify({"detail": "shop and access_token required"}), 400
     try:
         channels_module.connect_shopify(merchant["id"], shop, token)
-        return jsonify({"status": "connected", "platform": "shopify", "domain": shop}), 200
+        _trigger_initial_sync(merchant["id"], "shopify")
+        return jsonify({"status": "connected", "platform": "shopify", "domain": shop, "audit_started": True}), 200
     except Exception as e:
         logger.error(f"[Channels] Shopify connect failed: {e}")
         return jsonify({"detail": str(e)}), 400
@@ -2225,7 +2239,8 @@ def api_connect_tiktok():
         return jsonify({"detail": "seller_id, app_key, app_secret, and access_token required"}), 400
     try:
         channels_module.connect_tiktok(merchant["id"], seller_id, app_key, app_secret, access_token, shop_cipher)
-        return jsonify({"status": "connected", "platform": "tiktok"}), 200
+        _trigger_initial_sync(merchant["id"], "tiktok")
+        return jsonify({"status": "connected", "platform": "tiktok", "audit_started": True}), 200
     except Exception as e:
         logger.error(f"[Channels] TikTok connect failed: {e}")
         return jsonify({"detail": str(e)}), 400
@@ -2258,10 +2273,34 @@ def api_connect_amazon():
             merchant["id"], seller_id, access_key, secret_key, region,
             refresh_token, lwa_client_id, lwa_client_secret, role_arn
         )
-        return jsonify({"status": "connected", "platform": "amazon"}), 200
+        _trigger_initial_sync(merchant["id"], "amazon")
+        return jsonify({"status": "connected", "platform": "amazon", "audit_started": True}), 200
     except Exception as e:
         logger.error(f"[Channels] Amazon connect failed: {e}")
         return jsonify({"detail": str(e)}), 400
+
+
+@app.route('/api/v1/auth/callback/complete', methods=['POST'])
+@require_roles([UserRole.ADMIN, UserRole.MERCHANT, UserRole.ENGINEER])
+def api_auth_callback_complete():
+    """Landing route for store authorizations: triggers the automated background audit."""
+    merchant = get_merchant_context()
+    if not merchant:
+        return jsonify({"error": "No merchant context"}), 403
+    header_id = request.headers.get("X-Merchant-Id", "").strip()
+    if header_id and header_id != merchant["id"]:
+        return jsonify({"error": "Merchant context mismatch"}), 403
+    data = request.get_json(silent=True) or {}
+    channel = (data.get("channel") or "shopify").lower().strip()
+    if channel not in ("shopify", "tiktok", "amazon"):
+        return jsonify({"detail": "channel must be shopify, tiktok, or amazon"}), 400
+    _trigger_initial_sync(merchant["id"], channel)
+    return jsonify({
+        "status": "authorized",
+        "message": "Store authorization complete. Your AI COO is actively auditing your store telemetry logs now.",
+        "channel": channel,
+        "audit_started": True,
+    }), 200
 
 
 @app.route('/api/v1/channels/<platform>/disconnect', methods=['POST'])
@@ -5034,6 +5073,7 @@ def shopify_oauth_callback():
             access_token=result["access_token"],
             shopify_shop_domain=shop,
         )
+        _trigger_initial_sync(merchant_id, "shopify")
         return redirect("/dashboard/settings?tab=stores&onboarding=1&oauth_sync=success")
     except Exception as e:
         logger.error(f"[Shopify OAuth] {e}")
@@ -5112,6 +5152,7 @@ def tiktok_oauth_callback():
             shop_cipher=shop_cipher,
             refresh_token=refresh_token,
         )
+        _trigger_initial_sync(merchant_id, "tiktok")
         return redirect("/dashboard/settings?tab=stores&onboarding=1&oauth_sync=success")
     except Exception as e:
         logger.error(f"[TikTok OAuth] {e}")
