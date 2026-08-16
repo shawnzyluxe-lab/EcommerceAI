@@ -720,6 +720,18 @@ TIKTOK_SERVICE_ID = os.environ.get("TIKTOK_SERVICE_ID", "")
 TIKTOK_AUTH_REGION = os.environ.get("TIKTOK_AUTH_REGION", "")
 TIKTOK_REDIRECT_URI = "https://vantavcommerce.com/api/v1/auth/tiktok/callback"
 
+
+def _tiktok_creds_for_region(region: str = ""):
+    """Return region-specific TikTok app credentials, falling back to global env."""
+    r = (region or TIKTOK_AUTH_REGION or "").strip().upper() or ""
+    if r and r != "GLOBAL":
+        app_key = os.environ.get(f"TIKTOK_APP_KEY_{r}") or TIKTOK_APP_KEY
+        app_secret = os.environ.get(f"TIKTOK_APP_SECRET_{r}") or TIKTOK_APP_SECRET
+        service_id = os.environ.get(f"TIKTOK_SERVICE_ID_{r}") or TIKTOK_SERVICE_ID
+    else:
+        app_key, app_secret, service_id = TIKTOK_APP_KEY, TIKTOK_APP_SECRET, TIKTOK_SERVICE_ID
+    return app_key, app_secret, service_id
+
 SHOPIFY_DOMAIN = os.environ.get('SHOPIFY_DOMAIN', '').strip()
 STOREFRONT_TOKEN = os.environ.get('SHOPIFY_STOREFRONT_TOKEN', '').strip()
 CUSTOMER_ACCOUNT_CLIENT_ID = os.environ.get('SHOPIFY_CUSTOMER_ACCOUNT_CLIENT_ID', '').strip()
@@ -2250,10 +2262,11 @@ def api_connect_tiktok():
     app_secret = (data.get("app_secret") or "").strip()
     access_token = (data.get("access_token") or "").strip()
     shop_cipher = (data.get("shop_cipher") or "").strip()
+    region = (data.get("region") or "").strip().lower()
     if not seller_id or not app_key or not app_secret or not access_token:
         return jsonify({"detail": "seller_id, app_key, app_secret, and access_token required"}), 400
     try:
-        channels_module.connect_tiktok(merchant["id"], seller_id, app_key, app_secret, access_token, shop_cipher)
+        channels_module.connect_tiktok(merchant["id"], seller_id, app_key, app_secret, access_token, shop_cipher, region=region)
         _trigger_initial_sync(merchant["id"], "tiktok")
         return jsonify({"status": "connected", "platform": "tiktok", "audit_started": True}), 200
     except Exception as e:
@@ -5084,19 +5097,24 @@ def shopify_oauth_connect():
     return redirect(oauth_url)
 
 
-def _tiktok_oauth_state(merchant_id: str, secret: str) -> str:
-    sig = hmac.new(secret.encode("utf-8"), merchant_id.encode("utf-8"), hashlib.sha256).hexdigest()[:16]
-    return f"{merchant_id}:{sig}"
+def _tiktok_oauth_state(merchant_id: str, secret: str, region: str = "") -> str:
+    payload = f"{merchant_id}:{region}"
+    sig = hmac.new(secret.encode("utf-8"), payload.encode("utf-8"), hashlib.sha256).hexdigest()[:16]
+    return f"{merchant_id}:{region}:{sig}"
 
 
-def _verify_tiktok_oauth_state(state: str, secret: str) -> Optional[str]:
+def _verify_tiktok_oauth_state(state: str, secret: str) -> tuple:
     if not state or ":" not in state:
-        return None
-    merchant_id, sig = state.split(":", 1)
-    expected = hmac.new(secret.encode("utf-8"), merchant_id.encode("utf-8"), hashlib.sha256).hexdigest()[:16]
+        return None, ""
+    parts = state.split(":", 2)
+    if len(parts) < 3:
+        return None, ""
+    merchant_id, region, sig = parts
+    payload = f"{merchant_id}:{region}"
+    expected = hmac.new(secret.encode("utf-8"), payload.encode("utf-8"), hashlib.sha256).hexdigest()[:16]
     if not hmac.compare_digest(sig, expected):
-        return None
-    return merchant_id
+        return None, ""
+    return merchant_id, region
 
 
 @app.route('/api/v1/auth/shopify/callback')
@@ -5140,16 +5158,19 @@ def tiktok_oauth_connect():
         return redirect("/login?error=auth_required")
     if not merchant.get("live_access_enabled"):
         return redirect("/dashboard/commerce-hub?oauth_sync=error")
-    if not TIKTOK_APP_KEY or not TIKTOK_APP_SECRET or not TIKTOK_SERVICE_ID:
+
+    region = (request.args.get("region") or TIKTOK_AUTH_REGION or "").strip().lower()
+    app_key, app_secret, service_id = _tiktok_creds_for_region(region)
+    if not app_key or not app_secret or not service_id:
         return redirect("/dashboard/commerce-hub?oauth_sync=error")
 
-    state = _tiktok_oauth_state(merchant["id"], TIKTOK_APP_SECRET)
+    state = _tiktok_oauth_state(merchant["id"], app_secret, region)
     auth_url = tiktok_sync.build_auth_url(
-        service_id=TIKTOK_SERVICE_ID,
-        app_key=TIKTOK_APP_KEY,
+        service_id=service_id,
+        app_key=app_key,
         redirect_uri=TIKTOK_REDIRECT_URI,
         state=state,
-        region=TIKTOK_AUTH_REGION,
+        region=region,
     )
     return redirect(auth_url)
 
@@ -5163,8 +5184,9 @@ def tiktok_oauth_callback():
         return redirect("/dashboard/commerce-hub?oauth_sync=error")
 
     merchant_id = None
+    region = ""
     if TIKTOK_APP_SECRET:
-        merchant_id = _verify_tiktok_oauth_state(state, TIKTOK_APP_SECRET)
+        merchant_id, region = _verify_tiktok_oauth_state(state, TIKTOK_APP_SECRET)
     if not merchant_id:
         merchant = get_merchant_context()
         if merchant:
@@ -5172,19 +5194,20 @@ def tiktok_oauth_callback():
         else:
             return redirect("/login?error=auth_required")
 
-    if not TIKTOK_APP_KEY or not TIKTOK_APP_SECRET:
+    app_key, app_secret, _ = _tiktok_creds_for_region(region)
+    if not app_key or not app_secret:
         return redirect("/dashboard/commerce-hub?oauth_sync=error")
 
     try:
-        token_data = tiktok_sync.exchange_auth_code(code, TIKTOK_APP_KEY, TIKTOK_APP_SECRET)
+        token_data = tiktok_sync.exchange_auth_code(code, app_key, app_secret)
         access_token = token_data.get("access_token") or token_data.get("accessToken", "")
         refresh_token = token_data.get("refresh_token") or token_data.get("refreshToken", "")
 
         shops = tiktok_sync.get_authorized_shops(
             access_token=access_token,
-            app_key=TIKTOK_APP_KEY,
-            app_secret=TIKTOK_APP_SECRET,
-            region=TIKTOK_AUTH_REGION,
+            app_key=app_key,
+            app_secret=app_secret,
+            region=region,
         )
         if not shops:
             return redirect("/dashboard/commerce-hub?oauth_sync=error")
@@ -5198,11 +5221,12 @@ def tiktok_oauth_callback():
         channels_module.connect_tiktok(
             merchant_id=merchant_id,
             seller_id=shop_id,
-            app_key=TIKTOK_APP_KEY,
-            app_secret=TIKTOK_APP_SECRET,
+            app_key=app_key,
+            app_secret=app_secret,
             access_token=access_token,
             shop_cipher=shop_cipher,
             refresh_token=refresh_token,
+            region=region,
         )
         _trigger_initial_sync(merchant_id, "tiktok")
         return_url = "/dashboard/settings?tab=stores&onboarding=1&oauth_sync=success"

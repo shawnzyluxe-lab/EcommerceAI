@@ -146,6 +146,7 @@ def connect_tiktok(
     access_token: str = "",
     shop_cipher: str = "",
     refresh_token: str = "",
+    region: str = "",
 ) -> Dict[str, Any]:
     """Persist a TikTok Shop connection."""
     _enforce_store_limit(merchant_id)
@@ -163,6 +164,7 @@ def connect_tiktok(
         "access_token": access_token,
         "refresh_token": refresh_token,
         "shop_cipher": shop_cipher,
+        "region": region,
     }))
     token.scope_permissions = "shop.list,order.list,product.list"
     token.updated_at = datetime.utcnow()

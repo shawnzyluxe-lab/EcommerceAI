@@ -31,7 +31,16 @@
           <span class="tag tag-ghost" style="margin-top: 10px; display: inline-block;">Disabled in sandbox</span>
           {% endif %}
         {% else %}
+        {% if ch.platform == 'tiktok' and ch.state != 'connected' %}
+        <select id="tiktok-region" style="margin-top: 8px; width: 100%; padding: 5px; font-size: .72rem; border-radius: 6px; border: 1px solid var(--line); background: var(--surface); color: var(--ink);">
+          <option value="us" selected>US TikTok Shop</option>
+          <option value="uk">UK / EU TikTok Shop</option>
+          <option value="">Global / Other</option>
+        </select>
+        <button class="btn" style="margin-top: 6px; width: 100%; font-size: .72rem; padding: 5px 8px;" onclick="openConnectModal('tiktok')">Connect</button>
+        {% else %}
         <button class="btn" style="margin-top: 10px; width: 100%; font-size: .72rem; padding: 5px 8px;" onclick="openConnectModal('{{ ch.platform }}')">{{ 'Manage' if ch.state == 'connected' else 'Connect' }}</button>
+        {% endif %}
         {% endif %}
       {% else %}
       <span class="tag tag-ghost" style="margin-top: 10px; display: inline-block;">Coming soon</span>
@@ -86,6 +95,12 @@
       </div>
 
       <div id="tiktok-fields" style="display:none;">
+        <label style="font-size: .75rem; color: var(--ink-3); font-weight: 600;">Region</label>
+        <select id="tiktok-manual-region" style="width: 100%; padding: 10px; margin: 6px 0 12px; border: 1px solid var(--line); border-radius: 8px; background: var(--surface); color: var(--ink);">
+          <option value="us" selected>US TikTok Shop</option>
+          <option value="uk">UK / EU TikTok Shop</option>
+          <option value="">Global / Other</option>
+        </select>
         <label style="font-size: .75rem; color: var(--ink-3); font-weight: 600;">Shop / Seller ID</label>
         <input id="tiktok-seller" type="text" placeholder="Your TikTok shop ID" style="width: 100%; padding: 10px; margin: 6px 0 12px; border: 1px solid var(--line); border-radius: 8px; background: var(--surface); color: var(--ink);">
         <label style="font-size: .75rem; color: var(--ink-3); font-weight: 600;">App key</label>
@@ -172,7 +187,9 @@ function openConnectModal(platform) {
     return;
   }
   if (platform === 'tiktok') {
-    window.location.href = '/api/v1/auth/tiktok/connect';
+    const regionSelect = document.getElementById('tiktok-region');
+    const region = regionSelect ? regionSelect.value : 'us';
+    window.location.href = '/api/v1/auth/tiktok/connect?region=' + encodeURIComponent(region);
     return;
   }
   document.getElementById('platform').value = platform;
@@ -199,7 +216,8 @@ async function submitConnect(e) {
       app_key: document.getElementById('tiktok-key').value,
       app_secret: document.getElementById('tiktok-secret').value,
       access_token: document.getElementById('tiktok-access-token').value,
-      shop_cipher: document.getElementById('tiktok-shop-cipher').value
+      shop_cipher: document.getElementById('tiktok-shop-cipher').value,
+      region: document.getElementById('tiktok-manual-region').value
     };
   } else if (platform === 'amazon') {
     body = {

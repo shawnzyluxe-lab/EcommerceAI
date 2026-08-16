@@ -54,6 +54,7 @@ def _get_credentials(merchant_id: str) -> Dict[str, str]:
         "refresh_token": creds.get("refresh_token", ""),
         "shop_id": creds.get("shop_id", ""),
         "shop_cipher": creds.get("shop_cipher", ""),
+        "region": creds.get("region", ""),
     }
 
 
@@ -103,7 +104,8 @@ def _request(
     if not all([app_key, app_secret, access_token]):
         raise ValueError("TikTok credentials incomplete: app_key, app_secret, and access_token are required")
 
-    base = base_url or BASE_URL
+    region = credentials.get("region", "")
+    base = base_url or _api_base(region) or BASE_URL
     url = f"{base}{endpoint}?access_token={access_token}&app_key={app_key}"
     if shop_cipher:
         url += f"&shop_cipher={shop_cipher}"
