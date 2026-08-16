@@ -384,6 +384,34 @@ def run_migrations():
                 """,
             )
 
+        # Pre-aggregated SKU profitability materialized view for fast dashboard reads
+        _run(
+            "mv.mv_daily_sku_profitability",
+            """
+            CREATE MATERIALIZED VIEW IF NOT EXISTS mv_daily_sku_profitability AS
+            SELECT
+                oi.sku,
+                o.merchant_id,
+                SUM(oi.qty * oi.unit_price) AS gross_revenue,
+                SUM(oi.qty * oi.unit_cost) AS total_cogs,
+                COUNT(DISTINCT o.id) AS total_orders_count,
+                MAX(o.created_at)::date AS calculation_date
+            FROM orders o
+            JOIN order_items oi ON o.id = oi.order_id
+            GROUP BY oi.sku, o.merchant_id
+            """,
+        )
+        _run(
+            "idx.mv_daily_sku_profitability",
+            "CREATE UNIQUE INDEX IF NOT EXISTS idx_mv_sku_profitability_lookup ON mv_daily_sku_profitability (merchant_id, sku)",
+        )
+
+        # Multi-tenant covering index for product inventory lookups
+        _run(
+            "idx.products.tenant_covering",
+            "CREATE INDEX IF NOT EXISTS idx_products_tenant_covering ON products (merchant_id, sku) INCLUDE (on_hand, reorder_point)",
+        )
+
         # High-performance indexes for the True Profit Engine and AI COO Regression Engine
         _run(
             "idx.daily_costs.sku_date",
@@ -408,6 +436,38 @@ def run_migrations():
         _run("analyze.orders", "ANALYZE orders")
 
 
+def refresh_materialized_views():
+    """Refresh materialized views concurrently so dashboard reads stay fast."""
+    raw_url = os.environ.get("DATABASE_URL_ADMIN") or os.environ.get("DATABASE_URL")
+    if not raw_url:
+        print("DATABASE_URL not set; skipping materialized view refresh.")
+        return
+    if raw_url.startswith("sqlite"):
+        print("SQLite detected; no materialized views to refresh.")
+        return
+    if raw_url.startswith("postgresql://"):
+        url = "postgresql+psycopg" + raw_url[len("postgresql"):]
+    elif raw_url.startswith("postgres://"):
+        url = "postgresql+psycopg" + raw_url[len("postgres"):]
+    else:
+        url = raw_url
+
+    engine = create_engine(url)
+    with engine.connect().execution_options(isolation_level="AUTOCOMMIT") as conn:
+        try:
+            conn.execute(text("REFRESH MATERIALIZED VIEW CONCURRENTLY mv_daily_sku_profitability"))
+            print("[migrate] mv_daily_sku_profitability refreshed concurrently")
+        except Exception as e:
+            # A non-concurrent refresh is safer if the unique index has not been created yet.
+            try:
+                conn.execute(text("REFRESH MATERIALIZED VIEW mv_daily_sku_profitability"))
+                print(f"[migrate] mv_daily_sku_profitability refreshed (non-concurrent): {e}")
+            except Exception as inner:
+                print(f"[migrate] materialized view refresh failed: {inner}")
+
+
 if __name__ == "__main__":
     run_migrations()
+    if "--refresh" in sys.argv:
+        refresh_materialized_views()
     print("Migration pass complete.")

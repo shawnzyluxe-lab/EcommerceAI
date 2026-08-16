@@ -4,8 +4,11 @@ Specialized Finance and Logistics agents evaluate live SKU telemetry, then a
 controller synthesizes recommendations and validates them against merchant
 business memory before staging actions through the Action Gate.
 """
+import asyncio
 import datetime
+import os
 import uuid
+from concurrent.futures import ThreadPoolExecutor
 from decimal import Decimal
 from typing import Dict, List, Optional
 
@@ -13,6 +16,7 @@ from pydantic import BaseModel, Field
 
 from models import db, Product, UnifiedOrder, OrderItem, DailyCost, BusinessMemory
 import action_gate
+import cache_barrier
 import competitor_intelligence
 import profit_regression
 
@@ -166,70 +170,88 @@ class AICOOController:
         self.constraints = constraints
         self.finance_dept = FinanceAgent()
         self.logistics_dept = LogisticsAgent(carrier_database=carrier_database)
+        max_workers = min(8, (4 if (os.cpu_count() or 1) < 2 else 8))
+        self._executor = ThreadPoolExecutor(max_workers=max_workers, thread_name_prefix="coo-eval-")
+
+    async def _evaluate_telemetry(self, telemetry: ChannelTelemetrySnapshot) -> List[EvaluatedActionDraft]:
+        """Run independent Finance and Logistics diagnostics concurrently in a thread pool."""
+        loop = asyncio.get_event_loop()
+        fin_task = loop.run_in_executor(self._executor, self.finance_dept.inspect_margins, telemetry)
+        log_task = loop.run_in_executor(self._executor, self.logistics_dept.inspect_runway, telemetry)
+        fin, log = await asyncio.gather(fin_task, log_task)
+
+        drafts: List[EvaluatedActionDraft] = []
+        if fin["margin_percentage"] < self.constraints.floor_margin_percentage:
+            action_id = f"ACT_COO_{uuid.uuid4().hex[:6].upper()}"
+            drafts.append(
+                EvaluatedActionDraft(
+                    action_id=action_id,
+                    kind="ad_budget",
+                    title=f"Scale down underperforming ad spend: {telemetry.sku}",
+                    payload={
+                        "sku": telemetry.sku,
+                        "channel": telemetry.channel,
+                        "modification": "REDUCE_BUDGET",
+                        "value_percentage": 25.0,
+                    },
+                    evidence={
+                        "confidence_score": 89,
+                        "reason": (
+                            f"Net profit margin dropped to {fin['margin_percentage']}% "
+                            f"(floor limit is {self.constraints.floor_margin_percentage}%)."
+                        ),
+                        "metrics": [
+                            f"Active CAC reached ${fin['current_cac']} vs merchant ceiling ${self.constraints.max_cac_threshold}.",
+                            "Attributed 24h ad overhead is pulling product margins below acceptable floor.",
+                        ],
+                    },
+                )
+            )
+
+        if log["is_critical_stockout"]:
+            action_id = f"ACT_COO_{uuid.uuid4().hex[:6].upper()}"
+            drafts.append(
+                EvaluatedActionDraft(
+                    action_id=action_id,
+                    kind="po",
+                    title=f"Urgent procurement restock dispatch: {telemetry.sku}",
+                    payload={
+                        "sku": telemetry.sku,
+                        "channel": telemetry.channel,
+                        "suggested_units": log.get("dynamic_reorder_point_units") or log["recommended_order_qty"],
+                        "estimated_capital_overhead": round(
+                            (log.get("dynamic_reorder_point_units") or log["recommended_order_qty"]) * telemetry.cogs_unit, 2
+                        ),
+                        "carrier_delay_lag_days": log.get("calculated_delay_lag", 0.0),
+                        "safety_buffer_days": log.get("allocated_safety_buffer", 2),
+                    },
+                    evidence={
+                        "confidence_score": 94,
+                        "reason": "Fulfillment runout calculation confirms critical stockout threshold reached.",
+                        "metrics": [
+                            f"Current on-hand status is down to {telemetry.on_hand_inventory} items.",
+                            f"Sales trajectory dictates absolute catalog depletion in {log['days_runway']} days.",
+                        ],
+                    },
+                )
+            )
+
+        return drafts
+
+    async def execute_parallel_sku_diagnostics(self, matrix: List[ChannelTelemetrySnapshot]) -> List[EvaluatedActionDraft]:
+        """Dispatch multi-agent evaluations concurrently across thread pools."""
+        if not matrix:
+            return []
+        tasks = [self._evaluate_telemetry(telemetry) for telemetry in matrix]
+        results = await asyncio.gather(*tasks)
+        staged_actions: List[EvaluatedActionDraft] = []
+        for item_list in results:
+            staged_actions.extend(item_list)
+        return staged_actions
 
     def run_autonomous_diagnostic(self, matrix: List[ChannelTelemetrySnapshot]) -> List[EvaluatedActionDraft]:
-        staged_actions: List[EvaluatedActionDraft] = []
-
-        for telemetry in matrix:
-            fin = self.finance_dept.inspect_margins(telemetry)
-            log = self.logistics_dept.inspect_runway(telemetry)
-
-            if fin["margin_percentage"] < self.constraints.floor_margin_percentage:
-                action_id = f"ACT_COO_{uuid.uuid4().hex[:6].upper()}"
-                staged_actions.append(
-                    EvaluatedActionDraft(
-                        action_id=action_id,
-                        kind="ad_budget",
-                        title=f"Scale down underperforming ad spend: {telemetry.sku}",
-                        payload={
-                            "sku": telemetry.sku,
-                            "channel": telemetry.channel,
-                            "modification": "REDUCE_BUDGET",
-                            "value_percentage": 25.0,
-                        },
-                        evidence={
-                            "confidence_score": 89,
-                            "reason": (
-                                f"Net profit margin dropped to {fin['margin_percentage']}% "
-                                f"(floor limit is {self.constraints.floor_margin_percentage}%)."
-                            ),
-                            "metrics": [
-                                f"Active CAC reached ${fin['current_cac']} vs merchant ceiling ${self.constraints.max_cac_threshold}.",
-                                "Attributed 24h ad overhead is pulling product margins below acceptable floor.",
-                            ],
-                        },
-                    )
-                )
-
-            if log["is_critical_stockout"]:
-                action_id = f"ACT_COO_{uuid.uuid4().hex[:6].upper()}"
-                staged_actions.append(
-                    EvaluatedActionDraft(
-                        action_id=action_id,
-                        kind="po",
-                        title=f"Urgent procurement restock dispatch: {telemetry.sku}",
-                        payload={
-                            "sku": telemetry.sku,
-                            "channel": telemetry.channel,
-                            "suggested_units": log.get("dynamic_reorder_point_units") or log["recommended_order_qty"],
-                            "estimated_capital_overhead": round(
-                                (log.get("dynamic_reorder_point_units") or log["recommended_order_qty"]) * telemetry.cogs_unit, 2
-                            ),
-                            "carrier_delay_lag_days": log.get("calculated_delay_lag", 0.0),
-                            "safety_buffer_days": log.get("allocated_safety_buffer", 2),
-                        },
-                        evidence={
-                            "confidence_score": 94,
-                            "reason": "Fulfillment runout calculation confirms critical stockout threshold reached.",
-                            "metrics": [
-                                f"Current on-hand status is down to {telemetry.on_hand_inventory} items.",
-                                f"Sales trajectory dictates absolute catalog depletion in {log['days_runway']} days.",
-                            ],
-                        },
-                    )
-                )
-
-        return staged_actions
+        """Sync entry point that runs the parallel diagnostic in a fresh event loop."""
+        return asyncio.run(self.execute_parallel_sku_diagnostics(matrix))
 
 
 def _dominant_channel(merchant_id: str, sku: str, since: datetime.datetime) -> str:
@@ -248,94 +270,107 @@ def _dominant_channel(merchant_id: str, sku: str, since: datetime.datetime) -> s
     return row[0] if row else "shopify"
 
 
+def _build_single_snapshot(merchant_id: str, product: Product, since: datetime.datetime) -> ChannelTelemetrySnapshot:
+    """Build a single ChannelTelemetrySnapshot for a product over the lookback window."""
+    sku = product.sku
+    cogs_unit = float(product.unit_cost or 0)
+    on_hand = int(product.on_hand or 0)
+
+    line_rows = (
+        db.session.query(
+            db.func.coalesce(db.func.sum(OrderItem.qty), 0).label("units"),
+            db.func.coalesce(db.func.sum(OrderItem.qty * OrderItem.unit_price), 0).label("revenue"),
+            db.func.coalesce(db.func.sum(OrderItem.qty * OrderItem.unit_cost), 0).label("cogs"),
+            db.func.coalesce(db.func.count(db.distinct(UnifiedOrder.id)), 0).label("orders"),
+        )
+        .join(UnifiedOrder, UnifiedOrder.id == OrderItem.order_id)
+        .filter(
+            UnifiedOrder.merchant_id == merchant_id,
+            OrderItem.sku == sku,
+            UnifiedOrder.created_at >= since,
+        )
+        .first()
+    )
+
+    refund_rows = (
+        db.session.query(db.func.count(db.distinct(UnifiedOrder.id)).label("refunds"))
+        .join(OrderItem, OrderItem.order_id == UnifiedOrder.id)
+        .filter(
+            UnifiedOrder.merchant_id == merchant_id,
+            OrderItem.sku == sku,
+            UnifiedOrder.created_at >= since,
+            UnifiedOrder.status.in_(["refunded", "cancelled"]),
+        )
+        .first()
+    )
+
+    # Allocate order-level shipping/fees proportional to this SKU's revenue share.
+    order_totals = (
+        db.session.query(
+            db.func.coalesce(db.func.sum(UnifiedOrder.revenue), 0).label("total_revenue"),
+            db.func.coalesce(db.func.sum(UnifiedOrder.shipping_charged), 0).label("total_shipping"),
+            db.func.coalesce(db.func.sum(UnifiedOrder.tax), 0).label("total_tax"),
+        )
+        .join(OrderItem, OrderItem.order_id == UnifiedOrder.id)
+        .filter(
+            UnifiedOrder.merchant_id == merchant_id,
+            OrderItem.sku == sku,
+            UnifiedOrder.created_at >= since,
+        )
+        .first()
+    )
+
+    sku_revenue = float(line_rows.revenue or 0)
+    total_revenue = float(order_totals.total_revenue or 0) or 1.0
+    share = sku_revenue / total_revenue
+
+    shipping = float(order_totals.total_shipping or 0) * share
+    # Estimate marketplace fees as 5% of SKU revenue unless we have line-level data.
+    marketplace_fees = sku_revenue * 0.05
+
+    log_date = since.date()
+    daily = (
+        DailyCost.query.filter_by(sku=sku)
+        .filter(DailyCost.log_date >= log_date)
+        .first()
+    )
+    ad_spend = float(daily.ad_spend or 0) if daily else 0.0
+
+    channel = _dominant_channel(merchant_id, sku, since)
+    market = competitor_intelligence.get_market_evidence(sku, channel)
+
+    return ChannelTelemetrySnapshot(
+        sku=sku,
+        channel=channel,
+        units_sold_24h=int(line_rows.units or 0),
+        revenue_24h=sku_revenue,
+        cogs_unit=cogs_unit,
+        ad_spend_attributed=ad_spend,
+        shipping_cost_actual=shipping,
+        marketplace_fees=marketplace_fees,
+        refunds_filed_count=int(refund_rows.refunds or 0),
+        on_hand_inventory=on_hand,
+        competitor_median_price=float(market.get("competitor_median_price", 0.0) or 0),
+    )
+
+
 def _build_snapshots(merchant_id: str, days: int = 1) -> List[ChannelTelemetrySnapshot]:
     since = datetime.datetime.utcnow() - datetime.timedelta(days=days)
     products = Product.query.filter_by(merchant_id=merchant_id).all()
     snapshots: List[ChannelTelemetrySnapshot] = []
 
     for product in products:
-        sku = product.sku
-        cogs_unit = float(product.unit_cost or 0)
-        on_hand = int(product.on_hand or 0)
+        cache_key = cache_barrier.sku_metrics_key(merchant_id, product.sku)
 
-        line_rows = (
-            db.session.query(
-                db.func.coalesce(db.func.sum(OrderItem.qty), 0).label("units"),
-                db.func.coalesce(db.func.sum(OrderItem.qty * OrderItem.unit_price), 0).label("revenue"),
-                db.func.coalesce(db.func.sum(OrderItem.qty * OrderItem.unit_cost), 0).label("cogs"),
-                db.func.coalesce(db.func.count(db.distinct(UnifiedOrder.id)), 0).label("orders"),
-            )
-            .join(UnifiedOrder, UnifiedOrder.id == OrderItem.order_id)
-            .filter(
-                UnifiedOrder.merchant_id == merchant_id,
-                OrderItem.sku == sku,
-                UnifiedOrder.created_at >= since,
-            )
-            .first()
-        )
+        def _compute() -> Dict:
+            return _build_single_snapshot(merchant_id, product, since).model_dump()
 
-        refund_rows = (
-            db.session.query(db.func.count(db.distinct(UnifiedOrder.id)).label("refunds"))
-            .join(OrderItem, OrderItem.order_id == UnifiedOrder.id)
-            .filter(
-                UnifiedOrder.merchant_id == merchant_id,
-                OrderItem.sku == sku,
-                UnifiedOrder.created_at >= since,
-                UnifiedOrder.status.in_(["refunded", "cancelled"]),
-            )
-            .first()
-        )
-
-        # Allocate order-level shipping/fees proportional to this SKU's COGS share.
-        order_totals = (
-            db.session.query(
-                db.func.coalesce(db.func.sum(UnifiedOrder.revenue), 0).label("total_revenue"),
-                db.func.coalesce(db.func.sum(UnifiedOrder.shipping_charged), 0).label("total_shipping"),
-                db.func.coalesce(db.func.sum(UnifiedOrder.tax), 0).label("total_tax"),
-            )
-            .join(OrderItem, OrderItem.order_id == UnifiedOrder.id)
-            .filter(
-                UnifiedOrder.merchant_id == merchant_id,
-                OrderItem.sku == sku,
-                UnifiedOrder.created_at >= since,
-            )
-            .first()
-        )
-
-        sku_revenue = float(line_rows.revenue or 0)
-        total_revenue = float(order_totals.total_revenue or 0) or 1.0
-        share = sku_revenue / total_revenue
-
-        shipping = float(order_totals.total_shipping or 0) * share
-        # Estimate marketplace fees as 5% of SKU revenue unless we have line-level data.
-        marketplace_fees = sku_revenue * 0.05
-
-        log_date = since.date()
-        daily = (
-            DailyCost.query.filter_by(sku=sku)
-            .filter(DailyCost.log_date >= log_date)
-            .first()
-        )
-        ad_spend = float(daily.ad_spend or 0) if daily else 0.0
-
-        channel = _dominant_channel(merchant_id, sku, since)
-        market = competitor_intelligence.get_market_evidence(sku, channel)
-
-        snapshots.append(
-            ChannelTelemetrySnapshot(
-                sku=sku,
-                channel=channel,
-                units_sold_24h=int(line_rows.units or 0),
-                revenue_24h=sku_revenue,
-                cogs_unit=cogs_unit,
-                ad_spend_attributed=ad_spend,
-                shipping_cost_actual=shipping,
-                marketplace_fees=marketplace_fees,
-                refunds_filed_count=int(refund_rows.refunds or 0),
-                on_hand_inventory=on_hand,
-                competitor_median_price=float(market.get("competitor_median_price", 0.0) or 0),
-            )
-        )
+        cached = cache_barrier.get_or_compute(cache_key, _compute, ttl=60)
+        try:
+            snapshots.append(ChannelTelemetrySnapshot(**cached))
+        except Exception:
+            # Fallback to fresh computation if the cached shape becomes stale.
+            snapshots.append(_build_single_snapshot(merchant_id, product, since))
 
     return snapshots
 

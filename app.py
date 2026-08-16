@@ -10,6 +10,7 @@ import requests
 import smtplib
 import logging
 import asyncio
+import time
 import dataclasses
 from threading import Thread
 from email.mime.text import MIMEText
@@ -56,6 +57,7 @@ if SENTRY_DSN:
 
 from models import db, Tenant, ConnectedChannel, ActiveSession, BusinessMetric, CommerceChannel, MerchantChannel, SupportMetric, MarketingStudio, PredictiveLogistics, OutboundTransmission, SaaSBilling, LocalProductCatalog, MerchantProfile, TenantOAuthToken, MerchantMetric, SystemExceptionLog, ProcessedWebhookEvent, AdSpendAnalytic, GeneratedPurchaseOrder, AIAgent, AgentMessage, MerchantDecisionLog, MagicLoginToken, TrendingProduct, ProductFinancialLedger, MerchantSetting, ProfitFeedOrder, AdSpendFeed, Alert, BetaWaitlistApplication, PendingAction, StartupPackProject, BusinessMemory, WorkspaceSeat, IntegrationLink, SecureChannelCredential
 import profit_feed
+import cache_barrier
 import billing as billing_module
 import alert_matrix
 import vetted_operator
@@ -2888,6 +2890,34 @@ def api_coo_diagnostic():
         return jsonify({"detail": str(e)}), 500
 
 
+@app.route('/api/v1/sku-metrics', methods=['GET'])
+@require_roles([UserRole.ADMIN, UserRole.MERCHANT, UserRole.ENGINEER])
+def api_sku_metrics():
+    """Return cached 24h SKU metrics using the Redis cache-barrier key schema."""
+    merchant = get_merchant_context()
+    if not merchant:
+        return jsonify({"error": "No merchant context"}), 403
+    sku = request.args.get("sku", "").strip()
+    if not sku:
+        return jsonify({"detail": "sku is required"}), 400
+
+    product = Product.query.filter_by(merchant_id=merchant["id"], sku=sku).first()
+    if not product:
+        return jsonify({"detail": f"SKU {sku} not found"}), 404
+
+    since = datetime.utcnow() - timedelta(days=1)
+
+    def _compute():
+        return coo_agent_mesh._build_single_snapshot(merchant["id"], product, since).model_dump()
+
+    try:
+        metrics = cache_barrier.get_sku_metrics(merchant["id"], sku, _compute, ttl=60)
+        return jsonify({"sku": sku, "metrics": metrics, "cached": True}), 200
+    except Exception as e:
+        logger.error(f"[SKU metrics] {e}")
+        return jsonify({"detail": str(e)}), 500
+
+
 @app.route('/api/v1/analytics/profit-regression', methods=['GET'])
 @require_roles([UserRole.ADMIN, UserRole.MERCHANT, UserRole.ENGINEER])
 def api_profit_regression():
@@ -5413,5 +5443,40 @@ def api_monitoring_alert_test():
     return jsonify({"status": "alert_dispatched"}), 200
 
 
+def _start_mview_refresh_worker():
+    """Lightweight background routine that refreshes materialized views periodically."""
+    interval = int(os.environ.get("MVIEW_REFRESH_MINUTES", "15"))
+    if os.environ.get("DISABLE_MVIEW_REFRESH") == "1":
+        return
+
+    def _loop():
+        while True:
+            time.sleep(interval * 60)
+            try:
+                import migrate as _migrate
+                _migrate.refresh_materialized_views()
+            except Exception as e:
+                logger.warning(f"[mview refresh worker] {e}")
+
+    t = Thread(target=_loop, daemon=True, name="mview-refresh")
+    t.start()
+    logger.info("[mview refresh worker] started")
+
+
+@app.route('/api/admin/refresh-materialized-views', methods=['POST'])
+@require_roles([UserRole.ADMIN, UserRole.ENGINEER])
+def api_refresh_materialized_views():
+    """Trigger a manual refresh of materialized views."""
+    try:
+        import migrate as _migrate
+        _migrate.refresh_materialized_views()
+        return jsonify({"status": "ok"}), 200
+    except Exception as e:
+        logger.error(f"[mview refresh] {e}")
+        return jsonify({"detail": str(e)}), 500
+
+
 if __name__ == '__main__':
     app.run(debug=True, port=3000)
+else:
+    _start_mview_refresh_worker()
