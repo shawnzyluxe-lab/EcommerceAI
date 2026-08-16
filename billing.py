@@ -2,6 +2,7 @@
 import os
 import json
 import logging
+from typing import Dict, Any
 from urllib.parse import urlparse, parse_qs, urlencode, urlunparse
 import stripe
 
@@ -200,6 +201,21 @@ def create_customer_portal_session(merchant_id, return_url=None):
         return_url=return_url or "https://vantavcommerce.com/dashboard/billing",
     )
     return session.url
+
+
+def verify_checkout_session(session_id: str) -> Dict[str, Any]:
+    """Retrieve a Checkout session from Stripe and return key details."""
+    _ensure_configured()
+    if not session_id:
+        raise ValueError("session_id is required")
+    session = stripe.checkout.Session.retrieve(session_id)
+    return {
+        "id": session.id,
+        "payment_status": session.get("payment_status"),
+        "customer": session.get("customer"),
+        "metadata": session.get("metadata", {}),
+        "subscription": session.get("subscription"),
+    }
 
 
 def get_public_key():

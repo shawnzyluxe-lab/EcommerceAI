@@ -1470,6 +1470,34 @@ def dashboard():
     if not merchant:
         return redirect(url_for('login'))
     merchant_id = merchant["id"]
+
+    # If the merchant just returned from Stripe, verify the checkout session
+    # synchronously so they can connect stores immediately even if the webhook
+    # is still queued.
+    if request.args.get('checkout') == 'success' and request.args.get('session_id'):
+        try:
+            checkout = billing_module.verify_checkout_session(request.args.get('session_id'))
+            if checkout.get("payment_status") == "paid":
+                profile = MerchantProfile.query.get(merchant_id)
+                billing = SaaSBilling.query.get(merchant_id)
+                metadata = checkout.get("metadata", {})
+                chosen_tier = metadata.get("selected_tier") or metadata.get("plan_choice") or "Vantav Operator"
+                chosen_tier = _canonical_tier(chosen_tier)
+                concierge_bundle = metadata.get("concierge_bundle") == "true"
+                if profile and profile.sandbox_status != "approved":
+                    profile.account_tier = chosen_tier
+                    profile.sandbox_status = "approved"
+                    profile.live_access_enabled = 1
+                    profile.approved_at = datetime.utcnow()
+                    if billing:
+                        billing.current_plan = chosen_tier
+                        if concierge_bundle and "concierge_bundle" not in (billing.add_ons or []):
+                            billing.add_ons = list((billing.add_ons or []) + ["concierge_bundle"])
+                    db.session.commit()
+                    merchant = get_merchant_context()
+        except Exception as e:
+            logger.warning(f"[Dashboard] Checkout verification failed: {e}")
+
     ctx = context(active_page='overview', merchant=merchant, merchant_id=merchant_id)
     ctx["show_brand_build_prompt"] = (
         request.args.get('checkout') == 'success'
@@ -3692,7 +3720,7 @@ def create_stripe_checkout():
     db.session.commit()
 
     try:
-        success_url = url_for('dashboard', _external=True, _scheme='https') + '?checkout=success&onboarding=1'
+        success_url = url_for('dashboard', _external=True, _scheme='https') + '?checkout=success&onboarding=1&session_id={{CHECKOUT_SESSION_ID}}'
         cancel_url = url_for('subscribe', _external=True, _scheme='https') + '?canceled=1'
         session_url, session_id, customer_id = billing_module.create_checkout_session(
             merchant_id,
