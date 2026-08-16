@@ -217,9 +217,10 @@ async function submitConnect(e) {
     const res = await fetch(url, {method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify(body)});
     const data = await res.json();
     if (res.ok) {
-      msg.textContent = 'Connected successfully.';
+      msg.textContent = 'Connected successfully. Starting initial sync...';
       msg.style.color = 'var(--green)';
-      loadChannels();
+      const returnUrl = encodeURIComponent('/dashboard/settings?tab=stores&onboarding=1');
+      window.location.href = `/dashboard/onboarding-loading?channel=${platform}&return=${returnUrl}`;
     } else {
       msg.textContent = data.detail || 'Failed';
       msg.style.color = 'var(--red)';

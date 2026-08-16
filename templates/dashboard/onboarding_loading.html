@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Vantav — Initializing</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            onyx: '#0D0D11',
+            slateDark: '#16161F',
+            borderMuted: '#262636',
+            accentGold: '#D4AF37'
+          },
+          fontFamily: {
+            mono: ['Courier New', 'Courier', 'monospace']
+          }
+        }
+      }
+    }
+  </script>
+</head>
+<body class="bg-onyx h-screen flex flex-col justify-center items-center text-gray-100 font-sans selection:bg-accentGold selection:text-onyx p-4">
+
+  <div class="w-full max-w-lg border border-borderMuted bg-slateDark p-8 rounded-md shadow-2xl space-y-6 relative overflow-hidden">
+
+    <div class="flex items-center space-x-2 border-b border-borderMuted/40 pb-4">
+      <span class="w-2 h-2 rounded-full bg-accentGold animate-ping"></span>
+      <span class="font-mono text-xs tracking-[0.2em] text-accentGold font-bold">PROMETHEUS // INITIALIZATION ENGINE</span>
+    </div>
+
+    <div class="space-y-1">
+      <h2 class="text-lg font-bold text-white uppercase tracking-wide">Syncing Your Store Telemetry</h2>
+      <p class="text-xs text-gray-400 font-mono">Your credentials are secure. The Assistant is running an initial audit on your past 14 days of store transactions.</p>
+    </div>
+
+    <div class="w-full bg-onyx border border-borderMuted rounded-sm p-1.5 overflow-hidden h-7 flex items-center">
+      <div id="progressBarFill" class="bg-white h-full w-[0%] transition-all duration-500 ease-out rounded-sm shadow-md flex justify-end items-center pr-2">
+        <span id="progressPercentText" class="text-[10px] font-mono text-onyx font-bold">0%</span>
+      </div>
+    </div>
+
+    <div class="bg-onyx/80 border border-borderMuted rounded-sm p-4 h-32 overflow-hidden font-mono text-[11px] text-gray-500 flex flex-col justify-end space-y-1">
+      <div id="log-line-1" class="transition-opacity duration-300"></div>
+      <div id="log-line-2" class="transition-opacity duration-300"></div>
+      <div id="log-line-3" class="transition-opacity duration-300 text-gray-300"></div>
+    </div>
+
+  </div>
+
+  <script>
+    document.addEventListener("DOMContentLoaded", function() {
+      const barFill = document.getElementById("progressBarFill");
+      const txtPercent = document.getElementById("progressPercentText");
+      const l1 = document.getElementById("log-line-1");
+      const l2 = document.getElementById("log-line-2");
+      const l3 = document.getElementById("log-line-3");
+
+      const params = new URLSearchParams(window.location.search);
+      const returnUrl = params.get("return") || "/dashboard";
+
+      const sequence = [
+        { percent: 15, l1: "SYSTEM: Credentials authenticated successfully via secure tunnel API.", l2: "SYSTEM: Pulling 14-day historical multi-channel order history.", l3: "> Connecting to Shopify REST endpoints..." },
+        { percent: 45, l1: "SYSTEM: Pulling 14-day historical multi-channel order history.", l2: "SYSTEM: Harvest complete. Normalized historical rows to database schemas.", l3: "> Transmitting data cache to relational tables..." },
+        { percent: 75, l1: "SYSTEM: Harvest complete. Normalized historical rows to database schemas.", l2: "SYSTEM: Assistant initialization complete.", l3: "> Running regression analytics and margin audits..." },
+        { percent: 100, l1: "SYSTEM: Assistant initialization complete.", l2: "SYSTEM: Regression analytics and margin audits completed.", l3: "> [SUCCESS] Dashboard telemetry arrays fully populated." }
+      ];
+
+      let stage = 0;
+      function advance() {
+        if (stage < sequence.length) {
+          const step = sequence[stage];
+          barFill.style.width = step.percent + "%";
+          txtPercent.innerText = step.percent + "%";
+          l1.innerText = step.l1;
+          l2.innerText = step.l2;
+          l3.innerText = step.l3;
+          stage++;
+          setTimeout(advance, 1400);
+        } else {
+          window.location.href = returnUrl;
+        }
+      }
+      setTimeout(advance, 400);
+    });
+  </script>
+</body>
+</html>

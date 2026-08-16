@@ -33,7 +33,7 @@ logging.basicConfig(
     handlers=[logging.StreamHandler()],
 )
 logger = logging.getLogger("shawnzyluxe_core")
-from urllib.parse import urlencode
+from urllib.parse import urlencode, quote
 from flask import Flask, render_template, request, redirect, url_for, session, flash, jsonify, send_file, make_response, after_this_request, current_app
 from flask_sock import Sock
 from dotenv import load_dotenv
@@ -82,6 +82,7 @@ import marketing_studio as marketing_studio_module
 import assistant_engine
 import startup_pack
 import initial_sync
+import historical_ingestion
 import sandbox_demo
 import migrate as migrate_module
 from dashboard_context import (
@@ -261,7 +262,7 @@ def _delete_session_cookie(response):
 # Beta launch scope: overview, profit engine, alerts, billing, settings, and the
 # regression chart. All other sidebar pages are hidden from merchant nav.
 COMMERCIAL_READY_DASHBOARD_PAGES = {
-    "overview", "alerts", "profit_engine", "billing", "settings", "regression_chart", "startup_pack",
+    "overview", "alerts", "profit_engine", "billing", "settings", "regression_chart", "startup_pack", "onboarding_loading",
 }
 
 from tier_manager import TierManager, TIER_LIMITS, PLAN_TO_TIER
@@ -1552,7 +1553,7 @@ def dashboard_page(page):
         'mobile', 'store_catalog', 'products', 'orders', 'customers',
         'inventory', 'shipments', 'returns', 'analytics', 'discounts', 'apps',
         'reports', 'settings', 'tiktok_studio',
-        'monitoring', 'regression_chart'
+        'monitoring', 'regression_chart', 'onboarding_loading'
     }
     if active_page not in valid_pages:
         return redirect(url_for('dashboard'))
@@ -2188,11 +2189,11 @@ def api_channel_display_name(platform):
 def _trigger_initial_sync(merchant_id: str, channel: str) -> None:
     """Start the 14-day historical pull + diagnostic audit in the background."""
     try:
-        initial_sync.start_initial_sync(
-            merchant_id,
-            channel,
-            current_app._get_current_object(),
-        )
+        app = current_app._get_current_object()
+        if channel == "shopify":
+            historical_ingestion.trigger_onboarding_harvest(merchant_id, app=app)
+        else:
+            initial_sync.start_initial_sync(merchant_id, channel, app)
     except Exception as e:
         logger.error(f"[Initial Sync] Failed to start background audit for {merchant_id}: {e}")
 
@@ -2278,6 +2279,25 @@ def api_connect_amazon():
     except Exception as e:
         logger.error(f"[Channels] Amazon connect failed: {e}")
         return jsonify({"detail": str(e)}), 400
+
+
+@app.route('/api/v1/sync/initialize-onboarding-harvest', methods=['POST'])
+@require_roles([UserRole.ADMIN, UserRole.MERCHANT, UserRole.ENGINEER])
+def api_initialize_onboarding_harvest():
+    """Trigger the 14-day Shopify historical harvest in a background worker."""
+    merchant = get_merchant_context()
+    if not merchant:
+        return jsonify({"error": "No merchant context"}), 403
+    data = request.get_json(silent=True) or {}
+    shop_domain = (data.get("shop_domain") or "").strip()
+    token = (data.get("access_token") or data.get("decrypted_offline_token") or "").strip()
+    result = historical_ingestion.trigger_onboarding_harvest(
+        merchant["id"],
+        shop_domain=shop_domain or None,
+        token=token or None,
+        app=current_app._get_current_object(),
+    )
+    return jsonify(result), 200 if result.get("status") == "processing" else 400
 
 
 @app.route('/api/v1/auth/callback/complete', methods=['POST'])
@@ -5074,7 +5094,8 @@ def shopify_oauth_callback():
             shopify_shop_domain=shop,
         )
         _trigger_initial_sync(merchant_id, "shopify")
-        return redirect("/dashboard/settings?tab=stores&onboarding=1&oauth_sync=success")
+        return_url = "/dashboard/settings?tab=stores&onboarding=1&oauth_sync=success"
+        return redirect(f"/dashboard/onboarding-loading?channel=shopify&return={quote(return_url, safe='')}")
     except Exception as e:
         logger.error(f"[Shopify OAuth] {e}")
         return redirect("/dashboard/settings?tab=stores&onboarding=1&oauth_sync=error")
@@ -5153,7 +5174,8 @@ def tiktok_oauth_callback():
             refresh_token=refresh_token,
         )
         _trigger_initial_sync(merchant_id, "tiktok")
-        return redirect("/dashboard/settings?tab=stores&onboarding=1&oauth_sync=success")
+        return_url = "/dashboard/settings?tab=stores&onboarding=1&oauth_sync=success"
+        return redirect(f"/dashboard/onboarding-loading?channel=tiktok&return={quote(return_url, safe='')}")
     except Exception as e:
         logger.error(f"[TikTok OAuth] {e}")
         return redirect("/dashboard/settings?tab=stores&onboarding=1&oauth_sync=error")
