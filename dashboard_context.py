@@ -21,6 +21,7 @@ import channels as channels_module
 import channel_analytics
 import tracking
 import monitoring as monitoring_module
+from tier_manager import TierManager
 
 
 from zoneinfo import ZoneInfo
@@ -745,6 +746,15 @@ def context(active_page=None, merchant=None, merchant_id=None):
         for group in nav_groups:
             group["links"] = [link for link in group["links"] if link.get("id") != "startup_pack"]
 
+    # Sidebar only shows pages the merchant's tier is allowed to access.
+    merchant_tier = (merchant or {}).get("tier")
+    if merchant_tier and user_role not in ("Admin", "Engineer"):
+        for group in nav_groups:
+            group["links"] = [
+                link for link in group["links"]
+                if TierManager.can_access_page(merchant_tier, link.get("id", ""))
+            ]
+
     # Admin-only backend navigation.
     if user_role in ("Admin", "Engineer"):
         nav_groups.append({
@@ -780,7 +790,6 @@ def context(active_page=None, merchant=None, merchant_id=None):
     tier_limits = {}
     if merchant_id:
         try:
-            from tier_manager import TierManager
             billing = SaaSBilling.query.get(merchant_id)
             tier_key = (merchant_obj.get("tier") or "Basic Tier").replace("AI Tier", "Plan").strip()
             meta = TierManager.get_tier_meta(tier_key)

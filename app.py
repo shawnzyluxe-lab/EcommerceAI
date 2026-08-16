@@ -678,6 +678,9 @@ SMTP_PORT = int(os.environ.get("SMTP_PORT", "587"))
 SMTP_USERNAME = os.environ.get("SMTP_USERNAME", "")
 SMTP_PASSWORD = os.environ.get("SMTP_PASSWORD", "")
 MERCHANT_EMAIL = os.environ.get("MERCHANT_EMAIL", "shawn@shawnzyluxe.com")
+SUPPORT_EMAIL = os.environ.get("SUPPORT_EMAIL", "support@vantavcommerce.com")
+SECURITY_EMAIL = os.environ.get("SECURITY_EMAIL", "security@vantavcommerce.com")
+NO_REPLY_EMAIL = os.environ.get("NO_REPLY_EMAIL", "noreply@send.vantavcommerce.com")
 SUPPLIER_EMAIL = os.environ.get("SUPPLIER_EMAIL", "production@supplier-c.com")
 
 MAILGUN_API_KEY = os.environ.get("MAILGUN_API_KEY", "")
@@ -1141,6 +1144,7 @@ def dispatch_external_email(recipient, subject, html_body):
                 auth=("api", MAILGUN_API_KEY),
                 data={
                     "from": f"Vantav <postmaster@{MAILGUN_DOMAIN}>",
+                    "h:Reply-To": SUPPORT_EMAIL,
                     "to": recipient,
                     "subject": subject,
                     "html": html_body,
@@ -1163,6 +1167,7 @@ def dispatch_external_email(recipient, subject, html_body):
         msg = MIMEMultipart("alternative")
         msg["Subject"] = subject
         msg["From"] = f"Vantav <{SMTP_USERNAME}>"
+        msg["Reply-To"] = SUPPORT_EMAIL
         msg["To"] = recipient
         msg.attach(MIMEText(html_body, "html"))
 
@@ -1448,6 +1453,15 @@ def legal_refund():
 @limiter.exempt
 def legal_security():
     return render_template('security.html')
+
+
+@app.route('/status')
+@limiter.exempt
+def status_page():
+    """Public status page for Vantav platform health."""
+    health_response, _ = health_check()
+    health = health_response.get_json()
+    return render_template('status.html', health=health)
 
 
 @app.route('/dashboard')

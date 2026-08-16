@@ -1,0 +1,29 @@
+{% extends 'legal.html' %}
+{% block legal_title %}System Status{% endblock %}
+{% block legal_content %}
+<h1>Vantav System Status</h1>
+<p><strong>Last updated:</strong> <span id="status-timestamp">{{ health.timestamp }}</span></p>
+
+<div style="display: grid; gap: 1rem; margin: 2rem 0;">
+  <div style="background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 1.2rem;">
+    <div style="display: flex; align-items: center; gap: .75rem; margin-bottom: .5rem;">
+      <span style="width: 12px; height: 12px; border-radius: 50%; background: {% if health.status == 'HEALTHY' %}#22c55e{% else %}#ef4444{% endif %};"></span>
+      <h2 style="margin: 0; font-size: 1.2rem;">{{ health.status }}</h2>
+    </div>
+    <p style="margin: 0; color: var(--muted);">Overall platform status</p>
+  </div>
+
+  <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 1rem;">
+    <div style="background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 1.2rem;">
+      <h3 style="margin: 0 0 .5rem; font-size: 1rem;">Database</h3>
+      <p style="margin: 0; color: {% if health.database_connected %}#22c55e{% else %}#ef4444{% endif %};">{% if health.database_connected %}Connected{% else %}Degraded{% endif %}</p>
+    </div>
+    <div style="background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 1.2rem;">
+      <h3 style="margin: 0 0 .5rem; font-size: 1rem;">Generated Storage</h3>
+      <p style="margin: 0; color: {% if health.generated_storage_write_access %}#22c55e{% else %}#ef4444{% endif %};">{% if health.generated_storage_write_access %}Writable{% else %}Degraded{% endif %}</p>
+    </div>
+  </div>
+</div>
+
+<p style="color: var(--muted);">For incident reports or security issues, contact <a href="mailto:security@vantavcommerce.com">security@vantavcommerce.com</a>.</p>
+{% endblock %}
