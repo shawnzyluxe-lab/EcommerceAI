@@ -9,6 +9,12 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="{{ url_for('static', filename='css/dashboard.css') }}">
+  <style>
+  .subnav { display: flex; gap: 6px; margin: -8px 0 18px; border-bottom: 1px solid var(--line); padding-bottom: 8px; flex-wrap: wrap; }
+  .subnav a { color: var(--ink-3); text-decoration: none; font-size: .8rem; font-weight: 600; padding: 6px 10px; border-bottom: 2px solid transparent; margin-bottom: -9px; }
+  .subnav a:hover { color: var(--accent); }
+  .subnav a.active { color: var(--accent); border-bottom-color: var(--accent); }
+  </style>
   {% block head %}{% endblock %}
 </head>
 <body data-merchant-name="{{ merchant.name | default('there') }}" data-merchant-timezone="{{ merchant.timezone | default('UTC') }}" data-theme="{{ merchant.theme | default('prometheus-dark') }}" style="--brand-accent: {{ merchant.brand_color | default('#8b5cf6') }}; --brand-accent-2: {{ merchant.brand_color_secondary | default('#a78bfa') }};">
@@ -127,7 +133,7 @@
         <div class="breadcrumb">{{ merchant.name | default('Your store') }} / {{ active_page | replace('_ai', '') | replace('_', ' ') | title }}</div>
         <div class="topbar-actions">
           <div class="tier-badge" id="current-merchant-tier-badge">{{ merchant.tier | default('Enterprise Plan') }}</div>
-          <a href="/dashboard/commerce-hub" class="btn btn-primary">Connect a channel</a>
+          <a href="/dashboard/settings?tab=stores" class="btn btn-primary">Connect a channel</a>
           <a href="/site-logout" class="btn btn-ghost">Log out</a>
           <div class="topbar-avatar">{{ (merchant.name | default('Admin'))[:2] | upper }}</div>
         </div>
@@ -151,6 +157,21 @@
           <strong>Application not approved.</strong> This account does not have access to live marketplace features.
         </div>
         {% endif %}
+        {% block subnav %}
+        {% set active_group = namespace(value=None) %}
+        {% for group in nav_groups %}
+          {% for item in group.links %}
+            {% if active_page == item.id %}{% set active_group.value = group %}{% endif %}
+          {% endfor %}
+        {% endfor %}
+        {% if active_group.value and active_group.value.links | length > 1 %}
+        <nav class="subnav" aria-label="{{ active_group.value.label }} sections">
+          {% for item in active_group.value.links %}
+          <a href="{{ item.url }}" class="{% if active_page == item.id %}active{% endif %}">{{ item.label }}</a>
+          {% endfor %}
+        </nav>
+        {% endif %}
+        {% endblock %}
         {% block content %}{% endblock %}
       </main>
     </div>
