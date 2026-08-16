@@ -32,17 +32,26 @@
         </div>
       </div>
 
-      <nav class="sidebar-nav">
+      <nav class="sidebar-nav" id="sidebar-nav">
         {% for group in nav_groups %}
-        <div class="nav-group">
-          <div class="nav-group-label">{{ group.label }}</div>
-          {% for item in group.links %}
-          <a class="nav-item {% if active_page == item.id %}active{% endif %}" href="{{ item.url }}" data-section="{{ item.id }}">
-            <span class="nav-icon">{{ item.icon }}</span>
-            <span class="nav-text">{{ item.label }}</span>
-            {% if item.badge %}<span class="nav-badge">{{ item.badge }}</span>{% endif %}
-          </a>
-          {% endfor %}
+        {% set group_has_active = namespace(found=false) %}
+        {% for item in group.links %}
+          {% if active_page == item.id %}{% set group_has_active.found = true %}{% endif %}
+        {% endfor %}
+        <div class="nav-group {% if not group_has_active.found %}collapsed{% endif %}" data-group-label="{{ group.label }}">
+          <button class="nav-group-toggle" aria-expanded="{{ 'true' if group_has_active.found else 'false' }}" aria-controls="nav-group-{{ loop.index }}">
+            <span class="nav-group-label">{{ group.label }}</span>
+            <span class="nav-group-chevron" aria-hidden="true">▾</span>
+          </button>
+          <div class="nav-group-links" id="nav-group-{{ loop.index }}">
+            {% for item in group.links %}
+            <a class="nav-item {% if active_page == item.id %}active{% endif %}" href="{{ item.url }}" data-section="{{ item.id }}">
+              <span class="nav-icon">{{ item.icon }}</span>
+              <span class="nav-text">{{ item.label }}</span>
+              {% if item.badge %}<span class="nav-badge">{{ item.badge }}</span>{% endif %}
+            </a>
+            {% endfor %}
+          </div>
         </div>
         {% endfor %}
       </nav>
@@ -120,6 +129,46 @@
     document.getElementById('mobile-menu-btn')?.addEventListener('click', () => {
       document.getElementById('sidebar').classList.toggle('open');
     });
+
+    // Collapsible sidebar nav groups — persist state per merchant session.
+    (function initSidebarGroups(){
+      const nav = document.getElementById('sidebar-nav');
+      if (!nav) return;
+      const storageKey = 'vantav_sidebar_groups';
+      let saved = {};
+      try { saved = JSON.parse(localStorage.getItem(storageKey) || '{}'); } catch (e) {}
+
+      function applyState(group, expanded){
+        group.classList.toggle('collapsed', !expanded);
+        const toggle = group.querySelector('.nav-group-toggle');
+        if (toggle) toggle.setAttribute('aria-expanded', expanded ? 'true' : 'false');
+      }
+
+      function persist(){
+        const state = {};
+        nav.querySelectorAll('.nav-group').forEach(g => {
+          const key = g.dataset.groupLabel;
+          if (key) state[key] = !g.classList.contains('collapsed');
+        });
+        try { localStorage.setItem(storageKey, JSON.stringify(state)); } catch (e) {}
+      }
+
+      nav.querySelectorAll('.nav-group').forEach(group => {
+        const label = group.dataset.groupLabel;
+        const isActive = group.querySelector('.nav-item.active') !== null;
+        const defaultOpen = isActive || (label ? saved[label] !== false : true);
+        if (!isActive && typeof (label ? saved[label] : undefined) === 'boolean') {
+          applyState(group, label ? saved[label] : true);
+        } else {
+          applyState(group, defaultOpen);
+        }
+
+        group.querySelector('.nav-group-toggle')?.addEventListener('click', () => {
+          applyState(group, group.classList.contains('collapsed'));
+          persist();
+        });
+      });
+    })();
 
     // Poll session status; the server now expires idle sessions and will return 401.
     (function keepAlive() {
