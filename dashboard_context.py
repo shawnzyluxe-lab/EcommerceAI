@@ -630,6 +630,11 @@ NAV_GROUPS = [
         "label": "Overview",
         "links": [
             {"id": "overview", "label": "Overview", "url": "/dashboard", "icon": "◈"},
+        ],
+    },
+    {
+        "label": "Vantav AI",
+        "links": [
             {"id": "team_ai", "label": "Vantav AI", "url": "/dashboard/team-ai", "icon": "◉"},
         ],
     },
