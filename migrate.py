@@ -430,6 +430,38 @@ def run_migrations():
             "CREATE INDEX IF NOT EXISTS idx_orders_partial_fraud_exceptions ON orders (fraud_score DESC, created_at DESC) WHERE status = 'pending' AND fraud_score >= 75",
         )
 
+        # Hardened multi-tenant session registry
+        _run("pgcrypto.extension", 'CREATE EXTENSION IF NOT EXISTS "pgcrypto"')
+        _run(
+            "user_authentication table",
+            """
+            CREATE TABLE IF NOT EXISTS user_authentication (
+                id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+                merchant_id VARCHAR(100) NOT NULL REFERENCES merchant_profiles(merchant_id) ON DELETE CASCADE,
+                email VARCHAR(255) NOT NULL UNIQUE,
+                password_hash VARCHAR(255) NOT NULL,
+                clearance_level VARCHAR(50) NOT NULL DEFAULT 'merchant',
+                account_status VARCHAR(50) NOT NULL DEFAULT 'active',
+                created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+            )
+            """,
+        )
+        _run(
+            "active_session_vault table",
+            """
+            CREATE TABLE IF NOT EXISTS active_session_vault (
+                session_token VARCHAR(512) PRIMARY KEY,
+                user_id UUID NOT NULL REFERENCES user_authentication(id) ON DELETE CASCADE,
+                merchant_id VARCHAR(100) NOT NULL REFERENCES merchant_profiles(merchant_id) ON DELETE CASCADE,
+                ip_address VARCHAR(45),
+                expires_at TIMESTAMP WITH TIME ZONE NOT NULL,
+                created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+            )
+            """,
+        )
+        _run("idx.user_auth_lookup", "CREATE INDEX IF NOT EXISTS idx_user_auth_lookup ON user_authentication(email, account_status)")
+        _run("idx.session_vault_expiry", "CREATE INDEX IF NOT EXISTS idx_session_vault_expiry ON active_session_vault(session_token, expires_at)")
+
         # Refresh PostgreSQL planner statistics after schema/index changes
         _run("analyze.daily_costs", "ANALYZE daily_costs")
         _run("analyze.order_items", "ANALYZE order_items")

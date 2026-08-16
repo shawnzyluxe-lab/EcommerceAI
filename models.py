@@ -31,6 +31,33 @@ class User(db.Model):
     created_at = db.Column(db.DateTime, server_default=db.func.now())
 
 
+class UserAuthentication(db.Model):
+    __tablename__ = "user_authentication"
+    __table_args__ = (
+        db.Index("idx_user_auth_lookup", "email", "account_status"),
+    )
+    id = db.Column(db.String(36), primary_key=True, default=_uuid)
+    merchant_id = db.Column(db.String(100), db.ForeignKey("merchant_profiles.merchant_id"), nullable=False, index=True)
+    email = db.Column(db.String(255), unique=True, nullable=False, index=True)
+    password_hash = db.Column(db.String(255), nullable=False)
+    clearance_level = db.Column(db.String(50), nullable=False, default="merchant")
+    account_status = db.Column(db.String(50), nullable=False, default="active")
+    created_at = db.Column(db.DateTime, server_default=db.func.now())
+
+
+class ActiveSessionVault(db.Model):
+    __tablename__ = "active_session_vault"
+    __table_args__ = (
+        db.Index("idx_session_vault_expiry", "session_token", "expires_at"),
+    )
+    session_token = db.Column(db.String(512), primary_key=True)
+    user_id = db.Column(db.String(36), db.ForeignKey("user_authentication.id"), nullable=False)
+    merchant_id = db.Column(db.String(100), db.ForeignKey("merchant_profiles.merchant_id"), nullable=False)
+    ip_address = db.Column(db.String(45))
+    expires_at = db.Column(db.DateTime, nullable=False)
+    created_at = db.Column(db.DateTime, server_default=db.func.now())
+
+
 class ConnectedChannel(db.Model):
     __tablename__ = "connected_channels"
     id = db.Column(db.String(36), primary_key=True, default=_uuid)

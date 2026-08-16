@@ -83,6 +83,7 @@ import assistant_engine
 import startup_pack
 import initial_sync
 import historical_ingestion
+import master_auth_engine
 import sandbox_demo
 import migrate as migrate_module
 from dashboard_context import (
@@ -2131,6 +2132,19 @@ def api_rollback_action(action_id):
         return jsonify({"detail": str(e)}), 400
 
 
+@app.route('/api/v1/actions/<int:action_id>/approve', methods=['POST'])
+@master_auth_engine.require_clearance("admin")
+def api_v1_approve_action(action_id):
+    """Hardened Action Gate approve endpoint protected by signed X-Session-Token."""
+    merchant_id = g.session_ctx.get("merchant_id")
+    try:
+        result = action_gate.approve_action(action_id, merchant_id, decided_by=merchant_id)
+        return jsonify(result), 200
+    except Exception as e:
+        logger.error(f"[Action Gate] V1 approve failed: {e}")
+        return jsonify({"detail": str(e)}), 400
+
+
 @app.route('/api/actions/verify-cron', methods=['POST'])
 @require_roles([UserRole.ADMIN, UserRole.MERCHANT, UserRole.ENGINEER])
 def api_verify_actions_cron():
@@ -3430,6 +3444,23 @@ def auth_login():
     }))
     _set_session_cookie(response, session_token)
     return response, 200
+
+
+@app.route('/api/v1/session/authenticate', methods=['POST'])
+@limiter.limit("10 per minute")
+def api_session_authenticate():
+    """Issue a signed X-Session-Token for hardened endpoint access."""
+    payload = request.get_json(silent=True) or {}
+    email = (payload.get("email") or "").strip().lower()
+    password = payload.get("password", "")
+    if not email or not password:
+        return jsonify({"detail": "Email and password are required."}), 400
+
+    result = master_auth_engine.authenticate(email, password)
+    if not result:
+        return jsonify({"detail": "Invalid identity credentials matched."}), 401
+
+    return jsonify(result), 200
 
 
 TIER_NAME_MAP = {
