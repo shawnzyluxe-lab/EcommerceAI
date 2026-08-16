@@ -34,7 +34,7 @@ logging.basicConfig(
 )
 logger = logging.getLogger("shawnzyluxe_core")
 from urllib.parse import urlencode, quote
-from flask import Flask, render_template, request, redirect, url_for, session, flash, jsonify, send_file, make_response, after_this_request, current_app
+from flask import Flask, render_template, request, redirect, url_for, session, flash, jsonify, send_file, make_response, after_this_request, current_app, g
 from flask_sock import Sock
 from dotenv import load_dotenv
 
