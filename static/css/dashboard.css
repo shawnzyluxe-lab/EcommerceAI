@@ -317,7 +317,7 @@ td.num { text-align: right; font-variant-numeric: tabular-nums; }
 .alert-body { flex: 1; min-width: 0; }
 .alert-title { font-size: .88rem; font-weight: 600; color: var(--ink); }
 .alert-detail { font-size: .8rem; color: var(--ink-3); margin-top: 2px; }
-.alert-actions { display: flex; gap: 6px; margin-top: 9px; }
+.alert-actions { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 9px; }
 .alert-when { font-size: .72rem; color: var(--ink-3); white-space: nowrap; }
 
 /* ---------- workflow overview ---------- */
@@ -414,11 +414,10 @@ td.num { text-align: right; font-variant-numeric: tabular-nums; }
 }
 @media (max-width: 900px) {
   .app-shell { grid-template-columns: 1fr; }
-  .sidebar { position: fixed; left: 0; top: 0; bottom: 0; transform: translateX(-100%); transition: transform .2s; z-index: 100; }
-  .sidebar.open { transform: translateX(0); }
+  .sidebar { position: fixed; left: 0; top: 0; bottom: 0; transform: translateX(-100%); transition: transform .2s; z-index: 100; width: 260px; max-width: 80vw; }
+  .sidebar.open { transform: translateX(0); box-shadow: 0 0 0 9999px rgba(0,0,0,.45); }
   .mobile-menu-btn { display: block; }
   .grid-2, .grid-3 { grid-template-columns: 1fr; }
-  .topbar-actions .btn-ghost { display: none; }
 }
 @media (max-width: 560px) {
   .topbar { flex-wrap: nowrap; gap: 10px; padding: 10px 16px; }
@@ -427,17 +426,18 @@ td.num { text-align: right; font-variant-numeric: tabular-nums; }
   .topbar-brand { min-width: 0; }
   .topbar-brand .brand-name { font-size: .95rem; }
   .topbar-actions { gap: 8px; }
-  .topbar-actions .btn-primary { padding: 5px 9px; font-size: .72rem; }
-  .topbar-avatar { width: 28px; height: 28px; font-size: .7rem; }
+  .topbar-actions .btn-ghost { padding: 5px 9px; font-size: .72rem; }
   .kpi-grid, .grid-4 { grid-template-columns: 1fr; }
   .main-content { padding: 14px; }
   .page-header h1, .page-header p { overflow-wrap: break-word; }
   .kpi-value { overflow-wrap: break-word; }
-  .alert-actions { flex-wrap: wrap; }
   .table-wrap .tag { white-space: normal; }
+  .prompt { flex-wrap: wrap; }
+  .prompt input { min-width: 120px; }
 }
 @media (max-width: 420px) {
   .topbar .topbar-actions .btn-primary { display: none; }
+  .topbar-actions .btn-ghost { padding: 5px 8px; font-size: .7rem; }
 }
 
 /* ---------- mobile overview fixes ---------- */

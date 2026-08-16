@@ -172,9 +172,19 @@
   </div>
 
   <script>
-    document.getElementById('mobile-menu-btn')?.addEventListener('click', () => {
-      document.getElementById('sidebar').classList.toggle('open');
-    });
+    (function mobileSidebar(){
+      const sidebar = document.getElementById('sidebar');
+      const menuBtn = document.getElementById('mobile-menu-btn');
+      menuBtn?.addEventListener('click', () => sidebar.classList.toggle('open'));
+      // Close sidebar when any nav link is clicked, or when tapping outside it on mobile.
+      sidebar?.querySelectorAll('a').forEach(link => link.addEventListener('click', () => sidebar.classList.remove('open')));
+      document.addEventListener('click', e => {
+        if (!sidebar?.classList.contains('open')) return;
+        if (!sidebar.contains(e.target) && !menuBtn.contains(e.target)) {
+          sidebar.classList.remove('open');
+        }
+      });
+    })();
 
     // Collapsible sidebar nav groups — persist state per merchant session.
     (function initSidebarGroups(){
