@@ -9,10 +9,6 @@
   </p>
 </section>
 
-<div class="ai-greeting" id="ai-greeting" style="display:none;">
-  <span class="ai-greeting-icon">{{ ai_greeting }}</span>
-</div>
-
 <div class="workflow-pillars" style="margin-top: 18px;">
 
   <!-- PILLAR 01: TRUE PROFIT -->
@@ -228,23 +224,6 @@
 {% endif %}
 
 <style>
-.ai-greeting {
-  background: var(--purple-bg);
-  border: 1px solid var(--accent-line);
-  border-radius: 12px;
-  padding: 12px 16px;
-  color: var(--ink);
-  font-size: .9rem;
-  display: flex;
-  align-items: center;
-  gap: 10px;
-}
-.ai-greeting-icon::before {
-  content: "✦";
-  color: var(--purple);
-  margin-right: 8px;
-  font-weight: 700;
-}
 .hidden { display: none !important; }
 </style>
 
@@ -305,19 +284,5 @@ async function dismissHeroAction(actionId) {
   }
 }
 
-// Show the personalized AI greeting once per browser session (flag is cleared on login).
-(function(){
-  const banner = document.getElementById('ai-greeting');
-  if (!banner) return;
-  try {
-    if (!sessionStorage.getItem('vantav_greeting_shown')) {
-      banner.style.display = 'flex';
-      sessionStorage.setItem('vantav_greeting_shown', '1');
-    }
-  } catch (e) {
-    // sessionStorage may be disabled in some contexts; show the banner anyway.
-    banner.style.display = 'flex';
-  }
-})();
 </script>
 {% endblock %}

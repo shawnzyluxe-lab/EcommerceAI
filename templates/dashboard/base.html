@@ -129,9 +129,7 @@
         <div class="breadcrumb">{{ merchant.name | default('Your store') }} / {{ active_page | replace('_ai', '') | replace('_', ' ') | title }}</div>
         <div class="topbar-actions">
           <div class="tier-badge" id="current-merchant-tier-badge">{{ merchant.tier | default('Enterprise Plan') }}</div>
-          <a href="/dashboard/settings?tab=stores" class="btn btn-primary">Connect a channel</a>
           <a href="/site-logout" class="btn btn-ghost">Log out</a>
-          <div class="topbar-avatar">{{ (merchant.name | default('Admin'))[:2] | upper }}</div>
         </div>
       </header>
 
