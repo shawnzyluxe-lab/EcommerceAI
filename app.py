@@ -602,12 +602,14 @@ def get_merchant_context():
     if billing and billing.add_ons:
         concierge_bundle = "concierge_bundle" in (billing.add_ons if isinstance(billing.add_ons, list) else [])
     theme_setting = MerchantSetting.query.get((s.merchant_id, "theme"))
+    account_holder_setting = MerchantSetting.query.get((s.merchant_id, "account_holder_name"))
     return {
         "id": s.merchant_id,
         "tier": tier,
         "tier_meta": tier_meta,
         "concierge_bundle": concierge_bundle,
         "name": display_name,
+        "account_holder_name": account_holder_setting.setting_value if account_holder_setting else display_name,
         "email": profile.admin_email,
         "sandbox_status": sandbox_status,
         "live_access_enabled": bool(profile.live_access_enabled) and not sandbox_expired,
@@ -2077,6 +2079,26 @@ def api_channels():
         return jsonify({"detail": "Could not load channels."}), 500
 
 
+@app.route('/api/v1/channels/<platform>/display-name', methods=['POST'])
+@require_roles([UserRole.ADMIN, UserRole.MERCHANT, UserRole.ENGINEER])
+def api_channel_display_name(platform):
+    """Set a merchant-specific display name for a channel."""
+    merchant = get_merchant_context()
+    if not merchant:
+        return jsonify({"error": "No merchant context"}), 403
+    data = request.get_json(silent=True) or {}
+    name = (data.get("display_name") or "").strip()
+    if not name:
+        return jsonify({"error": "display_name is required"}), 400
+    setting = MerchantSetting.query.get((merchant["id"], f"channel_name:{platform}"))
+    if not setting:
+        setting = MerchantSetting(merchant_id=merchant["id"], setting_key=f"channel_name:{platform}")
+        db.session.add(setting)
+    setting.setting_value = name
+    db.session.commit()
+    return jsonify({"updated": True, "platform": platform, "display_name": name}), 200
+
+
 @app.route('/api/v1/channels/shopify', methods=['POST'])
 @require_roles([UserRole.ADMIN, UserRole.MERCHANT, UserRole.ENGINEER])
 def api_connect_shopify():
@@ -2932,6 +2954,31 @@ def api_merchant_set_business_name():
     profile.business_name = new_name
     db.session.commit()
     return jsonify({"updated": True, "business_name": new_name}), 200
+
+
+@app.route('/api/v1/merchant/account', methods=['POST'])
+@require_roles([UserRole.ADMIN, UserRole.MERCHANT, UserRole.ENGINEER])
+def api_merchant_account():
+    """Update the merchant's business name and account holder name."""
+    merchant = get_merchant_context()
+    if not merchant:
+        return jsonify({"error": "No merchant context"}), 403
+    data = request.get_json(silent=True) or {}
+    business_name = (data.get("business_name") or "").strip()
+    account_holder_name = (data.get("account_holder_name") or "").strip()
+    profile = MerchantProfile.query.get(merchant["id"])
+    if not profile:
+        return jsonify({"error": "Merchant profile not found"}), 404
+    if business_name:
+        profile.business_name = business_name
+    if account_holder_name:
+        setting = MerchantSetting.query.get((merchant["id"], "account_holder_name"))
+        if not setting:
+            setting = MerchantSetting(merchant_id=merchant["id"], setting_key="account_holder_name")
+            db.session.add(setting)
+        setting.setting_value = account_holder_name
+    db.session.commit()
+    return jsonify({"updated": True, "business_name": profile.business_name, "account_holder_name": account_holder_name or merchant["account_holder_name"]}), 200
 
 
 @app.route('/api/v1/merchant/business-memory', methods=['GET', 'POST'])

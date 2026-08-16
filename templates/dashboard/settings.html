@@ -21,14 +21,17 @@
   <div class="grid grid-2">
     <div class="card">
       <div class="card-head"><h3>Account Profile</h3></div>
-      <form>
+      <form id="account-form" onsubmit="saveAccount(event)">
+        <label style="font-size: .75rem; color: var(--ink-3); font-weight: 600;">Account holder name</label>
+        <input id="account-holder-name" type="text" value="{{ merchant.account_holder_name | default(merchant.name) | default('Your name') }}" style="width: 100%; padding: 10px; margin: 6px 0 14px; border: 1px solid var(--line); border-radius: 8px; background: var(--surface); color: var(--ink);">
         <label style="font-size: .75rem; color: var(--ink-3); font-weight: 600;">Business name</label>
-        <input type="text" value="{{ merchant.name | default('Your store') }}" style="width: 100%; padding: 10px; margin: 6px 0 14px; border: 1px solid var(--line); border-radius: 8px; background: var(--surface); color: var(--ink);">
+        <input id="business-name" type="text" value="{{ merchant.name | default('Your store') }}" style="width: 100%; padding: 10px; margin: 6px 0 14px; border: 1px solid var(--line); border-radius: 8px; background: var(--surface); color: var(--ink);">
         <label style="font-size: .75rem; color: var(--ink-3); font-weight: 600;">Admin email</label>
-        <input type="email" value="{{ merchant.email | default('admin@example.com') }}" style="width: 100%; padding: 10px; margin: 6px 0 14px; border: 1px solid var(--line); border-radius: 8px; background: var(--surface); color: var(--ink);">
+        <input type="email" value="{{ merchant.email | default('admin@example.com') }}" disabled style="width: 100%; padding: 10px; margin: 6px 0 14px; border: 1px solid var(--line); border-radius: 8px; background: var(--line-2);">
         <label style="font-size: .75rem; color: var(--ink-3); font-weight: 600;">Account tier</label>
         <input type="text" value="{{ merchant.tier | default('Enterprise Plan') }}" disabled style="width: 100%; padding: 10px; margin: 6px 0 14px; border: 1px solid var(--line); border-radius: 8px; background: var(--line-2);">
-        <button class="btn btn-primary">Save changes</button>
+        <button class="btn btn-primary" id="account-save-btn" type="submit">Save changes</button>
+        <div id="account-form-message" style="margin-top: 8px; font-size: .8rem;"></div>
       </form>
     </div>
 
@@ -238,6 +241,36 @@ function switchSettingsTab(tab){
   document.querySelectorAll('.settings-tab').forEach(b => b.classList.toggle('active', b.dataset.tab === tab));
   document.querySelectorAll('.settings-panel').forEach(p => p.style.display = p.id === 'panel-' + tab ? 'block' : 'none');
   if (history.replaceState) { history.replaceState(null, '', '?tab=' + tab); }
+}
+
+async function saveAccount(e){
+  e.preventDefault();
+  const btn = document.getElementById('account-save-btn');
+  const msg = document.getElementById('account-form-message');
+  btn.disabled = true;
+  msg.textContent = 'Saving…';
+  msg.style.color = 'var(--ink-2)';
+  try {
+    const body = JSON.stringify({
+      account_holder_name: document.getElementById('account-holder-name').value.trim(),
+      business_name: document.getElementById('business-name').value.trim()
+    });
+    const res = await fetch('/api/v1/merchant/account', {method: 'POST', headers: {'Content-Type': 'application/json'}, body, credentials: 'same-origin'});
+    const data = await res.json();
+    if (res.ok) {
+      msg.textContent = 'Saved.';
+      msg.style.color = 'var(--green)';
+      document.body.dataset.accountHolderName = data.account_holder_name;
+      updateGreeting?.();
+    } else {
+      throw new Error(data.error || 'Could not save');
+    }
+  } catch (err) {
+    msg.textContent = err.message;
+    msg.style.color = 'var(--red)';
+  } finally {
+    btn.disabled = false;
+  }
 }
 
 // Billing portal

@@ -7,7 +7,7 @@ from typing import Dict, Any, List, Optional
 
 import requests
 
-from models import db, MerchantChannel, TenantOAuthToken, CommerceChannel, ProfitFeedOrder, MerchantProfile
+from models import db, MerchantChannel, TenantOAuthToken, CommerceChannel, ProfitFeedOrder, MerchantProfile, MerchantSetting
 from tier_manager import TierManager
 
 
@@ -59,9 +59,13 @@ def list_channels(merchant_id: str) -> List[Dict[str, Any]]:
         mc = connected.get(platform)
         token = tokens.get(platform)
         state = "connected" if (mc or token) else "disconnected"
+        display_name_setting = MerchantSetting.query.get((merchant_id, f"channel_name:{platform}"))
+        default_name = (cc.channel_name if cc else platform.title()) + (" Shop" if platform in ("tiktok", "amazon") else "")
+        display_name = display_name_setting.setting_value if display_name_setting else default_name
         channels.append({
             "platform": platform,
-            "name": (cc.channel_name if cc else platform.title()) + (" Shop" if platform in ("tiktok", "amazon") else ""),
+            "name": display_name,
+            "default_name": default_name,
             "abbr": _platform_abbr(platform),
             "color": _platform_color(platform),
             "state": state,

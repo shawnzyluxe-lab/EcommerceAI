@@ -22,7 +22,7 @@
   </style>
   {% block head %}{% endblock %}
 </head>
-<body data-merchant-name="{{ merchant.name | default('there') }}" data-merchant-timezone="{{ merchant.timezone | default('UTC') }}" data-theme="{{ merchant.theme | default('prometheus-dark') }}" style="--brand-accent: {{ merchant.brand_color | default('#8b5cf6') }}; --brand-accent-2: {{ merchant.brand_color_secondary | default('#a78bfa') }};">
+<body data-merchant-name="{{ merchant.name | default('there') }}" data-account-holder-name="{{ merchant.account_holder_name | default(merchant.name) | default('there') }}" data-merchant-timezone="{{ merchant.timezone | default('UTC') }}" data-theme="{{ merchant.theme | default('prometheus-dark') }}" style="--brand-accent: {{ merchant.brand_color | default('#8b5cf6') }}; --brand-accent-2: {{ merchant.brand_color_secondary | default('#a78bfa') }};">
   <script>
   (function applyTheme(){
     const themeVars = ['--bg','--surface','--surface-elevated','--ink','--ink-2','--ink-3','--line','--line-2'];
@@ -248,7 +248,7 @@
 
     // Update greeting elements to the merchant's saved timezone on first paint.
     (function updateGreeting() {
-      const name = document.body.dataset.merchantName || document.querySelector('[data-merchant-name]')?.dataset.merchantName || 'there';
+      const name = document.body.dataset.accountHolderName || document.body.dataset.merchantName || document.querySelector('[data-account-holder-name]')?.dataset.accountHolderName || 'there';
       const tz = document.body.dataset.merchantTimezone || Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC';
       const now = new Date();
       const hour = parseInt(new Intl.DateTimeFormat('en-US', { timeZone: tz, hour: 'numeric', hour12: false }).format(now), 10);
