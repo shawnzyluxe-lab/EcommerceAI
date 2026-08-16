@@ -104,7 +104,7 @@ DASHBOARD_STATE = {
     "ai_briefing": COO["narrative"],
     "conversion_feeds": [
         {"store": "Shopify Storefront", "rate": "3.4%", "status": "Optimal", "up": True},
-        {"store": "TikTok Video Shop", "rate": "4.1%", "status": "Trending", "up": True},
+        {"store": "TikTok Shop", "rate": "4.1%", "status": "Trending", "up": True},
         {"store": "Amazon Marketplace", "rate": "2.8%", "status": "Stable", "up": False},
     ],
     "channels": {
@@ -258,7 +258,7 @@ def _delete_session_cookie(response):
 # Beta launch scope: overview, profit engine, alerts, billing, settings, and the
 # regression chart. All other sidebar pages are hidden from merchant nav.
 COMMERCIAL_READY_DASHBOARD_PAGES = {
-    "overview", "alerts", "profit_engine", "billing", "settings",
+    "overview", "alerts", "profit_engine", "billing", "settings", "regression_chart",
 }
 
 from tier_manager import TierManager, TIER_LIMITS, PLAN_TO_TIER
@@ -809,7 +809,7 @@ with app.app_context():
     # Seed or restore commerce channels
     if not CommerceChannel.query.first():
         db.session.add(CommerceChannel(channel_id="shopify", channel_name="Shopify Storefront", pending_orders=12, conversion_rate=3.4, performance_status="Optimal"))
-        db.session.add(CommerceChannel(channel_id="tiktok", channel_name="TikTok Video Shop", pending_orders=7, conversion_rate=4.1, performance_status="Trending"))
+        db.session.add(CommerceChannel(channel_id="tiktok", channel_name="TikTok Shop", pending_orders=7, conversion_rate=4.1, performance_status="Trending"))
         db.session.add(CommerceChannel(channel_id="amazon", channel_name="Amazon Marketplace", pending_orders=4, conversion_rate=2.8, performance_status="Stable"))
     for cc in CommerceChannel.query.all():
         DASHBOARD_STATE["channels"][cc.channel_id]["pending_orders"] = cc.pending_orders
@@ -1484,7 +1484,7 @@ def dashboard_page(page):
         'mobile', 'store_catalog', 'products', 'orders', 'customers',
         'inventory', 'shipments', 'returns', 'analytics', 'discounts', 'apps',
         'reports', 'settings', 'tiktok_studio',
-        'monitoring'
+        'monitoring', 'regression_chart'
     }
     if active_page not in valid_pages:
         return redirect(url_for('dashboard'))
@@ -2831,11 +2831,8 @@ def api_profit_regression():
 @app.route('/regression-chart')
 @require_roles([UserRole.ADMIN, UserRole.MERCHANT, UserRole.ENGINEER])
 def regression_chart_view():
-    """Standalone regression chart view."""
-    merchant = get_merchant_context()
-    if not merchant:
-        return redirect(url_for('login'))
-    return render_template('regression-chart-view.html', merchant=merchant)
+    """Redirect legacy standalone regression chart into the dashboard."""
+    return redirect(url_for('dashboard_page', page='regression-chart'))
 
 
 @app.route('/api/v1/assistant/thread', methods=['DELETE'])

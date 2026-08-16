@@ -37,6 +37,23 @@ def _platform_abbr(platform: str) -> str:
     return {"shopify": "SP", "tiktok": "TT", "amazon": "AZ", "ebay": "EB", "walmart": "WM", "bigcommerce": "BC", "woocommerce": "WC"}.get(platform, platform[:2].upper())
 
 
+def _platform_default_name(platform: str) -> str:
+    base = {
+        "shopify": "Shopify",
+        "tiktok": "TikTok",
+        "amazon": "Amazon",
+        "ebay": "eBay",
+        "walmart": "Walmart",
+        "bigcommerce": "BigCommerce",
+        "woocommerce": "WooCommerce",
+    }.get(platform, platform.title())
+    if platform == "tiktok":
+        return base + " Shop"
+    if platform == "amazon":
+        return base + " Marketplace"
+    return base
+
+
 def list_channels(merchant_id: str) -> List[Dict[str, Any]]:
     """Return the canonical channel catalog with merchant-specific connection state."""
     if not merchant_id:
@@ -60,7 +77,7 @@ def list_channels(merchant_id: str) -> List[Dict[str, Any]]:
         token = tokens.get(platform)
         state = "connected" if (mc or token) else "disconnected"
         display_name_setting = MerchantSetting.query.get((merchant_id, f"channel_name:{platform}"))
-        default_name = (cc.channel_name if cc else platform.title()) + (" Shop" if platform in ("tiktok", "amazon") else "")
+        default_name = _platform_default_name(platform)
         display_name = display_name_setting.setting_value if display_name_setting else default_name
         channels.append({
             "platform": platform,

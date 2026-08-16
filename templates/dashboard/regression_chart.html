@@ -1,0 +1,129 @@
+{% extends 'dashboard/base.html' %}
+{% block title %}Regression — {{ brand.name }} {{ brand.product }}{% endblock %}
+{% block head %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+{% endblock %}
+{% block content %}
+<section class="page-header">
+  <h1>Historical Margin Stability Forecast</h1>
+  <p>OLS regression on SKU true-net profit with 7-day trend projection.</p>
+</section>
+
+<div class="grid grid-2">
+  <div class="card">
+    <div class="card-head">
+      <h3>Regression Chart</h3>
+      <span class="spacer"></span>
+      <div style="font-size:.8rem; color:var(--ink-2);">SKU: <strong id="reg-sku">SKU-404-PODS</strong></div>
+    </div>
+    <div style="height:360px; position:relative; padding:10px 0;">
+      <canvas id="vantaRegressionChart"></canvas>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-head"><h3>Diagnostics</h3></div>
+    <div style="padding:0 16px 16px;">
+      <div style="display:flex; gap:12px; margin-bottom:16px; flex-wrap:wrap;">
+        <div style="flex:1; min-width:120px; background:var(--surface-elevated); border:1px solid var(--line); border-radius:10px; padding:14px;">
+          <div style="font-size:.7rem; color:var(--ink-3); text-transform:uppercase; letter-spacing:.05em;">Trend</div>
+          <div style="font-size:1.1rem; font-weight:700; color:var(--ink);" id="ui-trend-direction">EVALUATING...</div>
+        </div>
+        <div style="flex:1; min-width:120px; background:var(--surface-elevated); border:1px solid var(--line); border-radius:10px; padding:14px;">
+          <div style="font-size:.7rem; color:var(--ink-3); text-transform:uppercase; letter-spacing:.05em;">R² Confidence</div>
+          <div style="font-size:1.1rem; font-weight:700; color:var(--accent);" id="ui-r2-score">--.--%</div>
+        </div>
+        <div style="flex:1; min-width:120px; background:var(--surface-elevated); border:1px solid var(--line); border-radius:10px; padding:14px;">
+          <div style="font-size:.7rem; color:var(--ink-3); text-transform:uppercase; letter-spacing:.05em;">7-Day Projection</div>
+          <div style="font-size:1.1rem; font-weight:700; color:var(--ink);" id="ui-projection">$--</div>
+        </div>
+      </div>
+      <p style="font-size:.85rem; color:var(--ink-2); line-height:1.5;" id="ui-reasoning-summary">Initializing core regression parameters...</p>
+    </div>
+  </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', async function() {
+  const urlParams = new URLSearchParams(window.location.search);
+  const sku = urlParams.get('sku') || 'SKU-404-PODS';
+  document.getElementById('reg-sku').textContent = sku;
+
+  let data;
+  try {
+    const response = await fetch('/api/v1/analytics/profit-regression?sku=' + encodeURIComponent(sku));
+    if (!response.ok) throw new Error('Regression API returned ' + response.status);
+    data = await response.json();
+  } catch (err) {
+    document.getElementById('ui-reasoning-summary').textContent = 'Unable to load regression data: ' + err.message;
+    document.getElementById('ui-trend-direction').textContent = 'ERROR';
+    return;
+  }
+
+  document.getElementById('ui-trend-direction').textContent = data.trend_direction;
+  document.getElementById('ui-r2-score').textContent = (data.r_squared_confidence * 100).toFixed(2) + '%';
+  document.getElementById('ui-projection').textContent = '$' + Number(data.projected_net_profit_7d || 0).toLocaleString();
+
+  const reason = `Mathematical OLS regression on ${data.sku} shows a slope of $${data.slope_rate_of_change}/day with ${(data.r_squared_confidence * 100).toFixed(2)}% confidence. 7-day projected net profit: $${data.projected_net_profit_7d}.`;
+  document.getElementById('ui-reasoning-summary').textContent = reason;
+
+  const labels = data.historical_points.map(p => p.label).concat(
+    data.trend_line.filter(t => t.days_ago < 0).map(t => t.label)
+  );
+  const trendPoints = data.trend_line.map(t => t.predicted_net_profit < 0 ? 0 : t.predicted_net_profit);
+
+  const ctx = document.getElementById('vantaRegressionChart').getContext('2d');
+  new Chart(ctx, {
+    type: 'line',
+    data: {
+      labels: labels,
+      datasets: [
+        {
+          label: 'True Net Profit ($)',
+          data: data.historical_points.map(p => p.net_profit).concat(
+            data.trend_line.filter(t => t.days_ago < 0).map(() => null)
+          ),
+          borderColor: '#FFFFFF',
+          backgroundColor: '#FFFFFF',
+          pointRadius: 4,
+          pointHoverRadius: 6,
+          showLine: false,
+          z: 2
+        },
+        {
+          label: 'OLS Regression Trend Slope',
+          data: trendPoints,
+          borderColor: '#D4AF37',
+          borderWidth: 1.5,
+          borderDash: [5, 5],
+          pointRadius: 0,
+          fill: false,
+          tension: 0,
+          z: 1
+        }
+      ]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: {
+        legend: {
+          labels: { color: 'var(--ink-2)', font: { family: 'Inter', size: 11 } }
+        }
+      },
+      scales: {
+        x: {
+          grid: { color: 'var(--line)' },
+          ticks: { color: 'var(--ink-2)', font: { family: 'Inter' } }
+        },
+        y: {
+          grid: { color: 'var(--line)' },
+          ticks: { color: 'var(--ink-2)', font: { family: 'Inter' } },
+          min: 0
+        }
+      }
+    }
+  });
+});
+</script>
+{% endblock %}

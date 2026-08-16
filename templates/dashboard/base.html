@@ -263,8 +263,8 @@
   </script>
   {% block scripts %}{% endblock %}
 
-  {% if active_page %}
-  <!-- AI Assistant floating popup (all dashboard pages) -->
+  {% if active_page and active_page != 'overview' %}
+  <!-- AI Assistant floating popup (all dashboard pages except overview) -->
   <div class="ai-float" data-page="{{ active_page }}">
     <div id="ai-popup" class="ai-popup">
       <div class="ai-popup-head">
@@ -294,7 +294,9 @@
     </div>
     <button class="ai-float-btn" id="ai-float-btn" onclick="toggleAIPopup()" title="Open AI Assistant">&#10022;</button>
   </div>
+  {% endif %}
 
+  {% if active_page and active_page != 'overview' %}
   <script>
   (function(){
     const popup = document.getElementById('ai-popup');

@@ -644,7 +644,7 @@ NAV_GROUPS = [
             {"id": "alerts", "label": "Alerts", "url": "/dashboard/alerts", "icon": "⚠", "badge": str(len(ALERTS))},
             {"id": "action_gate", "label": "Action Gate", "url": "/dashboard/action-gate", "icon": "✓"},
             {"id": "profit_engine", "label": "Profit Dashboard", "url": "/dashboard/profit-engine", "icon": "$"},
-            {"id": "regression_chart", "label": "Regression", "url": "/regression-chart", "icon": "◯"},
+            {"id": "regression_chart", "label": "Regression", "url": "/dashboard/regression-chart", "icon": "◯"},
             {"id": "predictions", "label": "Predictions", "url": "/dashboard/predictions", "icon": "◐"},
             {"id": "product_research", "label": "Product Research", "url": "/dashboard/product-research", "icon": "◎"},
             {"id": "analytics", "label": "Analytics", "url": "/dashboard/analytics", "icon": "▤"},
