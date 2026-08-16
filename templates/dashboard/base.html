@@ -156,12 +156,12 @@
       nav.querySelectorAll('.nav-group').forEach(group => {
         const label = group.dataset.groupLabel;
         const isActive = group.querySelector('.nav-item.active') !== null;
-        const defaultOpen = isActive || (label ? saved[label] !== false : true);
-        if (!isActive && typeof (label ? saved[label] : undefined) === 'boolean') {
-          applyState(group, label ? saved[label] : true);
-        } else {
-          applyState(group, defaultOpen);
-        }
+        // Default: all groups collapsed on first login; only the active page's group expands.
+        let expanded = isActive;
+        const savedOpen = label ? saved[label] : undefined;
+        if (typeof savedOpen === 'boolean') { expanded = savedOpen; }
+        if (isActive) { expanded = true; }
+        applyState(group, expanded);
 
         group.querySelector('.nav-group-toggle')?.addEventListener('click', () => {
           applyState(group, group.classList.contains('collapsed'));
