@@ -630,12 +630,12 @@ NAV_GROUPS = [
         "label": "Overview",
         "links": [
             {"id": "overview", "label": "Overview", "url": "/dashboard", "icon": "◈"},
+            {"id": "team_ai", "label": "Vantav AI", "url": "/dashboard/team-ai", "icon": "◉"},
         ],
     },
     {
         "label": "Workspace",
         "links": [
-            {"id": "team_ai", "label": "Vantav AI", "url": "/dashboard/team-ai", "icon": "◉"},
             {"id": "orders", "label": "Orders", "url": "/dashboard/orders", "icon": "◫", "badge": "24"},
             {"id": "customers", "label": "Customers", "url": "/dashboard/customers", "icon": "○"},
             {"id": "analytics", "label": "Analytics", "url": "/dashboard/analytics", "icon": "▤"},
