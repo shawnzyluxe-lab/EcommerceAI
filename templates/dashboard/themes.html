@@ -4,24 +4,80 @@
 
 <section class="page-header">
   <h1>Themes</h1>
-  <p>Manage storefront themes and branding.</p>
+  <p>Choose the look of your dashboard. Your selection is saved to your account and applies on every device.</p>
 </section>
 
-<div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 16px;">
+<div class="theme-grid" id="theme-grid">
   {% for t in [
-    {'name':'Prometheus Light','active':True},
-    {'name':'Prometheus Dark','active':False},
-    {'name':'Luxury Editorial','active':False},
-    {'name':'Minimal Clean','active':False}
+    {'slug':'prometheus-dark','name':'Prometheus Dark','active': merchant.theme == 'prometheus-dark'},
+    {'slug':'prometheus-light','name':'Prometheus Light','active': merchant.theme == 'prometheus-light'},
+    {'slug':'luxury-editorial','name':'Luxury Editorial','active': merchant.theme == 'luxury-editorial'},
+    {'slug':'minimal-clean','name':'Minimal Clean','active': merchant.theme == 'minimal-clean'}
   ] %}
-  <div class="card" style="border: 2px solid {% if t.active %}var(--gold){% else %}var(--line){% endif %}; border-radius: 14px; overflow: hidden;">
-    <div style="height: 120px; background: linear-gradient(135deg, {% if 'Dark' in t.name %}#16161f,#2a2a3a{% else %}#f6f8fc,#e4e8f0{% endif %});"></div>
+  <div class="theme-card {% if t.active %}active{% endif %}" data-theme="{{ t.slug }}" style="border: 2px solid {% if t.active %}var(--gold){% else %}var(--line){% endif %}; border-radius: 14px; overflow: hidden;">
+    <div class="theme-preview" style="height: 120px; background: linear-gradient(135deg, {% if 'Dark' in t.name or 'Editorial' in t.name %}#16161f,#2a2a3a{% else %}#f6f8fc,#e4e8f0{% endif %});"></div>
     <div style="padding: 14px;">
-      <div style="font-weight: 700; margin-bottom: 8px;">{{ t.name }} {% if t.active %}<span class="tag tag-green">Active</span>{% endif %}</div>
-      <button class="btn" style="width: 100%;">{% if t.active %}Customize{% else %}Activate{% endif %}</button>
+      <div style="font-weight: 700; margin-bottom: 8px; display: flex; align-items: center; justify-content: space-between;">
+        {{ t.name }}
+        {% if t.active %}<span class="tag tag-green" style="font-size: .7rem;">Active</span>{% endif %}
+      </div>
+      <button class="btn theme-activate-btn" style="width: 100%;" data-theme="{{ t.slug }}">{% if t.active %}Customize{% else %}Activate{% endif %}</button>
     </div>
   </div>
   {% endfor %}
 </div>
+
+<div id="theme-toast" style="display:none; position: fixed; bottom: 24px; right: 24px; background: var(--surface-elevated); border: 1px solid var(--line); padding: 12px 18px; border-radius: 10px; box-shadow: var(--shadow); z-index: 100;"></div>
+
+<script>
+(function(){
+  const grid = document.getElementById('theme-grid');
+  const toast = document.getElementById('theme-toast');
+
+  function showToast(msg){
+    toast.textContent = msg;
+    toast.style.display = 'block';
+    setTimeout(() => { toast.style.display = 'none'; }, 3000);
+  }
+
+  async function activateTheme(slug){
+    try {
+      const res = await fetch('/api/v1/merchant/theme', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({theme: slug}),
+        credentials: 'same-origin'
+      });
+      const data = await res.json();
+      if (!res.ok) { showToast(data.error || 'Could not activate theme.'); return; }
+      if (window.setTheme) window.setTheme(data.theme);
+      grid.querySelectorAll('.theme-card').forEach(card => {
+        const isActive = card.dataset.theme === data.theme;
+        card.classList.toggle('active', isActive);
+        card.style.borderColor = isActive ? 'var(--gold)' : 'var(--line)';
+        const badge = card.querySelector('.tag');
+        if (badge) badge.remove();
+        if (isActive) {
+          const title = card.querySelector('div > div');
+          const span = document.createElement('span');
+          span.className = 'tag tag-green';
+          span.style.fontSize = '.7rem';
+          span.textContent = 'Active';
+          title.appendChild(span);
+        }
+        const btn = card.querySelector('button');
+        btn.textContent = isActive ? 'Customize' : 'Activate';
+      });
+      showToast(data.theme.replace(/-/g, ' ').replace(/\b\w/g, l => l.toUpperCase()) + ' theme activated.');
+    } catch (e) {
+      showToast('Network error. Please try again.');
+    }
+  }
+
+  grid.querySelectorAll('.theme-activate-btn').forEach(btn => {
+    btn.addEventListener('click', () => activateTheme(btn.dataset.theme));
+  });
+})();
+</script>
 
 {% endblock %}

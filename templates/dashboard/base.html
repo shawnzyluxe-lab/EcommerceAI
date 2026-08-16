@@ -11,7 +11,41 @@
   <link rel="stylesheet" href="{{ url_for('static', filename='css/dashboard.css') }}">
   {% block head %}{% endblock %}
 </head>
-<body data-merchant-name="{{ merchant.name | default('there') }}" data-merchant-timezone="{{ merchant.timezone | default('UTC') }}" style="--brand-accent: {{ merchant.brand_color | default('#8b5cf6') }}; --brand-accent-2: {{ merchant.brand_color_secondary | default('#a78bfa') }};">
+<body data-merchant-name="{{ merchant.name | default('there') }}" data-merchant-timezone="{{ merchant.timezone | default('UTC') }}" data-theme="{{ merchant.theme | default('prometheus-dark') }}" style="--brand-accent: {{ merchant.brand_color | default('#8b5cf6') }}; --brand-accent-2: {{ merchant.brand_color_secondary | default('#a78bfa') }};">
+  <script>
+  (function applyTheme(){
+    const themeVars = ['--bg','--surface','--surface-elevated','--ink','--ink-2','--ink-3','--line','--line-2'];
+    const presets = {
+      'prometheus-dark': { 'color-scheme': 'dark' },
+      'prometheus-light': {
+        '--bg': '#f9fafb', '--surface': '#ffffff', '--surface-elevated': '#f3f4f6',
+        '--ink': '#111827', '--ink-2': '#374151', '--ink-3': '#6b7280',
+        '--line': '#e5e7eb', '--line-2': '#f3f4f6', 'color-scheme': 'light'
+      },
+      'luxury-editorial': {
+        '--bg': '#0a0a0f', '--surface': '#12121a', '--surface-elevated': '#1a1a24',
+        '--ink': '#f5f3f0', '--ink-2': '#cfc8be', '--ink-3': '#8f877e',
+        '--line': '#2e2e38', '--line-2': '#1c1c26', 'color-scheme': 'dark'
+      },
+      'minimal-clean': {
+        '--bg': '#ffffff', '--surface': '#ffffff', '--surface-elevated': '#f9fafb',
+        '--ink': '#111827', '--ink-2': '#4b5563', '--ink-3': '#9ca3af',
+        '--line': '#e5e7eb', '--line-2': '#f3f4f6', 'color-scheme': 'light'
+      }
+    };
+    window.setTheme = function(theme){
+      const body = document.body;
+      const vars = presets[theme] || {};
+      body.dataset.theme = theme;
+      themeVars.forEach(v => body.style.removeProperty(v));
+      Object.keys(vars).forEach(k => {
+        if (k === 'color-scheme') { body.style.colorScheme = vars[k]; }
+        else { body.style.setProperty(k, vars[k]); }
+      });
+    };
+    setTheme(document.body.dataset.theme || 'prometheus-dark');
+  })();
+  </script>
   <div class="app-shell">
     <aside class="sidebar" id="sidebar">
       <div class="brand">
@@ -63,15 +97,12 @@
           <div class="plan-note">Unlimited access</div>
           <a href="/dashboard/billing" class="plan-link">View Plan</a>
         </div>
-        <div class="user-row" style="justify-content: space-between;">
-          <div style="display: flex; align-items: center; gap: 10px;">
-            <div class="user-avatar">{{ (merchant.name | default('Admin'))[:2] | upper }}</div>
-            <div class="user-info">
-              <div class="user-name">{{ merchant.name | default('Admin User') }}</div>
-              <div class="user-email">{{ merchant.email | default('admin@example.com') }}</div>
-            </div>
+        <div class="user-row">
+          <div class="user-avatar">{{ (merchant.name | default('Admin'))[:2] | upper }}</div>
+          <div class="user-info">
+            <div class="user-name">{{ merchant.name | default('Admin User') }}</div>
+            <div class="user-email">{{ merchant.email | default('admin@example.com') }}</div>
           </div>
-          <a href="/site-logout" class="btn btn-ghost" style="font-size: .75rem; padding: 4px 8px;">Log out</a>
         </div>
       </div>
     </aside>

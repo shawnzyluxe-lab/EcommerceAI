@@ -601,6 +601,7 @@ def get_merchant_context():
     concierge_bundle = False
     if billing and billing.add_ons:
         concierge_bundle = "concierge_bundle" in (billing.add_ons if isinstance(billing.add_ons, list) else [])
+    theme_setting = MerchantSetting.query.get((s.merchant_id, "theme"))
     return {
         "id": s.merchant_id,
         "tier": tier,
@@ -614,6 +615,7 @@ def get_merchant_context():
         "sandbox_expired": sandbox_expired,
         "brand_color": profile.brand_color or "#8b5cf6",
         "brand_color_secondary": profile.brand_color_secondary or "#a78bfa",
+        "theme": theme_setting.setting_value if theme_setting else "prometheus-dark",
         "role": s.role,
     }
 
@@ -2845,6 +2847,30 @@ def api_merchant_timezone():
     setting.setting_value = tz
     db.session.commit()
     return jsonify({"timezone": tz}), 200
+
+
+@app.route('/api/v1/merchant/theme', methods=['GET', 'POST'])
+@require_roles([UserRole.ADMIN, UserRole.MERCHANT, UserRole.ENGINEER])
+def api_merchant_theme():
+    """Get or set the merchant's dashboard theme."""
+    merchant = get_merchant_context()
+    if not merchant:
+        return jsonify({"error": "No merchant context"}), 403
+    allowed = {"prometheus-dark", "prometheus-light", "luxury-editorial", "minimal-clean"}
+    if request.method == 'GET':
+        setting = MerchantSetting.query.get((merchant["id"], "theme"))
+        return jsonify({"theme": setting.setting_value if setting else "prometheus-dark"}), 200
+    data = request.get_json(silent=True) or {}
+    theme = (data.get("theme") or "prometheus-dark").strip()
+    if theme not in allowed:
+        return jsonify({"error": f"Invalid theme. Choose one of: {', '.join(sorted(allowed))}"}), 400
+    setting = MerchantSetting.query.get((merchant["id"], "theme"))
+    if not setting:
+        setting = MerchantSetting(merchant_id=merchant["id"], setting_key="theme")
+        db.session.add(setting)
+    setting.setting_value = theme
+    db.session.commit()
+    return jsonify({"theme": theme}), 200
 
 
 @app.route('/api/v1/merchant/set-password', methods=['POST'])
