@@ -431,12 +431,14 @@ def run_migrations():
         )
 
         # Hardened multi-tenant session registry
-        _run("pgcrypto.extension", 'CREATE EXTENSION IF NOT EXISTS "pgcrypto"')
+        # Recreate with VARCHAR PK so the app can generate UUIDs without requiring pgcrypto.
+        _run("session_vault.drop", "DROP TABLE IF EXISTS active_session_vault")
+        _run("user_auth.drop", "DROP TABLE IF EXISTS user_authentication")
         _run(
             "user_authentication table",
             """
             CREATE TABLE IF NOT EXISTS user_authentication (
-                id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+                id VARCHAR(36) PRIMARY KEY,
                 merchant_id VARCHAR(100) NOT NULL REFERENCES merchant_profiles(merchant_id) ON DELETE CASCADE,
                 email VARCHAR(255) NOT NULL UNIQUE,
                 password_hash VARCHAR(255) NOT NULL,
@@ -451,7 +453,7 @@ def run_migrations():
             """
             CREATE TABLE IF NOT EXISTS active_session_vault (
                 session_token VARCHAR(512) PRIMARY KEY,
-                user_id UUID NOT NULL REFERENCES user_authentication(id) ON DELETE CASCADE,
+                user_id VARCHAR(36) NOT NULL REFERENCES user_authentication(id) ON DELETE CASCADE,
                 merchant_id VARCHAR(100) NOT NULL REFERENCES merchant_profiles(merchant_id) ON DELETE CASCADE,
                 ip_address VARCHAR(45),
                 expires_at TIMESTAMP WITH TIME ZONE NOT NULL,

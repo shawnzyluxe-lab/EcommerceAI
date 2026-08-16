@@ -118,7 +118,6 @@ def _create_user_from_profile(profile: MerchantProfile) -> UserAuthentication:
     """Provision a hardened auth record from an existing MerchantProfile."""
     clearance = _clearance_for_email(profile.admin_email or "")
     user = UserAuthentication(
-        id=profile.merchant_id or secrets.token_hex(16),
         merchant_id=profile.merchant_id,
         email=(profile.admin_email or "").lower(),
         password_hash=profile.password_hash or hash_password(secrets.token_hex(16)),
