@@ -639,7 +639,6 @@ NAV_GROUPS = [
     {
         "label": "Commerce",
         "links": [
-            {"id": "commerce_hub", "label": "Commerce Hub", "url": "/dashboard/commerce-hub", "icon": "☰"},
             {"id": "products", "label": "Products", "url": "/dashboard/products", "icon": "□"},
             {"id": "inventory", "label": "Inventory", "url": "/dashboard/inventory", "icon": "▣"},
             {"id": "shipments", "label": "Shipments", "url": "/dashboard/shipments", "icon": "✈"},

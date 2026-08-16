@@ -1473,8 +1473,8 @@ def dashboard_page(page):
         return redirect(url_for('login'))
     active_page = page.replace('-', '_')
     # Pages merged into the unified Settings page.
-    if active_page in ('billing', 'integrations', 'themes'):
-        return redirect(url_for('dashboard_page', page='settings', tab=active_page))
+    if active_page in ('billing', 'integrations', 'themes', 'commerce_hub'):
+        return redirect(url_for('dashboard_page', page='settings', tab='stores'))
     valid_pages = {
         'overview', 'command_center', 'commerce_hub', 'alerts', 'action_gate', 'profit_engine', 'startup_pack',
         'predictions', 'product_research', 'fulfillment', 'fraud', 'suppliers',
