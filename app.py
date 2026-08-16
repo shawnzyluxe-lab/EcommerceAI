@@ -258,7 +258,7 @@ def _delete_session_cookie(response):
 # Beta launch scope: overview, profit engine, alerts, billing, settings, and the
 # regression chart. All other sidebar pages are hidden from merchant nav.
 COMMERCIAL_READY_DASHBOARD_PAGES = {
-    "overview", "alerts", "profit_engine", "billing", "settings", "regression_chart",
+    "overview", "alerts", "profit_engine", "billing", "settings", "regression_chart", "startup_pack",
 }
 
 from tier_manager import TierManager, TIER_LIMITS, PLAN_TO_TIER
@@ -1457,6 +1457,11 @@ def dashboard():
         return redirect(url_for('login'))
     merchant_id = merchant["id"]
     ctx = context(active_page='overview', merchant=merchant, merchant_id=merchant_id)
+    ctx["show_brand_build_prompt"] = (
+        request.args.get('checkout') == 'success'
+        and request.args.get('concierge_bundle') == 'true'
+        and bool(merchant.get('concierge_bundle'))
+    )
     return render_template('dashboard/overview.html', **ctx)
 
 
@@ -1465,6 +1470,11 @@ def _dashboard_context(active_page):
     merchant = get_merchant_context()
     merchant_id = merchant["id"] if merchant else None
     ctx = context(active_page=active_page, merchant=merchant, merchant_id=merchant_id)
+    ctx["show_brand_build_prompt"] = (
+        request.args.get('checkout') == 'success'
+        and request.args.get('concierge_bundle') == 'true'
+        and bool(merchant and merchant.get('concierge_bundle'))
+    )
     return ctx
 
 
@@ -1476,7 +1486,12 @@ def dashboard_page(page):
     active_page = page.replace('-', '_')
     # Pages merged into the unified Settings page.
     if active_page in ('billing', 'integrations', 'themes', 'commerce_hub'):
-        return redirect(url_for('dashboard_page', page='settings', tab='stores'))
+        redirect_kwargs = {'page': 'settings', 'tab': 'stores'}
+        if request.args.get('checkout') == 'success':
+            redirect_kwargs['checkout'] = 'success'
+            if request.args.get('concierge_bundle') == 'true':
+                redirect_kwargs['concierge_bundle'] = 'true'
+        return redirect(url_for('dashboard_page', **redirect_kwargs))
     valid_pages = {
         'overview', 'command_center', 'commerce_hub', 'alerts', 'action_gate', 'profit_engine', 'startup_pack',
         'predictions', 'product_research', 'fulfillment', 'fraud', 'suppliers',
@@ -1494,6 +1509,9 @@ def dashboard_page(page):
     if not s or s.role not in (UserRole.ADMIN.value, UserRole.ENGINEER.value):
         if active_page not in COMMERCIAL_READY_DASHBOARD_PAGES:
             return redirect(url_for('dashboard'))
+        # Brand Build is locked behind the Concierge Bundle add-on.
+        if active_page == 'startup_pack' and not merchant.get('concierge_bundle'):
+            return redirect(url_for('dashboard_page', page='settings', tab='billing'))
     ctx = _dashboard_context(active_page)
     # Tier-based page gating (admins and engineers bypass tier limits).
     if s.role not in (UserRole.ADMIN.value, UserRole.ENGINEER.value):

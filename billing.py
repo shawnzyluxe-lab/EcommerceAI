@@ -2,12 +2,21 @@
 import os
 import json
 import logging
+from urllib.parse import urlparse, parse_qs, urlencode, urlunparse
 import stripe
 
 from models import db, SaaSBilling, MerchantProfile
 from tier_manager import TIER_PRICE_ENV, PLAN_TO_TIER
 
 logger = logging.getLogger(__name__)
+
+
+def _add_qs_param(url, key, value):
+    parsed = urlparse(url)
+    qs = parse_qs(parsed.query)
+    qs[key] = [value]
+    return urlunparse(parsed._replace(query=urlencode(qs, doseq=True)))
+
 
 stripe.api_key = os.environ.get("STRIPE_SECRET_KEY", os.environ.get("STRIPE_LIVE_SECRET_KEY", ""))
 STRIPE_PUBLISHABLE_KEY = os.environ.get("STRIPE_PUBLISHABLE_KEY", os.environ.get("STRIPE_LIVE_PUBLISHABLE_KEY", ""))
@@ -131,6 +140,15 @@ def create_checkout_session(
         add_ons.append("concierge_bundle")
         line_items.append({"price": concierge_price, "quantity": 1})
 
+    # Add concierge flag to success URL so the dashboard can prompt for Brand Build.
+    default_success = "https://vantavcommerce.com/dashboard/billing?checkout=success"
+    if concierge_bundle:
+        default_success = _add_qs_param(default_success, "concierge_bundle", "true")
+    if success_url:
+        success_url = _add_qs_param(success_url, "concierge_bundle", "true") if concierge_bundle else success_url
+    else:
+        success_url = default_success
+
     profile = MerchantProfile.query.get(merchant_id)
     if not profile:
         raise ValueError(f"Merchant {merchant_id} not found")
@@ -162,7 +180,7 @@ def create_checkout_session(
         },
         "subscription_data": subscription_data,
         "allow_promotion_codes": True,
-        "success_url": success_url or "https://vantavcommerce.com/dashboard/billing?checkout=success",
+        "success_url": success_url,
         "cancel_url": cancel_url or "https://vantavcommerce.com/subscribe?canceled=1",
     }
 

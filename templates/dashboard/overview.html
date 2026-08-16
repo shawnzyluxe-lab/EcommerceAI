@@ -9,6 +9,21 @@
   </p>
 </section>
 
+{% if show_brand_build_prompt %}
+<div id="brand-build-prompt" class="card" style="border: 1px solid var(--green); background: var(--green-bg); margin-bottom: 18px;">
+  <div style="display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap;">
+    <div>
+      <div style="font-weight: 700; color: var(--ink); margin-bottom: 4px;">Concierge Bundle active — start your Brand Build</div>
+      <div style="font-size: .85rem; color: var(--ink-2);">Your custom brand build + manufacturer match is ready to begin.</div>
+    </div>
+    <div style="display: flex; gap: 10px; align-items: center;">
+      <a href="/dashboard/startup-pack" class="btn btn-primary">Start Brand Build</a>
+      <button class="btn btn-ghost" onclick="document.getElementById('brand-build-prompt').style.display='none'" style="font-size:.8rem;">Dismiss</button>
+    </div>
+  </div>
+</div>
+{% endif %}
+
 <div class="workflow-pillars" style="margin-top: 18px;">
 
   <!-- PILLAR 01: TRUE PROFIT -->

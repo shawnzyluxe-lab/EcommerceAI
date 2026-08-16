@@ -219,6 +219,7 @@ COMMERCIAL_READY_PAGE_IDS = {
     "regression_chart",
     "billing",
     "settings",
+    "startup_pack",
 }
 
 
@@ -737,6 +738,12 @@ def context(active_page=None, merchant=None, merchant_id=None):
             if link.get("id") == "alerts":
                 link["badge"] = str(len(live_alerts))
     nav_groups = _filter_nav_for_role(nav_groups, user_role)
+
+    # Brand Build (startup_pack) is only visible when the Concierge Bundle add-on is active.
+    has_concierge = bool(merchant and merchant.get("concierge_bundle"))
+    if not has_concierge and user_role not in ("Admin", "Engineer"):
+        for group in nav_groups:
+            group["links"] = [link for link in group["links"] if link.get("id") != "startup_pack"]
 
     # Admin-only backend navigation.
     if user_role in ("Admin", "Engineer"):
