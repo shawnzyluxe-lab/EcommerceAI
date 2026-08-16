@@ -14,6 +14,11 @@
   .subnav a { color: var(--ink-3); text-decoration: none; font-size: .8rem; font-weight: 600; padding: 6px 10px; border-bottom: 2px solid transparent; margin-bottom: -9px; }
   .subnav a:hover { color: var(--accent); }
   .subnav a.active { color: var(--accent); border-bottom-color: var(--accent); }
+  .nav-group-header { display: flex; align-items: center; justify-content: space-between; padding: 10px 12px; margin: 2px 10px; border-radius: 8px; color: var(--ink-3); text-decoration: none; font-size: .68rem; text-transform: uppercase; letter-spacing: .09em; font-weight: 600; }
+  .nav-group-header:hover { background: var(--surface-elevated); color: var(--ink); }
+  .nav-group-header.active { color: var(--accent); background: var(--surface-elevated); }
+  .nav-group-count { background: var(--line); color: var(--ink-2); font-size: .6rem; padding: 2px 6px; border-radius: 99px; }
+  .nav-group-header.active .nav-group-count { background: var(--accent); color: #fff; }
   </style>
   {% block head %}{% endblock %}
 </head>
@@ -74,25 +79,16 @@
 
       <nav class="sidebar-nav" id="sidebar-nav">
         {% for group in nav_groups %}
-        {% set group_has_active = namespace(found=false) %}
+        {% set group_is_active = namespace(found=false) %}
         {% for item in group.links %}
-          {% if active_page == item.id %}{% set group_has_active.found = true %}{% endif %}
+          {% if active_page == item.id %}{% set group_is_active.found = true %}{% endif %}
         {% endfor %}
-        <div class="nav-group {% if not group_has_active.found %}collapsed{% endif %}" data-group-label="{{ group.label }}">
-          <button class="nav-group-toggle" aria-expanded="{{ 'true' if group_has_active.found else 'false' }}" aria-controls="nav-group-{{ loop.index }}">
-            <span class="nav-group-label">{{ group.label }}</span>
-            <span class="nav-group-chevron" aria-hidden="true">▾</span>
-          </button>
-          <div class="nav-group-links" id="nav-group-{{ loop.index }}">
-            {% for item in group.links %}
-            <a class="nav-item {% if active_page == item.id %}active{% endif %}" href="{{ item.url }}" data-section="{{ item.id }}">
-              <span class="nav-icon">{{ item.icon }}</span>
-              <span class="nav-text">{{ item.label }}</span>
-              {% if item.badge %}<span class="nav-badge">{{ item.badge }}</span>{% endif %}
-            </a>
-            {% endfor %}
-          </div>
-        </div>
+        {% if group.links %}
+        <a class="nav-group-header {% if group_is_active.found %}active{% endif %}" href="{{ group.links[0].url }}" data-group-label="{{ group.label }}">
+          <span class="nav-group-label">{{ group.label }}</span>
+          {% if group.links | length > 1 %}<span class="nav-group-count">{{ group.links | length }}</span>{% endif %}
+        </a>
+        {% endif %}
         {% endfor %}
       </nav>
 
@@ -101,7 +97,7 @@
           <div class="plan-icon">{% if merchant.tier and 'Enterprise' in merchant.tier %}♛{% else %}★{% endif %}</div>
           <div class="plan-name">{{ merchant.tier | default('Enterprise Plan') }}</div>
           <div class="plan-note">Unlimited access</div>
-          <a href="/dashboard/billing" class="plan-link">View Plan</a>
+          <a href="/dashboard/settings?tab=billing" class="plan-link">View Plan</a>
         </div>
         <div class="user-row">
           <div class="user-avatar">{{ (merchant.name | default('Admin'))[:2] | upper }}</div>
