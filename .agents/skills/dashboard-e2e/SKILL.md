@@ -94,3 +94,9 @@ xrandr --output VNC-0 --mode 1600x1200
 - The CSP `script-src` in `monitoring.py` must include `https://cdn.jsdelivr.net`; otherwise the canvas stays blank even though the API returns the DEGRADED text.
 - To test the chart end-to-end locally, run the app with a CSP middleware that allows the CDN or temporarily patch `monitoring.py` during testing only.
 - Use `seed_regression_sku.py` (or a temporary deterministic seed) to populate `SKU-404-PODS` data for the target merchant; `sqlite:///shawnzyluxe.db` resolves to `instance/shawnzyluxe.db` in this repo.
+
+## PR #6 grouped navigation and Shopify Stores UI
+
+- Revision `5899e7d` is testable locally with the existing Growth/Admin account `shawn@shawnzyluxe.com`; the live deployment may lag and show the old headings-only sidebar.
+- On the local build, click the `Intelligence` and `Operations` buttons in the sidebar to reveal `Profit Dashboard` and `Inventory`; route checks should confirm `/dashboard/profit-engine`, `/dashboard/inventory`, and `/dashboard/settings` render with active highlighting.
+- The Shopify UI is under `/dashboard/settings?tab=stores`, where `Connect Manually` exposes Shopify, store-domain, and access-token fields. Do not submit a real token during navigation tests; actual OAuth/token exchange requires authorized store credentials and can mutate connected-store state.
