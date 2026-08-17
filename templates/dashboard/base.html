@@ -151,21 +151,6 @@
           <strong>Application not approved.</strong> This account does not have access to live marketplace features.
         </div>
         {% endif %}
-        {% block subnav %}
-        {% set active_group = namespace(value=None) %}
-        {% for group in nav_groups %}
-          {% for item in group.links %}
-            {% if active_page == item.id %}{% set active_group.value = group %}{% endif %}
-          {% endfor %}
-        {% endfor %}
-        {% if active_group.value and active_group.value.links | length > 1 %}
-        <nav class="subnav" aria-label="{{ active_group.value.label }} sections">
-          {% for item in active_group.value.links %}
-          <a href="{{ item.url }}" class="{% if active_page == item.id %}active{% endif %}">{{ item.label }}</a>
-          {% endfor %}
-        </nav>
-        {% endif %}
-        {% endblock %}
         {% block content %}{% endblock %}
       </main>
     </div>
