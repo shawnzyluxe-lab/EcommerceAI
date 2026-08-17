@@ -84,10 +84,21 @@
           {% if active_page == item.id %}{% set group_is_active.found = true %}{% endif %}
         {% endfor %}
         {% if group.links %}
-        <a class="nav-group-header {% if group_is_active.found %}active{% endif %}" href="{{ group.links[0].url }}" data-group-label="{{ group.label }}">
-          <span class="nav-group-label">{{ group.label }}</span>
-          {% if group.links | length > 1 %}<span class="nav-group-count">{{ group.links | length }}</span>{% endif %}
-        </a>
+        <section class="nav-group" data-group-label="{{ group.label }}">
+          <button class="nav-group-toggle" type="button" aria-expanded="true">
+            <span class="nav-group-label">{{ group.label }}</span>
+            <span class="nav-group-chevron">⌄</span>
+          </button>
+          <div class="nav-group-links">
+            {% for item in group.links %}
+            <a class="nav-item {% if active_page == item.id %}active{% endif %}" href="{{ item.url }}">
+              <span class="nav-icon">{{ item.icon }}</span>
+              <span class="nav-text">{{ item.label }}</span>
+              {% if item.badge %}<span class="nav-badge">{{ item.badge }}</span>{% endif %}
+            </a>
+            {% endfor %}
+          </div>
+        </section>
         {% endif %}
         {% endfor %}
       </nav>

@@ -260,10 +260,10 @@ def _delete_session_cookie(response):
 
 # Commercial-ready dashboard pages. Merchants can only reach these pages; admins and
 # engineers can still access every page in valid_pages for development.
-# Beta launch scope: overview, profit engine, alerts, billing, settings, and the
-# regression chart. All other sidebar pages are hidden from merchant nav.
+# Merchant-ready scope includes core financial and inventory views. Other pages
+# remain available to admins and engineers while they are being completed.
 COMMERCIAL_READY_DASHBOARD_PAGES = {
-    "overview", "alerts", "profit_engine", "billing", "settings", "regression_chart", "startup_pack", "onboarding_loading",
+    "overview", "alerts", "profit_engine", "inventory", "billing", "settings", "regression_chart", "startup_pack", "onboarding_loading",
 }
 
 from tier_manager import TierManager, TIER_LIMITS, PLAN_TO_TIER

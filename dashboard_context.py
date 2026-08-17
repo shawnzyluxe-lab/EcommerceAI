@@ -212,11 +212,13 @@ def _ai_greeting(merchant_id: Optional[str], merchant: Optional[Dict[str, Any]] 
 # backed by real data. Admins and engineers can still see every page so development
 # and internal demos can continue.
 # Beta launch scope: overview, profit engine, alerts, billing, settings, and the
-# regression chart. All other sidebar pages are hidden from merchant nav.
+# inventory, billing, settings, and regression. Other pages remain admin-only
+# until they are ready for merchant use.
 COMMERCIAL_READY_PAGE_IDS = {
     "overview",
     "alerts",
     "profit_engine",
+    "inventory",
     "regression_chart",
     "billing",
     "settings",
@@ -893,4 +895,3 @@ def context(active_page=None, merchant=None, merchant_id=None):
         },
         "generated": now.strftime("%A, %d %b %Y · %H:%M %Z"),
     }
-
