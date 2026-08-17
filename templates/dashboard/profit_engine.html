@@ -10,8 +10,14 @@
 <div class="grid grid-2">
   <div class="card">
     <div class="card-head"><h3>True margin</h3></div>
+    {% if not has_sales %}
+    <div style="padding: 22px 0; color: var(--ink-3);">
+      <strong style="display: block; color: var(--ink-2); margin-bottom: 6px;">No sales in the last 30 days</strong>
+      Profit metrics will appear here after your connected store records an order.
+    </div>
+    {% endif %}
     <div id="breakdown-rows">
-      {% for r in profit_rows %}
+      {% for r in profit_rows if has_sales %}
       <div style="display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px dashed var(--line); font-size: .9rem;">
         <span style="color: var(--ink-3);">{{ r.label }}</span>
         <span class="mono {{ 'up' if r.kind == 'in' else 'down' }}" style="font-weight: 600;">
@@ -33,6 +39,9 @@
       <span class="tag tag-green">Live</span>
     </div>
     <div class="table-wrap">
+      {% if not has_sales %}
+      <div style="padding: 22px; text-align: center; color: var(--ink-3);">No orders in the last 30 days.</div>
+      {% else %}
       <table>
         <thead><tr><th>Order</th><th>Channel</th><th class="num">Revenue</th><th class="num">Profit</th><th class="num">Margin</th><th>State</th><th>Tracking</th></tr></thead>
         <tbody id="orders-body">
@@ -53,12 +62,14 @@
           {% endfor %}
         </tbody>
       </table>
+      {% endif %}
     </div>
   </div>
 </div>
 
 <script>
 (function() {
+  let hasSales = {{ 'true' if has_sales else 'false' }};
   const fmt = n => n.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2});
   const stateClass = {'shipped':'tag-green','delayed':'tag-amber','refunded':'tag-red','packed':'tag-blue','cancelled':'tag-red'};
 
@@ -101,8 +112,12 @@
         fetch('/api/profit/breakdown').then(r => r.json()),
         fetch('/api/orders').then(r => r.json())
       ]);
-      if (bd && bd.rows) renderBreakdown(bd);
-      if (od && od.orders) renderOrders(od.orders);
+      if (!hasSales && od && od.orders && od.orders.length) {
+        window.location.reload();
+        return;
+      }
+      if (hasSales && bd && bd.rows) renderBreakdown(bd);
+      if (hasSales && od && od.orders) renderOrders(od.orders);
     } catch (e) {
       console.error('Profit refresh failed', e);
     }

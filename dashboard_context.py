@@ -716,6 +716,38 @@ def context(active_page=None, merchant=None, merchant_id=None):
         costs = feed["total_costs"]
         net = feed["net_profit"]
         profit_rows = feed["profit_rows"]
+    has_sales = bool(orders)
+
+    inventory_rows = []
+    if active_page == "inventory" and merchant_id:
+        products = Product.query.filter_by(merchant_id=merchant_id).all()
+        for product in products:
+            on_hand = int(product.on_hand or 0)
+            reorder_point = int(product.reorder_point or 0)
+            if on_hand == 0:
+                status = "Out"
+            elif on_hand <= reorder_point:
+                status = "Low"
+            else:
+                status = "OK"
+            inventory_rows.append({
+                "sku": product.sku,
+                "title": product.title,
+                "on_hand": on_hand,
+                "inbound": int(product.inbound or 0),
+                "reorder_point": reorder_point,
+                "unit_cost": float(product.unit_cost or 0),
+                "status": status,
+            })
+        inventory_rows.sort(
+            key=lambda row: ({"Out": 0, "Low": 1, "OK": 2}[row["status"]], row["on_hand"], row["sku"])
+        )
+    inventory_kpis = {
+        "total_skus": len(inventory_rows),
+        "low_stock": sum(row["status"] == "Low" for row in inventory_rows),
+        "out_of_stock": sum(row["status"] == "Out" for row in inventory_rows),
+        "inventory_value": sum(row["on_hand"] * row["unit_cost"] for row in inventory_rows),
+    }
     # Always serve fresh headline numbers even if BRIEFING is mutated elsewhere.
     briefing = dict(BRIEFING)
     briefing["revenue"] = gross
@@ -728,8 +760,8 @@ def context(active_page=None, merchant=None, merchant_id=None):
             live_alerts = [alert_matrix.alert_to_dict(a) for a in alert_matrix.get_alerts(merchant_id)]
             fraud_alerts = [alert_matrix.fraud_alert_to_dict(a) for a in alert_matrix.get_fraud_alerts(merchant_id)]
         except Exception:
-            live_alerts = ALERTS
-            fraud_alerts = FRAUD
+            live_alerts = []
+            fraud_alerts = []
     else:
         live_alerts = ALERTS
         fraud_alerts = FRAUD
@@ -854,6 +886,9 @@ def context(active_page=None, merchant=None, merchant_id=None):
         "net": net,
         "net_margin": round(net / gross * 100, 1) if gross else 0.0,
         "orders": orders,
+        "has_sales": has_sales,
+        "inventory_rows": inventory_rows,
+        "inventory_kpis": inventory_kpis,
         "series": SALES_SERIES,
         "series_max": max(p["value"] for p in SALES_SERIES),
         "forecasts": FORECASTS,

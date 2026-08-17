@@ -40,6 +40,8 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
+SEED_DEMO_DATA = os.environ.get("SEED_DEMO_DATA", "false").lower() in ("1", "true", "yes")
+
 SENTRY_DSN = os.environ.get("SENTRY_DSN", "")
 if SENTRY_DSN:
     try:
@@ -788,25 +790,50 @@ with app.app_context():
 
     # Seed FK-dependent merchant data now that profiles exist
     if not MerchantMetric.query.filter_by(merchant_id="merchant_shawn_01").first():
-        db.session.add(MerchantMetric(merchant_id="merchant_shawn_01", total_unified_balance=20560.00, true_net_profit=1394.00, gross_revenue=4582.00, ai_briefing="System initialized."))
+        db.session.add(MerchantMetric(
+            merchant_id="merchant_shawn_01",
+            total_unified_balance=20560.00 if SEED_DEMO_DATA else 0.0,
+            true_net_profit=1394.00 if SEED_DEMO_DATA else 0.0,
+            gross_revenue=4582.00 if SEED_DEMO_DATA else 0.0,
+            ai_briefing="System initialized." if SEED_DEMO_DATA else "No sales data yet.",
+        ))
     if not MerchantMetric.query.filter_by(merchant_id="merchant_guest_02").first():
-        db.session.add(MerchantMetric(merchant_id="merchant_guest_02", total_unified_balance=1240.00, true_net_profit=410.00, gross_revenue=890.00, ai_briefing="System initialized."))
+        db.session.add(MerchantMetric(
+            merchant_id="merchant_guest_02",
+            total_unified_balance=1240.00 if SEED_DEMO_DATA else 0.0,
+            true_net_profit=410.00 if SEED_DEMO_DATA else 0.0,
+            gross_revenue=890.00 if SEED_DEMO_DATA else 0.0,
+            ai_briefing="System initialized." if SEED_DEMO_DATA else "No sales data yet.",
+        ))
     if not MerchantChannel.query.filter_by(merchant_id="merchant_shawn_01").first():
-        db.session.add(MerchantChannel(merchant_id="merchant_shawn_01", channel_id="shopify", pending_orders=12, conversion_rate=3.4))
-        db.session.add(MerchantChannel(merchant_id="merchant_shawn_01", channel_id="amazon", pending_orders=4, conversion_rate=2.8))
-        db.session.add(MerchantChannel(merchant_id="merchant_shawn_01", channel_id="tiktok", pending_orders=7, conversion_rate=4.1))
+        channel_defaults = {
+            "shopify": (12, 3.4),
+            "amazon": (4, 2.8),
+            "tiktok": (7, 4.1),
+        } if SEED_DEMO_DATA else {
+            "shopify": (0, 0.0),
+            "amazon": (0, 0.0),
+            "tiktok": (0, 0.0),
+        }
+        for channel_id, (pending_orders, conversion_rate) in channel_defaults.items():
+            db.session.add(MerchantChannel(
+                merchant_id="merchant_shawn_01",
+                channel_id=channel_id,
+                pending_orders=pending_orders,
+                conversion_rate=conversion_rate,
+            ))
     if not SystemExceptionLog.query.first():
         db.session.add(SystemExceptionLog(module_origin="DATABASE_CORE", error_severity="INFO", exception_msg="Relational multi-tenant isolation layer fully hardened."))
     db.session.commit()
 
     # Seed or restore business metrics
-    if not BusinessMetric.query.first():
+    if not BusinessMetric.query.filter_by(merchant_id="merchant_shawn_01").first():
         db.session.add(BusinessMetric(
             merchant_id="merchant_shawn_01",
-            total_unified_balance=20560.00,
-            true_net_profit=1394.00,
-            gross_revenue=4582.00,
-            ai_briefing=COO["narrative"],
+            total_unified_balance=20560.00 if SEED_DEMO_DATA else 0.0,
+            true_net_profit=1394.00 if SEED_DEMO_DATA else 0.0,
+            gross_revenue=4582.00 if SEED_DEMO_DATA else 0.0,
+            ai_briefing=COO["narrative"] if SEED_DEMO_DATA else "No sales data yet.",
         ))
     latest = BusinessMetric.query.order_by(BusinessMetric.id.desc()).first()
     if latest:
@@ -818,19 +845,34 @@ with app.app_context():
         BRIEFING["revenue"] = latest.gross_revenue
         BRIEFING["profit"] = latest.true_net_profit
 
-    # Seed the real-time Profit Feed with demo data if no orders exist yet.
-    profit_feed.seed_demo_data("merchant_shawn_01")
-    profit_feed.seed_demo_data("merchant_guest_02")
+    if SEED_DEMO_DATA:
+        profit_feed.seed_demo_data("merchant_shawn_01")
+        profit_feed.seed_demo_data("merchant_guest_02")
 
     # Seed / refresh the Alert Matrix from latest data.
-    alert_matrix.seed_demo_alerts("merchant_shawn_01")
+    if SEED_DEMO_DATA:
+        alert_matrix.seed_demo_alerts("merchant_shawn_01")
     alert_matrix.refresh_alerts("merchant_shawn_01")
 
     # Seed or restore commerce channels
     if not CommerceChannel.query.first():
-        db.session.add(CommerceChannel(channel_id="shopify", channel_name="Shopify Storefront", pending_orders=12, conversion_rate=3.4, performance_status="Optimal"))
-        db.session.add(CommerceChannel(channel_id="tiktok", channel_name="TikTok Shop", pending_orders=7, conversion_rate=4.1, performance_status="Trending"))
-        db.session.add(CommerceChannel(channel_id="amazon", channel_name="Amazon Marketplace", pending_orders=4, conversion_rate=2.8, performance_status="Stable"))
+        commerce_defaults = [
+            ("shopify", "Shopify Storefront", 12, 3.4, "Optimal"),
+            ("tiktok", "TikTok Shop", 7, 4.1, "Trending"),
+            ("amazon", "Amazon Marketplace", 4, 2.8, "Stable"),
+        ] if SEED_DEMO_DATA else [
+            ("shopify", "Shopify Storefront", 0, 0.0, "Not connected"),
+            ("tiktok", "TikTok Shop", 0, 0.0, "Not connected"),
+            ("amazon", "Amazon Marketplace", 0, 0.0, "Not connected"),
+        ]
+        for channel_id, channel_name, pending_orders, conversion_rate, performance_status in commerce_defaults:
+            db.session.add(CommerceChannel(
+                channel_id=channel_id,
+                channel_name=channel_name,
+                pending_orders=pending_orders,
+                conversion_rate=conversion_rate,
+                performance_status=performance_status,
+            ))
     for cc in CommerceChannel.query.all():
         DASHBOARD_STATE["channels"][cc.channel_id]["pending_orders"] = cc.pending_orders
         feed = next((f for f in DASHBOARD_STATE["conversion_feeds"] if cc.channel_name.lower() in f["store"].lower()), None)
@@ -845,9 +887,9 @@ with app.app_context():
     # Seed or restore support metrics
     if not SupportMetric.query.first():
         db.session.add(SupportMetric(
-            active_chats=DASHBOARD_STATE["support_chats"],
-            sentiment_score=DASHBOARD_STATE["support_sentiment"],
-            recent_resolution=DASHBOARD_STATE["support_resolution"],
+            active_chats=DASHBOARD_STATE["support_chats"] if SEED_DEMO_DATA else 0,
+            sentiment_score=DASHBOARD_STATE["support_sentiment"] if SEED_DEMO_DATA else "No data",
+            recent_resolution=DASHBOARD_STATE["support_resolution"] if SEED_DEMO_DATA else "No support activity yet.",
         ))
     latest_support = SupportMetric.query.order_by(SupportMetric.id.desc()).first()
     if latest_support:
@@ -861,10 +903,10 @@ with app.app_context():
     # Seed or restore marketing studio
     if not MarketingStudio.query.first():
         db.session.add(MarketingStudio(
-            active_campaign=DASHBOARD_STATE["mktg_campaign"],
-            generation_status=DASHBOARD_STATE["mktg_status"],
-            platform_target="Shopify / SMS",
-            copy_preview=DASHBOARD_STATE["mktg_copy"],
+            active_campaign=DASHBOARD_STATE["mktg_campaign"] if SEED_DEMO_DATA else "",
+            generation_status=DASHBOARD_STATE["mktg_status"] if SEED_DEMO_DATA else "Not started",
+            platform_target="Shopify / SMS" if SEED_DEMO_DATA else "",
+            copy_preview=DASHBOARD_STATE["mktg_copy"] if SEED_DEMO_DATA else "",
         ))
     latest_mktg = MarketingStudio.query.order_by(MarketingStudio.id.desc()).first()
     if latest_mktg:
@@ -876,7 +918,7 @@ with app.app_context():
         MARKETING["copy"] = latest_mktg.copy_preview
 
     # Seed or restore predictive logistics
-    if not PredictiveLogistics.query.first():
+    if SEED_DEMO_DATA and not PredictiveLogistics.query.first():
         db.session.add(PredictiveLogistics(
             variant_sku="SZL-VAR-B",
             days_remaining=4,
@@ -898,14 +940,14 @@ with app.app_context():
     if not SaaSBilling.query.first():
         db.session.add(SaaSBilling(
             merchant_id="merchant_shawn_01",
-            stripe_customer_id="cus_R8zX1042",
-            stripe_subscription_item_id="si_R8zX1042_metered",
-            current_plan="Enterprise AI Tier",
-            metered_usage_units=4820,
-            accrued_invoice_value=241.00,
-            billing_cycle_end="2026-09-01",
+            stripe_customer_id="cus_R8zX1042" if SEED_DEMO_DATA else "",
+            stripe_subscription_item_id="si_R8zX1042_metered" if SEED_DEMO_DATA else "",
+            current_plan="Enterprise AI Tier" if SEED_DEMO_DATA else "Beta Tier",
+            metered_usage_units=4820 if SEED_DEMO_DATA else 0,
+            accrued_invoice_value=241.00 if SEED_DEMO_DATA else 0.0,
+            billing_cycle_end="2026-09-01" if SEED_DEMO_DATA else "",
         ))
-    if not LocalProductCatalog.query.first():
+    if SEED_DEMO_DATA and not LocalProductCatalog.query.first():
         db.session.add(LocalProductCatalog(
             shopify_product_id="prod_882041",
             title="Shawnzyluxe Luxury Hoodie",
@@ -920,18 +962,18 @@ with app.app_context():
             price=45.00,
             inventory_quantity=140,
         ))
-    if not AdSpendAnalytic.query.first():
+    if SEED_DEMO_DATA and not AdSpendAnalytic.query.first():
         db.session.add(AdSpendAnalytic(merchant_id="merchant_shawn_01", platform_source="Shopify Product Ads", budget_allocated=1500.00, current_spend=420.00, roas=3.4, conversion_count=28))
         db.session.add(AdSpendAnalytic(merchant_id="merchant_shawn_01", platform_source="TikTok Video Ads", budget_allocated=2000.00, current_spend=680.00, roas=4.1, conversion_count=47))
         db.session.add(AdSpendAnalytic(merchant_id="merchant_shawn_01", platform_source="Meta Retargeting Loop", budget_allocated=1200.00, current_spend=310.00, roas=2.9, conversion_count=19))
-    if not GeneratedPurchaseOrder.query.first():
+    if SEED_DEMO_DATA and not GeneratedPurchaseOrder.query.first():
         db.session.add(GeneratedPurchaseOrder(po_reference="PO-SZL-A8F2", merchant_id="merchant_shawn_01", variant_sku="SZL-VAR-B", units_ordered=450, fulfillment_status="PENDING"))
-    if not AIAgent.query.first():
+    if SEED_DEMO_DATA and not AIAgent.query.first():
         db.session.add(AIAgent(agent_id="agent_logistics", merchant_id="merchant_shawn_01", agent_name="Operations Analyst", agent_role="Operations", status="IDLE_MONITORING", last_action="Reviewed inventory levels and flagged restock needs."))
         db.session.add(AIAgent(agent_id="agent_finance", merchant_id="merchant_shawn_01", agent_name="Finance Analyst", agent_role="Finance", status="IDLE_MONITORING", last_action="Checked cash flow and ad budget headroom."))
         db.session.add(AIAgent(agent_id="agent_marketing", merchant_id="merchant_shawn_01", agent_name="Marketing Analyst", agent_role="Marketing", status="IDLE_MONITORING", last_action="Standing by for campaign instructions."))
         db.session.add(AIAgent(agent_id="agent_support", merchant_id="merchant_shawn_01", agent_name="Support Analyst", agent_role="Support", status="IDLE_MONITORING", last_action="Monitoring customer ticket trends across channels."))
-    if not AgentMessage.query.first():
+    if SEED_DEMO_DATA and not AgentMessage.query.first():
         db.session.add(AgentMessage(sender_agent="agent_logistics", recipient_agent="agent_finance", merchant_id="merchant_shawn_01",
                                     payload="Alert: SKU SZL-VAR-B inventory velocity tracking indicates total stockout threat in 96 hours.", action_taken="stockout_alert"))
         db.session.add(AgentMessage(sender_agent="agent_finance", recipient_agent="agent_marketing", merchant_id="merchant_shawn_01",

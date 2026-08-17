@@ -7,26 +7,34 @@
   <p>Real-time stock levels, reorder points, and warehouse allocation.</p>
 </section>
 
+{% if inventory_rows %}
 <div class="kpi-grid">
-  <div class="card kpi-card"><div class="kpi-label">Total SKUs</div><div class="kpi-value">1,250</div><div class="kpi-delta up">▲ 12 vs last 30 days</div></div>
-  <div class="card kpi-card"><div class="kpi-label">Low stock</div><div class="kpi-value">8</div><div class="kpi-delta down">▲ 3 vs last 30 days</div></div>
-  <div class="card kpi-card"><div class="kpi-label">Out of stock</div><div class="kpi-value">2</div><div class="kpi-delta up">▼ 1 vs last 30 days</div></div>
-  <div class="card kpi-card"><div class="kpi-label">Inventory value</div><div class="kpi-value">$284k</div><div class="kpi-delta up">▲ 2.1% vs last 30 days</div></div>
+  <div class="card kpi-card"><div class="kpi-label">Total SKUs</div><div class="kpi-value">{{ inventory_kpis.total_skus }}</div></div>
+  <div class="card kpi-card"><div class="kpi-label">Low stock</div><div class="kpi-value">{{ inventory_kpis.low_stock }}</div></div>
+  <div class="card kpi-card"><div class="kpi-label">Out of stock</div><div class="kpi-value">{{ inventory_kpis.out_of_stock }}</div></div>
+  <div class="card kpi-card"><div class="kpi-label">Inventory value</div><div class="kpi-value">${{ '{:,.2f}'.format(inventory_kpis.inventory_value) }}</div></div>
 </div>
+{% endif %}
 
 <div class="card">
-  <div class="card-head"><h3>Stock by Warehouse</h3><span class="spacer"></span><button class="btn btn-primary">Reorder all low</button></div>
+  <div class="card-head"><h3>Inventory</h3><span class="spacer"></span></div>
+  {% if not inventory_rows %}
+  <div style="padding: 28px; text-align: center; color: var(--ink-3);">
+    <strong style="display: block; color: var(--ink-2); margin-bottom: 6px;">No inventory synced yet</strong>
+    Connect a store in <a href="/dashboard/settings?tab=stores" style="color: var(--purple);">Settings → Stores</a> to sync your products.
+  </div>
+  {% else %}
   <div class="table-wrap">
     <table>
-      <thead><tr><th>SKU</th><th>Product</th><th class="num">Miami</th><th class="num">Dallas</th><th class="num">Total</th><th>Status</th></tr></thead>
+      <thead><tr><th>SKU</th><th>Product</th><th class="num">On hand</th><th class="num">Inbound</th><th class="num">Reorder point</th><th>Status</th></tr></thead>
       <tbody>
-        <tr><td class="b mono">PRM-BTL-001</td><td>Prometheus Insulated Bottle</td><td class="num">64</td><td class="num">64</td><td class="num mono">128</td><td><span class="tag tag-green">OK</span></td></tr>
-        <tr><td class="b mono">PRM-HOD-002</td><td>Prometheus Hoodie</td><td class="num">24</td><td class="num">40</td><td class="num mono">64</td><td><span class="tag tag-green">OK</span></td></tr>
-        <tr><td class="b mono">PRM-BAG-004</td><td>Prometheus Backpack</td><td class="num">11</td><td class="num">28</td><td class="num mono">39</td><td><span class="tag tag-amber">Low</span></td></tr>
-        <tr><td class="b mono">PRM-MUG-005</td><td>Prometheus Ceramic Mug</td><td class="num">0</td><td class="num">0</td><td class="num mono">0</td><td><span class="tag tag-red">Out</span></td></tr>
+        {% for row in inventory_rows %}
+        <tr><td class="b mono">{{ row.sku }}</td><td>{{ row.title }}</td><td class="num mono">{{ row.on_hand }}</td><td class="num mono">{{ row.inbound }}</td><td class="num mono">{{ row.reorder_point }}</td><td><span class="tag {% if row.status == 'Out' %}tag-red{% elif row.status == 'Low' %}tag-amber{% else %}tag-green{% endif %}">{{ row.status }}</span></td></tr>
+        {% endfor %}
       </tbody>
     </table>
   </div>
+  {% endif %}
 </div>
 
 {% endblock %}
