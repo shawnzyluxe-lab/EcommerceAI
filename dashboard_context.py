@@ -717,7 +717,7 @@ def context(active_page=None, merchant=None, merchant_id=None):
     has_sales = bool(orders)
 
     inventory_rows = []
-    if merchant_id:
+    if active_page == "inventory" and merchant_id:
         products = Product.query.filter_by(merchant_id=merchant_id).all()
         for product in products:
             on_hand = int(product.on_hand or 0)

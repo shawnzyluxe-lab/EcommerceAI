@@ -69,7 +69,7 @@
 
 <script>
 (function() {
-  const hasSales = {{ 'true' if has_sales else 'false' }};
+  let hasSales = {{ 'true' if has_sales else 'false' }};
   const fmt = n => n.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2});
   const stateClass = {'shipped':'tag-green','delayed':'tag-amber','refunded':'tag-red','packed':'tag-blue','cancelled':'tag-red'};
 
@@ -112,6 +112,10 @@
         fetch('/api/profit/breakdown').then(r => r.json()),
         fetch('/api/orders').then(r => r.json())
       ]);
+      if (!hasSales && od && od.orders && od.orders.length) {
+        window.location.reload();
+        return;
+      }
       if (hasSales && bd && bd.rows) renderBreakdown(bd);
       if (hasSales && od && od.orders) renderOrders(od.orders);
     } catch (e) {
