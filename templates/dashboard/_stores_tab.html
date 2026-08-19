@@ -78,7 +78,8 @@
   </div>
 
   <div class="card" id="connect-panel">
-    <div class="card-head"><h3>Connect Manually</h3></div>
+    <div class="card-head"><h3>Manual connection (advanced)</h3></div>
+    <p style="font-size:.8rem; color:var(--ink-3); margin:0 16px 12px;">Use this only when you have custom app or developer credentials. For Shopify, the Connect button above is the normal route.</p>
     <form id="connect-form" onsubmit="submitConnect(event)">
       <label style="font-size: .75rem; color: var(--ink-3); font-weight: 600;">Platform</label>
       <select id="platform" style="width: 100%; padding: 10px; margin: 6px 0 12px; border: 1px solid var(--line); border-radius: 8px; background: var(--surface); color: var(--ink);" onchange="toggleFields()">
@@ -90,7 +91,7 @@
       <div id="shopify-fields">
         <label style="font-size: .75rem; color: var(--ink-3); font-weight: 600;">Store domain</label>
         <input id="shopify-shop" type="text" placeholder="store.myshopify.com" style="width: 100%; padding: 10px; margin: 6px 0 12px; border: 1px solid var(--line); border-radius: 8px; background: var(--surface); color: var(--ink);">
-        <label style="font-size: .75rem; color: var(--ink-3); font-weight: 600;">Access token</label>
+        <label style="font-size: .75rem; color: var(--ink-3); font-weight: 600;">Access token (custom app)</label>
         <input id="shopify-token" type="password" placeholder="shpat_…" style="width: 100%; padding: 10px; margin: 6px 0 12px; border: 1px solid var(--line); border-radius: 8px; background: var(--surface); color: var(--ink);">
       </div>
 
@@ -132,7 +133,7 @@
         <input id="amazon-role-arn" type="text" style="width: 100%; padding: 10px; margin: 6px 0 12px; border: 1px solid var(--line); border-radius: 8px; background: var(--surface); color: var(--ink);">
       </div>
 
-      <button class="btn btn-primary" style="width: 100%;" type="submit" {% if SANDBOX %}disabled{% endif %}>{% if SANDBOX %}Live connect disabled in sandbox{% else %}Encrypt &amp; Save Connection{% endif %}</button>
+      <button class="btn btn-primary" style="width: 100%;" type="submit" {% if SANDBOX %}disabled{% endif %}>{% if SANDBOX %}Live connect disabled in sandbox{% else %}Save manual connection{% endif %}</button>
       {% if SANDBOX %}
       <p style="font-size:.75rem; color:var(--ink-3); margin-top:8px;">Simulated demo channels are already connected for your 48-hour sandbox. Request live access to connect your real stores.</p>
       {% endif %}
@@ -180,6 +181,21 @@ function toggleFields() {
   document.getElementById('amazon-fields').style.display = p === 'amazon' ? 'block' : 'none';
 }
 
+function getShopifyDomain() {
+  const shopInput = document.getElementById('shopify-shop');
+  let shop = shopInput ? shopInput.value.trim().toLowerCase() : '';
+  if (!shop) {
+    shop = (window.prompt('Enter your Shopify store domain (for example, store.myshopify.com):') || '').trim().toLowerCase();
+  }
+  shop = shop.replace(/^https?:\/\//, '').replace(/\/.*$/, '');
+  if (!/^[a-z0-9](?:[a-z0-9-]*[a-z0-9])?\.myshopify\.com$/.test(shop)) {
+    alert('Enter a Shopify store domain like store.myshopify.com.');
+    return '';
+  }
+  if (shopInput) shopInput.value = shop;
+  return shop;
+}
+
 function openConnectModal(platform) {
   if (!['shopify','tiktok','amazon'].includes(platform)) return;
   if (SANDBOX) {
@@ -190,6 +206,12 @@ function openConnectModal(platform) {
     const regionSelect = document.getElementById('tiktok-region');
     const region = regionSelect ? regionSelect.value : 'us';
     window.location.href = '/api/v1/auth/tiktok/connect?region=' + encodeURIComponent(region);
+    return;
+  }
+  if (platform === 'shopify') {
+    const shop = getShopifyDomain();
+    if (!shop) return;
+    window.location.href = '/api/v1/auth/shopify/connect?shop=' + encodeURIComponent(shop);
     return;
   }
   document.getElementById('platform').value = platform;
