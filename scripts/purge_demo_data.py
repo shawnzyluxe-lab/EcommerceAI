@@ -15,11 +15,13 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from app import app  # noqa: E402
 from models import (  # noqa: E402
+    ActionEvidence,
     AdSpendAnalytic,
     AdSpendFeed,
     AIAgent,
     AgentMessage,
     Alert,
+    PendingAction,
     BusinessMetric,
     GeneratedPurchaseOrder,
     LocalProductCatalog,
@@ -67,6 +69,28 @@ def purge(merchant_id, dry_run=False):
                 AdSpendFeed.amount == amount,
             ),
         )
+    # Draft actions and their evidence reference the alerts they came from, so
+    # they have to go before the alerts themselves.
+    demo_alert_ids = [
+        a.id
+        for a in Alert.query.filter(
+            Alert.merchant_id == merchant_id,
+            Alert.source_id.in_(DEMO_ALERT_SOURCE_IDS),
+        ).all()
+    ]
+    demo_action_ids = [
+        p.id for p in PendingAction.query.filter(PendingAction.alert_id.in_(demo_alert_ids)).all()
+    ] if demo_alert_ids else []
+    if demo_action_ids:
+        drop(
+            "action_evidence",
+            ActionEvidence.query.filter(ActionEvidence.action_id.in_(demo_action_ids)),
+        )
+        drop(
+            "pending_actions",
+            PendingAction.query.filter(PendingAction.id.in_(demo_action_ids)),
+        )
+        db.session.flush()
     drop(
         "alerts",
         Alert.query.filter(
