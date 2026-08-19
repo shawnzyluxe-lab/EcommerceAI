@@ -216,6 +216,18 @@ def execute_shopify_14d_history_harvest(merchant_id: str, shop_domain: str, toke
     with app.app_context():
         logger.info(f"[Historical Ingestion] Starting 14-day harvest for {merchant_id} on {shop_domain}")
 
+        try:
+            from shopify_sync import sync_products
+
+            catalog_count = sync_products(merchant_id)
+            logger.info(
+                f"[Historical Ingestion] Synced {catalog_count} Shopify catalog variants for {merchant_id}"
+            )
+        except Exception as e:
+            logger.error(
+                f"[Historical Ingestion] Shopify catalog sync failed for {merchant_id}; continuing with orders: {e}"
+            )
+
         time_window = datetime.datetime.utcnow() - datetime.timedelta(days=14)
         created_at_min = time_window.isoformat() + "Z"
 
