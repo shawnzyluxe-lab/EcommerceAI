@@ -225,6 +225,28 @@ COMMERCIAL_READY_PAGE_IDS = {
     "startup_pack",
 }
 
+# These pages still contain sample business content. Admins can access them
+# while they are being developed, so the page must identify that content.
+PLACEHOLDER_DASHBOARD_PAGE_IDS = {
+    "analytics",
+    "apps",
+    "automations",
+    "customers",
+    "discounts",
+    "fulfillment",
+    "health_score",
+    "marketing",
+    "orders",
+    "predictions",
+    "product_research",
+    "products",
+    "reports",
+    "returns",
+    "store_catalog",
+    "suppliers",
+    "support",
+}
+
 
 def _filter_nav_for_role(nav_groups, user_role):
     """Return a copy of nav_groups with only commercial-ready pages for merchants."""
@@ -872,6 +894,7 @@ def context(active_page=None, merchant=None, merchant_id=None):
         "nav": NAV,
         "nav_groups": nav_groups,
         "active_page": active_page or "overview",
+        "show_placeholder_banner": (active_page or "overview") in PLACEHOLDER_DASHBOARD_PAGE_IDS,
         "merchant": merchant_obj,
         "coo": dict(COO, greeting=_greeting_for(merchant_obj)),
         "ai_greeting": _ai_greeting(merchant_id, merchant_obj),

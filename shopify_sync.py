@@ -6,7 +6,7 @@ from typing import Dict, Any, List, Tuple, Optional
 
 import requests
 
-from models import db, MerchantChannel, TenantOAuthToken, MerchantSetting
+from models import db, MerchantChannel, TenantOAuthToken, MerchantSetting, Product
 import profit_feed
 import channels as channels_module
 
@@ -159,6 +159,48 @@ def sync_products(merchant_id: str, limit: int = 250) -> int:
                 })
             except (TypeError, ValueError) as e:
                 logger.warning(f"[Shopify Sync] Skipping malformed variant {variant.get('id')}: {e}")
+
+    for item in catalog:
+        variant_id = str(item.get("variant_id") or "").strip()
+        product_sku = str(item.get("sku") or "").strip()
+        if not product_sku:
+            if not variant_id:
+                logger.warning("[Shopify Sync] Skipping variant without SKU or Shopify variant ID")
+                continue
+            product_sku = f"SHPFY-VAR-{variant_id}"
+
+        product_row = Product.query.filter_by(
+            merchant_id=merchant_id,
+            sku=product_sku,
+        ).first()
+        if not product_row:
+            conflicting_row = Product.query.filter(
+                Product.sku == product_sku,
+                Product.merchant_id != merchant_id,
+            ).first()
+            if conflicting_row:
+                logger.warning(
+                    "[Shopify Sync] Skipping SKU %s owned by merchant %s",
+                    product_sku,
+                    conflicting_row.merchant_id,
+                )
+                continue
+            product_row = Product(
+                sku=product_sku,
+                merchant_id=merchant_id,
+                title=(item.get("title") or product_sku)[:255],
+            )
+            db.session.add(product_row)
+
+        product_row.title = (item.get("title") or product_row.title or product_sku)[:255]
+        product_row.on_hand = int(item.get("inventory_quantity") or 0)
+        channel_ids = dict(product_row.channel_ids or {})
+        channel_ids["shopify"] = {
+            "product_id": item.get("product_id", ""),
+            "variant_id": variant_id,
+            "inventory_item_id": item.get("inventory_item_id", ""),
+        }
+        product_row.channel_ids = channel_ids
 
     # Persist as merchant setting keyed by platform.
     setting = MerchantSetting.query.filter_by(merchant_id=merchant_id, setting_key="shopify_products").first()
