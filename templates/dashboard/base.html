@@ -162,6 +162,9 @@
           <strong>Application not approved.</strong> This account does not have access to live marketplace features.
         </div>
         {% endif %}
+        {% if show_placeholder_banner %}
+        {% include 'dashboard/_placeholder_banner.html' %}
+        {% endif %}
         {% block content %}{% endblock %}
       </main>
     </div>
