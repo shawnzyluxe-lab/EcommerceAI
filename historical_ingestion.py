@@ -20,6 +20,7 @@ from models import db, Product, UnifiedOrder, OrderItem, BusinessMetric
 import channels as channels_module
 import coo_agent_mesh
 import profit_regression
+import shopify_sync
 
 logger = logging.getLogger(__name__)
 
@@ -217,9 +218,7 @@ def execute_shopify_14d_history_harvest(merchant_id: str, shop_domain: str, toke
         logger.info(f"[Historical Ingestion] Starting 14-day harvest for {merchant_id} on {shop_domain}")
 
         try:
-            from shopify_sync import sync_products
-
-            catalog_count = sync_products(merchant_id)
+            catalog_count = shopify_sync.sync_products(merchant_id)
             logger.info(
                 f"[Historical Ingestion] Synced {catalog_count} Shopify catalog variants for {merchant_id}"
             )
