@@ -2281,6 +2281,13 @@ def api_connect_shopify():
     if not shop or not token:
         return jsonify({"detail": "shop and access_token required"}), 400
     try:
+        shopify_sync._shopify_get(shop, token, "shop")
+    except Exception:
+        logger.warning("[Channels] Shopify credential validation failed for merchant %s", merchant["id"])
+        return jsonify({
+            "detail": "Shopify could not verify these credentials. Check the store domain and access token, then try again.",
+        }), 400
+    try:
         channels_module.connect_shopify(merchant["id"], shop, token)
         _trigger_initial_sync(merchant["id"], "shopify")
         return jsonify({"status": "connected", "platform": "shopify", "domain": shop, "audit_started": True}), 200
