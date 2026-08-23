@@ -3053,6 +3053,65 @@ def api_sku_metrics():
         return jsonify({"detail": str(e)}), 500
 
 
+@app.route('/api/v1/products/<sku>', methods=['PATCH'])
+@require_roles([UserRole.ADMIN, UserRole.MERCHANT, UserRole.ENGINEER])
+def api_update_product(sku):
+    """Update unit cost and/or reorder point for a SKU and recalc profit."""
+    merchant = get_merchant_context()
+    if not merchant:
+        return jsonify({"error": "No merchant context"}), 403
+    data = request.get_json(silent=True) or {}
+    product = Product.query.filter_by(merchant_id=merchant["id"], sku=sku).first()
+    if not product:
+        return jsonify({"detail": "Product not found"}), 404
+
+    updated = False
+    if "unit_cost" in data:
+        try:
+            product.unit_cost = round(float(data["unit_cost"]), 4)
+            updated = True
+        except (TypeError, ValueError):
+            return jsonify({"detail": "unit_cost must be a number"}), 400
+    if "reorder_point" in data:
+        try:
+            product.reorder_point = int(data["reorder_point"])
+            updated = True
+        except (TypeError, ValueError):
+            return jsonify({"detail": "reorder_point must be an integer"}), 400
+
+    recalc_count = 0
+    if updated:
+        db.session.add(product)
+        db.session.commit()
+    if "unit_cost" in data:
+        try:
+            recalc_count = profit_feed.recalc_profit_for_sku(merchant["id"], sku)
+        except Exception as e:
+            logger.error(f"[Product update] Profit recalc failed for {sku}: {e}")
+
+    return jsonify({
+        "sku": product.sku,
+        "unit_cost": float(product.unit_cost or 0),
+        "reorder_point": product.reorder_point,
+        "profit_orders_recalculated": recalc_count,
+    }), 200
+
+
+@app.route('/api/v1/products/recalc-profit', methods=['POST'])
+@require_roles([UserRole.ADMIN, UserRole.MERCHANT, UserRole.ENGINEER])
+def api_recalc_profit():
+    """Recompute all profit feed orders for the merchant using current product costs."""
+    merchant = get_merchant_context()
+    if not merchant:
+        return jsonify({"error": "No merchant context"}), 403
+    try:
+        count = profit_feed.recalc_profit_for_merchant(merchant["id"])
+        return jsonify({"profit_orders_recalculated": count}), 200
+    except Exception as e:
+        logger.error(f"[Profit recalc] {e}")
+        return jsonify({"detail": str(e)}), 500
+
+
 @app.route('/api/v1/analytics/profit-regression', methods=['GET'])
 @require_roles([UserRole.ADMIN, UserRole.MERCHANT, UserRole.ENGINEER])
 def api_profit_regression():

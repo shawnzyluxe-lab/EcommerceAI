@@ -9,7 +9,7 @@ from collections import defaultdict
 import tracking
 import rules_engine
 import unified_ingest
-from models import db, ProfitFeedOrder, AdSpendFeed
+from models import db, ProfitFeedOrder, AdSpendFeed, Product, OrderItem
 
 logger = logging.getLogger(__name__)
 
@@ -76,7 +76,7 @@ def record_order(merchant_id, channel, order_id, gross_revenue, items=1, state="
     defaults = _channel_defaults(channel)
     gross = float(gross_revenue or 0.0)
     fees = gross * defaults["fee_pct"] + defaults["fee_fixed"]
-    cogs = gross * defaults["cogs_pct"]
+    cogs = _compute_order_cogs(merchant_id, order_items, defaults, gross)
     shipping = defaults["shipping"] * max(int(items or 1), 1)
     refund = float(refund_amount or 0.0)
 
@@ -122,6 +122,36 @@ def record_order(merchant_id, channel, order_id, gross_revenue, items=1, state="
     except Exception as e:
         logger.warning(f"[RULES ENGINE] record_order run failed: {e}")
     return order
+
+
+def _compute_item_cogs(merchant_id, item, defaults):
+    """Return COGS for one line item using the product's unit cost when available."""
+    sku = str(item.get("sku") or item.get("product_id") or "").strip()
+    qty = int(item.get("qty") or item.get("quantity") or 1)
+    unit_price = float(item.get("price") or item.get("unit_price") or 0.0)
+    if sku and merchant_id:
+        product = Product.query.filter_by(sku=sku, merchant_id=merchant_id).first()
+        if product:
+            unit_cost = float(product.unit_cost or 0)
+            if unit_cost > 0:
+                return unit_cost * qty
+    if unit_price > 0:
+        return unit_price * qty * defaults.get("cogs_pct", 0.35)
+    return 0.0
+
+
+def _compute_order_cogs(merchant_id, order_items, defaults, gross_fallback=0.0):
+    """Sum per-line COGS using product unit cost when possible, else channel estimate."""
+    if order_items:
+        return round(
+            sum(
+                _compute_item_cogs(merchant_id, item, defaults)
+                for item in order_items
+                if isinstance(item, dict)
+            ),
+            2,
+        )
+    return round(gross_fallback * defaults.get("cogs_pct", 0.35), 2)
 
 
 def _compute_net(order, ad_spend):
@@ -301,6 +331,67 @@ def get_kpis(merchant_id):
         "channels": channel_spend,
         "generated_at": datetime.now(timezone.utc).isoformat(),
     }
+
+
+def recalc_order_cogs_from_items(merchant_id, order_id, order_items=None):
+    """Recompute a ProfitFeedOrder's COGS/net from line items and current Product.unit_cost.
+
+    If order_items is supplied, it should be a list of dicts with sku/qty/price.
+    Otherwise, the function loads OrderItem rows for the order from the database.
+    """
+    pf = ProfitFeedOrder.query.filter_by(merchant_id=merchant_id, order_id=order_id).first()
+    if not pf:
+        return None
+
+    if order_items is None:
+        order_items = [
+            {
+                "sku": oi.sku,
+                "qty": oi.qty,
+                "price": float(oi.unit_price or 0),
+            }
+            for oi in OrderItem.query.filter_by(order_id=order_id).all()
+            if oi.sku
+        ]
+
+    defaults = _channel_defaults(pf.channel)
+    pf.cost_of_goods_sold = _compute_order_cogs(merchant_id, order_items, defaults, pf.gross_revenue)
+    pf.net_profit = _compute_net(pf, float(pf.ad_spend_attributed or 0.0))
+    db.session.add(pf)
+    return pf
+
+
+def recalc_profit_for_sku(merchant_id, sku):
+    """Recompute all profit feed orders that contain the given SKU."""
+    order_ids = (
+        db.session.query(ProfitFeedOrder.order_id)
+        .join(OrderItem, OrderItem.order_id == ProfitFeedOrder.order_id)
+        .filter(ProfitFeedOrder.merchant_id == merchant_id, OrderItem.sku == sku)
+        .distinct()
+        .all()
+    )
+    updated = 0
+    for (order_id,) in order_ids:
+        if recalc_order_cogs_from_items(merchant_id, order_id):
+            updated += 1
+    db.session.commit()
+    return updated
+
+
+def recalc_profit_for_merchant(merchant_id):
+    """Recompute all profit feed orders for a merchant."""
+    order_ids = (
+        db.session.query(ProfitFeedOrder.order_id)
+        .filter_by(merchant_id=merchant_id)
+        .distinct()
+        .all()
+    )
+    updated = 0
+    for (order_id,) in order_ids:
+        if recalc_order_cogs_from_items(merchant_id, order_id):
+            updated += 1
+    db.session.commit()
+    return updated
 
 
 def seed_demo_data(merchant_id="merchant_shawn_01"):
