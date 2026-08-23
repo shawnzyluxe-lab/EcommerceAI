@@ -24,7 +24,17 @@
 </div>
 {% endif %}
 
-{% if show_onboarding and connected|length == 0 %}
+{% if not merchant.live_access_enabled %}
+<div class="card" style="border: 1px solid var(--accent); background: var(--accent-bg); margin-bottom: 18px;">
+  <div style="display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap;">
+    <div>
+      <div style="font-weight: 700; color: var(--ink); margin-bottom: 4px;">Choose a plan to connect your store</div>
+      <div style="font-size: .85rem; color: var(--ink-2);">Your account is created. Subscribe to a Vantav plan to sync live store data.</div>
+    </div>
+    <a href="/subscribe" class="btn btn-primary">View plans</a>
+  </div>
+</div>
+{% elif show_onboarding and connected|length == 0 %}
 <div class="card" style="border: 1px solid var(--accent); background: var(--accent-bg); margin-bottom: 18px;">
   <div style="display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap;">
     <div>

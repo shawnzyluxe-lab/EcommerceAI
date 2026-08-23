@@ -265,7 +265,7 @@ def _delete_session_cookie(response):
 # Merchant-ready scope includes core financial and inventory views. Other pages
 # remain available to admins and engineers while they are being completed.
 COMMERCIAL_READY_DASHBOARD_PAGES = {
-    "overview", "alerts", "profit_engine", "inventory", "billing", "settings", "regression_chart", "startup_pack", "onboarding_loading",
+    "overview", "alerts", "profit_engine", "inventory", "billing", "settings", "startup_pack", "onboarding_loading",
 }
 
 from tier_manager import TierManager, TIER_LIMITS, PLAN_TO_TIER
@@ -273,12 +273,20 @@ from tier_manager import TierManager, TIER_LIMITS, PLAN_TO_TIER
 # Backwards-compatible friendly name mapping used by auth signup/provision forms.
 TIER_NAME_MAP = {
     "Starter": "Basic Tier",
+    "operator": "Vantav Operator",
+    "growth": "Vantav Growth",
+    "scale": "Vantav Scale",
     "Operator": "Vantav Operator",
     "Growth": "Vantav Growth",
     "Scale": "Vantav Scale",
+    "Vantav Operator": "Vantav Operator",
+    "Vantav Growth": "Vantav Growth",
+    "Vantav Scale": "Vantav Scale",
+    "Basic Tier": "Basic Tier",
     "Pro": "Vantav Growth",
     "Enterprise": "Vantav Scale",
     "Concierge": "Concierge Bundle",
+    "Concierge Bundle": "Concierge Bundle",
 }
 
 
@@ -1473,7 +1481,8 @@ def checkout():
     host = request.host.split(':')[0].lower()
     if host in ('shawnzyluxe.com', 'www.shawnzyluxe.com'):
         return render_template('coming_soon.html')
-    return render_template('checkout.html')
+    merchant = get_merchant_context()
+    return render_template('checkout.html', merchant=merchant)
 
 
 @app.route('/thank-you')
@@ -1552,6 +1561,10 @@ def dashboard():
                         billing.current_plan = chosen_tier
                         if concierge_bundle and "concierge_bundle" not in (billing.add_ons or []):
                             billing.add_ons = list((billing.add_ons or []) + ["concierge_bundle"])
+                    # Sync workspace seat limits to the paid tier.
+                    memory = action_gate.get_business_memory(merchant_id)
+                    tier_meta = TierManager.get_tier_meta(chosen_tier)
+                    memory.max_authorized_seats = int(tier_meta.get("max_users", 1))
                     db.session.commit()
                     merchant = get_merchant_context()
         except Exception as e:
@@ -1595,7 +1608,7 @@ def dashboard_page(page):
     active_page = page.replace('-', '_')
     # Pages merged into the unified Settings page.
     if active_page in ('billing', 'integrations', 'themes', 'commerce_hub'):
-        redirect_kwargs = {'page': 'settings', 'tab': 'stores'}
+        redirect_kwargs = {'page': 'settings', 'tab': 'billing' if active_page == 'billing' else 'stores'}
         if request.args.get('checkout') == 'success':
             redirect_kwargs['checkout'] = 'success'
             if request.args.get('concierge_bundle') == 'true':
@@ -3584,11 +3597,7 @@ def api_session_authenticate():
     return jsonify(result), 200
 
 
-TIER_NAME_MAP = {
-    "Starter": "Basic Tier",
-    "Pro": "Pro Tier",
-    "Enterprise": "Enterprise AI Tier",
-}
+# TIER_NAME_MAP is defined above with all plan/tier aliases.
 
 
 @app.route('/api/v1/auth/signup', methods=['POST'])
@@ -3603,9 +3612,10 @@ def auth_signup():
     if not email or not password or len(password) < 8:
         return jsonify({"detail": "A valid email and a password of at least 8 characters are required."}), 400
 
-    tier = TIER_NAME_MAP.get(selected_tier)
-    if not tier:
+    # Direct sign-up creates a free Basic Tier account; the chosen paid plan is selected at checkout.
+    if selected_tier and selected_tier not in TIER_NAME_MAP:
         return jsonify({"detail": "Invalid system tier parameters provided."}), 400
+    tier = "Basic Tier"
 
     # 1. Capture Bot Registrations
     bot_score = verify_captcha_v3(captcha_token)
@@ -3640,7 +3650,7 @@ def auth_signup():
             total_unified_balance=0.0,
             true_net_profit=0.0,
             gross_revenue=0.0,
-            ai_briefing="System initialized. Complete onboarding to activate multi-channel engine.",
+            ai_briefing="System initialized. Choose a plan and connect your first store to start tracking profit and alerts.",
         ))
         db.session.flush()
 
@@ -3705,6 +3715,9 @@ def auth_provision_node():
             admin_email=email,
             account_tier=tier,
             password_hash=generate_password_hash(password, method="pbkdf2:sha256"),
+            sandbox_status="approved",
+            live_access_enabled=1,
+            approved_at=datetime.utcnow(),
         ))
         db.session.flush()
         db.session.add(SaaSBilling(
@@ -3720,7 +3733,7 @@ def auth_provision_node():
             total_unified_balance=0.0,
             true_net_profit=0.0,
             gross_revenue=0.0,
-            ai_briefing=f"Provisioned {role} account. Activate multi-channel engine.",
+            ai_briefing=f"Provisioned {role} account. Choose a plan and connect your first store.",
         ))
         db.session.flush()
 
@@ -3908,29 +3921,42 @@ def create_stripe_checkout():
     concierge_bundle = bool(data.get("concierge_bundle"))
     plan = (data.get("plan") or "operator").lower().strip()
 
-    if not email or not password or len(password) < 8:
-        return jsonify({"detail": "A valid email and a password of at least 8 characters are required."}), 400
-
-    # Find or provision the merchant account so the webhook can upgrade it.
-    profile = MerchantProfile.query.filter_by(admin_email=email).first()
-    if profile:
-        # Require the existing account password; do not let a stranger start a
-        # checkout with someone else's email and take over the account.
-        if not check_password_hash(profile.password_hash or "", password):
-            return jsonify({"detail": "Email already registered. Log in to upgrade or use a different email."}), 409
+    # If the merchant is already logged in, use the existing account and ignore
+    # any email/password they typed. Anonymous users must create an account.
+    merchant_ctx = get_merchant_context()
+    profile = None
+    merchant_id = None
+    if merchant_ctx:
+        profile = MerchantProfile.query.get(merchant_ctx["id"])
+        if not profile:
+            return jsonify({"detail": "Session merchant not found."}), 403
+        email = profile.admin_email
         merchant_id = profile.merchant_id
         profile.business_name = business_name or profile.business_name
     else:
-        merchant_id = f"tenant_{uuid.uuid4().hex[:8]}"
-        db.session.add(MerchantProfile(
-            merchant_id=merchant_id,
-            business_name=business_name,
-            admin_email=email,
-            account_tier="Basic Tier",
-            password_hash=generate_password_hash(password, method="pbkdf2:sha256"),
-            sandbox_status="pending",
-            live_access_enabled=0,
-        ))
+        if not email or not password or len(password) < 8:
+            return jsonify({"detail": "A valid email and a password of at least 8 characters are required."}), 400
+
+        # Find or provision the merchant account so the webhook can upgrade it.
+        profile = MerchantProfile.query.filter_by(admin_email=email).first()
+        if profile:
+            # Require the existing account password; do not let a stranger start a
+            # checkout with someone else's email and take over the account.
+            if not check_password_hash(profile.password_hash or "", password):
+                return jsonify({"detail": "Email already registered. Log in to upgrade or use a different email."}), 409
+            merchant_id = profile.merchant_id
+            profile.business_name = business_name or profile.business_name
+        else:
+            merchant_id = f"tenant_{uuid.uuid4().hex[:8]}"
+            db.session.add(MerchantProfile(
+                merchant_id=merchant_id,
+                business_name=business_name,
+                admin_email=email,
+                account_tier="Basic Tier",
+                password_hash=generate_password_hash(password, method="pbkdf2:sha256"),
+                sandbox_status="pending",
+                live_access_enabled=0,
+            ))
         db.session.flush()
         db.session.add(SaaSBilling(
             merchant_id=merchant_id,
@@ -3943,7 +3969,7 @@ def create_stripe_checkout():
             total_unified_balance=0.0,
             true_net_profit=0.0,
             gross_revenue=0.0,
-            ai_briefing="System initialized. Complete onboarding to activate multi-channel engine.",
+            ai_briefing="System initialized. Choose a plan and connect your first store to start tracking profit and alerts.",
         ))
         tier_meta = TierManager.get_tier_meta("Basic Tier")
         memory = BusinessMemory(merchant_id=merchant_id)

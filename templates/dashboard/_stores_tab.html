@@ -4,9 +4,17 @@
 <div class="card" style="border: 1px solid var(--accent); background: var(--accent-bg); margin-bottom: 24px;">
   <div style="display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap;">
     <div>
+      {% if connected|length > 0 %}
+      <div style="font-weight: 700; color: var(--ink); margin-bottom: 4px;">Store connected</div>
+      <div style="font-size: .85rem; color: var(--ink-2);">Set unit costs and reorder points in Inventory so true profit and low-stock alerts are accurate.</div>
+      {% else %}
       <div style="font-weight: 700; color: var(--ink); margin-bottom: 4px;">Connect your first store</div>
       <div style="font-size: .85rem; color: var(--ink-2);">Choose your platform and enter your credentials. Shopify can also connect with one click via OAuth.</div>
+      {% endif %}
     </div>
+    {% if connected|length > 0 %}
+    <a href="/dashboard/inventory" class="btn btn-primary">Set unit costs</a>
+    {% endif %}
   </div>
 </div>
 {% endif %}
@@ -31,7 +39,11 @@
           <span class="tag tag-ghost" style="margin-top: 10px; display: inline-block;">Disabled in sandbox</span>
           {% endif %}
         {% else %}
-        {% if ch.platform == 'tiktok' and ch.state != 'connected' %}
+        {% if ch.state == 'connected' %}
+        <button class="btn" style="margin-top: 10px; width: 100%; font-size: .72rem; padding: 5px 8px;" onclick="openConnectModal('{{ ch.platform }}')">Manage</button>
+        {% elif not merchant.live_access_enabled %}
+        <a href="/subscribe" class="tag tag-ghost" style="margin-top: 10px; display: inline-block;">Subscribe to connect</a>
+        {% elif ch.platform == 'tiktok' and ch.state != 'connected' %}
         <select id="tiktok-region" style="margin-top: 8px; width: 100%; padding: 5px; font-size: .72rem; border-radius: 6px; border: 1px solid var(--line); background: var(--surface); color: var(--ink);">
           <option value="us" selected>US TikTok Shop</option>
           <option value="uk">UK / EU TikTok Shop</option>
@@ -39,7 +51,7 @@
         </select>
         <button class="btn" style="margin-top: 6px; width: 100%; font-size: .72rem; padding: 5px 8px;" onclick="openConnectModal('tiktok')">Connect</button>
         {% else %}
-        <button class="btn" style="margin-top: 10px; width: 100%; font-size: .72rem; padding: 5px 8px;" onclick="openConnectModal('{{ ch.platform }}')">{{ 'Manage' if ch.state == 'connected' else 'Connect' }}</button>
+        <button class="btn" style="margin-top: 10px; width: 100%; font-size: .72rem; padding: 5px 8px;" onclick="openConnectModal('{{ ch.platform }}')">Connect</button>
         {% endif %}
         {% endif %}
       {% else %}

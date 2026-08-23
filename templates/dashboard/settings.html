@@ -58,16 +58,20 @@
         <button class="btn" style="background: rgba(0,0,0,.25); color: var(--ink); border-color: rgba(0,0,0,.2);" onclick="switchSettingsTab('billing')">Manage Plan</button>
       </div>
       <div style="font-size: .85rem; font-weight: 600; margin-bottom: 10px;">Usage Overview</div>
-      {% for label, used, limit in [['Orders', 12450, 100000], ['Products', 1250, 10000], ['Customers', 8750, 100000], ['Storage', 45.6, 500]] %}
+      {% if usage_overview %}
+      {% for label, used, limit in usage_overview %}
       <div style="margin-bottom: 12px;">
         <div style="display: flex; justify-content: space-between; font-size: .8rem; margin-bottom: 4px;">
           <span>{{ label }}</span><span>{{ used }} / {{ limit }}</span>
         </div>
         <div style="height: 6px; border-radius: 99px; background: var(--line-2); overflow: hidden;">
-          <div style="height: 100%; border-radius: 99px; background: var(--gold); width: {{ (used / limit * 100) | round(1) }}%;"></div>
+          <div style="height: 100%; border-radius: 99px; background: var(--gold); width: {% if limit > 0 %}{{ (used / limit * 100) | round(1) }}{% else %}0{% endif %}%;"></div>
         </div>
       </div>
       {% endfor %}
+      {% else %}
+      <div style="font-size: .85rem; color: var(--ink-3);">Usage data will appear after your store is connected.</div>
+      {% endif %}
     </div>
   </div>
 </div>

@@ -162,8 +162,7 @@ def create_checkout_session(
         billing = SaaSBilling(merchant_id=merchant_id)
         db.session.add(billing)
     billing.stripe_customer_id = customer_id
-    billing.current_plan = selected_tier
-    billing.add_ons = list(set((billing.add_ons or []) + add_ons))
+    # Don't set current_plan/add_ons here; those are applied after successful payment.
     db.session.commit()
 
     subscription_data = {"metadata": subscription_metadata}

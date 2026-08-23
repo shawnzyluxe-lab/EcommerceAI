@@ -81,9 +81,9 @@
                     <input type="password" id="signup-password" class="w-full bg-onyx border border-borderMuted focus:border-accentGold rounded-sm px-3 py-2 text-sm text-white font-mono placeholder:text-gray-600 focus:outline-none transition mb-3" placeholder="Set Secure Password" minlength="8" required>
                     <label class="text-xs font-mono text-gray-400 mb-1 block">Select your plan:</label>
                     <select id="signup-tier" class="w-full bg-onyx border border-borderMuted focus:border-accentGold rounded-sm px-3 py-2 text-sm text-white font-mono mb-3">
-                        <option value="Starter">Starter (2 Stores Max | 500 Orders/Mo Cap)</option>
-                        <option value="Pro">Pro (Unlimited Stores | 5K Orders/Mo Cap)</option>
-                        <option value="Enterprise">Enterprise (Unlimited Volume | Real-Time Sync)</option>
+                        <option value="operator">Vantav Operator — $199/mo (2 stores, 1K orders/mo)</option>
+                        <option value="growth" selected>Vantav Growth — $399/mo (5 stores, 5K orders/mo) MOST POPULAR</option>
+                        <option value="scale">Vantav Scale — $799/mo (15 stores, high volume)</option>
                     </select>
                     <button type="submit" class="w-full bg-white hover:bg-accentGold text-onyx font-bold uppercase text-xs tracking-widest py-3 px-4 transition font-mono rounded-sm shadow-md">
                         Create account
@@ -183,7 +183,12 @@
 
             const serverResult = await response.json();
             if (response.ok) {
-                window.location.href = "/dashboard";
+                if (targetAction === 'signup') {
+                    const signupTier = document.getElementById('signup-tier').value;
+                    window.location.href = '/checkout?plan=' + encodeURIComponent(signupTier);
+                } else {
+                    window.location.href = "/dashboard";
+                }
             } else {
                 alert("Security Rejection: " + (serverResult.detail || "Unknown error"));
             }

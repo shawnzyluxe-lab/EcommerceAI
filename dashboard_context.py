@@ -219,7 +219,6 @@ COMMERCIAL_READY_PAGE_IDS = {
     "alerts",
     "profit_engine",
     "inventory",
-    "regression_chart",
     "billing",
     "settings",
     "startup_pack",
@@ -671,7 +670,6 @@ NAV_GROUPS = [
             {"id": "alerts", "label": "Alerts", "url": "/dashboard/alerts", "icon": "⚠", "badge": str(len(ALERTS))},
             {"id": "action_gate", "label": "Action Gate", "url": "/dashboard/action-gate", "icon": "✓"},
             {"id": "profit_engine", "label": "Profit Dashboard", "url": "/dashboard/profit-engine", "icon": "$"},
-            {"id": "regression_chart", "label": "Regression", "url": "/dashboard/regression-chart", "icon": "◯"},
             {"id": "predictions", "label": "Predictions", "url": "/dashboard/predictions", "icon": "◐"},
             {"id": "product_research", "label": "Product Research", "url": "/dashboard/product-research", "icon": "◎"},
             {"id": "analytics", "label": "Analytics", "url": "/dashboard/analytics", "icon": "▤"},
@@ -771,6 +769,7 @@ def context(active_page=None, merchant=None, merchant_id=None):
         "out_of_stock": sum(row["status"] == "Out" for row in inventory_rows),
         "inventory_value": sum(row["on_hand"] * row["unit_cost"] for row in inventory_rows),
     }
+    inventory_needs_cost_setup = bool(inventory_rows) and any(row["unit_cost"] == 0 for row in inventory_rows)
     # Always serve fresh headline numbers even if BRIEFING is mutated elsewhere.
     briefing = dict(BRIEFING)
     briefing["revenue"] = gross
@@ -873,6 +872,19 @@ def context(active_page=None, merchant=None, merchant_id=None):
         except Exception:
             pass
 
+    # Usage overview for the settings page.
+    usage_overview = []
+    if merchant_id:
+        try:
+            order_count = UnifiedOrder.query.filter_by(merchant_id=merchant_id).count()
+            product_count = Product.query.filter_by(merchant_id=merchant_id).count()
+            usage_overview = [
+                ("Orders", order_count, tier_limits.get("orders", 500)),
+                ("Products", product_count, tier_limits.get("products", 10000)),
+            ]
+        except Exception:
+            pass
+
     # Channel list from persistent connections.
     try:
         channel_data = channels_module.list_channels(merchant_id) if merchant_id else CHANNELS
@@ -913,6 +925,8 @@ def context(active_page=None, merchant=None, merchant_id=None):
         "has_sales": has_sales,
         "inventory_rows": inventory_rows,
         "inventory_kpis": inventory_kpis,
+        "inventory_needs_cost_setup": inventory_needs_cost_setup,
+        "usage_overview": usage_overview,
         "series": SALES_SERIES,
         "series_max": max(p["value"] for p in SALES_SERIES),
         "forecasts": FORECASTS,
