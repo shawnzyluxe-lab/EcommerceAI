@@ -68,18 +68,18 @@ xrandr --output VNC-0 --mode 1600x1200
 - Start the local server with a test reCAPTCHA key so sandbox logins work:
   ```bash
   env -u RECAPTCHA_SITE_KEY -u RECAPTCHA_SECRET_KEY \
-      RECAPTCHA_SITE_KEY="6LeIxAcTAAAAAJcZVRqyHh71UMIEGNQ_MXjiZKhI" \
+      RECAPTCHA_SITE_KEY="<TEST_RECAPTCHA_SITE_KEY>" \
       RECAPTCHA_SECRET_KEY="" \
       SESSION_COOKIE_SECURE=false \
       .venv/bin/python app.py
   ```
-- `verify_captcha_v3` returns `1.0` when `RECAPTCHA_SECRET_KEY` is empty, so the Google test key badge can be hidden via `document.querySelector('.grecaptcha-badge').style.display='none'` if it appears in the recording.
-- Seed `merchant_ivor_demo` (or another sandbox merchant) with `ivonderhaff@gmail.com` / `Pqk57Qa9Weo` and matching orders/channels before recording so the dashboard KPIs read `$4,582` revenue and `$1,394` net profit.
+- `verify_captcha_v3` returns `1.0` when `RECAPTCHA_SECRET_KEY` is empty, so the reCAPTCHA badge can be hidden via `document.querySelector('.grecaptcha-badge').style.display='none'` if it appears in the recording.
+- Seed `merchant_ivor_demo` (or another sandbox merchant) with a test email / password and matching orders/channels before recording so the dashboard KPIs read `$4,582` revenue and `$1,394` net profit.
 - The `computer` `left_click` action may not register on page elements in this environment; use `Ctrl+L` address-bar navigation and `browser_console`/`Return` for form submission and in-page generators.
 
 ## Live deployed E2E testing (Render / https://vantavcommerce.com)
 
-- Use the test merchant `test_rules_engine@example.com` / `TestPass123!`.
+- Use the test merchant `test_rules_engine@example.com` / `<TEST_PASSWORD>`.
 - The beta login flow collects a reCAPTCHA token if `grecaptcha` is present but continues without it; the live endpoint does not enforce a captcha score.
 - `POST /api/v1/forecast/cron` returns SKU-level forecasts and, if a source-id bucket is free, creates `inventory_runout`/`reorder` alerts via `rules_engine.evaluate_products`.
 - `GET /api/analytics/channels?days=30` returns per-channel true-profit JSON; the dashboard Overview renders it in the **Channel Performance** table.
