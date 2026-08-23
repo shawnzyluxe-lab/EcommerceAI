@@ -74,6 +74,20 @@
       {% endif %}
     </div>
   </div>
+
+  <div class="card" style="margin-top: 20px;">
+    <div class="card-head"><h3>Change Password</h3></div>
+    <form id="password-form" onsubmit="changePassword(event)" style="max-width: 520px;">
+      <label style="font-size: .75rem; color: var(--ink-3); font-weight: 600;">Current password</label>
+      <input id="current-password" type="password" autocomplete="current-password" required style="width: 100%; padding: 10px; margin: 6px 0 14px; border: 1px solid var(--line); border-radius: 8px; background: var(--surface); color: var(--ink);">
+      <label style="font-size: .75rem; color: var(--ink-3); font-weight: 600;">New password</label>
+      <input id="new-password" type="password" autocomplete="new-password" minlength="8" required style="width: 100%; padding: 10px; margin: 6px 0 14px; border: 1px solid var(--line); border-radius: 8px; background: var(--surface); color: var(--ink);">
+      <label style="font-size: .75rem; color: var(--ink-3); font-weight: 600;">Confirm new password</label>
+      <input id="confirm-password" type="password" autocomplete="new-password" minlength="8" required style="width: 100%; padding: 10px; margin: 6px 0 14px; border: 1px solid var(--line); border-radius: 8px; background: var(--surface); color: var(--ink);">
+      <button class="btn btn-primary" id="password-save-btn" type="submit">Update password</button>
+      <div id="password-form-message" style="margin-top: 8px; font-size: .8rem;"></div>
+    </form>
+  </div>
 </div>
 
 <div class="settings-panel" id="panel-stores" {% if active_tab != 'stores' %}style="display:none;"{% endif %}>
@@ -283,6 +297,37 @@ async function saveAccount(e){
       updateGreeting?.();
     } else {
       throw new Error(data.error || 'Could not save');
+    }
+  } catch (err) {
+    msg.textContent = err.message;
+    msg.style.color = 'var(--red)';
+  } finally {
+    btn.disabled = false;
+  }
+}
+
+async function changePassword(e){
+  e.preventDefault();
+  const btn = document.getElementById('password-save-btn');
+  const msg = document.getElementById('password-form-message');
+  btn.disabled = true;
+  msg.textContent = 'Updating…';
+  msg.style.color = 'var(--ink-2)';
+  try {
+    const current = document.getElementById('current-password').value;
+    const newPass = document.getElementById('new-password').value;
+    const confirm = document.getElementById('confirm-password').value;
+    if (newPass.length < 8) { throw new Error('Password must be at least 8 characters.'); }
+    if (newPass !== confirm) { throw new Error('New password and confirmation do not match.'); }
+    const body = JSON.stringify({current_password: current, new_password: newPass, confirm_password: confirm});
+    const res = await fetch('/api/v1/merchant/set-password', {method: 'POST', headers: {'Content-Type': 'application/json'}, body, credentials: 'same-origin'});
+    const data = await res.json();
+    if (res.ok) {
+      msg.textContent = 'Password updated.';
+      msg.style.color = 'var(--green)';
+      document.getElementById('password-form').reset();
+    } else {
+      throw new Error(data.error || 'Could not update password');
     }
   } catch (err) {
     msg.textContent = err.message;

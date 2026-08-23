@@ -3218,17 +3218,31 @@ def api_merchant_theme():
 @app.route('/api/v1/merchant/set-password', methods=['POST'])
 @require_roles([UserRole.ADMIN, UserRole.MERCHANT, UserRole.ENGINEER])
 def api_merchant_set_password():
-    """Allow a logged-in merchant to set or reset their password."""
+    """Allow a logged-in merchant to change their password."""
     merchant = get_merchant_context()
     if not merchant:
         return jsonify({"error": "No merchant context"}), 403
     data = request.get_json(silent=True) or {}
     new_password = (data.get("new_password") or "").strip()
+    current_password = data.get("current_password", "")
+    confirm_password = (data.get("confirm_password") or "").strip()
+
     if len(new_password) < 8:
         return jsonify({"error": "Password must be at least 8 characters"}), 400
+    if new_password != confirm_password:
+        return jsonify({"error": "New password and confirmation do not match"}), 400
+
     profile = MerchantProfile.query.get(merchant["id"])
     if not profile:
         return jsonify({"error": "Merchant profile not found"}), 404
+
+    is_privileged = merchant.get("role") in (UserRole.ADMIN.value, UserRole.ENGINEER.value)
+    if not is_privileged:
+        if not current_password:
+            return jsonify({"error": "Current password is required"}), 400
+        if not profile.password_hash or not check_password_hash(profile.password_hash, current_password):
+            return jsonify({"error": "Current password is incorrect"}), 401
+
     profile.password_hash = generate_password_hash(new_password, method="pbkdf2:sha256")
     db.session.commit()
     return jsonify({"updated": True, "merchant_id": merchant["id"]}), 200
