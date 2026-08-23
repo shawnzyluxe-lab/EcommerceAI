@@ -95,6 +95,17 @@ xrandr --output VNC-0 --mode 1600x1200
 - To test the chart end-to-end locally, run the app with a CSP middleware that allows the CDN or temporarily patch `monitoring.py` during testing only.
 - Use `seed_regression_sku.py` (or a temporary deterministic seed) to populate `SKU-404-PODS` data for the target merchant; `sqlite:///shawnzyluxe.db` resolves to `instance/shawnzyluxe.db` in this repo.
 
+## Cost and reorder-point E2E
+
+- `/dashboard/inventory` lists Shopify products with editable `Unit cost` and `Reorder point` inputs and per-row `Save` buttons.
+- `Save` calls `PATCH /api/v1/products/<sku>` and updates `Product.unit_cost` / `Product.reorder_point`.
+- If `unit_cost` changes, the endpoint calls `profit_feed.recalc_profit_for_sku()`, which recomputes `cost_of_goods_sold` and `net_profit` for every `ProfitFeedOrder` containing that SKU.
+- The UI status text after save is `Saved` or `Saved (<N> orders)` where `<N>` is `profit_orders_recalculated`.
+- To verify end-to-end: pick a SKU that appears in an existing ProfitFeedOrder (look at `/dashboard/profit-engine`), change its unit cost to a known value, save, then refresh `/dashboard/profit-engine` and confirm `Product cost` and `Net profit` update to `gross - fees - shipping - (qty * unit_cost)`.
+- Reorder point can be updated independently; the row status shows `Saved` and the value persists after a page reload.
+- Restore changed values to keep the test merchant data clean.
+- Native `left_click` on the small inline `Save` button is unreliable in this managed Chrome environment; use `Ctrl+L` navigation plus `browser_console` to set input values and call the row's `saveProductRow(button)` function when clicks do not register.
+
 ## PR #6 grouped navigation and Shopify Stores UI
 
 - Revision `5899e7d` is testable locally with the existing Growth/Admin account `shawn@shawnzyluxe.com`; the live deployment may lag and show the old headings-only sidebar.
