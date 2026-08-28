@@ -26,6 +26,7 @@ from datetime import datetime, timedelta
 from enum import Enum
 from functools import wraps
 from typing import Optional
+from sqlalchemy import or_
 
 logging.basicConfig(
     level=logging.INFO,
@@ -677,7 +678,7 @@ def enforce_tier_limits(merchant_id, requested_feature):
 def site_wall_protect():
     if not site_wall_enabled():
         return None
-    if request.endpoint in ('home', 'login', 'site_login', 'site_logout', 'subscribe', 'checkout', 'thank_you', 'session_heartbeat', 'create_stripe_checkout', 'beta_apply', 'api_beta_apply', 'auth_login', 'auth_signup', 'auth_provision_node', 'shopify_orders_webhook', 'tiktok_orders_webhook', 'amazon_orders_webhook', 'stripe_billing_webhook', 'supplier_po_update', 'execute_mitigation', 'generate_magic_link', 'magic_login', 'register_merchant', 'shopify_oauth_callback', 'tiktok_oauth_callback', 'health_check', 'legal_terms', 'legal_privacy', 'legal_refund', 'static'):
+    if request.endpoint in ('home', 'login', 'site_login', 'site_logout', 'subscribe', 'checkout', 'thank_you', 'session_heartbeat', 'create_stripe_checkout', 'beta_apply', 'api_beta_apply', 'auth_login', 'auth_signup', 'auth_provision_node', 'shopify_orders_webhook', 'shopify_gdpr_customer_data_request', 'shopify_gdpr_customer_redact', 'shopify_gdpr_shop_redact', 'shopify_app_uninstalled', 'tiktok_orders_webhook', 'amazon_orders_webhook', 'stripe_billing_webhook', 'supplier_po_update', 'execute_mitigation', 'generate_magic_link', 'magic_login', 'register_merchant', 'shopify_oauth_callback', 'tiktok_oauth_callback', 'health_check', 'legal_terms', 'legal_privacy', 'legal_refund', 'static'):
         return None
     if site_wall_authenticated():
         return None
@@ -4170,7 +4171,7 @@ def update_tenant_settings():
         return jsonify({"detail": "Failed to save configuration."}), 500
 
 
-SHOPIFY_WEBHOOK_SECRET = os.environ.get("SHOPIFY_WEBHOOK_SECRET", "").strip().encode()
+SHOPIFY_WEBHOOK_SECRET = os.environ.get("SHOPIFY_WEBHOOK_SECRET", "").strip().encode() or os.environ.get("SHOPIFY_CLIENT_SECRET", "").strip().encode()
 TIKTOK_WEBHOOK_SECRET = os.environ.get("TIKTOK_WEBHOOK_SECRET", "").strip().encode()
 AMAZON_WEBHOOK_SECRET = os.environ.get("AMAZON_WEBHOOK_SECRET", "").strip().encode()
 
@@ -4331,6 +4332,242 @@ def shopify_orders_webhook():
             }
         })
         return jsonify({"status": "rejected", "reason": "Hardened intercept"}), 400
+
+
+# ------------------------------------------------------------
+# Shopify GDPR / app-lifecycle webhooks (mandatory for public apps)
+# ------------------------------------------------------------
+
+def _parse_shopify_gdpr_webhook():
+    """Verify Shopify HMAC and map the shop domain to a merchant_id."""
+    raw_body = request.get_data()
+    hmac_header = request.headers.get("X-Shopify-Hmac-SHA256")
+
+    if SHOPIFY_WEBHOOK_SECRET:
+        if not hmac_header:
+            logger.warning("Shopify GDPR webhook dropped: missing HMAC signature.")
+            return None, jsonify({"status": "rejected", "reason": "Missing HMAC"}), 401
+        try:
+            computed = hmac.new(SHOPIFY_WEBHOOK_SECRET, raw_body, hashlib.sha256).digest()
+            if not hmac.compare_digest(computed, base64.b64decode(hmac_header)):
+                logger.warning("Shopify GDPR webhook dropped: invalid HMAC signature.")
+                return None, jsonify({"status": "rejected", "reason": "Invalid HMAC"}), 401
+        except Exception:
+            return None, jsonify({"status": "rejected", "reason": "Invalid HMAC"}), 401
+    else:
+        logger.warning("SHOPIFY_WEBHOOK_SECRET not set — accepting GDPR webhook without HMAC verification")
+
+    try:
+        payload = json.loads(raw_body.decode("utf-8"))
+    except json.JSONDecodeError:
+        return None, jsonify({"status": "rejected", "reason": "Malformed JSON"}), 400
+
+    shop_domain = (payload.get("shop_domain") or payload.get("shop") or "").strip().lower()
+    event_id = request.headers.get("X-Shopify-Webhook-Id")
+
+    token = TenantOAuthToken.query.filter_by(shop_domain=shop_domain).first()
+    merchant_id = token.merchant_id if token else None
+    if not merchant_id:
+        link = IntegrationLink.query.filter_by(shopify_shop_domain=shop_domain, platform="shopify").first()
+        if link:
+            merchant_id = link.merchant_id
+
+    return {"raw_body": raw_body, "payload": payload, "shop_domain": shop_domain, "merchant_id": merchant_id, "event_id": event_id}, None, 200
+
+
+@app.route('/api/v1/webhooks/shopify-gdpr/customers/data_request', methods=['POST'])
+@limiter.limit("60 per minute")
+def shopify_gdpr_customer_data_request():
+    """Customer data request: collect and return the customer's order history."""
+    context, error, status = _parse_shopify_gdpr_webhook()
+    if error:
+        return error, status
+
+    merchant_id = context["merchant_id"]
+    if not merchant_id:
+        return jsonify({"status": "accepted"}), 200
+
+    tenant_rls.set_tenant_scope(merchant_id)
+
+    event_id = context["event_id"]
+    if event_id and ProcessedWebhookEvent.query.get(event_id):
+        return jsonify({"status": "duplicate_ignored"}), 200
+
+    customer = context["payload"].get("customer") or {}
+    customer_id = str(customer.get("id") or customer.get("customer_id") or "").strip()
+    customer_email = (customer.get("email") or "").strip().lower()
+
+    query = UnifiedOrder.query.filter_by(merchant_id=merchant_id, channel="shopify")
+    filters = []
+    if customer_id:
+        filters.append(UnifiedOrder.customer_id == customer_id)
+    if customer_email:
+        filters.append(UnifiedOrder.ship_to.cast(db.Text).ilike(f"%{customer_email}%"))
+    if filters:
+        query = query.filter(or_(*filters))
+    orders = query.order_by(UnifiedOrder.created_at.desc()).limit(500).all()
+
+    order_ids = [o.id for o in orders]
+    items = []
+    if order_ids:
+        items = OrderItem.query.filter(OrderItem.order_id.in_(order_ids)).all()
+
+    summary_lines = []
+    for o in orders:
+        line_items = [f"{i.sku} x{i.qty} @ ${float(i.unit_price):.2f}" for i in items if i.order_id == o.id]
+        summary_lines.append(
+            f"Order {o.id} — {o.created_at} — ${float(o.revenue):.2f} — items: {', '.join(line_items) if line_items else 'none recorded'}"
+        )
+
+    body = f"""<p>Shopify customer data request for shop <b>{context['shop_domain']}</b>:</p>
+<p>Customer ID: {customer_id or 'N/A'}<br>Customer email: {customer_email or 'N/A'}</p>
+<p>Orders found: {len(orders)}</p>
+<pre>{'<br>'.join(summary_lines) or 'No orders stored.'}</pre>
+"""
+
+    merchant = MerchantProfile.query.get(merchant_id)
+    recipient = merchant.admin_email if merchant and merchant.admin_email else SUPPORT_EMAIL
+    dispatch_external_email(recipient, f"Shopify customer data request — {context['shop_domain']}", body)
+
+    if event_id:
+        db.session.add(ProcessedWebhookEvent(event_id=event_id))
+        db.session.commit()
+
+    return jsonify({"status": "accepted"}), 200
+
+
+@app.route('/api/v1/webhooks/shopify-gdpr/customers/redact', methods=['POST'])
+@limiter.limit("60 per minute")
+def shopify_gdpr_customer_redact():
+    """Customer redaction: remove PII for the specified customer."""
+    context, error, status = _parse_shopify_gdpr_webhook()
+    if error:
+        return error, status
+
+    merchant_id = context["merchant_id"]
+    if not merchant_id:
+        return jsonify({"status": "accepted"}), 200
+
+    tenant_rls.set_tenant_scope(merchant_id)
+
+    event_id = context["event_id"]
+    if event_id and ProcessedWebhookEvent.query.get(event_id):
+        return jsonify({"status": "duplicate_ignored"}), 200
+
+    customer = context["payload"].get("customer") or {}
+    customer_id = str(customer.get("id") or customer.get("customer_id") or "").strip()
+    customer_email = (customer.get("email") or "").strip().lower()
+
+    query = UnifiedOrder.query.filter_by(merchant_id=merchant_id, channel="shopify")
+    filters = []
+    if customer_id:
+        filters.append(UnifiedOrder.customer_id == customer_id)
+    if customer_email:
+        filters.append(UnifiedOrder.ship_to.cast(db.Text).ilike(f"%{customer_email}%"))
+    if filters:
+        query = query.filter(or_(*filters))
+    orders = query.all()
+
+    for order in orders:
+        order.customer_id = "redacted"
+        order.ship_to = {"redacted": True}
+
+    if event_id:
+        db.session.add(ProcessedWebhookEvent(event_id=event_id))
+    db.session.commit()
+    logger.info(f"Redacted {len(orders)} Shopify orders for merchant {merchant_id}")
+
+    return jsonify({"status": "accepted"}), 200
+
+
+@app.route('/api/v1/webhooks/shopify-gdpr/shop/redact', methods=['POST'])
+@limiter.limit("60 per minute")
+def shopify_gdpr_shop_redact():
+    """Shop redaction: delete all Shopify data for the store."""
+    context, error, status = _parse_shopify_gdpr_webhook()
+    if error:
+        return error, status
+
+    merchant_id = context["merchant_id"]
+    shop_domain = context["shop_domain"]
+    if not merchant_id:
+        return jsonify({"status": "accepted"}), 200
+
+    tenant_rls.set_tenant_scope(merchant_id)
+
+    event_id = context["event_id"]
+    if event_id and ProcessedWebhookEvent.query.get(event_id):
+        return jsonify({"status": "duplicate_ignored"}), 200
+
+    # Remove Shopify orders and their line items first (products are RESTRICTed by order_items).
+    shopify_order_ids = [
+        row[0] for row in
+        db.session.query(UnifiedOrder.id).filter_by(merchant_id=merchant_id, channel="shopify").all()
+    ]
+    if shopify_order_ids:
+        OrderItem.query.filter(OrderItem.order_id.in_(shopify_order_ids)).delete(synchronize_session=False)
+        UnifiedOrder.query.filter_by(merchant_id=merchant_id, channel="shopify").delete(synchronize_session=False)
+
+    ProfitFeedOrder.query.filter_by(merchant_id=merchant_id, channel="shopify").delete(synchronize_session=False)
+    AdSpendFeed.query.filter_by(merchant_id=merchant_id, platform_source="shopify").delete(synchronize_session=False)
+
+    # Remove only Shopify-only products; keep products shared with other channels.
+    for product in Product.query.filter_by(merchant_id=merchant_id).all():
+        channel_ids = product.channel_ids or {}
+        if isinstance(channel_ids, str):
+            try:
+                channel_ids = json.loads(channel_ids)
+            except json.JSONDecodeError:
+                channel_ids = {}
+        if isinstance(channel_ids, dict) and "shopify" in channel_ids:
+            del channel_ids["shopify"]
+        if not channel_ids:
+            db.session.delete(product)
+        else:
+            product.channel_ids = channel_ids
+
+    # Clean up integration artifacts.
+    TenantOAuthToken.query.filter_by(shop_domain=shop_domain).delete(synchronize_session=False)
+    IntegrationLink.query.filter_by(merchant_id=merchant_id, platform="shopify", shopify_shop_domain=shop_domain).delete(synchronize_session=False)
+    MerchantChannel.query.filter_by(merchant_id=merchant_id, channel_id="shopify").delete(synchronize_session=False)
+
+    if event_id:
+        db.session.add(ProcessedWebhookEvent(event_id=event_id))
+    db.session.commit()
+    logger.info(f"Redacted all Shopify data for merchant {merchant_id}, shop {shop_domain}")
+
+    return jsonify({"status": "accepted"}), 200
+
+
+@app.route('/api/v1/webhooks/shopify/app/uninstalled', methods=['POST'])
+@limiter.limit("60 per minute")
+def shopify_app_uninstalled():
+    """App uninstalled: revoke tokens and mark the Shopify integration inactive."""
+    context, error, status = _parse_shopify_gdpr_webhook()
+    if error:
+        return error, status
+
+    merchant_id = context["merchant_id"]
+    shop_domain = context["shop_domain"]
+    if not merchant_id:
+        return jsonify({"status": "accepted"}), 200
+
+    tenant_rls.set_tenant_scope(merchant_id)
+
+    event_id = context["event_id"]
+    if event_id and ProcessedWebhookEvent.query.get(event_id):
+        return jsonify({"status": "duplicate_ignored"}), 200
+
+    TenantOAuthToken.query.filter_by(shop_domain=shop_domain).delete(synchronize_session=False)
+    IntegrationLink.query.filter_by(merchant_id=merchant_id, platform="shopify", shopify_shop_domain=shop_domain).delete(synchronize_session=False)
+    MerchantChannel.query.filter_by(merchant_id=merchant_id, channel_id="shopify").delete(synchronize_session=False)
+
+    if event_id:
+        db.session.add(ProcessedWebhookEvent(event_id=event_id))
+    db.session.commit()
+    logger.info(f"Uninstalled Shopify integration for merchant {merchant_id}, shop {shop_domain}")
+
+    return jsonify({"status": "accepted"}), 200
 
 
 def process_idempotent_channel_event(event_id, merchant_id, platform_id, amount=0.0):
