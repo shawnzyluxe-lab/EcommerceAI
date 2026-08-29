@@ -251,10 +251,10 @@ PLACEHOLDER_DASHBOARD_PAGE_IDS = {
 def sample_pages_enabled() -> bool:
     """Global admin switch that controls whether placeholder/sample pages are visible to merchants."""
     try:
-        return AdminPlatformControl.get_bool("sample_pages_enabled", default=True)
+        return AdminPlatformControl.get_bool("sample_pages_enabled", default=False)
     except Exception:
-        # Fail open so a startup hiccup doesn't lock the dashboard.
-        return True
+        # Fail closed for production; hide sample pages if the control lookup breaks.
+        return False
 
 
 def global_sync_paused() -> bool:

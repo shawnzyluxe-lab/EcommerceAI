@@ -452,7 +452,8 @@ def require_roles(permitted_roles):
 def verify_captcha_v3(token: str) -> float:
     """Validate a Google reCAPTCHA v3 token and return the bot score (0.0-1.0)."""
     if not RECAPTCHA_SECRET_KEY:
-        return 1.0  # If not configured, fail open for local dev
+        # Fail open only in unit tests; require a real secret in production.
+        return 1.0 if app.config.get("TESTING") else 0.0
     try:
         response = requests.post(RECAPTCHA_VERIFY_URL, data={
             "secret": RECAPTCHA_SECRET_KEY,
