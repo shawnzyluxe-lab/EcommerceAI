@@ -26,7 +26,7 @@ from datetime import datetime, timedelta
 from enum import Enum
 from functools import wraps
 from typing import Optional
-from sqlalchemy import or_, func
+from sqlalchemy import or_, func, text
 
 logging.basicConfig(
     level=logging.INFO,
@@ -383,8 +383,21 @@ def _protected_merchant_ids() -> set:
 
 
 def _cascade_delete_merchant(merchant_id: str) -> None:
-    """Delete every row that references the merchant across all tables."""
+    """Delete every row that references the merchant across all tables except the profile itself."""
+    # Some child tables don't have a merchant_id column but hold FKs to merchant-owned rows.
+    # Remove them first so the generic merchant_id pass doesn't hit RESTRICT constraints.
+    db.session.execute(text("""
+        DELETE FROM order_items
+        WHERE order_id IN (SELECT id FROM orders WHERE merchant_id = :merchant_id)
+    """), {"merchant_id": merchant_id})
+    db.session.execute(text("""
+        DELETE FROM daily_costs
+        WHERE sku IN (SELECT sku FROM products WHERE merchant_id = :merchant_id)
+    """), {"merchant_id": merchant_id})
+
     for table in reversed(db.metadata.sorted_tables):
+        if table.name == 'merchant_profiles':
+            continue
         conditions = []
         for col in table.columns:
             if col.name in ('merchant_id', 'original_merchant_id', 'impersonating_merchant_id'):
