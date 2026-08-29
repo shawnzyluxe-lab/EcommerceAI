@@ -344,6 +344,34 @@ def _merchant_requires_tier_selection(merchant: dict) -> bool:
     return False
 
 
+def _tier_test_accounts() -> set:
+    """Emails that can bypass checkout for paid-tier testing."""
+    env_emails = {e.strip().lower() for e in os.environ.get('MERCHANT_TIER_TEST_ACCOUNTS', '').split(',') if e.strip()}
+    return env_emails | {'merchant@vantavcommerce.com'}
+
+
+def _reset_test_merchant_for_tier_testing(profile: MerchantProfile) -> None:
+    """Put a designated test merchant back into the tier-selection state."""
+    if not profile:
+        return
+    email = (profile.admin_email or "").strip().lower()
+    if email not in _tier_test_accounts():
+        return
+    profile.account_tier = "Basic Tier"
+    profile.sandbox_status = "pending"
+    profile.live_access_enabled = 0
+    billing = SaaSBilling.query.get(profile.merchant_id)
+    if not billing:
+        billing = SaaSBilling(merchant_id=profile.merchant_id)
+        db.session.add(billing)
+    billing.current_plan = "Basic Tier"
+    try:
+        memory = action_gate.get_business_memory(profile.merchant_id)
+        memory.max_authorized_seats = 1
+    except Exception:
+        pass
+
+
 def get_current_user():
     """Return the active session record with its role, or None."""
     token = request.cookies.get(SESSION_COOKIE_NAME)
@@ -1843,7 +1871,7 @@ def api_merchant_select_tier():
         return jsonify({'error': 'Invalid tier'}), 400
     # Paid tiers can be selected directly only for whitelisted test accounts.
     # All other merchants must complete checkout before a paid tier is enabled.
-    test_tier_emails = {e.strip().lower() for e in os.environ.get('MERCHANT_TIER_TEST_ACCOUNTS', 'merchant@vantavcommerce.com').split(',') if e.strip()} | {'merchant@vantavcommerce.com'}
+    test_tier_emails = _tier_test_accounts()
     if tier != 'Basic Tier' and merchant.get('email', '').lower() not in test_tier_emails:
         slug = {'Vantav Operator': 'operator', 'Vantav Growth': 'growth', 'Vantav Scale': 'scale'}.get(tier)
         return jsonify({'error': 'Paid plan requires checkout', 'redirect': '/checkout?plan=' + quote(slug or '')}), 402
@@ -4215,9 +4243,16 @@ def site_login():
 @app.route('/site-logout')
 def site_logout():
     token = request.cookies.get(SESSION_COOKIE_NAME)
+    merchant_id = None
     if token:
+        session_record = ActiveSession.query.filter_by(token=token).first()
+        if session_record:
+            merchant_id = session_record.merchant_id
         ActiveSession.query.filter_by(token=token).delete()
-        db.session.commit()
+    if merchant_id:
+        profile = MerchantProfile.query.get(merchant_id)
+        _reset_test_merchant_for_tier_testing(profile)
+    db.session.commit()
     response = redirect(url_for('home'))
     _delete_session_cookie(response)
     return response
@@ -4275,6 +4310,11 @@ def auth_login():
         )
         db.session.add(profile)
         db.session.flush()
+
+    # Test merchant accounts always start at the tier chooser so the user can
+    # re-select a plan on every login.
+    if profile and not (is_admin or is_engineer):
+        _reset_test_merchant_for_tier_testing(profile)
 
     # 3. Issue encrypted session JWT (session cookie + ActiveSession row)
     session_token = secrets.token_urlsafe(32)
