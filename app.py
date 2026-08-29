@@ -333,6 +333,17 @@ def _canonical_tier(raw_tier: str) -> str:
     return mapping.get(raw_tier, "Vantav Operator")
 
 
+def _merchant_requires_tier_selection(merchant: dict) -> bool:
+    """Return True when a merchant has signed in but not picked/confirmed a tier."""
+    if not merchant:
+        return False
+    if merchant.get("role") != UserRole.MERCHANT.value:
+        return False
+    if merchant.get("sandbox_status") in ("pending", "rejected", None, ""):
+        return True
+    return False
+
+
 def get_current_user():
     """Return the active session record with its role, or None."""
     token = request.cookies.get(SESSION_COOKIE_NAME)
@@ -1669,6 +1680,9 @@ def dashboard():
         except Exception as e:
             logger.warning(f"[Dashboard] Checkout verification failed: {e}")
 
+    if _merchant_requires_tier_selection(merchant):
+        return redirect(url_for('choose_tier'))
+
     ctx = context(active_page='overview', merchant=merchant, merchant_id=merchant_id)
     ctx["show_brand_build_prompt"] = (
         request.args.get('checkout') == 'success'
@@ -1704,6 +1718,8 @@ def dashboard_page(page):
     merchant = get_merchant_context()
     if not merchant:
         return redirect(url_for('login'))
+    if _merchant_requires_tier_selection(merchant):
+        return redirect(url_for('choose_tier'))
     s = get_current_user()
     active_page = page.replace('-', '_')
     # Pages merged into the unified Settings page.
@@ -1765,6 +1781,90 @@ def dashboard_page(page):
                                page_title=active_page.replace('_', ' ').title(),
                                page_description='This module is being rebuilt to the new commercial-grade standard.',
                                page_content='')
+
+
+@app.route('/choose-tier')
+def choose_tier():
+    merchant = get_merchant_context()
+    if not merchant:
+        return redirect(url_for('login'))
+    if merchant.get('role') in (UserRole.ADMIN.value, UserRole.ENGINEER.value):
+        return redirect(url_for('dashboard'))
+    if not _merchant_requires_tier_selection(merchant):
+        return redirect(url_for('dashboard'))
+    merchant_id = merchant['id']
+    tiers = [
+        {
+            'id': 'Basic Tier',
+            'name': 'Vantav Basic',
+            'price': 'Free',
+            'description': 'For solo operators just getting started.',
+            'features': ['Profit dashboard', 'Live alerts', 'Email support'],
+        },
+        {
+            'id': 'Vantav Operator',
+            'name': 'Vantav Operator',
+            'price': '$199/mo',
+            'description': 'Core tools to run one store end-to-end.',
+            'features': ['Everything in Basic', 'Inventory & orders', 'Product catalog', 'Multi-channel connections'],
+        },
+        {
+            'id': 'Vantav Growth',
+            'name': 'Vantav Growth',
+            'price': '$399/mo',
+            'description': 'Growth automation and advanced analytics.',
+            'features': ['Everything in Operator', 'Marketing & automations', 'AI Assistant', 'Analytics & predictions'],
+        },
+        {
+            'id': 'Vantav Scale',
+            'name': 'Vantav Scale',
+            'price': '$799/mo',
+            'description': 'Enterprise-grade controls and fraud protection.',
+            'features': ['Everything in Growth', 'Fraud & risk tools', 'Supplier hub', 'Reports & API access'],
+        },
+    ]
+    ctx = context(active_page='choose_tier', merchant=merchant, merchant_id=merchant_id)
+    ctx['nav_groups'] = []
+    ctx['active_page'] = 'choose_tier'
+    ctx['tiers'] = tiers
+    return render_template('choose_tier.html', **ctx)
+
+
+@app.route('/api/merchant/select-tier', methods=['POST'])
+@require_roles([UserRole.MERCHANT])
+def api_merchant_select_tier():
+    merchant = get_merchant_context()
+    if not merchant:
+        return jsonify({'error': 'Unauthorized'}), 401
+    data = request.get_json(silent=True) or {}
+    tier = data.get('tier')
+    if tier not in (('Basic Tier', 'Vantav Operator', 'Vantav Growth', 'Vantav Scale')):
+        return jsonify({'error': 'Invalid tier'}), 400
+    merchant_id = merchant['id']
+    profile = MerchantProfile.query.get(merchant_id)
+    if not profile:
+        return jsonify({'error': 'Merchant not found'}), 404
+    billing = SaaSBilling.query.get(merchant_id)
+    if not billing:
+        billing = SaaSBilling(merchant_id=merchant_id)
+        db.session.add(billing)
+    tier_meta = TierManager.get_tier_meta(tier)
+    profile.account_tier = tier
+    profile.sandbox_status = 'approved'
+    profile.live_access_enabled = 1
+    profile.approved_at = datetime.utcnow()
+    billing.current_plan = tier
+    try:
+        memory = action_gate.get_business_memory(merchant_id)
+        memory.max_authorized_seats = int(tier_meta.get('max_users', 1))
+    except Exception as e:
+        logger.warning(f"[SelectTier] Could not update seats for {merchant_id}: {e}")
+    db.session.commit()
+    try:
+        log_admin_audit('tier_selected', target_merchant_id=merchant_id, details={'tier': tier, 'source': 'choose-tier'})
+    except Exception:
+        pass
+    return jsonify({'status': 'ok', 'tier': tier, 'redirect': url_for('dashboard')})
 
 
 @app.route('/home')

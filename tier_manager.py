@@ -210,24 +210,23 @@ PLAN_TO_TIER = {
     "beta_startup": "Vantav Growth",
 }
 
-DEFAULT_MERCHANT_PAGE_IDS: set = {
-    "overview",
-    "alerts",
-    "profit_engine",
-    "inventory",
-    "billing",
-    "settings",
-    "startup_pack",
-}
-
 TIER_PAGE_ACCESS = {
-    "overview": "Vantav Operator",
-    "alerts": "Vantav Operator",
-    "action_gate": "Vantav Operator",
-    "profit_engine": "Vantav Operator",
-    "regression_chart": "Vantav Operator",
-    "billing": "Vantav Operator",
+    # Basic Tier
+    "overview": "Basic Tier",
+    "alerts": "Basic Tier",
+    "settings": "Basic Tier",
+    "billing": "Basic Tier",
+    "support": "Basic Tier",
+    "profit_engine": "Basic Tier",
+    "action_gate": "Basic Tier",
+    # Vantav Operator
+    "inventory": "Vantav Operator",
+    "orders": "Vantav Operator",
+    "products": "Vantav Operator",
+    "store_catalog": "Vantav Operator",
     "commerce_hub": "Vantav Operator",
+    "customers": "Vantav Operator",
+    # Vantav Growth
     "command_center": "Vantav Growth",
     "monitoring": "Vantav Growth",
     "predictions": "Vantav Growth",
@@ -237,10 +236,22 @@ TIER_PAGE_ACCESS = {
     "team_ai": "Vantav Growth",
     "product_research": "Vantav Growth",
     "fulfillment": "Vantav Growth",
+    "returns": "Vantav Growth",
+    "shipments": "Vantav Growth",
+    "suppliers": "Vantav Growth",
+    "tiktok_studio": "Vantav Growth",
+    "discounts": "Vantav Growth",
+    "analytics": "Vantav Growth",
+    "mobile": "Vantav Growth",
+    # Vantav Scale
     "fraud": "Vantav Scale",
-    "suppliers": "Vantav Scale",
     "startup_pack": "Vantav Scale",
+    "apps": "Vantav Scale",
+    "reports": "Vantav Scale",
+    "regression_chart": "Vantav Scale",
 }
+
+DEFAULT_MERCHANT_PAGE_IDS: set = set(TIER_PAGE_ACCESS.keys())
 
 
 class TierManager:
