@@ -1,9 +1,9 @@
 {% extends 'dashboard/base.html' %}
-{% block title %}Admin — Dashboard{% endblock %}
+{% block title %}{{ dashboard_title | default('Admin') }} — Dashboard{% endblock %}
 {% block content %}
 
 <section class="page-header">
-  <h1>Admin Dashboard</h1>
+  <h1>{{ dashboard_title | default('Admin') }} Dashboard</h1>
   <p>Platform overview, connected stores, and quick actions.</p>
 </section>
 

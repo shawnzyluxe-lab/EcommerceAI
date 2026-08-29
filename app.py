@@ -1632,8 +1632,10 @@ def dashboard():
     merchant = get_merchant_context()
     if not merchant:
         return redirect(url_for('login'))
-    if merchant.get('role') in (UserRole.ADMIN.value, UserRole.ENGINEER.value):
+    if merchant.get('role') == UserRole.ADMIN.value:
         return redirect(url_for('admin_dashboard'))
+    if merchant.get('role') == UserRole.ENGINEER.value:
+        return redirect(url_for('engineer_dashboard'))
     merchant_id = merchant["id"]
 
     # If the merchant just returned from Stripe, verify the checkout session
@@ -2568,7 +2570,7 @@ def api_get_shopify_products():
 
 
 @app.route('/api/admin/shopify/sync/<merchant_id>', methods=['POST'])
-@require_roles([UserRole.ADMIN])
+@require_roles([UserRole.ADMIN, UserRole.ENGINEER])
 def api_admin_sync_shopify(merchant_id):
     """Admin-triggered Shopify sync for testing (bypasses live-access gate)."""
     try:
@@ -2613,7 +2615,7 @@ def api_get_tiktok_products():
 
 
 @app.route('/api/admin/tiktok/sync/<merchant_id>', methods=['POST'])
-@require_roles([UserRole.ADMIN])
+@require_roles([UserRole.ADMIN, UserRole.ENGINEER])
 def api_admin_sync_tiktok(merchant_id):
     """Admin-triggered TikTok Shop sync for testing (bypasses live-access gate)."""
     try:
@@ -2625,7 +2627,7 @@ def api_admin_sync_tiktok(merchant_id):
 
 
 @app.route('/api/admin/tiktok/marketing/sync/<merchant_id>', methods=['POST'])
-@require_roles([UserRole.ADMIN])
+@require_roles([UserRole.ADMIN, UserRole.ENGINEER])
 def api_admin_sync_tiktok_marketing(merchant_id):
     """Admin-triggered TikTok ad campaign sync."""
     try:
@@ -2638,7 +2640,7 @@ def api_admin_sync_tiktok_marketing(merchant_id):
 
 
 @app.route('/api/admin/tiktok/marketing/evaluate/<merchant_id>', methods=['POST'])
-@require_roles([UserRole.ADMIN])
+@require_roles([UserRole.ADMIN, UserRole.ENGINEER])
 def api_admin_evaluate_tiktok_marketing(merchant_id):
     """Admin-triggered TikTok marketing overhead evaluation and action drafting."""
     try:
@@ -2652,7 +2654,7 @@ def api_admin_evaluate_tiktok_marketing(merchant_id):
 
 
 @app.route('/api/admin/tiktok/marketing/creative-refresh/<merchant_id>', methods=['POST'])
-@require_roles([UserRole.ADMIN])
+@require_roles([UserRole.ADMIN, UserRole.ENGINEER])
 def api_admin_tiktok_creative_refresh(merchant_id):
     """Queue a TikTok creative refresh for an SKU."""
     data = request.get_json() or {}
@@ -2761,7 +2763,7 @@ def api_get_amazon_products():
 
 
 @app.route('/api/admin/amazon/sync/<merchant_id>', methods=['POST'])
-@require_roles([UserRole.ADMIN])
+@require_roles([UserRole.ADMIN, UserRole.ENGINEER])
 def api_admin_sync_amazon(merchant_id):
     """Admin-triggered Amazon sync for testing (bypasses live-access gate)."""
     try:
@@ -2773,7 +2775,7 @@ def api_admin_sync_amazon(merchant_id):
 
 
 @app.route('/api/admin/provision-demo', methods=['POST'])
-@require_roles([UserRole.ADMIN])
+@require_roles([UserRole.ADMIN, UserRole.ENGINEER])
 def admin_provision_demo():
     """Create or reset a demo/review merchant with full live access for partnership testing."""
     data = request.get_json(silent=True) or {}
@@ -2839,7 +2841,7 @@ def admin_provision_demo():
 
 
 @app.route('/api/admin/seed-regression-demo/<merchant_id>', methods=['POST'])
-@require_roles([UserRole.ADMIN])
+@require_roles([UserRole.ADMIN, UserRole.ENGINEER])
 def api_admin_seed_regression_demo(merchant_id):
     """Backfill 14 days of realistic revenue and cost data for the regression demo SKU."""
     try:
@@ -2900,7 +2902,7 @@ def _admin_merchant_row(p: MerchantProfile, now: datetime) -> dict:
 
 
 @app.route('/admin/merchants')
-@require_roles([UserRole.ADMIN])
+@require_roles([UserRole.ADMIN, UserRole.ENGINEER])
 def admin_merchants():
     """Backend admin view of all merchants, tiers, sync status, pending actions, and live chat."""
     ctx = _dashboard_context('admin_merchants')
@@ -2917,7 +2919,7 @@ def admin_merchants():
 
 
 @app.route('/api/admin/merchants', methods=['GET'])
-@require_roles([UserRole.ADMIN])
+@require_roles([UserRole.ADMIN, UserRole.ENGINEER])
 def api_admin_merchants():
     """JSON list of merchants for admin monitoring."""
     now = datetime.utcnow()
@@ -2926,7 +2928,7 @@ def api_admin_merchants():
 
 
 @app.route('/api/admin/merchants/<merchant_id>', methods=['PATCH'])
-@require_roles([UserRole.ADMIN])
+@require_roles([UserRole.ADMIN, UserRole.ENGINEER])
 def api_admin_update_merchant(merchant_id):
     """Admin update of merchant tier, sandbox, live access, feature flags, and billing."""
     p = MerchantProfile.query.get_or_404(merchant_id)
@@ -2967,14 +2969,14 @@ def api_admin_update_merchant(merchant_id):
 
 
 @app.route('/api/admin/stripe-balance')
-@require_roles([UserRole.ADMIN])
+@require_roles([UserRole.ADMIN, UserRole.ENGINEER])
 def api_admin_stripe_balance():
     """Return the platform Stripe balance."""
     return jsonify(billing_module.get_stripe_balance())
 
 
 @app.route('/admin/chat')
-@require_roles([UserRole.ADMIN])
+@require_roles([UserRole.ADMIN, UserRole.ENGINEER])
 def admin_chat():
     """Admin support chat dashboard."""
     ctx = _dashboard_context('admin_chat')
@@ -2982,7 +2984,7 @@ def admin_chat():
 
 
 @app.route('/api/admin/chat/threads', methods=['GET'])
-@require_roles([UserRole.ADMIN])
+@require_roles([UserRole.ADMIN, UserRole.ENGINEER])
 def api_admin_chat_threads():
     """List merchants with unread support message counts."""
     rows = db.session.query(
@@ -3017,7 +3019,7 @@ def api_admin_chat_threads():
 
 
 @app.route('/api/admin/chat/<merchant_id>', methods=['GET'])
-@require_roles([UserRole.ADMIN])
+@require_roles([UserRole.ADMIN, UserRole.ENGINEER])
 def api_admin_chat_messages(merchant_id):
     """Return chat history with a merchant and mark merchant messages as read."""
     profile = MerchantProfile.query.get_or_404(merchant_id)
@@ -3037,7 +3039,7 @@ def api_admin_chat_messages(merchant_id):
 
 
 @app.route('/api/admin/chat/<merchant_id>', methods=['POST'])
-@require_roles([UserRole.ADMIN])
+@require_roles([UserRole.ADMIN, UserRole.ENGINEER])
 def api_admin_chat_send(merchant_id):
     """Send an admin message to a merchant."""
     profile = MerchantProfile.query.get_or_404(merchant_id)
@@ -3063,7 +3065,7 @@ def api_admin_chat_send(merchant_id):
 # --------------------------------------------------------------------------
 
 @app.route('/api/admin/impersonate/<merchant_id>', methods=['POST'])
-@require_roles([UserRole.ADMIN])
+@require_roles([UserRole.ADMIN, UserRole.ENGINEER])
 def api_admin_impersonate(merchant_id):
     """Admin view-as-merchant: load the target tenant's dashboard without a password."""
     target = MerchantProfile.query.get_or_404(merchant_id)
@@ -3080,7 +3082,7 @@ def api_admin_impersonate(merchant_id):
 
 
 @app.route('/api/admin/stop-impersonating', methods=['GET', 'POST'])
-@require_roles([UserRole.ADMIN])
+@require_roles([UserRole.ADMIN, UserRole.ENGINEER])
 def api_admin_stop_impersonating():
     """Restore the admin's original merchant context."""
     s = get_current_user()
@@ -3100,7 +3102,7 @@ def api_admin_stop_impersonating():
 
 
 @app.route('/api/admin/announcements', methods=['POST'])
-@require_roles([UserRole.ADMIN])
+@require_roles([UserRole.ADMIN, UserRole.ENGINEER])
 def api_admin_announcement():
     """Broadcast a global admin message to every merchant's support chat."""
     data = request.get_json(silent=True) or {}
@@ -3128,7 +3130,7 @@ def api_admin_announcement():
 
 
 @app.route('/api/admin/audit', methods=['GET'])
-@require_roles([UserRole.ADMIN])
+@require_roles([UserRole.ADMIN, UserRole.ENGINEER])
 def api_admin_audit():
     """Paginated admin audit log."""
     limit = min(int(request.args.get('limit', 50)), 200)
@@ -3161,7 +3163,7 @@ def api_admin_audit():
 
 
 @app.route('/api/admin/platform-controls', methods=['GET'])
-@require_roles([UserRole.ADMIN])
+@require_roles([UserRole.ADMIN, UserRole.ENGINEER])
 def api_admin_platform_controls_get():
     """Return the current global platform switches."""
     return jsonify({
@@ -3172,7 +3174,7 @@ def api_admin_platform_controls_get():
 
 
 @app.route('/api/admin/platform-controls', methods=['POST'])
-@require_roles([UserRole.ADMIN])
+@require_roles([UserRole.ADMIN, UserRole.ENGINEER])
 def api_admin_platform_controls_set():
     """Update global platform switches: global_sync_paused, maintenance_mode, sample_pages_enabled."""
     data = request.get_json(silent=True) or {}
@@ -3188,7 +3190,7 @@ def api_admin_platform_controls_set():
 
 
 @app.route('/api/admin/<platform>/sync/<merchant_id>', methods=['POST'])
-@require_roles([UserRole.ADMIN])
+@require_roles([UserRole.ADMIN, UserRole.ENGINEER])
 def api_admin_sync_platform(platform, merchant_id):
     """Generic admin-triggered sync for any supported platform."""
     if platform not in ('shopify', 'tiktok', 'amazon', 'ebay', 'walmart', 'bigcommerce', 'woocommerce'):
@@ -3211,7 +3213,7 @@ def api_admin_sync_platform(platform, merchant_id):
 
 
 @app.route('/api/admin/stores/<merchant_id>/<platform>/reset', methods=['POST'])
-@require_roles([UserRole.ADMIN])
+@require_roles([UserRole.ADMIN, UserRole.ENGINEER])
 def api_admin_store_reset(merchant_id, platform):
     """Mark a merchant's channel connection stale (forces re-auth/re-sync)."""
     if platform not in ('shopify', 'tiktok', 'amazon', 'ebay', 'walmart', 'bigcommerce', 'woocommerce'):
@@ -3233,7 +3235,7 @@ def api_admin_store_reset(merchant_id, platform):
 
 
 @app.route('/admin')
-@require_roles([UserRole.ADMIN])
+@require_roles([UserRole.ADMIN, UserRole.ENGINEER])
 def admin_dashboard():
     """Admin control panel landing page."""
     ctx = _dashboard_context('admin_dashboard')
@@ -3241,11 +3243,23 @@ def admin_dashboard():
     ctx["summary"] = _admin_summary(now)
     ctx["stores"] = _admin_stores()
     ctx["recent_events"] = _admin_recent_events(now)
-    return render_template('dashboard/admin.html', **ctx)
+    return render_template('dashboard/admin.html', dashboard_title='Admin', **ctx)
+
+
+@app.route('/engineer')
+@require_roles([UserRole.ENGINEER])
+def engineer_dashboard():
+    """Engineer control panel landing page."""
+    ctx = _dashboard_context('engineer_dashboard')
+    now = datetime.utcnow()
+    ctx["summary"] = _admin_summary(now)
+    ctx["stores"] = _admin_stores()
+    ctx["recent_events"] = _admin_recent_events(now)
+    return render_template('dashboard/admin.html', dashboard_title='Engineer', **ctx)
 
 
 @app.route('/admin/audit')
-@require_roles([UserRole.ADMIN])
+@require_roles([UserRole.ADMIN, UserRole.ENGINEER])
 def admin_audit_page():
     """Admin audit log page."""
     ctx = _dashboard_context('admin_audit')
@@ -3319,7 +3333,7 @@ def _admin_recent_events(now):
 
 
 @app.route('/api/admin/summary', methods=['GET'])
-@require_roles([UserRole.ADMIN])
+@require_roles([UserRole.ADMIN, UserRole.ENGINEER])
 def api_admin_summary():
     """Return platform summary for the admin dashboard."""
     now = datetime.utcnow()
@@ -3327,14 +3341,14 @@ def api_admin_summary():
 
 
 @app.route('/api/admin/stores', methods=['GET'])
-@require_roles([UserRole.ADMIN])
+@require_roles([UserRole.ADMIN, UserRole.ENGINEER])
 def api_admin_stores():
     """Return all connected stores across merchants."""
     return jsonify({"stores": _admin_stores()}), 200
 
 
 @app.route('/api/admin/stores/<merchant_id>/<platform>/unlink', methods=['POST'])
-@require_roles([UserRole.ADMIN])
+@require_roles([UserRole.ADMIN, UserRole.ENGINEER])
 def api_admin_unlink_store(merchant_id, platform):
     """Admin-only: disconnect a store from any merchant account."""
     if platform not in ('shopify', 'tiktok', 'amazon', 'ebay', 'walmart', 'bigcommerce', 'woocommerce'):
@@ -4014,7 +4028,7 @@ def api_startup_pack_check_item(item_id):
 # ============================================================
 
 @app.route('/admin/startup-pack', methods=['GET'])
-@require_roles([UserRole.ADMIN])
+@require_roles([UserRole.ADMIN, UserRole.ENGINEER])
 def admin_startup_pack():
     """Admin review page for Startup Pack concierge submissions."""
     merchant = get_merchant_context()
@@ -4024,7 +4038,7 @@ def admin_startup_pack():
 
 
 @app.route('/api/admin/startup-pack/submissions', methods=['GET'])
-@require_roles([UserRole.ADMIN])
+@require_roles([UserRole.ADMIN, UserRole.ENGINEER])
 def api_admin_startup_pack_submissions():
     """List all Startup Pack submissions for admin review."""
     try:
@@ -4037,7 +4051,7 @@ def api_admin_startup_pack_submissions():
 
 
 @app.route('/api/admin/startup-pack/<merchant_id>/brief', methods=['POST'])
-@require_roles([UserRole.ADMIN])
+@require_roles([UserRole.ADMIN, UserRole.ENGINEER])
 def api_admin_deliver_startup_brief(merchant_id):
     """Admin delivers a curated Startup Pack brief with optional supplier recommendations."""
     data = request.get_json(silent=True) or {}
@@ -4288,7 +4302,7 @@ def auth_signup():
 
 
 @app.route('/api/v1/auth/provision-node', methods=['POST'])
-@require_roles([UserRole.ADMIN])
+@require_roles([UserRole.ADMIN, UserRole.ENGINEER])
 def auth_provision_node():
     """Admin-only user provisioning. Prevents self-service role escalation."""
     payload = request.get_json(silent=True) or {}
@@ -5924,7 +5938,7 @@ def magic_login():
 
 
 @app.route('/api/v1/admin/kill-switch', methods=['POST'])
-@require_roles([UserRole.ADMIN])
+@require_roles([UserRole.ADMIN, UserRole.ENGINEER])
 def admin_kill_switch():
     """Halt all background channel synchronization."""
     try:
@@ -5935,7 +5949,7 @@ def admin_kill_switch():
 
 
 @app.route('/api/v1/admin/release-lock', methods=['POST'])
-@require_roles([UserRole.ADMIN])
+@require_roles([UserRole.ADMIN, UserRole.ENGINEER])
 def admin_release_lock():
     """Restore global synchronization."""
     try:
@@ -6292,7 +6306,7 @@ def api_beta_apply():
 
 
 @app.route('/admin/beta-waitlist', methods=['GET'])
-@require_roles([UserRole.ADMIN])
+@require_roles([UserRole.ADMIN, UserRole.ENGINEER])
 def admin_beta_waitlist():
     """Admin review page for beta applications."""
     merchant = get_merchant_context()
@@ -6302,7 +6316,7 @@ def admin_beta_waitlist():
 
 
 @app.route('/api/admin/beta-applications', methods=['GET'])
-@require_roles([UserRole.ADMIN])
+@require_roles([UserRole.ADMIN, UserRole.ENGINEER])
 def api_admin_beta_applications():
     """List beta waitlist applications for admin review."""
     status = request.args.get("status")
@@ -6315,7 +6329,7 @@ def api_admin_beta_applications():
 
 
 @app.route('/api/admin/beta-applications/<int:app_id>/sandbox', methods=['POST'])
-@require_roles([UserRole.ADMIN])
+@require_roles([UserRole.ADMIN, UserRole.ENGINEER])
 def api_admin_approve_sandbox(app_id):
     """Approve an application into the 48-hour sandbox and email login credentials."""
     try:
@@ -6378,7 +6392,7 @@ def api_admin_approve_sandbox(app_id):
 
 
 @app.route('/api/admin/seed-sandbox-demo/<merchant_id>', methods=['POST'])
-@require_roles([UserRole.ADMIN])
+@require_roles([UserRole.ADMIN, UserRole.ENGINEER])
 def api_admin_seed_sandbox_demo(merchant_id):
     """Generate or refresh demo data for a sandbox merchant."""
     try:
@@ -6392,7 +6406,7 @@ def api_admin_seed_sandbox_demo(merchant_id):
 
 
 @app.route('/api/admin/beta-applications/<int:app_id>/live', methods=['POST'])
-@require_roles([UserRole.ADMIN])
+@require_roles([UserRole.ADMIN, UserRole.ENGINEER])
 def api_admin_approve_live(app_id):
     """Grant live marketplace access to a sandbox merchant."""
     try:
@@ -6407,7 +6421,7 @@ def api_admin_approve_live(app_id):
 
 
 @app.route('/api/admin/beta-applications/<int:app_id>/checkout', methods=['POST'])
-@require_roles([UserRole.ADMIN])
+@require_roles([UserRole.ADMIN, UserRole.ENGINEER])
 def api_admin_send_checkout(app_id):
     """Create a Stripe checkout link for a sandbox/approved applicant and email it."""
     try:
@@ -6453,7 +6467,7 @@ def api_admin_send_checkout(app_id):
 
 
 @app.route('/api/admin/beta-applications/<int:app_id>/reject', methods=['POST'])
-@require_roles([UserRole.ADMIN])
+@require_roles([UserRole.ADMIN, UserRole.ENGINEER])
 def api_admin_reject(app_id):
     """Reject a beta application."""
     data = request.get_json(silent=True) or {}
@@ -6466,7 +6480,7 @@ def api_admin_reject(app_id):
 
 
 @app.route('/api/admin/reset-password', methods=['POST'])
-@require_roles([UserRole.ADMIN])
+@require_roles([UserRole.ADMIN, UserRole.ENGINEER])
 def api_admin_reset_password():
     """Generate or set a temporary password for a merchant account."""
     data = request.get_json(silent=True) or {}
@@ -6521,7 +6535,7 @@ def api_monitoring_alerts():
 
 
 @app.route('/api/v1/monitoring/alert-test', methods=['POST'])
-@require_roles([UserRole.ADMIN])
+@require_roles([UserRole.ADMIN, UserRole.ENGINEER])
 def api_monitoring_alert_test():
     """Send a test alert through configured channels."""
     monitoring_module.send_alert({

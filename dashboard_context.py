@@ -763,7 +763,7 @@ ALL_DASHBOARD_PAGE_IDS = sorted({
     if link.get("id")
 } | COMMERCIAL_READY_PAGE_IDS | PLACEHOLDER_DASHBOARD_PAGE_IDS | {
     "command_center", "commerce_hub", "monitoring", "regression_chart",
-    "onboarding_loading", "tiktok_studio", "startup_pack",
+    "onboarding_loading", "tiktok_studio", "startup_pack", "engineer_dashboard",
 })
 
 
@@ -844,8 +844,8 @@ def context(active_page=None, merchant=None, merchant_id=None):
                 link["badge"] = str(len(live_alerts))
     nav_groups = _filter_nav_for_role(nav_groups, user_role, merchant)
 
-    # Admin-only backend navigation.
-    if user_role in ("Admin", "Engineer"):
+    # Admin/engineer backend navigation.
+    if user_role == "Admin":
         admin_group = {
             "label": "Admin",
             "links": [
@@ -858,6 +858,19 @@ def context(active_page=None, merchant=None, merchant_id=None):
         nav_groups.append(admin_group)
         # Master admins land in a dedicated control panel, not the merchant dashboard.
         nav_groups = [admin_group]
+    elif user_role == "Engineer":
+        engineer_group = {
+            "label": "Engineer",
+            "links": [
+                {"id": "engineer_dashboard", "label": "Engineer Home", "url": "/engineer", "icon": "◈"},
+                {"id": "admin_merchants", "label": "Members", "url": "/admin/merchants", "icon": "◈"},
+                {"id": "admin_audit", "label": "Audit Log", "url": "/admin/audit", "icon": "◈"},
+                {"id": "admin_chat", "label": "Support Chat", "url": "/admin/chat", "icon": "✉"},
+            ],
+        }
+        nav_groups.append(engineer_group)
+        # Engineers land in a dedicated control panel, not the merchant dashboard.
+        nav_groups = [engineer_group]
 
     # Action Gate: draft approvals from open alerts.
     pending_actions = []
