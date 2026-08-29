@@ -6657,11 +6657,12 @@ def _engineer_chat_process(message):
 
     if re.search(r'\b(metrics|request count|latency|p95|p99)\b', text):
         metrics = monitoring_module.current_metrics()
+        latency = metrics.get('latency_ms') or {}
         return {
             "reply": (
-                f"Requests (1h): {metrics.get('request_count')}; "
-                f"p95 latency: {metrics.get('p95_latency_ms')} ms; "
-                f"error rate: {(metrics.get('error_rate') or 0) * 100:.2f}%."
+                f"Requests (last minute): {metrics.get('requests_per_minute')}; "
+                f"p95 latency: {latency.get('p95')} ms; "
+                f"error rate: {metrics.get('error_rate_percent', 0):.2f}%."
             ),
             "result": metrics,
             "action": "metrics",
