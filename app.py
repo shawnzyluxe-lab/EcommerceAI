@@ -103,6 +103,7 @@ from dashboard_context import (
     predictive_context,
     ALL_DASHBOARD_PAGE_IDS,
     PLACEHOLDER_DASHBOARD_PAGE_IDS,
+    BETA_LOCKED_PAGE_IDS,
     sample_pages_enabled,
     global_sync_paused,
     maintenance_mode,
@@ -1800,10 +1801,10 @@ def dashboard_page(page):
     if active_page not in valid_pages:
         return redirect(url_for('dashboard'))
     ctx = _dashboard_context(active_page)
-    # Global admin content moderation: hide all sample/placeholder pages when the
-    # admin has flipped the "sample_pages_enabled" switch off.
+    # Closed-beta gating: hide all non-beta modules from merchants unless the
+    # admin has enabled sample/non-beta pages for testing.
     if not s or s.role not in (UserRole.ADMIN.value, UserRole.ENGINEER.value):
-        if active_page in PLACEHOLDER_DASHBOARD_PAGE_IDS and not sample_pages_enabled():
+        if active_page in BETA_LOCKED_PAGE_IDS and not sample_pages_enabled():
             return redirect(url_for('dashboard'))
     # Commercial gating: merchants can only reach the pages their tier allows or
     # that the admin has explicitly enabled via feature flags.
@@ -6836,7 +6837,7 @@ def _engineer_chat_process(message):
                 "• run migrations\n"
                 "• pause sync / resume sync\n"
                 "• maintenance on / off\n"
-                "• sample pages on / off"
+                "• non-beta on / off"
             ),
             "action": "help",
         }
@@ -6993,18 +6994,18 @@ def _engineer_chat_process(message):
         log_admin_audit("engineer_chat.platform_control", details={"key": "maintenance_mode", "value": val})
         return {"reply": f"Maintenance mode {'enabled' if val else 'disabled'}.", "action": "platform_control"}
 
-    sample_match = re.search(r'\bsample\s+pages?\s+(on|off|show|hide|enable|disable)\b', text)
+    sample_match = re.search(r'\b(?:sample\s+pages?|non[-\s]?beta)\s+(on|off|show|hide|enable|disable)\b', text, re.IGNORECASE)
     if sample_match:
         val = sample_match.group(1) in ('on', 'show', 'enable', 'true')
         AdminPlatformControl.set_bool('sample_pages_enabled', val)
         log_admin_audit("engineer_chat.platform_control", details={"key": "sample_pages_enabled", "value": val})
-        return {"reply": f"Sample/placeholder pages {'shown' if val else 'hidden'} for merchants.", "action": "platform_control"}
+        return {"reply": f"Non-beta modules {'shown' if val else 'hidden'} for merchants.", "action": "platform_control"}
 
     return {
         "reply": (
             "I didn't understand. Try: health, metrics, sync shopify for merchant_xxx, "
             "reset tiktok for merchant_xxx, run migrations, pause sync, maintenance on, "
-            "sample pages off, audit, exceptions, stores, summary, or help."
+            "non-beta on, audit, exceptions, stores, summary, or help."
         ),
         "action": "unknown",
     }

@@ -214,6 +214,18 @@ def _ai_greeting(merchant_id: Optional[str], merchant: Optional[Dict[str, Any]] 
 # Beta launch scope: overview, profit engine, alerts, billing, settings, and the
 # inventory, billing, settings, and regression. Other pages remain admin-only
 # until they are ready for merchant use.
+# Closed-beta gating: only these pages are visible to merchants by default.
+# All other pages are hidden unless the admin flips the "sample_pages_enabled"
+# switch (which now acts as a "show non-beta modules" toggle).
+BETA_READY_PAGE_IDS = {
+    "overview",
+    "alerts",
+    "profit_engine",
+    "billing",
+    "settings",
+    "support",
+}
+
 COMMERCIAL_READY_PAGE_IDS = {
     "overview",
     "alerts",
@@ -224,8 +236,8 @@ COMMERCIAL_READY_PAGE_IDS = {
     "startup_pack",
 }
 
-# These pages still contain sample business content. Admins can access them
-# while they are being developed, so the page must identify that content.
+# These pages still contain sample business content and show a placeholder
+# banner when the admin enables them for testing.
 PLACEHOLDER_DASHBOARD_PAGE_IDS = {
     "analytics",
     "apps",
@@ -244,7 +256,6 @@ PLACEHOLDER_DASHBOARD_PAGE_IDS = {
     "returns",
     "store_catalog",
     "suppliers",
-    "support",
 }
 
 
@@ -288,7 +299,7 @@ def _filter_nav_for_role(nav_groups, user_role, merchant=None):
             page_id = link.get("id", "")
             if not TierManager.page_enabled(merchant_id, merchant_tier, page_id):
                 continue
-            if not sample_pages_on and page_id in PLACEHOLDER_DASHBOARD_PAGE_IDS:
+            if not sample_pages_on and page_id in BETA_LOCKED_PAGE_IDS:
                 continue
             if page_id == "startup_pack" and not has_concierge:
                 continue
@@ -765,6 +776,8 @@ ALL_DASHBOARD_PAGE_IDS = sorted({
     "command_center", "commerce_hub", "monitoring", "regression_chart",
     "onboarding_loading", "tiktok_studio", "startup_pack", "engineer_dashboard",
 })
+
+BETA_LOCKED_PAGE_IDS = set(ALL_DASHBOARD_PAGE_IDS) - BETA_READY_PAGE_IDS
 
 
 def context(active_page=None, merchant=None, merchant_id=None):
