@@ -5367,16 +5367,47 @@ def process_idempotent_channel_event(event_id, merchant_id, platform_id, amount=
 @limiter.limit("60 per minute")
 def tiktok_orders_webhook():
     """Ingest TikTok Shop order events into the isolated merchant channel."""
+    raw_body = request.get_data()
     event_id = request.headers.get("X-Tiktok-Event-Id") or request.headers.get("X-TikTok-Event-Id")
-    merchant_target = request.args.get("merchant_id", "merchant_shawn_01")
+    merchant_target = request.args.get("merchant_id")
+    signature = request.headers.get("X-Tiktok-Signature") or request.headers.get("X-Webhook-Signature")
+
+    if not merchant_target:
+        return jsonify({"status": "rejected", "reason": "Missing merchant_id query parameter"}), 400
+    if not event_id:
+        return jsonify({"status": "rejected", "reason": "Missing X-Tiktok-Event-Id"}), 400
+
+    if TIKTOK_WEBHOOK_SECRET:
+        if not signature:
+            log_system_exception("TIKTOK_WEBHOOK", "WARNING", "Dropped inbound TikTok webhook: missing signature.")
+            return jsonify({"status": "rejected", "reason": "Missing signature"}), 401
+        computed = hmac.new(TIKTOK_WEBHOOK_SECRET, raw_body, hashlib.sha256).hexdigest()
+        if not hmac.compare_digest(computed, signature):
+            log_system_exception("TIKTOK_WEBHOOK", "WARNING", "Dropped inbound TikTok webhook: invalid signature.")
+            return jsonify({"status": "rejected", "reason": "Invalid signature"}), 401
+    else:
+        logger.warning("TIKTOK_WEBHOOK_SECRET not set — accepting webhook without signature verification")
+
+    try:
+        raw = json.loads(raw_body.decode("utf-8"))
+    except json.JSONDecodeError as je:
+        log_system_exception("TIKTOK_WEBHOOK", "WARNING", f"Malformed JSON: {je}")
+        return jsonify({"status": "rejected", "reason": "Malformed JSON"}), 400
+
     tenant_rls.set_tenant_scope(merchant_target)
     blocked = enforce_tier_limits(merchant_target, "tiktok")
     if blocked:
         return blocked
-    raw = request.get_json(force=True, silent=True) or {}
-    order_price = float(raw.get("order_amount", raw.get("total_amount", 0.00)))
+
+    try:
+        order_price = float(raw.get("order_amount", raw.get("total_amount", 0.00)))
+    except (TypeError, ValueError):
+        return jsonify({"status": "rejected", "reason": "Invalid order_amount"}), 400
+
     try:
         created = process_idempotent_channel_event(event_id, merchant_target, "tiktok", order_price)
+        if not created:
+            return jsonify({"status": "duplicate_ignored"}), 200
         db.session.commit()
         # Feed the real-time Profit Feed for TikTok Shop.
         line_items = raw.get("line_items") or raw.get("skus") or raw.get("items") or []
@@ -5411,7 +5442,7 @@ def tiktok_orders_webhook():
         )
         # Trigger real-time multi-channel routing pipeline in the background
         run_async_task(lambda: asyncio.run(process_incoming_order_event(raw)))
-        return jsonify({"status": "synchronized" if created else "ignored"}), 200
+        return jsonify({"status": "synchronized"}), 200
     except Exception as e:
         log_system_exception("TIKTOK_WEBHOOK", "CRITICAL", str(e))
         db.session.rollback()
@@ -5422,17 +5453,48 @@ def tiktok_orders_webhook():
 @limiter.limit("60 per minute")
 def amazon_orders_webhook():
     """Ingest Amazon Seller Central order events into the isolated merchant channel."""
+    raw_body = request.get_data()
     event_id = request.headers.get("X-Amazon-Sqs-Message-Id")
-    merchant_target = request.args.get("merchant_id", "merchant_shawn_01")
+    merchant_target = request.args.get("merchant_id")
+    signature = request.headers.get("X-Amazon-Signature") or request.headers.get("X-Webhook-Signature")
+
+    if not merchant_target:
+        return jsonify({"status": "rejected", "reason": "Missing merchant_id query parameter"}), 400
+    if not event_id:
+        return jsonify({"status": "rejected", "reason": "Missing X-Amazon-Sqs-Message-Id"}), 400
+
+    if AMAZON_WEBHOOK_SECRET:
+        if not signature:
+            log_system_exception("AMAZON_WEBHOOK", "WARNING", "Dropped inbound Amazon webhook: missing signature.")
+            return jsonify({"status": "rejected", "reason": "Missing signature"}), 401
+        computed = hmac.new(AMAZON_WEBHOOK_SECRET, raw_body, hashlib.sha256).hexdigest()
+        if not hmac.compare_digest(computed, signature):
+            log_system_exception("AMAZON_WEBHOOK", "WARNING", "Dropped inbound Amazon webhook: invalid signature.")
+            return jsonify({"status": "rejected", "reason": "Invalid signature"}), 401
+    else:
+        logger.warning("AMAZON_WEBHOOK_SECRET not set — accepting webhook without signature verification")
+
+    try:
+        raw = json.loads(raw_body.decode("utf-8"))
+    except json.JSONDecodeError as je:
+        log_system_exception("AMAZON_WEBHOOK", "WARNING", f"Malformed JSON: {je}")
+        return jsonify({"status": "rejected", "reason": "Malformed JSON"}), 400
+
     tenant_rls.set_tenant_scope(merchant_target)
     blocked = enforce_tier_limits(merchant_target, "amazon")
     if blocked:
         return blocked
-    raw = request.get_json(force=True, silent=True) or {}
+
     payload = raw.get("payload", raw)
-    order_price = float(payload.get("AmazonOrderTotal", payload.get("total", 0.00)))
+    try:
+        order_price = float(payload.get("AmazonOrderTotal", payload.get("total", 0.00)))
+    except (TypeError, ValueError):
+        return jsonify({"status": "rejected", "reason": "Invalid AmazonOrderTotal"}), 400
+
     try:
         created = process_idempotent_channel_event(event_id, merchant_target, "amazon", order_price)
+        if not created:
+            return jsonify({"status": "duplicate_ignored"}), 200
         db.session.commit()
         # Feed the real-time Profit Feed for Amazon.
         items = payload.get("NumberOfItemsShipped") or payload.get("items") or []
@@ -5473,7 +5535,7 @@ def amazon_orders_webhook():
             state="shipped" if payload.get("OrderStatus") != "Canceled" else "cancelled",
             order_items=order_items,
         )
-        return jsonify({"status": "synchronized" if created else "ignored"}), 200
+        return jsonify({"status": "synchronized"}), 200
     except Exception as e:
         log_system_exception("AMAZON_WEBHOOK", "CRITICAL", str(e))
         db.session.rollback()
