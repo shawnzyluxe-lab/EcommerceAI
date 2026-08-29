@@ -144,7 +144,7 @@
     {% set usage = {
       'Orders': (billing_account.metered_usage_units | default(0), tier_limits.orders | default(1000)),
       'Approved actions': (billing_account.approved_actions | default(0), tier_limits.actions | default(50)),
-      'Connected stores': (channels | default([]) | length, tier_limits.stores | default(2)),
+      'Connected stores': (connected | default([]) | length, tier_limits.stores | default(2)),
       'Team users': (team_users | default([]) | length, tier_limits.users | default(3))
     } %}
     {% for label, vals in usage.items() %}
