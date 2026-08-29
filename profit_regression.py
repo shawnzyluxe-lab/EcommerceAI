@@ -111,7 +111,7 @@ class VantaMathematicalRegressionEngine:
             intercept_baseline=round(b, 2),
             r_squared_confidence=round(r_squared, 4),
             trend_direction=trend,
-            projected_net_profit_7d=round(max(0.0, projected_7d), 2),
+            projected_net_profit_7d=round(projected_7d, 2),
         )
 
 
@@ -244,7 +244,7 @@ def analyze_sku_chart(
             {
                 "days_ago": days_ago,
                 "label": _days_ago_label(days_ago),
-                "predicted_net_profit": round(max(predicted, 0.0) if days_ago >= 0 else predicted, 2),
+                "predicted_net_profit": round(predicted, 2),
             }
         )
 

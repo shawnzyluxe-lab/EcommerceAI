@@ -444,7 +444,7 @@ def require_roles(permitted_roles):
         def wrapper(*args, **kwargs):
             s = get_current_user()
             if not s or s.role not in [role.value for role in permitted_roles]:
-                return jsonify({"error": "SECURITY PROTOCOL VIOLATION: Unauthorized endpoint access attempt. Session invalidated."}), 403
+                return jsonify({"error": "Access denied. Your session does not have the required role for this endpoint."}), 403
             return endpoint_function(*args, **kwargs)
         return wrapper
     return decorator
@@ -486,42 +486,8 @@ class WebhookOrderPayload:
         )
 
 
-class GlobalSystemCircuitBreaker:
-    """Redis-backed global kill switch for background channel sync workers."""
-    def __init__(self, redis_url: str):
-        try:
-            import redis.asyncio as redis
-            self.client = redis.from_url(redis_url)
-            self.enabled = True
-        except Exception as e:
-            logger.warning(f"Redis unavailable for circuit breaker: {e}")
-            self.client = None
-            self.enabled = False
-        self.switch_key = "sys:matrix:global_sync_lock"
-
-    async def engage_global_kill_switch(self):
-        if not self.client:
-            return
-        await self.client.set(self.switch_key, "HALTED")
-        logger.info("[HARD EXECUTABLE CONTROL] Global synchronization pipelines PAUSED.")
-
-    async def release_system_lock(self):
-        if not self.client:
-            return
-        await self.client.set(self.switch_key, "OPERATIONAL")
-        logger.info("[HARD EXECUTABLE CONTROL] Global synchronization pipelines restored.")
-
-    async def verify_pipeline_clearance(self) -> bool:
-        if not self.client:
-            return True
-        status = await self.client.get(self.switch_key)
-        if status == b"HALTED":
-            return False
-        return True
-
-
-REDIS_URL = os.environ.get("REDIS_URL", "redis://localhost:6379")
-circuit_breaker = GlobalSystemCircuitBreaker(REDIS_URL)
+# Global sync pause is controlled through AdminPlatformControl, not Redis.
+# No runtime Redis dependency for the order pipeline.
 
 
 # Admin kill switch: sync endpoints that are paused when global_sync_paused is true.
@@ -579,7 +545,7 @@ async def dispatch_amazon_mcf(tenant_id: str, sku: str, order_payload: dict):
 
 async def process_incoming_order_event(event_data: dict):
     """Absorb webhook order data, enforce tier policy, update DB, and fire multi-channel async workers."""
-    if not await circuit_breaker.verify_pipeline_clearance():
+    if global_sync_paused():
         logger.warning("[CIRCUIT BREAKER] Incoming order dropped. System sync is HALTED.")
         return False
 
@@ -931,6 +897,11 @@ with app.app_context():
     except Exception as e:
         app.logger.warning(f"Startup migration helper failed: {e}")
     db.create_all()
+    if DATABASE_URL.startswith("sqlite"):
+        try:
+            migrate_module.ensure_sqlite_schema(db)
+        except Exception as e:
+            app.logger.warning(f"Startup SQLite schema check failed: {e}")
 
     # Clean expired sessions
     ActiveSession.query.filter(
@@ -3066,6 +3037,7 @@ def _admin_merchant_row(p: MerchantProfile, now: datetime) -> dict:
         "sync_status": sync_status,
         "pending_actions": pending_actions,
         "unread": unread,
+        "version": p.updated_at.isoformat() if p.updated_at else None,
     }
 
 
@@ -3103,6 +3075,12 @@ def api_admin_update_merchant(merchant_id):
     """Admin update of merchant tier, sandbox, live access, feature flags, and billing."""
     p = MerchantProfile.query.get_or_404(merchant_id)
     data = request.get_json(silent=True) or {}
+
+    # Optimistic concurrency check: reject saves made against a stale version.
+    if 'version' in data and p.updated_at:
+        if data['version'] != p.updated_at.isoformat():
+            return jsonify({"error": "Merchant profile was modified by another session. Please reload and try again."}), 409
+
     if 'account_tier' in data:
         p.account_tier = _canonical_tier(data['account_tier'])
     if 'sandbox_status' in data:
@@ -3132,6 +3110,7 @@ def api_admin_update_merchant(merchant_id):
     if 'max_authorized_seats' in data:
         memory = action_gate.get_business_memory(merchant_id)
         memory.max_authorized_seats = int(data['max_authorized_seats'])
+    p.updated_at = datetime.utcnow()
     db.session.commit()
     log_admin_audit("merchant.update", target_merchant_id=merchant_id, details={"fields": list(data.keys())})
     now = datetime.utcnow()
@@ -5394,7 +5373,7 @@ def tiktok_orders_webhook():
     blocked = enforce_tier_limits(merchant_target, "tiktok")
     if blocked:
         return blocked
-    raw = request.get_json() or {}
+    raw = request.get_json(force=True, silent=True) or {}
     order_price = float(raw.get("order_amount", raw.get("total_amount", 0.00)))
     try:
         created = process_idempotent_channel_event(event_id, merchant_target, "tiktok", order_price)
@@ -5449,7 +5428,7 @@ def amazon_orders_webhook():
     blocked = enforce_tier_limits(merchant_target, "amazon")
     if blocked:
         return blocked
-    raw = request.get_json() or {}
+    raw = request.get_json(force=True, silent=True) or {}
     payload = raw.get("payload", raw)
     order_price = float(payload.get("AmazonOrderTotal", payload.get("total", 0.00)))
     try:
@@ -6139,9 +6118,10 @@ def magic_login():
 def admin_kill_switch():
     """Halt all background channel synchronization."""
     try:
-        asyncio.run(circuit_breaker.engage_global_kill_switch())
+        AdminPlatformControl.set_bool('global_sync_paused', True)
         return jsonify({"status": "HALTED"}), 200
     except Exception as e:
+        logger.error(f"[KILL SWITCH] Failed to engage: {e}")
         return jsonify({"status": "error", "reason": str(e)}), 500
 
 
@@ -6150,9 +6130,10 @@ def admin_kill_switch():
 def admin_release_lock():
     """Restore global synchronization."""
     try:
-        asyncio.run(circuit_breaker.release_system_lock())
+        AdminPlatformControl.set_bool('global_sync_paused', False)
         return jsonify({"status": "OPERATIONAL"}), 200
     except Exception as e:
+        logger.error(f"[RELEASE LOCK] Failed to release: {e}")
         return jsonify({"status": "error", "reason": str(e)}), 500
 
 

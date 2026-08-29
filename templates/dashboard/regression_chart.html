@@ -70,7 +70,7 @@ document.addEventListener('DOMContentLoaded', async function() {
   const labels = data.historical_points.map(p => p.label).concat(
     data.trend_line.filter(t => t.days_ago < 0).map(t => t.label)
   );
-  const trendPoints = data.trend_line.map(t => t.predicted_net_profit < 0 ? 0 : t.predicted_net_profit);
+  const trendPoints = data.trend_line.map(t => t.predicted_net_profit);
 
   const ctx = document.getElementById('vantaRegressionChart').getContext('2d');
   new Chart(ctx, {
@@ -118,8 +118,7 @@ document.addEventListener('DOMContentLoaded', async function() {
         },
         y: {
           grid: { color: 'var(--line)' },
-          ticks: { color: 'var(--ink-2)', font: { family: 'Inter' } },
-          min: 0
+          ticks: { color: 'var(--ink-2)', font: { family: 'Inter' } }
         }
       }
     }

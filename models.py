@@ -179,6 +179,7 @@ class MerchantProfile(db.Model):
     brand_color_secondary = db.Column(db.String(7))
     feature_flags = db.Column(db.JSON, default=dict)
     created_at = db.Column(db.DateTime, server_default=db.func.now())
+    updated_at = db.Column(db.DateTime, server_default=db.func.now(), onupdate=db.func.now())
 
 
 class PendingAction(db.Model):

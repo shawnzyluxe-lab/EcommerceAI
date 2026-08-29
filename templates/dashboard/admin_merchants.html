@@ -195,6 +195,7 @@
 const members = {{ merchants | tojson }};
 const featurePages = {{ feature_pages | tojson }};
 let editingId = null;
+let editingVersion = null;
 
 function formatMoney(cents) {
   if (cents === undefined || cents === null) return '—';
@@ -227,6 +228,7 @@ function editMember(merchantId) {
   const m = members.find(x => x.merchant_id === merchantId);
   if (!m) return;
   editingId = merchantId;
+  editingVersion = m.version || null;
   document.getElementById('edit-tier').value = m.account_tier || 'Basic Tier';
   document.getElementById('edit-sandbox').value = m.sandbox_status || 'pending';
   document.getElementById('edit-live').checked = m.live_access;
@@ -258,6 +260,7 @@ function editMember(merchantId) {
 
 function closeModal() {
   editingId = null;
+  editingVersion = null;
   document.getElementById('edit-modal').style.display = 'none';
 }
 
@@ -266,27 +269,46 @@ async function saveMember() {
   const btn = document.getElementById('save-btn');
   btn.disabled = true;
   document.getElementById('edit-status').textContent = 'Saving…';
+  const original = members.find(x => x.merchant_id === editingId) || {};
+
   const featureFlags = {};
   document.querySelectorAll('.feature-select').forEach(sel => {
     if (sel.value === 'on') featureFlags[sel.dataset.page] = true;
     else if (sel.value === 'off') featureFlags[sel.dataset.page] = false;
   });
-  const payload = {
-    account_tier: document.getElementById('edit-tier').value,
-    sandbox_status: document.getElementById('edit-sandbox').value,
-    live_access_enabled: document.getElementById('edit-live').checked,
-    feature_flags: featureFlags,
-  };
+
+  const payload = {};
+  if (editingVersion) payload.version = editingVersion;
+
+  const tier = document.getElementById('edit-tier').value;
+  if (tier !== (original.account_tier || 'Basic Tier')) payload.account_tier = tier;
+
+  const sandbox = document.getElementById('edit-sandbox').value;
+  if (sandbox !== (original.sandbox_status || 'pending')) payload.sandbox_status = sandbox;
+
+  const live = document.getElementById('edit-live').checked;
+  if (live !== original.live_access) payload.live_access_enabled = live;
+
+  const originalFlags = JSON.stringify(original.feature_flags || {});
+  if (JSON.stringify(featureFlags) !== originalFlags) payload.feature_flags = featureFlags;
+
   const currentPlan = document.getElementById('edit-current-plan').value;
-  if (currentPlan) payload.current_plan = currentPlan;
+  if (currentPlan !== (original.current_plan || '')) payload.current_plan = currentPlan;
+
   const metered = document.getElementById('edit-metered-usage').value;
-  if (metered !== '') payload.metered_usage_units = parseInt(metered, 10);
+  const origMetered = (original.metered_usage_units === undefined || original.metered_usage_units === null) ? '' : String(original.metered_usage_units);
+  if (metered !== '' && metered !== origMetered) payload.metered_usage_units = parseInt(metered, 10);
+
   const accrued = document.getElementById('edit-accrued-invoice').value;
-  if (accrued !== '') payload.accrued_invoice_value = parseFloat(accrued);
+  const origAccrued = (original.accrued_invoice_value === undefined || original.accrued_invoice_value === null) ? '' : String(original.accrued_invoice_value);
+  if (accrued !== '' && accrued !== origAccrued) payload.accrued_invoice_value = parseFloat(accrued);
+
   const cycle = document.getElementById('edit-billing-cycle').value;
-  if (cycle) payload.billing_cycle_end = cycle;
+  if (cycle !== (original.billing_cycle_end || '')) payload.billing_cycle_end = cycle;
+
   const seats = document.getElementById('edit-max-seats').value;
-  if (seats !== '') payload.max_authorized_seats = parseInt(seats, 10);
+  const origSeats = (original.max_authorized_seats === undefined || original.max_authorized_seats === null) ? '' : String(original.max_authorized_seats);
+  if (seats !== '' && seats !== origSeats) payload.max_authorized_seats = parseInt(seats, 10);
   try {
     const res = await fetch(`/api/admin/merchants/${editingId}`, {
       method: 'PATCH',

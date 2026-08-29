@@ -136,3 +136,15 @@ xrandr --output VNC-0 --mode 1600x1200
 - On the local build, click the `Intelligence` and `Operations` buttons in the sidebar to reveal `Profit Dashboard` and `Inventory`; route checks should confirm `/dashboard/profit-engine`, `/dashboard/inventory`, and `/dashboard/settings` render with active highlighting.
 - The Shopify UI is under `/dashboard/settings?tab=stores`, where `Connect Manually` exposes Shopify, store-domain, and access-token fields. Do not submit a real token during navigation tests; actual OAuth/token exchange requires authorized store credentials and can mutate connected-store state.
 
+## Adversarial live full-site audit
+
+- Run three separate Chrome profiles for admin (`shawn@shawnzyluxe.com` / `VantavMaster2025!`), engineer (`engineer@shawnzyluxe.com` / `EngVantav2025!`), and the tier-test merchant (`merchant@vantavcommerce.com` / `MerchantTest2025!`). Use the direct Chrome for Testing binary with `--incognito --user-data-dir=/tmp/...` to avoid password-save popups and cross-session cookie leaks.
+- The merchant login resets the tier-test account to `Basic Tier`/`sandbox_status=pending`/`live_access_enabled=false` and lands on `/choose-tier`. Tier selection can be driven by the UI cards or by `POST /api/merchant/select-tier` with `credentials:'same-origin'`.
+- Verify tier gating by refreshing `/dashboard` after each tier change and listing sidebar links from `document.querySelectorAll('.nav-group a')`. Direct access to a locked page should render an upgrade banner or redirect; a 500 is a blocker.
+- Feature flags on `/admin/merchants` take effect immediately, but the `Edit` modal caches the member's `sandbox_status`/`tier`/`live_access` values from when the page was loaded. Refresh `/admin/merchants` before editing, or use the API directly, to avoid overwriting choose-tier changes.
+- `PATCH /api/admin/merchants/<merchant_id>` merges `feature_flags`; to remove a flag, send `{"<page>": null}` rather than omitting the key.
+- Two-way support chat: merchant uses `toggleSupport()`/`sendSupportMessage()`; admin opens `/admin/chat?merchant_id=<merchant_id>` and calls `sendMessage()`. The merchant widget polls every 8 seconds.
+- `/api/engineer/exceptions` is engineer-only and may reveal runtime exceptions (e.g. Redis connection failures). `/api/v1/monitoring/health` and `/api/v1/monitoring/metrics` work for admin and engineer.
+- Public health endpoints (`/health`, `/api/v1/health`) must return `HEALTHY`. GDPR/webhook endpoints must reject unsigned traffic without 500s.
+- Watch for stale session invalidation: accessing an engineer-only endpoint as admin (or vice-versa) returns `SECURITY PROTOCOL VIOLATION` and can invalidate the cookie, forcing a fresh login.
+

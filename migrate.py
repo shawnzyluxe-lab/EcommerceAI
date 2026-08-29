@@ -1,7 +1,7 @@
 """One-off database migration runner for Render pre/post deploy."""
 import os
 import sys
-from sqlalchemy import create_engine, text
+from sqlalchemy import create_engine, inspect, text
 
 
 def run_migrations():
@@ -36,6 +36,7 @@ def run_migrations():
             ("sandbox_expires_at", "TIMESTAMP"),
             ("live_access_enabled", "INTEGER"),
             ("approved_at", "TIMESTAMP"),
+            ("updated_at", "TIMESTAMP DEFAULT NOW()"),
             ("brand_color", "VARCHAR(7)"),
             ("brand_color_secondary", "VARCHAR(7)"),
         ]:
@@ -553,6 +554,34 @@ def refresh_materialized_views():
                 print(f"[migrate] mv_daily_sku_profitability refreshed (non-concurrent): {e}")
             except Exception as inner:
                 print(f"[migrate] materialized view refresh failed: {inner}")
+
+
+def ensure_sqlite_schema(db):
+    """Add missing columns to existing SQLite tables so db.create_all() changes are honored."""
+    if db.engine.dialect.name != "sqlite":
+        return
+    inspector = inspect(db.engine)
+    existing_tables = set(inspector.get_table_names())
+    for table in db.metadata.sorted_tables:
+        if table.name not in existing_tables:
+            continue
+        existing_cols = {c["name"] for c in inspector.get_columns(table.name)}
+        for column in table.columns:
+            if column.name in existing_cols:
+                continue
+            try:
+                type_str = str(column.type)
+            except Exception:
+                type_str = "TEXT"
+            nullable = "NOT NULL" if column.nullable is False else ""
+            alter = f"ALTER TABLE {table.name} ADD COLUMN {column.name} {type_str} {nullable}".strip()
+            try:
+                with db.engine.connect() as conn:
+                    conn.execute(text(alter))
+                    conn.commit()
+                print(f"[migrate] SQLite added {table.name}.{column.name}")
+            except Exception as e:
+                print(f"[migrate] SQLite {table.name}.{column.name}: {e}")
 
 
 if __name__ == "__main__":

@@ -87,8 +87,7 @@
             );
 
             const historicalDots = data.historical_points.map(p => p.net_profit);
-            // Pad with nulls for future labels so the historical points stay aligned.
-            const trendPoints = data.trend_line.map(t => t.predicted_net_profit < 0 ? 0 : t.predicted_net_profit);
+            const trendPoints = data.trend_line.map(t => t.predicted_net_profit);
 
             const ctx = document.getElementById('vantaRegressionChart').getContext('2d');
             new Chart(ctx, {
@@ -139,8 +138,7 @@
                         },
                         y: {
                             grid: { color: '#262636' },
-                            ticks: { color: '#9CA3AF', font: { family: 'Courier New' } },
-                            min: 0
+                            ticks: { color: '#9CA3AF', font: { family: 'Courier New' } }
                         }
                     }
                 }
