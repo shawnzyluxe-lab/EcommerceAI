@@ -938,7 +938,7 @@ with app.app_context():
     db.session.commit()
 
     # Seed / refresh multi-tenant merchant profiles first (other tables FK to it)
-    temp_password = os.environ.get("TEMP_ACCOUNTS_PASSWORD") or (SITE_WALL_PASSWORD if SITE_WALL_PASSWORD else "IfxSVNs4iAs")
+    temp_password = os.environ.get("TEMP_ACCOUNTS_PASSWORD") or SITE_WALL_PASSWORD
     temp_accounts = [
         ("merchant_shawn_01", "Shawnzyluxe Pro", "shawn@shawnzyluxe.com", "Beta Tier"),
         ("merchant_admin_temp", "Temporary Admin", "admin@shawnzyluxe.com", "Enterprise AI Tier"),
@@ -952,7 +952,10 @@ with app.app_context():
             # Preserve tiers set by live Stripe webhooks (anything above Basic).
             if not p.account_tier or p.account_tier == "Basic Tier":
                 p.account_tier = tier
-            p.password_hash = generate_password_hash(temp_password, method="pbkdf2:sha256")
+            # Only overwrite the password hash when an explicit temp-password env var
+            # is set; otherwise preserve the existing password (e.g. a user reset).
+            if os.environ.get("TEMP_ACCOUNTS_PASSWORD"):
+                p.password_hash = generate_password_hash(temp_password, method="pbkdf2:sha256")
             p.sandbox_status = "approved"
             p.live_access_enabled = 1
         else:
@@ -961,7 +964,7 @@ with app.app_context():
                 business_name=name,
                 admin_email=email,
                 account_tier=tier,
-                password_hash=generate_password_hash(temp_password, method="pbkdf2:sha256"),
+                password_hash=generate_password_hash(temp_password, method="pbkdf2:sha256") if temp_password else "",
                 sandbox_status="approved",
                 live_access_enabled=1,
             ))
