@@ -1838,8 +1838,14 @@ def api_merchant_select_tier():
         return jsonify({'error': 'Unauthorized'}), 401
     data = request.get_json(silent=True) or {}
     tier = data.get('tier')
-    if tier not in (('Basic Tier', 'Vantav Operator', 'Vantav Growth', 'Vantav Scale')):
+    if tier not in ('Basic Tier', 'Vantav Operator', 'Vantav Growth', 'Vantav Scale'):
         return jsonify({'error': 'Invalid tier'}), 400
+    # Paid tiers can be selected directly only for whitelisted test accounts.
+    # All other merchants must complete checkout before a paid tier is enabled.
+    test_tier_emails = {e.strip().lower() for e in os.environ.get('MERCHANT_TIER_TEST_ACCOUNTS', 'merchant@vantavcommerce.com').split(',') if e.strip()} | {'merchant@vantavcommerce.com'}
+    if tier != 'Basic Tier' and merchant.get('email', '').lower() not in test_tier_emails:
+        slug = {'Vantav Operator': 'operator', 'Vantav Growth': 'growth', 'Vantav Scale': 'scale'}.get(tier)
+        return jsonify({'error': 'Paid plan requires checkout', 'redirect': '/checkout?plan=' + quote(slug or '')}), 402
     merchant_id = merchant['id']
     profile = MerchantProfile.query.get(merchant_id)
     if not profile:
