@@ -3052,7 +3052,10 @@ def _admin_merchant_row(p: MerchantProfile, now: datetime) -> dict:
         "business_name": p.business_name or p.merchant_id,
         "admin_email": p.admin_email or "—",
         "account_tier": (p.account_tier or "").replace("AI Tier", "Plan").strip(),
-        "current_plan": billing.current_plan or p.account_tier if billing else p.account_tier,
+        "current_plan": (
+            billing.current_plan if billing and billing.current_plan
+            else ("—" if billing and billing.current_plan is not None else p.account_tier)
+        ),
         "metered_usage_units": billing.metered_usage_units if billing else None,
         "accrued_invoice_value": billing.accrued_invoice_value if billing else None,
         "billing_cycle_end": billing.billing_cycle_end if billing else None,
@@ -3132,7 +3135,7 @@ def api_admin_update_merchant(merchant_id):
         db.session.add(billing)
     if 'current_plan' in data:
         raw_plan = (data['current_plan'] or '').strip()
-        billing.current_plan = _canonical_tier(raw_plan) if raw_plan else None
+        billing.current_plan = _canonical_tier(raw_plan) if raw_plan else ''
     if 'add_ons' in data and isinstance(data['add_ons'], list):
         billing.add_ons = data['add_ons']
     if 'metered_usage_units' in data:
