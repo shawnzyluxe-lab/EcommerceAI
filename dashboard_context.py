@@ -818,14 +818,17 @@ def context(active_page=None, merchant=None, merchant_id=None):
 
     # Admin-only backend navigation.
     if user_role in ("Admin", "Engineer"):
-        nav_groups.append({
+        admin_group = {
             "label": "Admin",
             "links": [
                 {"id": "admin_dashboard", "label": "Admin Home", "url": "/admin", "icon": "◈"},
                 {"id": "admin_merchants", "label": "Members", "url": "/admin/merchants", "icon": "◈"},
                 {"id": "admin_chat", "label": "Support Chat", "url": "/admin/chat", "icon": "✉"},
             ],
-        })
+        }
+        nav_groups.append(admin_group)
+        # Master admins land in a dedicated control panel, not the merchant dashboard.
+        nav_groups = [admin_group]
 
     # Action Gate: draft approvals from open alerts.
     pending_actions = []
