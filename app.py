@@ -6604,6 +6604,220 @@ def api_engineer_exceptions():
     }), 200
 
 
+def _engineer_chat_extract_platform(text):
+    """Extract a platform name and merchant_id from a chat message."""
+    # platform then merchant
+    m = re.search(
+        r'\b(shopify|tiktok|amazon|ebay|walmart|bigcommerce|woocommerce)\b.*?\b'
+        r'(merchant_[a-zA-Z0-9_]+|tenant_[a-zA-Z0-9_]+|demo_[a-zA-Z0-9_]+|shawn_[a-zA-Z0-9_]+)\b',
+        text, re.I,
+    )
+    if m:
+        return m.group(1).lower(), m.group(2)
+    # merchant then platform
+    m = re.search(
+        r'\b(merchant_[a-zA-Z0-9_]+|tenant_[a-zA-Z0-9_]+|demo_[a-zA-Z0-9_]+|shawn_[a-zA-Z0-9_]+)\b.*?\b'
+        r'(shopify|tiktok|amazon|ebay|walmart|bigcommerce|woocommerce)\b',
+        text, re.I,
+    )
+    if m:
+        return m.group(2).lower(), m.group(1)
+    return None, None
+
+
+def _engineer_chat_process(message):
+    """Parse a natural-language engineer command and execute the matching action."""
+    text = message.strip().lower()
+
+    if any(k in text for k in ('help', 'commands', 'what can you do', 'what can i')):
+        return {
+            "reply": (
+                "Available commands:\n"
+                "• health / status\n"
+                "• metrics\n"
+                "• alerts / sla\n"
+                "• exceptions / logs\n"
+                "• stores / connected stores\n"
+                "• audit / recent events\n"
+                "• summary\n"
+                "• sync <platform> for <merchant_id>\n"
+                "• reset <platform> for <merchant_id>\n"
+                "• run migrations\n"
+                "• pause sync / resume sync\n"
+                "• maintenance on / off\n"
+                "• sample pages on / off"
+            ),
+            "action": "help",
+        }
+
+    if re.search(r'\b(health|status|is .* (?:up|running))\b', text):
+        health = monitoring_module.deep_health()
+        status = health.get('status') or ('ok' if health.get('ok') else 'degraded')
+        return {"reply": f"Platform health is {status}.", "result": health, "action": "health"}
+
+    if re.search(r'\b(metrics|request count|latency|p95|p99)\b', text):
+        metrics = monitoring_module.current_metrics()
+        return {
+            "reply": (
+                f"Requests (1h): {metrics.get('request_count')}; "
+                f"p95 latency: {metrics.get('p95_latency_ms')} ms; "
+                f"error rate: {(metrics.get('error_rate') or 0) * 100:.2f}%."
+            ),
+            "result": metrics,
+            "action": "metrics",
+        }
+
+    if re.search(r'\b(alerts|sla|problems|issues|warnings)\b', text):
+        alerts = monitoring_module.check_sla()
+        return {"reply": f"Active SLA alerts: {len(alerts)}.", "result": {"alerts": alerts}, "action": "alerts"}
+
+    if re.search(r'\b(exceptions|errors|logs|failures)\b', text):
+        since = datetime.utcnow() - timedelta(hours=24)
+        rows = SystemExceptionLog.query.filter(
+            SystemExceptionLog.timestamp >= since
+        ).order_by(SystemExceptionLog.timestamp.desc()).limit(20).all()
+        exceptions = [
+            {
+                "id": r.id,
+                "module": r.module_origin,
+                "severity": r.error_severity,
+                "message": r.exception_msg,
+                "timestamp": r.timestamp.isoformat() if r.timestamp else None,
+            }
+            for r in rows
+        ]
+        return {
+            "reply": f"{len(exceptions)} exceptions in the last 24 hours.",
+            "result": {"exceptions": exceptions},
+            "action": "exceptions",
+        }
+
+    if re.search(r'\b(stores|connected stores|channels|connections)\b', text):
+        stores = _admin_stores()
+        return {"reply": f"{len(stores)} connected stores.", "result": {"stores": stores}, "action": "stores"}
+
+    if re.search(r'\b(audit|recent events|activity log|admin log)\b', text):
+        rows = AdminAuditLog.query.order_by(AdminAuditLog.created_at.desc()).limit(20).all()
+        events = [
+            {
+                "id": r.id,
+                "admin": r.admin_email,
+                "action": r.action,
+                "target": r.target_merchant_id,
+                "details": r.details,
+                "timestamp": r.created_at.isoformat() if r.created_at else None,
+            }
+            for r in rows
+        ]
+        return {
+            "reply": f"Last {len(events)} audit events.",
+            "result": {"events": events},
+            "action": "audit",
+        }
+
+    if re.search(r'\b(summary|overview|platform summary|kpi)\b', text):
+        summary = _admin_summary(datetime.utcnow())
+        return {
+            "reply": (
+                f"Members: {summary.get('total_members')}; "
+                f"paid: {summary.get('paid_accounts')}; "
+                f"active sessions (15m): {summary.get('active_sessions')}; "
+                f"connected stores: {summary.get('connected_stores')}; "
+                f"unread support messages: {summary.get('unread_support')}."
+            ),
+            "result": summary,
+            "action": "summary",
+        }
+
+    platform, merchant_id = _engineer_chat_extract_platform(text)
+
+    if re.search(r'\b(sync|resync|force\s*sync|run\s*sync)\b', text) and platform and merchant_id:
+        profile = MerchantProfile.query.get(merchant_id)
+        if not profile:
+            return {"reply": f"Merchant {merchant_id} not found.", "action": "sync"}
+        try:
+            if platform == 'shopify':
+                result = shopify_sync.sync_shopify(merchant_id)
+            elif platform == 'tiktok':
+                result = tiktok_sync.sync_tiktok(merchant_id)
+            elif platform == 'amazon':
+                result = amazon_sync.sync_amazon(merchant_id)
+            else:
+                return {"reply": f"Sync not implemented for {platform}.", "action": "sync"}
+            log_admin_audit("engineer_chat.sync", target_merchant_id=merchant_id, details={"platform": platform})
+            return {"reply": f"Synced {platform} for {merchant_id}.", "result": result, "action": "sync"}
+        except Exception as e:
+            logger.error(f"[engineer_chat sync] {e}")
+            return {"reply": f"Sync failed: {str(e)}", "action": "sync"}
+
+    if re.search(r'\b(reset|mark stale|force reconnect|re-auth)\b', text) and platform and merchant_id:
+        profile = MerchantProfile.query.get(merchant_id)
+        if not profile:
+            return {"reply": f"Merchant {merchant_id} not found.", "action": "reset"}
+        if platform not in ('shopify', 'tiktok', 'amazon', 'ebay', 'walmart', 'bigcommerce', 'woocommerce'):
+            return {"reply": f"Invalid platform: {platform}.", "action": "reset"}
+        try:
+            token = TenantOAuthToken.query.filter_by(merchant_id=merchant_id, platform_id=platform).first()
+            if token:
+                token.updated_at = datetime(2000, 1, 1)
+                db.session.add(token)
+            for link in IntegrationLink.query.filter_by(merchant_id=merchant_id, platform=platform).all():
+                link.updated_at = datetime(2000, 1, 1)
+                db.session.add(link)
+            db.session.commit()
+            log_admin_audit("engineer_chat.reset", target_merchant_id=merchant_id, details={"platform": platform})
+            return {"reply": f"Reset {platform} connection for {merchant_id}. It will be re-synced on next connect.", "action": "reset"}
+        except Exception as e:
+            db.session.rollback()
+            logger.error(f"[engineer_chat reset] {e}")
+            return {"reply": f"Reset failed: {str(e)}", "action": "reset"}
+
+    if re.search(r'\b(run\s+)?migrations?\b|\brefresh\s+(?:materialized\s+)?views?\b|\bschema\s+sync\b', text):
+        try:
+            db.create_all()
+            migrate_module.refresh_materialized_views()
+            log_admin_audit("engineer_chat.migrations")
+            return {"reply": "Schema synced and materialized views refreshed.", "action": "migrations"}
+        except Exception as e:
+            logger.error(f"[engineer_chat migrations] {e}")
+            return {"reply": f"Migrations failed: {str(e)}", "action": "migrations"}
+
+    if re.search(r'\b(pause|resume|stop|start|on|off)\b.*\b(sync|synchronization|marketplace|all syncs)\b', text) or \
+       re.search(r'\b(sync|synchronization|marketplace|all syncs)\b.*\b(pause|resume|stop|start|on|off)\b', text):
+        if any(w in text for w in ('pause', 'stop', 'off')):
+            enabled = True
+        elif any(w in text for w in ('resume', 'start', 'on')):
+            enabled = False
+        else:
+            enabled = True
+        AdminPlatformControl.set_bool('global_sync_paused', enabled)
+        log_admin_audit("engineer_chat.platform_control", details={"key": "global_sync_paused", "value": enabled})
+        return {"reply": f"Global sync {'paused' if enabled else 'resumed'}.", "action": "platform_control"}
+
+    maint_match = re.search(r'\bmaintenance(?:\s+mode)?\s+(on|off|enable|disable|true|false)\b', text)
+    if maint_match:
+        val = maint_match.group(1) in ('on', 'enable', 'true')
+        AdminPlatformControl.set_bool('maintenance_mode', val)
+        log_admin_audit("engineer_chat.platform_control", details={"key": "maintenance_mode", "value": val})
+        return {"reply": f"Maintenance mode {'enabled' if val else 'disabled'}.", "action": "platform_control"}
+
+    sample_match = re.search(r'\bsample\s+pages?\s+(on|off|show|hide|enable|disable)\b', text)
+    if sample_match:
+        val = sample_match.group(1) in ('on', 'show', 'enable', 'true')
+        AdminPlatformControl.set_bool('sample_pages_enabled', val)
+        log_admin_audit("engineer_chat.platform_control", details={"key": "sample_pages_enabled", "value": val})
+        return {"reply": f"Sample/placeholder pages {'shown' if val else 'hidden'} for merchants.", "action": "platform_control"}
+
+    return {
+        "reply": (
+            "I didn't understand. Try: health, metrics, sync shopify for merchant_xxx, "
+            "reset tiktok for merchant_xxx, run migrations, pause sync, maintenance on, "
+            "sample pages off, audit, exceptions, stores, summary, or help."
+        ),
+        "action": "unknown",
+    }
+
+
 @app.route('/api/engineer/migrations', methods=['POST'])
 @require_roles([UserRole.ENGINEER])
 def api_engineer_migrations():
@@ -6616,6 +6830,18 @@ def api_engineer_migrations():
     except Exception as e:
         logger.error(f"[engineer migrations] {e}")
         return jsonify({"status": "error", "error": str(e)}), 500
+
+
+@app.route('/api/engineer/chat', methods=['POST'])
+@require_roles([UserRole.ENGINEER])
+def api_engineer_chat():
+    """Natural-language engineer assistant: parse a command and run operational actions."""
+    data = request.get_json(silent=True) or {}
+    message = (data.get('message') or '').strip()
+    if not message:
+        return jsonify({"reply": "Please send a message.", "action": "noop"}), 400
+    result = _engineer_chat_process(message)
+    return jsonify(result), 200
 
 
 if __name__ == '__main__':

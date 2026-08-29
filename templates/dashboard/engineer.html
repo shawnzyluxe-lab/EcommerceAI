@@ -59,6 +59,17 @@
 </div>
 
 <div class="card" style="margin-bottom: 24px;">
+  <div class="card-head"><h3>Engineer Assistant</h3></div>
+  <div id="chat-history" style="height: 260px; overflow-y: auto; border: 1px solid var(--line); border-radius: 10px; padding: 12px; margin-bottom: 12px; background: var(--surface-elevated);">
+    <div class="chat-msg" style="margin-bottom: 8px;"><strong>Assistant:</strong> Type a command. Try "health", "metrics", "sync shopify for merchant_shawn_01", "pause sync", or "run migrations".</div>
+  </div>
+  <div style="display: flex; gap: 8px;">
+    <input type="text" id="chat-input" placeholder="Type a command…" style="flex: 1; padding: 10px 14px; border-radius: 8px; border: 1px solid var(--line); background: var(--surface); color: var(--ink);">
+    <button class="btn btn-primary" id="chat-send">Send</button>
+  </div>
+</div>
+
+<div class="card" style="margin-bottom: 24px;">
   <div class="card-head"><h3>System health</h3></div>
   <div id="health-loading" style="color:var(--ink-3); font-size:.85rem;">Loading…</div>
   <div id="health-list" style="display:grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px; display:none;"></div>
@@ -324,6 +335,50 @@ function escapeHtml(text) {
   div.textContent = text;
   return div.innerHTML;
 }
+
+const chatHistory = document.getElementById('chat-history');
+const chatInput = document.getElementById('chat-input');
+const chatSend = document.getElementById('chat-send');
+
+function appendChat(role, text, result) {
+  const div = document.createElement('div');
+  div.style.marginBottom = '8px';
+  div.innerHTML = `<strong>${role === 'user' ? 'You' : 'Assistant'}:</strong> ${escapeHtml(text)}`;
+  if (result && Object.keys(result).length > 0) {
+    const pre = document.createElement('pre');
+    pre.style.cssText = 'background:var(--surface);padding:8px;border-radius:6px;font-size:.75rem;white-space:pre-wrap;word-break:break-word;margin-top:6px;';
+    pre.textContent = JSON.stringify(result, null, 2);
+    div.appendChild(pre);
+  }
+  chatHistory.appendChild(div);
+  chatHistory.scrollTop = chatHistory.scrollHeight;
+}
+
+async function sendChat() {
+  const text = chatInput.value.trim();
+  if (!text) return;
+  appendChat('user', text);
+  chatInput.value = '';
+  chatSend.disabled = true;
+  try {
+    const res = await fetch('/api/engineer/chat', {
+      method: 'POST',
+      credentials: 'same-origin',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ message: text })
+    });
+    const data = await res.json();
+    appendChat('bot', data.reply || (res.ok ? 'Done.' : 'Error'), data.result);
+  } catch (e) {
+    appendChat('bot', 'Network or server error. Check console.');
+  } finally {
+    chatSend.disabled = false;
+    chatInput.focus();
+  }
+}
+
+if (chatSend) chatSend.addEventListener('click', sendChat);
+if (chatInput) chatInput.addEventListener('keydown', e => { if (e.key === 'Enter') sendChat(); });
 
 loadHealth();
 loadMetrics();
