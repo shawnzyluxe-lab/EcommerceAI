@@ -1826,6 +1826,7 @@ def choose_tier():
     ctx = context(active_page='choose_tier', merchant=merchant, merchant_id=merchant_id)
     ctx['nav_groups'] = []
     ctx['active_page'] = 'choose_tier'
+    ctx['merchant'] = dict(ctx.get('merchant', {}) or {}, tier='Choose your plan')
     ctx['tiers'] = tiers
     return render_template('choose_tier.html', **ctx)
 
