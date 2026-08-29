@@ -192,12 +192,12 @@ async function loadMetrics() {
     const list = document.getElementById('metrics-list');
     list.innerHTML = '';
     document.getElementById('request-count').textContent = data.request_count ?? '—';
-    document.getElementById('p95-latency').textContent = (data.p95_latency_ms ? data.p95_latency_ms + ' ms' : '—');
-    document.getElementById('error-rate').textContent = (data.error_rate ? (data.error_rate * 100).toFixed(2) + '%' : '—');
+    document.getElementById('p95-latency').textContent = (data.p95_latency_ms != null ? data.p95_latency_ms + ' ms' : '—');
+    document.getElementById('error-rate').textContent = (data.error_rate != null ? (data.error_rate * 100).toFixed(2) + '%' : '—');
     const metrics = {
-      'Mean latency': data.mean_latency_ms ? data.mean_latency_ms + ' ms' : '—',
+      'Mean latency': data.mean_latency_ms != null ? data.mean_latency_ms + ' ms' : '—',
       'Slow requests (1h)': data.slow_request_count ?? '—',
-      'DB latency p95': data.db_p95_ms ? data.db_p95_ms + ' ms' : '—',
+      'DB latency p95': data.db_p95_ms != null ? data.db_p95_ms + ' ms' : '—',
       'Failed logins (24h)': data.failed_logins_24h ?? '—',
     };
     Object.entries(metrics).forEach(([label, val]) => {

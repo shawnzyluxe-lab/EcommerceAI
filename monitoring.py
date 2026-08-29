@@ -106,6 +106,23 @@ def current_metrics() -> Dict[str, Any]:
     recent_error_count = len(recent_errors)
     error_rate = round((recent_error_count / recent_total) * 100, 2)
 
+    one_hour_ago = now - timedelta(hours=1)
+    recent_1h = [s for s in samples if datetime.fromisoformat(s["timestamp"]) > one_hour_ago]
+    durations_1h = [s["duration_ms"] for s in recent_1h]
+    request_count_1h = len(recent_1h)
+    mean_latency_ms = round(statistics.mean(durations_1h), 2) if durations_1h else 0.0
+    slow_request_count = sum(1 for d in durations_1h if d > SLOW_P95_MS)
+
+    twenty_four_hours_ago = now - timedelta(hours=24)
+    login_paths = ("/api/v1/auth/login", "/site-login", "/api/v1/site/login")
+    failed_logins_24h = sum(
+        1
+        for s in samples
+        if datetime.fromisoformat(s["timestamp"]) > twenty_four_hours_ago
+        and s["status_code"] in (401, 403)
+        and any(p in s["path"] for p in login_paths)
+    )
+
     status_counts: Dict[int, int] = defaultdict(int)
     for s in samples:
         status_counts[s["status_code"]] += 1
@@ -118,13 +135,21 @@ def current_metrics() -> Dict[str, Any]:
         "total_requests": total,
         "total_errors": error_count,
         "requests_per_minute": len(recent),
+        "request_count": request_count_1h,
         "error_rate_percent": error_rate,
+        "error_rate": round(error_rate / 100, 4) if error_rate is not None else 0.0,
+        "p95_latency_ms": round(_percentile(durations, 95), 2),
+        "mean_latency_ms": mean_latency_ms,
+        "slow_request_count": slow_request_count,
+        "db_p95_ms": round(_percentile(db_lat, 95), 2) if db_lat else 0.0,
+        "failed_logins_24h": failed_logins_24h,
         "latency_ms": {
             "p50": round(_percentile(durations, 50), 2),
             "p95": round(_percentile(durations, 95), 2),
             "p99": round(_percentile(durations, 99), 2),
             "min": round(min(durations), 2) if durations else 0.0,
             "max": round(max(durations), 2) if durations else 0.0,
+            "mean": mean_latency_ms,
         },
         "db_latency_ms": {
             "p50": round(_percentile(db_lat, 50), 2) if db_lat else 0.0,
