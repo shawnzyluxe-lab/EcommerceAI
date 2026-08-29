@@ -68,18 +68,18 @@ xrandr --output VNC-0 --mode 1600x1200
 - Start the local server with a test reCAPTCHA key so sandbox logins work:
   ```bash
   env -u RECAPTCHA_SITE_KEY -u RECAPTCHA_SECRET_KEY \
-      RECAPTCHA_SITE_KEY="6LeIxAcTAAAAAJcZVRqyHh71UMIEGNQ_MXjiZKhI" \
+      RECAPTCHA_SITE_KEY="<TEST_RECAPTCHA_SITE_KEY>" \
       RECAPTCHA_SECRET_KEY="" \
       SESSION_COOKIE_SECURE=false \
       .venv/bin/python app.py
   ```
-- `verify_captcha_v3` returns `1.0` when `RECAPTCHA_SECRET_KEY` is empty, so the Google test key badge can be hidden via `document.querySelector('.grecaptcha-badge').style.display='none'` if it appears in the recording.
-- Seed `merchant_ivor_demo` (or another sandbox merchant) with `ivonderhaff@gmail.com` / `Pqk57Qa9Weo` and matching orders/channels before recording so the dashboard KPIs read `$4,582` revenue and `$1,394` net profit.
+- `verify_captcha_v3` returns `1.0` when `RECAPTCHA_SECRET_KEY` is empty, so the reCAPTCHA badge can be hidden via `document.querySelector('.grecaptcha-badge').style.display='none'` if it appears in the recording.
+- Seed `merchant_ivor_demo` (or another sandbox merchant) with a test email / password and matching orders/channels before recording so the dashboard KPIs read `$4,582` revenue and `$1,394` net profit.
 - The `computer` `left_click` action may not register on page elements in this environment; use `Ctrl+L` address-bar navigation and `browser_console`/`Return` for form submission and in-page generators.
 
 ## Live deployed E2E testing (Render / https://vantavcommerce.com)
 
-- Use the test merchant `test_rules_engine@example.com` / `TestPass123!`.
+- Use the test merchant `test_rules_engine@example.com` / `<TEST_PASSWORD>`.
 - The beta login flow collects a reCAPTCHA token if `grecaptcha` is present but continues without it; the live endpoint does not enforce a captcha score.
 - `POST /api/v1/forecast/cron` returns SKU-level forecasts and, if a source-id bucket is free, creates `inventory_runout`/`reorder` alerts via `rules_engine.evaluate_products`.
 - `GET /api/analytics/channels?days=30` returns per-channel true-profit JSON; the dashboard Overview renders it in the **Channel Performance** table.
@@ -105,3 +105,34 @@ xrandr --output VNC-0 --mode 1600x1200
 - `PATCH /api/admin/merchants/<id>` canonicalizes `account_tier`; `Basic Tier` is preserved as a distinct free tier.
 - Merchant support widget functions: `toggleSupport()` and `sendSupportMessage()`. Admin chat functions: `loadThread('<merchant_id>')` and `sendMessage()`.
 - The merchant widget polls for new messages every 8 seconds. Use two Chrome windows (normal for admin, incognito for merchant) and `Alt+Tab` to test the full round trip.
+
+## Admin Control Panel (full set)
+
+- `/admin` is the admin home with cards for member count, support threads, Stripe balance, connected stores, recent audit events, and platform controls.
+- `/admin/merchants` has inline **Impersonate**, **Sync**, **Reset**, and **Edit** actions for each merchant.
+- `/admin/audit` renders the latest `AdminAuditLog` entries; `GET /api/admin/audit` supports `limit`, `offset`, `action`, and `merchant_id` filters.
+- `POST /api/admin/impersonate/<merchant_id>` and `GET/POST /api/admin/stop-impersonating` let the admin view the dashboard as a merchant; a banner on `base.html` shows the impersonation and offers an exit link.
+- `POST /api/admin/announcements` broadcasts a message to every merchant's support chat.
+- `POST /api/admin/platform-controls` toggles `global_sync_paused`, `maintenance_mode`, and `sample_pages_enabled`.
+- `POST /api/admin/<platform>/sync/<merchant_id>` triggers a store sync for `shopify`, `tiktok`, or `amazon`.
+- `POST /api/admin/stores/<merchant_id>/<platform>/reset` marks a connection stale.
+- `POST /api/admin/stores/<merchant_id>/<platform>/unlink` disconnects the store.
+- Billing override: `PATCH /api/admin/merchants/<id>` accepts `current_plan`, `add_ons`, `metered_usage_units`, `accrued_invoice_value`, `billing_cycle_end`, and `max_authorized_seats`.
+
+## Cost and reorder-point E2E
+
+- `/dashboard/inventory` lists Shopify products with editable `Unit cost` and `Reorder point` inputs and per-row `Save` buttons.
+- `Save` calls `PATCH /api/v1/products/<sku>` and updates `Product.unit_cost` / `Product.reorder_point`.
+- If `unit_cost` changes, the endpoint calls `profit_feed.recalc_profit_for_sku()`, which recomputes `cost_of_goods_sold` and `net_profit` for every `ProfitFeedOrder` containing that SKU.
+- The UI status text after save is `Saved` or `Saved (<N> orders)` where `<N>` is `profit_orders_recalculated`.
+- To verify end-to-end: pick a SKU that appears in an existing ProfitFeedOrder (look at `/dashboard/profit-engine`), change its unit cost to a known value, save, then refresh `/dashboard/profit-engine` and confirm `Product cost` and `Net profit` update to `gross - fees - shipping - (qty * unit_cost)`.
+- Reorder point can be updated independently; the row status shows `Saved` and the value persists after a page reload.
+- Restore changed values to keep the test merchant data clean.
+- Native `left_click` on the small inline `Save` button is unreliable in this managed Chrome environment; use `Ctrl+L` navigation plus `browser_console` to set input values and call the row's `saveProductRow(button)` function when clicks do not register.
+
+## PR #6 grouped navigation and Shopify Stores UI
+
+- Revision `5899e7d` is testable locally with the existing Growth/Admin account `shawn@shawnzyluxe.com`; the live deployment may lag and show the old headings-only sidebar.
+- On the local build, click the `Intelligence` and `Operations` buttons in the sidebar to reveal `Profit Dashboard` and `Inventory`; route checks should confirm `/dashboard/profit-engine`, `/dashboard/inventory`, and `/dashboard/settings` render with active highlighting.
+- The Shopify UI is under `/dashboard/settings?tab=stores`, where `Connect Manually` exposes Shopify, store-domain, and access-token fields. Do not submit a real token during navigation tests; actual OAuth/token exchange requires authorized store credentials and can mutate connected-store state.
+
