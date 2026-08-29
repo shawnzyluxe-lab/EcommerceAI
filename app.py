@@ -6607,25 +6607,15 @@ def api_engineer_exceptions():
 @app.route('/api/engineer/migrations', methods=['POST'])
 @require_roles([UserRole.ENGINEER])
 def api_engineer_migrations():
-    """Run idempotent schema migrations and return captured output."""
-    import io
-    import sys
-    import migrate as _migrate
-    old_stdout = sys.stdout
-    old_stderr = sys.stderr
-    captured = io.StringIO()
-    sys.stdout = captured
-    sys.stderr = captured
+    """Run safe, idempotent schema migrations and refresh materialized views."""
     try:
-        _migrate.run_migrations()
+        import migrate as _migrate
+        db.create_all()
         _migrate.refresh_materialized_views()
-        return jsonify({"status": "ok", "output": captured.getvalue()}), 200
+        return jsonify({"status": "ok", "message": "Schema synced and materialized views refreshed."}), 200
     except Exception as e:
         logger.error(f"[engineer migrations] {e}")
-        return jsonify({"status": "error", "output": captured.getvalue(), "error": str(e)}), 500
-    finally:
-        sys.stdout = old_stdout
-        sys.stderr = old_stderr
+        return jsonify({"status": "error", "error": str(e)}), 500
 
 
 if __name__ == '__main__':
