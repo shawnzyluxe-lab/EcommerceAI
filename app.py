@@ -196,7 +196,7 @@ manager = ConnectionManager()
 # ============================================================
 
 SITE_WALL_PASSWORD = os.environ.get("SITE_WALL_PASSWORD", "")
-MASTER_ADMIN_EMAIL = os.environ.get("MASTER_ADMIN_EMAIL", "shawn@shawnzyluxe.com,admin@shawnzyluxe.com")
+MASTER_ADMIN_EMAIL = os.environ.get("MASTER_ADMIN_EMAIL", "shawn@shawnzyluxe.com")
 MASTER_ADMIN_EMAILS = [e.strip().lower() for e in MASTER_ADMIN_EMAIL.split(",") if e.strip()]
 ENGINEER_EMAIL = os.environ.get("ENGINEER_EMAIL", "engineer@shawnzyluxe.com")
 ENGINEER_EMAILS = [e.strip().lower() for e in ENGINEER_EMAIL.split(",") if e.strip()]
@@ -941,7 +941,6 @@ with app.app_context():
     temp_password = os.environ.get("TEMP_ACCOUNTS_PASSWORD") or SITE_WALL_PASSWORD
     temp_accounts = [
         ("merchant_shawn_01", "Shawnzyluxe Pro", "shawn@shawnzyluxe.com", "Beta Tier"),
-        ("merchant_admin_temp", "Temporary Admin", "admin@shawnzyluxe.com", "Enterprise AI Tier"),
         ("merchant_engineer_temp", "Temporary Engineer", "engineer@shawnzyluxe.com", "Pro Tier"),
     ]
     for mid, name, email, tier in temp_accounts:
@@ -968,8 +967,6 @@ with app.app_context():
                 sandbox_status="approved",
                 live_access_enabled=1,
             ))
-    if not MerchantProfile.query.get("merchant_guest_02"):
-        db.session.add(MerchantProfile(merchant_id="merchant_guest_02", business_name="Alpha Storefronts", admin_email="guest@alpha.com", account_tier="Pro Tier", password_hash="", sandbox_status="approved", live_access_enabled=1))
     db.session.commit()
 
     # Seed FK-dependent merchant data now that profiles exist
@@ -979,14 +976,6 @@ with app.app_context():
             total_unified_balance=20560.00 if SEED_DEMO_DATA else 0.0,
             true_net_profit=1394.00 if SEED_DEMO_DATA else 0.0,
             gross_revenue=4582.00 if SEED_DEMO_DATA else 0.0,
-            ai_briefing="System initialized." if SEED_DEMO_DATA else "No sales data yet.",
-        ))
-    if not MerchantMetric.query.filter_by(merchant_id="merchant_guest_02").first():
-        db.session.add(MerchantMetric(
-            merchant_id="merchant_guest_02",
-            total_unified_balance=1240.00 if SEED_DEMO_DATA else 0.0,
-            true_net_profit=410.00 if SEED_DEMO_DATA else 0.0,
-            gross_revenue=890.00 if SEED_DEMO_DATA else 0.0,
             ai_briefing="System initialized." if SEED_DEMO_DATA else "No sales data yet.",
         ))
     if not MerchantChannel.query.filter_by(merchant_id="merchant_shawn_01").first():
@@ -1031,7 +1020,6 @@ with app.app_context():
 
     if SEED_DEMO_DATA:
         profit_feed.seed_demo_data("merchant_shawn_01")
-        profit_feed.seed_demo_data("merchant_guest_02")
 
     # Seed / refresh the Alert Matrix from latest data.
     if SEED_DEMO_DATA:
