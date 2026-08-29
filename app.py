@@ -6491,7 +6491,7 @@ def api_admin_reset_password():
     password = (data.get("password") or "").strip()
     if not email:
         return jsonify({"detail": "Email is required"}), 400
-    profile = MerchantProfile.query.filter_by(admin_email=email).first()
+    profile = _profile_for_email(email)
     if not profile:
         return jsonify({"detail": "Merchant not found"}), 404
     if not password:
