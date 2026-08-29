@@ -1,13 +1,16 @@
 {% extends 'dashboard/base.html' %}
-{% block title %}Admin — Members{% endblock %}
+{% block title %}{{ dashboard_title | default('Admin') }} — Members{% endblock %}
 {% block content %}
+
+{% set is_admin = (merchant.role == 'Admin') %}
 
 <section class="page-header">
   <h1>Members</h1>
-  <p>Manage all merchants, tiers, feature access, support chat, and platform balance.</p>
+  <p>{% if is_admin %}Manage all merchants, tiers, feature access, support chat, and platform balance.{% else %}View all merchants, sync status, support threads, and channel health.{% endif %}</p>
 </section>
 
 <div class="kpi-grid" style="margin-bottom: 24px;">
+  {% if is_admin %}
   <div class="card kpi-card">
     <div class="kpi-label">Stripe available</div>
     <div class="kpi-value" id="stripe-available">—</div>
@@ -17,6 +20,7 @@
     <div class="kpi-label">Stripe pending</div>
     <div class="kpi-value" id="stripe-pending">—</div>
   </div>
+  {% endif %}
   <div class="card kpi-card">
     <div class="kpi-label">Total members</div>
     <div class="kpi-value">{{ total_members }}</div>
@@ -95,7 +99,7 @@
           </td>
           <td>
             <div style="display:flex; gap:6px; flex-wrap:wrap;">
-              <button class="btn btn-primary" style="font-size:.7rem; padding:4px 8px;" onclick="editMember('{{ m.merchant_id }}')">Edit</button>
+              {% if is_admin %}<button class="btn btn-primary" style="font-size:.7rem; padding:4px 8px;" onclick="editMember('{{ m.merchant_id }}')">Edit</button>{% endif %}
               <a class="btn" style="font-size:.7rem; padding:4px 8px; text-decoration:none;" href="/admin/chat?merchant_id={{ m.merchant_id }}">Chat {% if m.unread %}<span class="tag tag-red" style="margin-left:4px;">{{ m.unread }}</span>{% endif %}</a>
               <a class="btn" style="font-size:.7rem; padding:4px 8px; text-decoration:none;" href="/api/admin/impersonate/{{ m.merchant_id }}" target="_blank">Impersonate</a>
               <button class="btn" style="font-size:.7rem; padding:4px 8px;" onclick="syncChannel('{{ m.merchant_id }}', 'shopify')">Sync S</button>
@@ -199,6 +203,7 @@ function formatMoney(cents) {
 
 const stripeBalance = {{ stripe_balance | tojson }};
 (function renderStripe() {
+  if (!document.getElementById('stripe-available')) return;
   const available = (stripeBalance.available || []).reduce((s, b) => s + (b.amount || 0), 0);
   const pending = (stripeBalance.pending || []).reduce((s, b) => s + (b.amount || 0), 0);
   const currency = (stripeBalance.currency || 'usd').toUpperCase();

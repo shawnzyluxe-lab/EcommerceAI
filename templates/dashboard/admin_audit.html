@@ -1,10 +1,10 @@
 {% extends 'dashboard/base.html' %}
-{% block title %}Admin — Audit Log{% endblock %}
+{% block title %}{{ dashboard_title | default('Admin') }} — Audit Log{% endblock %}
 {% block content %}
 
 <section class="page-header">
   <h1>Audit Log</h1>
-  <p>Immutable record of admin actions across the platform.</p>
+  <p>Immutable record of platform actions across merchants and system events.</p>
 </section>
 
 <div class="card">
