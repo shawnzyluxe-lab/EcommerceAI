@@ -821,6 +821,7 @@ def context(active_page=None, merchant=None, merchant_id=None):
         nav_groups.append({
             "label": "Admin",
             "links": [
+                {"id": "admin_dashboard", "label": "Admin Home", "url": "/admin", "icon": "◈"},
                 {"id": "admin_merchants", "label": "Members", "url": "/admin/merchants", "icon": "◈"},
                 {"id": "admin_chat", "label": "Support Chat", "url": "/admin/chat", "icon": "✉"},
             ],

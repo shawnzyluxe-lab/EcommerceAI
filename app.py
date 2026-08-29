@@ -1552,6 +1552,8 @@ def dashboard():
     merchant = get_merchant_context()
     if not merchant:
         return redirect(url_for('login'))
+    if merchant.get('role') in (UserRole.ADMIN.value, UserRole.ENGINEER.value):
+        return redirect(url_for('admin_dashboard'))
     merchant_id = merchant["id"]
 
     # If the merchant just returned from Stripe, verify the checkout session
@@ -2943,6 +2945,112 @@ def api_admin_chat_send(merchant_id):
     db.session.add(msg)
     db.session.commit()
     return jsonify({"id": msg.id, "sender": "admin", "created_at": msg.created_at.isoformat()}), 201
+
+
+@app.route('/admin')
+@require_roles([UserRole.ADMIN])
+def admin_dashboard():
+    """Admin control panel landing page."""
+    ctx = _dashboard_context('admin_dashboard')
+    now = datetime.utcnow()
+    ctx["summary"] = _admin_summary(now)
+    ctx["stores"] = _admin_stores()
+    ctx["recent_events"] = _admin_recent_events(now)
+    return render_template('dashboard/admin.html', **ctx)
+
+
+def _admin_summary(now):
+    """Compute platform-wide summary numbers for the admin dashboard."""
+    total_members = MerchantProfile.query.count()
+    active_sessions = ActiveSession.query.filter(
+        ActiveSession.last_seen >= now - timedelta(minutes=15)
+    ).count()
+    paid_accounts = MerchantProfile.query.filter_by(live_access_enabled=1).count()
+    unread_support = SupportMessage.query.filter_by(sender='merchant', read_at=None).count()
+    pending_sandbox = MerchantProfile.query.filter(
+        MerchantProfile.sandbox_status.in_(['pending', 'sandbox'])
+    ).count()
+    stripe_balance = billing_module.get_stripe_balance()
+    connected_stores = MerchantChannel.query.count()
+    return {
+        "total_members": total_members,
+        "active_sessions": active_sessions,
+        "paid_accounts": paid_accounts,
+        "unread_support": unread_support,
+        "pending_sandbox": pending_sandbox,
+        "stripe_balance": stripe_balance,
+        "connected_stores": connected_stores,
+    }
+
+
+def _admin_stores():
+    """List every connected store across all merchant accounts."""
+    stores = []
+    for p in MerchantProfile.query.all():
+        try:
+            channels = channels_module.list_channels(p.merchant_id)
+        except Exception:
+            continue
+        for ch in channels:
+            if ch.get('state') != 'connected':
+                continue
+            stores.append({
+                "merchant_id": p.merchant_id,
+                "business_name": p.business_name or p.merchant_id,
+                "admin_email": p.admin_email,
+                "platform": ch.get('platform'),
+                "name": ch.get('name'),
+                "orders": ch.get('orders', 0),
+                "revenue": ch.get('revenue', 0.0),
+                "sync": ch.get('sync'),
+            })
+    return stores
+
+
+def _admin_recent_events(now):
+    """Return recent platform activity for the admin dashboard."""
+    events = []
+    for s in ActiveSession.query.order_by(ActiveSession.created_at.desc()).limit(10).all():
+        events.append({
+            "time": s.created_at.isoformat() if s.created_at else None,
+            "message": f"Session created for {s.merchant_id} ({s.role})",
+        })
+    for m in SupportMessage.query.order_by(SupportMessage.created_at.desc()).limit(10).all():
+        events.append({
+            "time": m.created_at.isoformat() if m.created_at else None,
+            "message": f"Support message from {m.sender} ({m.merchant_id})",
+        })
+    events.sort(key=lambda x: x.get('time') or '', reverse=True)
+    return events[:20]
+
+
+@app.route('/api/admin/summary', methods=['GET'])
+@require_roles([UserRole.ADMIN])
+def api_admin_summary():
+    """Return platform summary for the admin dashboard."""
+    now = datetime.utcnow()
+    return jsonify(_admin_summary(now)), 200
+
+
+@app.route('/api/admin/stores', methods=['GET'])
+@require_roles([UserRole.ADMIN])
+def api_admin_stores():
+    """Return all connected stores across merchants."""
+    return jsonify({"stores": _admin_stores()}), 200
+
+
+@app.route('/api/admin/stores/<merchant_id>/<platform>/unlink', methods=['POST'])
+@require_roles([UserRole.ADMIN])
+def api_admin_unlink_store(merchant_id, platform):
+    """Admin-only: disconnect a store from any merchant account."""
+    if platform not in ('shopify', 'tiktok', 'amazon', 'ebay', 'walmart', 'bigcommerce', 'woocommerce'):
+        return jsonify({"error": "Invalid platform"}), 400
+    try:
+        channels_module.disconnect(merchant_id, platform)
+        return jsonify({"status": "disconnected", "merchant_id": merchant_id, "platform": platform}), 200
+    except Exception as e:
+        logger.error(f"[Admin Unlink] {e}")
+        return jsonify({"error": str(e)}), 400
 
 
 @app.route('/api/v1/chat/messages', methods=['GET'])
