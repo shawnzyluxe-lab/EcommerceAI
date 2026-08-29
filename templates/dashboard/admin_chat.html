@@ -1,0 +1,150 @@
+{% extends 'dashboard/base.html' %}
+{% block title %}Admin — Support Chat{% endblock %}
+{% block content %}
+
+<section class="page-header">
+  <h1>Support Chat</h1>
+  <p>Two-way chat with every merchant. Unread replies are highlighted.</p>
+</section>
+
+<div style="display:grid; grid-template-columns:300px 1fr; gap:20px; height:calc(100vh - 240px); min-height:500px;">
+  <div class="card" style="display:flex; flex-direction:column; overflow:hidden;">
+    <div class="card-head"><h3>Threads</h3></div>
+    <div id="thread-list" style="overflow:auto; flex:1; padding:12px; display:flex; flex-direction:column; gap:8px;">
+      <div style="color:var(--ink-3); font-size:.85rem;">Loading…</div>
+    </div>
+  </div>
+
+  <div class="card" style="display:flex; flex-direction:column; overflow:hidden;">
+    <div class="card-head" id="chat-header"><h3>Select a thread</h3></div>
+    <div id="chat-messages" style="flex:1; overflow:auto; padding:16px; display:flex; flex-direction:column; gap:12px;">
+      <div style="color:var(--ink-3); font-size:.9rem; text-align:center; margin-top:40px;">Choose a merchant from the sidebar to start chatting.</div>
+    </div>
+    <div id="chat-input" style="padding:16px; border-top:1px solid var(--line); display:none; gap:10px;">
+      <input type="text" id="message-text" placeholder="Type your message…" style="flex:1; padding:10px; border:1px solid var(--line); border-radius:10px; background:var(--surface);">
+      <button class="btn btn-primary" onclick="sendMessage()">Send</button>
+    </div>
+  </div>
+</div>
+
+<script>
+let currentMerchant = new URLSearchParams(window.location.search).get('merchant_id') || null;
+
+function formatTime(iso) {
+  if (!iso) return '';
+  const d = new Date(iso);
+  return d.toLocaleString();
+}
+
+function renderThreadList(threads) {
+  const container = document.getElementById('thread-list');
+  container.innerHTML = '';
+  if (!threads.length) {
+    container.innerHTML = '<div style="color:var(--ink-3); font-size:.85rem;">No threads yet.</div>';
+    return;
+  }
+  threads.forEach(t => {
+    const el = document.createElement('div');
+    el.className = 'thread-row';
+    el.style.cssText = `padding:10px; border-radius:10px; cursor:pointer; border:1px solid var(--line); ${t.merchant_id === currentMerchant ? 'background:var(--line-2);' : 'background:var(--surface);'}`;
+    el.innerHTML = `
+      <div style="display:flex; justify-content:space-between; align-items:center;">
+        <div style="font-weight:600; font-size:.85rem;">${t.business_name}</div>
+        ${t.unread ? `<span class="tag tag-red">${t.unread}</span>` : ''}
+      </div>
+      <div style="font-size:.72rem; color:var(--ink-3);">${t.admin_email || ''}</div>
+      <div style="font-size:.72rem; color:var(--ink-3);">${t.last_message_at ? formatTime(t.last_message_at) : 'No messages'}</div>
+    `;
+    el.onclick = () => loadThread(t.merchant_id);
+    container.appendChild(el);
+  });
+}
+
+function renderMessages(data) {
+  document.getElementById('chat-header').innerHTML = `<h3>${data.business_name}</h3>`;
+  const container = document.getElementById('chat-messages');
+  container.innerHTML = '';
+  if (!data.messages.length) {
+    container.innerHTML = '<div style="color:var(--ink-3); text-align:center; margin-top:40px;">No messages yet. Say hello.</div>';
+  } else {
+    data.messages.forEach(m => {
+      const isAdmin = m.sender === 'admin';
+      const row = document.createElement('div');
+      row.style.cssText = `display:flex; justify-content:${isAdmin ? 'flex-end' : 'flex-start'};`;
+      const bubble = document.createElement('div');
+      bubble.style.cssText = `max-width:70%; padding:10px 14px; border-radius:14px; font-size:.9rem; background:${isAdmin ? 'var(--accent)' : 'var(--line-2)'}; color:${isAdmin ? '#fff' : 'var(--ink)'};`;
+      bubble.innerHTML = `<div>${escapeHtml(m.message)}</div><div style="font-size:.68rem; opacity:.7; margin-top:4px; text-align:right;">${formatTime(m.created_at)}</div>`;
+      row.appendChild(bubble);
+      container.appendChild(row);
+    });
+    container.scrollTop = container.scrollHeight;
+  }
+  document.getElementById('chat-input').style.display = 'flex';
+}
+
+function escapeHtml(text) {
+  const div = document.createElement('div');
+  div.textContent = text;
+  return div.innerHTML;
+}
+
+async function loadThreads() {
+  try {
+    const res = await fetch('/api/admin/chat/threads', { credentials: 'same-origin' });
+    const data = await res.json();
+    renderThreadList(data.threads || []);
+    if (currentMerchant) {
+      const match = (data.threads || []).find(t => t.merchant_id === currentMerchant);
+      if (match) loadThread(currentMerchant, false);
+    }
+  } catch (e) {
+    console.error(e);
+  }
+}
+
+async function loadThread(merchantId, refreshThreads = true) {
+  currentMerchant = merchantId;
+  const url = new URL(window.location.href);
+  url.searchParams.set('merchant_id', merchantId);
+  window.history.replaceState({}, '', url);
+  if (refreshThreads) await loadThreads();
+  try {
+    const res = await fetch(`/api/admin/chat/${merchantId}`, { credentials: 'same-origin' });
+    const data = await res.json();
+    renderMessages(data);
+  } catch (e) {
+    console.error(e);
+  }
+}
+
+async function sendMessage() {
+  if (!currentMerchant) return;
+  const input = document.getElementById('message-text');
+  const text = input.value.trim();
+  if (!text) return;
+  input.value = '';
+  try {
+    await fetch(`/api/admin/chat/${currentMerchant}`, {
+      method: 'POST',
+      credentials: 'same-origin',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({message: text}),
+    });
+    await loadThread(currentMerchant);
+  } catch (e) {
+    console.error(e);
+  }
+}
+
+document.getElementById('message-text').addEventListener('keypress', e => {
+  if (e.key === 'Enter') sendMessage();
+});
+
+setInterval(() => {
+  if (document.getElementById('thread-list')) loadThreads();
+}, 8000);
+
+loadThreads();
+</script>
+
+{% endblock %}

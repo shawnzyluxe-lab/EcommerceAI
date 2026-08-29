@@ -26,7 +26,7 @@ from datetime import datetime, timedelta
 from enum import Enum
 from functools import wraps
 from typing import Optional
-from sqlalchemy import or_
+from sqlalchemy import or_, func
 
 logging.basicConfig(
     level=logging.INFO,
@@ -58,7 +58,7 @@ if SENTRY_DSN:
     except Exception as e:
         print(f"[SENTRY] Init failed: {e}")
 
-from models import db, Tenant, ConnectedChannel, ActiveSession, BusinessMetric, CommerceChannel, MerchantChannel, SupportMetric, MarketingStudio, PredictiveLogistics, OutboundTransmission, SaaSBilling, LocalProductCatalog, MerchantProfile, TenantOAuthToken, MerchantMetric, SystemExceptionLog, ProcessedWebhookEvent, AdSpendAnalytic, GeneratedPurchaseOrder, AIAgent, AgentMessage, MerchantDecisionLog, MagicLoginToken, TrendingProduct, ProductFinancialLedger, MerchantSetting, ProfitFeedOrder, AdSpendFeed, Alert, BetaWaitlistApplication, PendingAction, StartupPackProject, BusinessMemory, WorkspaceSeat, IntegrationLink, SecureChannelCredential, Product, UnifiedOrder, OrderItem
+from models import db, Tenant, ConnectedChannel, ActiveSession, BusinessMetric, CommerceChannel, MerchantChannel, SupportMetric, MarketingStudio, PredictiveLogistics, OutboundTransmission, SaaSBilling, LocalProductCatalog, MerchantProfile, TenantOAuthToken, MerchantMetric, SystemExceptionLog, ProcessedWebhookEvent, AdSpendAnalytic, GeneratedPurchaseOrder, AIAgent, AgentMessage, SupportMessage, MerchantDecisionLog, MagicLoginToken, TrendingProduct, ProductFinancialLedger, MerchantSetting, ProfitFeedOrder, AdSpendFeed, Alert, BetaWaitlistApplication, PendingAction, StartupPackProject, BusinessMemory, WorkspaceSeat, IntegrationLink, SecureChannelCredential, Product, UnifiedOrder, OrderItem
 import profit_feed
 import cache_barrier
 import billing as billing_module
@@ -101,6 +101,7 @@ from dashboard_context import (
     STRIPE,
     CATALOG,
     predictive_context,
+    ALL_DASHBOARD_PAGE_IDS,
 )
 from trend_worker import run_trend_scrape, TrendingProductsScraper
 
@@ -269,7 +270,7 @@ COMMERCIAL_READY_DASHBOARD_PAGES = {
     "overview", "alerts", "profit_engine", "inventory", "billing", "settings", "startup_pack", "onboarding_loading",
 }
 
-from tier_manager import TierManager, TIER_LIMITS, PLAN_TO_TIER
+from tier_manager import TierManager, TIER_LIMITS, PLAN_TO_TIER, DEFAULT_MERCHANT_PAGE_IDS
 
 # Backwards-compatible friendly name mapping used by auth signup/provision forms.
 TIER_NAME_MAP = {
@@ -633,6 +634,7 @@ def get_merchant_context():
         "sandbox_expired": sandbox_expired,
         "brand_color": profile.brand_color or "#8b5cf6",
         "brand_color_secondary": profile.brand_color_secondary or "#a78bfa",
+        "feature_flags": profile.feature_flags or {},
         "theme": theme_setting.setting_value if theme_setting else "prometheus-dark",
         "role": s.role,
     }
@@ -1626,19 +1628,21 @@ def dashboard_page(page):
     }
     if active_page not in valid_pages:
         return redirect(url_for('dashboard'))
-    # Commercial gating: merchants can only reach the pages that are live and
-    # backed by real data. Admins and engineers can still reach any page.
+    ctx = _dashboard_context(active_page)
+    # Commercial gating: merchants can only reach the pages their tier allows or
+    # that the admin has explicitly enabled via feature flags.
+    # Admins and engineers can still reach any page.
     s = get_current_user()
     if not s or s.role not in (UserRole.ADMIN.value, UserRole.ENGINEER.value):
-        if active_page not in COMMERCIAL_READY_DASHBOARD_PAGES:
+        flags = merchant.get("feature_flags") or {}
+        flag = flags.get(active_page)
+        if flag is True:
+            pass  # admin explicitly enabled this page
+        elif flag is False:
             return redirect(url_for('dashboard'))
-        # Brand Build is locked behind the Concierge Bundle add-on.
-        if active_page == 'startup_pack' and not merchant.get('concierge_bundle'):
-            return redirect(url_for('dashboard_page', page='settings', tab='billing'))
-    ctx = _dashboard_context(active_page)
-    # Tier-based page gating (admins and engineers bypass tier limits).
-    if s.role not in (UserRole.ADMIN.value, UserRole.ENGINEER.value):
-        if not TierManager.can_access_page(merchant["tier"], active_page):
+        elif active_page not in DEFAULT_MERCHANT_PAGE_IDS:
+            return redirect(url_for('dashboard'))
+        elif not TierManager.can_access_page(merchant["tier"], active_page):
             target = TierManager.page_upgrade_target(active_page)
             lock_content = (
                 f'<div style="text-align:center; padding: 40px 20px;">'
@@ -1649,6 +1653,9 @@ def dashboard_page(page):
                                    page_title='Upgrade required',
                                    page_description=f'Unlock this module with {target}.',
                                    page_content=lock_content)
+        # Brand Build is locked behind the Concierge Bundle add-on.
+        if active_page == 'startup_pack' and not merchant.get('concierge_bundle'):
+            return redirect(url_for('dashboard_page', page='settings', tab='billing'))
     template = 'dashboard/{}.html'.format(page.replace('-', '_'))
     try:
         return render_template(template, **ctx)
@@ -2746,38 +2753,61 @@ def api_admin_seed_regression_demo(merchant_id):
         return jsonify({"detail": str(e)}), 500
 
 
+def _admin_merchant_row(p: MerchantProfile, now: datetime) -> dict:
+    """Build a single merchant summary for the admin members view."""
+    billing = SaaSBilling.query.get(p.merchant_id)
+    links = IntegrationLink.query.filter_by(merchant_id=p.merchant_id).all()
+    tokens = TenantOAuthToken.query.filter_by(merchant_id=p.merchant_id).order_by(TenantOAuthToken.updated_at.desc()).all()
+    last_sync = max(
+        [t.updated_at for t in tokens if t.updated_at] +
+        [l.updated_at for l in links if l.updated_at],
+        default=None,
+    )
+    sync_status = "No channels"
+    if last_sync:
+        age = (now - last_sync).total_seconds()
+        sync_status = "OK" if age <= monitoring_module.MAX_CHANNEL_SYNC_AGE_SECONDS else "Stale"
+    pending_actions = PendingAction.query.filter_by(merchant_id=p.merchant_id, status='pending').count()
+    unread = SupportMessage.query.filter_by(
+        merchant_id=p.merchant_id, sender='merchant', read_at=None
+    ).count()
+    seat_count = WorkspaceSeat.query.filter_by(merchant_id=p.merchant_id).count()
+    last_active = db.session.query(func.max(ActiveSession.last_seen)).filter_by(merchant_id=p.merchant_id).scalar()
+    return {
+        "merchant_id": p.merchant_id,
+        "business_name": p.business_name or p.merchant_id,
+        "admin_email": p.admin_email or "—",
+        "account_tier": (p.account_tier or "").replace("AI Tier", "Plan").strip(),
+        "current_plan": billing.current_plan if billing else p.account_tier,
+        "sandbox_status": p.sandbox_status or "pending",
+        "live_access": bool(p.live_access_enabled),
+        "feature_flags": p.feature_flags or {},
+        "concierge": bool(billing and isinstance(billing.add_ons, list) and "concierge_bundle" in billing.add_ons),
+        "channels": [l.platform for l in links if l.platform],
+        "channel_count": len(links),
+        "seats": seat_count,
+        "last_sync": last_sync.isoformat() if last_sync else None,
+        "last_active": last_active.isoformat() if last_active else None,
+        "sync_status": sync_status,
+        "pending_actions": pending_actions,
+        "unread": unread,
+    }
+
+
 @app.route('/admin/merchants')
 @require_roles([UserRole.ADMIN])
 def admin_merchants():
-    """Backend admin view of all merchants, tiers, sync status, and pending actions."""
+    """Backend admin view of all merchants, tiers, sync status, pending actions, and live chat."""
     ctx = _dashboard_context('admin_merchants')
-    merchants = []
     now = datetime.utcnow()
-    for p in MerchantProfile.query.order_by(MerchantProfile.created_at.desc()).all():
-        billing = SaaSBilling.query.get(p.merchant_id)
-        channels = MerchantChannel.query.filter_by(merchant_id=p.merchant_id).all()
-        tokens = TenantOAuthToken.query.filter_by(merchant_id=p.merchant_id).order_by(TenantOAuthToken.updated_at.desc()).all()
-        last_sync = max([t.updated_at for t in tokens if t.updated_at], default=None)
-        sync_status = "No channels"
-        if last_sync:
-            age = (now - last_sync).total_seconds()
-            sync_status = "OK" if age <= monitoring_module.MAX_CHANNEL_SYNC_AGE_SECONDS else "Stale"
-        pending_actions = PendingAction.query.filter_by(merchant_id=p.merchant_id, status='pending').count()
-        merchants.append({
-            "merchant_id": p.merchant_id,
-            "business_name": p.business_name or p.merchant_id,
-            "admin_email": p.admin_email or "—",
-            "account_tier": (p.account_tier or "").replace("AI Tier", "Plan").strip(),
-            "current_plan": billing.current_plan if billing else p.account_tier,
-            "sandbox_status": p.sandbox_status or "pending",
-            "live_access": bool(p.live_access_enabled),
-            "concierge": bool(billing and isinstance(billing.add_ons, list) and "concierge_bundle" in billing.add_ons),
-            "channels": len(channels),
-            "last_sync": last_sync.isoformat() if last_sync else None,
-            "sync_status": sync_status,
-            "pending_actions": pending_actions,
-        })
-    ctx["merchants"] = merchants
+    ctx["merchants"] = [_admin_merchant_row(p, now) for p in MerchantProfile.query.order_by(MerchantProfile.created_at.desc()).all()]
+    ctx["stripe_balance"] = billing_module.get_stripe_balance()
+    ctx["total_members"] = MerchantProfile.query.count()
+    ctx["active_sessions"] = ActiveSession.query.filter(
+        ActiveSession.last_seen >= now - timedelta(minutes=15)
+    ).count()
+    ctx["paid_accounts"] = MerchantProfile.query.filter_by(live_access_enabled=1).count()
+    ctx["feature_pages"] = ALL_DASHBOARD_PAGE_IDS
     return render_template('dashboard/admin_merchants.html', **ctx)
 
 
@@ -2786,32 +2816,166 @@ def admin_merchants():
 def api_admin_merchants():
     """JSON list of merchants for admin monitoring."""
     now = datetime.utcnow()
-    out = []
-    for p in MerchantProfile.query.order_by(MerchantProfile.created_at.desc()).all():
-        billing = SaaSBilling.query.get(p.merchant_id)
-        channels = MerchantChannel.query.filter_by(merchant_id=p.merchant_id).all()
-        tokens = TenantOAuthToken.query.filter_by(merchant_id=p.merchant_id).order_by(TenantOAuthToken.updated_at.desc()).all()
-        last_sync = max([t.updated_at for t in tokens if t.updated_at], default=None)
-        sync_status = "No channels"
-        if last_sync:
-            age = (now - last_sync).total_seconds()
-            sync_status = "OK" if age <= monitoring_module.MAX_CHANNEL_SYNC_AGE_SECONDS else "Stale"
-        pending_actions = PendingAction.query.filter_by(merchant_id=p.merchant_id, status='pending').count()
-        out.append({
-            "merchant_id": p.merchant_id,
-            "business_name": p.business_name or p.merchant_id,
-            "admin_email": p.admin_email or "—",
-            "account_tier": (p.account_tier or "").replace("AI Tier", "Plan").strip(),
-            "current_plan": billing.current_plan if billing else p.account_tier,
-            "sandbox_status": p.sandbox_status or "pending",
-            "live_access": bool(p.live_access_enabled),
-            "concierge": bool(billing and isinstance(billing.add_ons, list) and "concierge_bundle" in billing.add_ons),
-            "channels": len(channels),
-            "last_sync": last_sync.isoformat() if last_sync else None,
-            "sync_status": sync_status,
-            "pending_actions": pending_actions,
-        })
+    out = [_admin_merchant_row(p, now) for p in MerchantProfile.query.order_by(MerchantProfile.created_at.desc()).all()]
     return jsonify({"merchants": out, "count": len(out)}), 200
+
+
+@app.route('/api/admin/merchants/<merchant_id>', methods=['PATCH'])
+@require_roles([UserRole.ADMIN])
+def api_admin_update_merchant(merchant_id):
+    """Admin update of merchant tier, sandbox status, live access, and feature flags."""
+    p = MerchantProfile.query.get_or_404(merchant_id)
+    data = request.get_json(silent=True) or {}
+    if 'account_tier' in data:
+        p.account_tier = _canonical_tier(data['account_tier'])
+    if 'sandbox_status' in data:
+        p.sandbox_status = data['sandbox_status']
+    if 'live_access_enabled' in data:
+        p.live_access_enabled = 1 if data['live_access_enabled'] else 0
+    if 'feature_flags' in data and isinstance(data['feature_flags'], dict):
+        flags = dict(p.feature_flags or {})
+        flags.update(data['feature_flags'])
+        # remove explicit None values so they fall back to tier gating
+        p.feature_flags = {k: v for k, v in flags.items() if v is not None}
+    db.session.commit()
+    now = datetime.utcnow()
+    return jsonify(_admin_merchant_row(p, now)), 200
+
+
+@app.route('/api/admin/stripe-balance')
+@require_roles([UserRole.ADMIN])
+def api_admin_stripe_balance():
+    """Return the platform Stripe balance."""
+    return jsonify(billing_module.get_stripe_balance())
+
+
+@app.route('/admin/chat')
+@require_roles([UserRole.ADMIN])
+def admin_chat():
+    """Admin support chat dashboard."""
+    ctx = _dashboard_context('admin_chat')
+    return render_template('dashboard/admin_chat.html', **ctx)
+
+
+@app.route('/api/admin/chat/threads', methods=['GET'])
+@require_roles([UserRole.ADMIN])
+def api_admin_chat_threads():
+    """List merchants with unread support message counts."""
+    rows = db.session.query(
+        SupportMessage.merchant_id,
+        func.count(SupportMessage.id).filter(SupportMessage.read_at.is_(None), SupportMessage.sender == 'merchant').label('unread'),
+        func.max(SupportMessage.created_at).label('last_message_at'),
+    ).group_by(SupportMessage.merchant_id).all()
+    profiles = {p.merchant_id: p for p in MerchantProfile.query.all()}
+    threads = []
+    for merchant_id, unread, last_message_at in rows:
+        p = profiles.get(merchant_id)
+        threads.append({
+            "merchant_id": merchant_id,
+            "business_name": p.business_name or merchant_id if p else merchant_id,
+            "admin_email": p.admin_email if p else None,
+            "unread": unread,
+            "last_message_at": last_message_at.isoformat() if last_message_at else None,
+        })
+    # include merchants with no messages at the bottom
+    messaged = {t['merchant_id'] for t in threads}
+    for p in MerchantProfile.query.all():
+        if p.merchant_id not in messaged:
+            threads.append({
+                "merchant_id": p.merchant_id,
+                "business_name": p.business_name or p.merchant_id,
+                "admin_email": p.admin_email,
+                "unread": 0,
+                "last_message_at": None,
+            })
+    threads.sort(key=lambda x: (x['last_message_at'] is None, x['last_message_at']), reverse=True)
+    return jsonify({"threads": threads}), 200
+
+
+@app.route('/api/admin/chat/<merchant_id>', methods=['GET'])
+@require_roles([UserRole.ADMIN])
+def api_admin_chat_messages(merchant_id):
+    """Return chat history with a merchant and mark merchant messages as read."""
+    profile = MerchantProfile.query.get_or_404(merchant_id)
+    SupportMessage.query.filter_by(
+        merchant_id=merchant_id, sender='merchant', read_at=None
+    ).update({"read_at": datetime.utcnow()}, synchronize_session=False)
+    db.session.commit()
+    msgs = SupportMessage.query.filter_by(merchant_id=merchant_id).order_by(SupportMessage.created_at.asc()).all()
+    return jsonify({
+        "merchant_id": merchant_id,
+        "business_name": profile.business_name or merchant_id,
+        "messages": [
+            {"id": m.id, "sender": m.sender, "sender_email": m.sender_email, "message": m.message, "created_at": m.created_at.isoformat() if m.created_at else None, "read": m.read_at is not None}
+            for m in msgs
+        ],
+    }), 200
+
+
+@app.route('/api/admin/chat/<merchant_id>', methods=['POST'])
+@require_roles([UserRole.ADMIN])
+def api_admin_chat_send(merchant_id):
+    """Send an admin message to a merchant."""
+    profile = MerchantProfile.query.get_or_404(merchant_id)
+    data = request.get_json(silent=True) or {}
+    text = (data.get('message') or '').strip()
+    if not text:
+        return jsonify({"error": "Message is required"}), 400
+    s = get_current_user()
+    admin_profile = MerchantProfile.query.get(s.merchant_id) if s else None
+    msg = SupportMessage(
+        merchant_id=merchant_id,
+        sender='admin',
+        sender_email=admin_profile.admin_email if admin_profile else 'admin@vantavcommerce.com',
+        message=text,
+    )
+    db.session.add(msg)
+    db.session.commit()
+    return jsonify({"id": msg.id, "sender": "admin", "created_at": msg.created_at.isoformat()}), 201
+
+
+@app.route('/api/v1/chat/messages', methods=['GET'])
+@require_roles([UserRole.MERCHANT, UserRole.ADMIN])
+def api_merchant_chat_messages():
+    """Return this merchant's support messages and mark admin messages as read."""
+    merchant = get_merchant_context()
+    if not merchant:
+        return jsonify({"error": "No merchant context"}), 403
+    merchant_id = merchant['id']
+    SupportMessage.query.filter_by(
+        merchant_id=merchant_id, sender='admin', read_at=None
+    ).update({"read_at": datetime.utcnow()}, synchronize_session=False)
+    db.session.commit()
+    msgs = SupportMessage.query.filter_by(merchant_id=merchant_id).order_by(SupportMessage.created_at.asc()).all()
+    return jsonify({
+        "merchant_id": merchant_id,
+        "messages": [
+            {"id": m.id, "sender": m.sender, "sender_email": m.sender_email, "message": m.message, "created_at": m.created_at.isoformat() if m.created_at else None, "read": m.read_at is not None}
+            for m in msgs
+        ],
+    }), 200
+
+
+@app.route('/api/v1/chat/message', methods=['POST'])
+@require_roles([UserRole.MERCHANT, UserRole.ADMIN])
+def api_merchant_chat_send():
+    """Post a message from the merchant to support / admin."""
+    merchant = get_merchant_context()
+    if not merchant:
+        return jsonify({"error": "No merchant context"}), 403
+    data = request.get_json(silent=True) or {}
+    text = (data.get('message') or '').strip()
+    if not text:
+        return jsonify({"error": "Message is required"}), 400
+    msg = SupportMessage(
+        merchant_id=merchant['id'],
+        sender='merchant',
+        sender_email=merchant.get('email'),
+        message=text,
+    )
+    db.session.add(msg)
+    db.session.commit()
+    return jsonify({"id": msg.id, "sender": "merchant", "created_at": msg.created_at.isoformat()}), 201
 
 
 @app.route('/api/v1/channels/writeback', methods=['POST'])

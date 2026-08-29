@@ -248,13 +248,23 @@ PLACEHOLDER_DASHBOARD_PAGE_IDS = {
 }
 
 
-def _filter_nav_for_role(nav_groups, user_role):
-    """Return a copy of nav_groups with only commercial-ready pages for merchants."""
+def _filter_nav_for_role(nav_groups, user_role, merchant=None):
+    """Return nav groups filtered by role, tier, and explicit merchant feature flags."""
     if user_role in ("Admin", "Engineer"):
         return nav_groups
     filtered = []
+    merchant_id = (merchant or {}).get("id")
+    merchant_tier = (merchant or {}).get("tier")
+    has_concierge = bool(merchant and merchant.get("concierge_bundle"))
     for group in nav_groups:
-        links = [link for link in group["links"] if link.get("id") in COMMERCIAL_READY_PAGE_IDS]
+        links = []
+        for link in group["links"]:
+            page_id = link.get("id", "")
+            if not TierManager.page_enabled(merchant_id, merchant_tier, page_id):
+                continue
+            if page_id == "startup_pack" and not has_concierge:
+                continue
+            links.append(link)
         if links:
             filtered.append({**group, "links": links})
     return filtered
@@ -718,6 +728,16 @@ NAV_GROUPS = [
     },
 ]
 
+ALL_DASHBOARD_PAGE_IDS = sorted({
+    link["id"]
+    for group in NAV_GROUPS
+    for link in group["links"]
+    if link.get("id")
+} | COMMERCIAL_READY_PAGE_IDS | PLACEHOLDER_DASHBOARD_PAGE_IDS | {
+    "command_center", "commerce_hub", "monitoring", "regression_chart",
+    "onboarding_loading", "tiktok_studio", "startup_pack",
+})
+
 
 def context(active_page=None, merchant=None, merchant_id=None):
     tz_name = _merchant_timezone(merchant_id)
@@ -794,29 +814,15 @@ def context(active_page=None, merchant=None, merchant_id=None):
         for link in group["links"]:
             if link.get("id") == "alerts":
                 link["badge"] = str(len(live_alerts))
-    nav_groups = _filter_nav_for_role(nav_groups, user_role)
-
-    # Brand Build (startup_pack) is only visible when the Concierge Bundle add-on is active.
-    has_concierge = bool(merchant and merchant.get("concierge_bundle"))
-    if not has_concierge and user_role not in ("Admin", "Engineer"):
-        for group in nav_groups:
-            group["links"] = [link for link in group["links"] if link.get("id") != "startup_pack"]
-
-    # Sidebar only shows pages the merchant's tier is allowed to access.
-    merchant_tier = (merchant or {}).get("tier")
-    if merchant_tier and user_role not in ("Admin", "Engineer"):
-        for group in nav_groups:
-            group["links"] = [
-                link for link in group["links"]
-                if TierManager.can_access_page(merchant_tier, link.get("id", ""))
-            ]
+    nav_groups = _filter_nav_for_role(nav_groups, user_role, merchant)
 
     # Admin-only backend navigation.
     if user_role in ("Admin", "Engineer"):
         nav_groups.append({
             "label": "Admin",
             "links": [
-                {"id": "admin_merchants", "label": "Merchants", "url": "/admin/merchants", "icon": "⚙"},
+                {"id": "admin_merchants", "label": "Members", "url": "/admin/merchants", "icon": "◈"},
+                {"id": "admin_chat", "label": "Support Chat", "url": "/admin/chat", "icon": "✉"},
             ],
         })
 

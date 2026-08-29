@@ -217,6 +217,30 @@ def verify_checkout_session(session_id: str) -> Dict[str, Any]:
     }
 
 
+def get_stripe_balance() -> Dict[str, Any]:
+    """Return Stripe account balance with available and pending amounts."""
+    _ensure_configured()
+    try:
+        bal = stripe.Balance.retrieve()
+        available = [
+            {"amount": b.amount, "currency": b.currency, "amount_decimal": b.amount / 100}
+            for b in bal.available
+        ]
+        pending = [
+            {"amount": b.amount, "currency": b.currency, "amount_decimal": b.amount / 100}
+            for b in bal.pending
+        ]
+        return {
+            "status": "ok",
+            "available": available,
+            "pending": pending,
+            "currency": available[0]["currency"] if available else None,
+        }
+    except Exception as e:
+        logger.error(f"[Stripe Balance] {e}")
+        return {"status": "error", "error": str(e), "available": [], "pending": []}
+
+
 def get_public_key():
     return STRIPE_PUBLISHABLE_KEY
 

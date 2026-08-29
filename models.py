@@ -173,6 +173,7 @@ class MerchantProfile(db.Model):
     approved_at = db.Column(db.DateTime)
     brand_color = db.Column(db.String(7))
     brand_color_secondary = db.Column(db.String(7))
+    feature_flags = db.Column(db.JSON, default=dict)
     created_at = db.Column(db.DateTime, server_default=db.func.now())
 
 
@@ -332,6 +333,17 @@ class AgentMessage(db.Model):
     merchant_id = db.Column(db.String(100), db.ForeignKey("merchant_profiles.merchant_id"))
     payload = db.Column(db.Text)
     action_taken = db.Column(db.String(255))
+    created_at = db.Column(db.DateTime, server_default=db.func.now())
+
+
+class SupportMessage(db.Model):
+    __tablename__ = "support_messages"
+    id = db.Column(db.Integer, primary_key=True, autoincrement=True)
+    merchant_id = db.Column(db.String(100), db.ForeignKey("merchant_profiles.merchant_id"), nullable=False, index=True)
+    sender = db.Column(db.String(50), nullable=False)  # 'admin' or 'merchant'
+    sender_email = db.Column(db.String(255))
+    message = db.Column(db.Text, nullable=False)
+    read_at = db.Column(db.DateTime)
     created_at = db.Column(db.DateTime, server_default=db.func.now())
 
 

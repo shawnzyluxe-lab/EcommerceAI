@@ -431,5 +431,107 @@
   })();
   </script>
   {% endif %}
+
+  {% if merchant.role == 'Merchant' %}
+  <div id="support-widget" style="position:fixed; bottom:24px; left:24px; z-index:100; font-family:inherit;">
+    <div id="support-panel" style="display:none; width:340px; height:420px; background:var(--surface); border:1px solid var(--line); border-radius:16px; box-shadow:0 20px 60px rgba(0,0,0,.2); flex-direction:column; overflow:hidden; margin-bottom:12px;">
+      <div style="padding:14px 16px; border-bottom:1px solid var(--line); display:flex; justify-content:space-between; align-items:center; background:var(--line-2);">
+        <strong style="font-size:.9rem;">Support</strong>
+        <button class="btn" style="padding:2px 8px; font-size:.8rem;" onclick="toggleSupport()">×</button>
+      </div>
+      <div id="support-messages" style="flex:1; overflow:auto; padding:14px; display:flex; flex-direction:column; gap:10px; font-size:.88rem;"></div>
+      <div style="padding:12px; border-top:1px solid var(--line); display:flex; gap:8px;">
+        <input id="support-input" type="text" placeholder="Type a message…" style="flex:1; padding:8px; border:1px solid var(--line); border-radius:8px; background:var(--surface);">
+        <button class="btn btn-primary" style="padding:6px 12px;" onclick="sendSupportMessage()">Send</button>
+      </div>
+    </div>
+    <button id="support-fab" onclick="toggleSupport()" style="width:52px; height:52px; border-radius:50%; border:none; background:var(--accent); color:#fff; font-size:22px; cursor:pointer; box-shadow:0 6px 20px rgba(0,0,0,.2); display:flex; align-items:center; justify-content:center; position:relative;">
+      ✉
+      <span id="support-badge" style="display:none; position:absolute; top:-2px; right:-2px; background:var(--red); color:#fff; font-size:.65rem; padding:2px 6px; border-radius:99px; font-weight:700;">0</span>
+    </button>
+  </div>
+  <script>
+  (function(){
+    let open = false;
+    let unread = 0;
+
+    function formatTime(iso) { return iso ? new Date(iso).toLocaleString() : ''; }
+
+    function escapeHtml(text){
+      const d = document.createElement('div'); d.textContent = text; return d.innerHTML;
+    }
+
+    function renderMessage(m){
+      const isMe = m.sender === 'merchant';
+      const row = document.createElement('div');
+      row.style.cssText = 'display:flex; justify-content:' + (isMe ? 'flex-end' : 'flex-start') + ';';
+      const bubble = document.createElement('div');
+      bubble.style.cssText = 'max-width:78%; padding:8px 12px; border-radius:12px; font-size:.85rem; background:' + (isMe ? 'var(--accent)' : 'var(--line-2)') + '; color:' + (isMe ? '#fff' : 'var(--ink)') + ';';
+      bubble.innerHTML = escapeHtml(m.message) + '<div style="font-size:.65rem; opacity:.7; margin-top:3px; text-align:right;">' + formatTime(m.created_at) + '</div>';
+      row.appendChild(bubble);
+      return row;
+    }
+
+    async function loadMessages(){
+      try {
+        const res = await fetch('/api/v1/chat/messages', {credentials: 'same-origin'});
+        if (!res.ok) return;
+        const data = await res.json();
+        const container = document.getElementById('support-messages');
+        const wasBottom = container.scrollHeight - container.scrollTop <= container.clientHeight + 20;
+        container.innerHTML = '';
+        (data.messages || []).forEach(m => container.appendChild(renderMessage(m)));
+        if (wasBottom || open) container.scrollTop = container.scrollHeight;
+        if (!open && data.messages) {
+          const newUnread = data.messages.filter(m => m.sender === 'admin' && !m.read).length;
+          unread = newUnread;
+          updateBadge();
+        }
+      } catch (e) { console.error(e); }
+    }
+
+    function updateBadge(){
+      const badge = document.getElementById('support-badge');
+      badge.textContent = unread;
+      badge.style.display = unread > 0 ? 'block' : 'none';
+    }
+
+    window.toggleSupport = function(){
+      const panel = document.getElementById('support-panel');
+      open = !open;
+      panel.style.display = open ? 'flex' : 'none';
+      if (open) {
+        const container = document.getElementById('support-messages');
+        container.scrollTop = container.scrollHeight;
+        unread = 0; updateBadge();
+      }
+    };
+
+    window.sendSupportMessage = async function(){
+      const input = document.getElementById('support-input');
+      const text = input.value.trim();
+      if (!text) return;
+      input.value = '';
+      const container = document.getElementById('support-messages');
+      container.appendChild(renderMessage({sender:'merchant', message:text, created_at: new Date().toISOString()}));
+      container.scrollTop = container.scrollHeight;
+      try {
+        await fetch('/api/v1/chat/message', {
+          method: 'POST',
+          credentials: 'same-origin',
+          headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify({message: text}),
+        });
+        await loadMessages();
+      } catch (e) { console.error(e); }
+    };
+
+    document.getElementById('support-input')?.addEventListener('keydown', e => { if (e.key === 'Enter') sendSupportMessage(); });
+
+    loadMessages();
+    setInterval(loadMessages, 8000);
+  })();
+  </script>
+  {% endif %}
 </body>
 </html>

@@ -464,6 +464,25 @@ def run_migrations():
         _run("idx.user_auth_lookup", "CREATE INDEX IF NOT EXISTS idx_user_auth_lookup ON user_authentication(email, account_status)")
         _run("idx.session_vault_expiry", "CREATE INDEX IF NOT EXISTS idx_session_vault_expiry ON active_session_vault(session_token, expires_at)")
 
+        _run("merchant_profiles.feature_flags", "ALTER TABLE merchant_profiles ADD COLUMN IF NOT EXISTS feature_flags JSONB DEFAULT '{}'::jsonb")
+
+        _run(
+            "support_messages table",
+            """
+            CREATE TABLE IF NOT EXISTS support_messages (
+                id SERIAL PRIMARY KEY,
+                merchant_id VARCHAR(100) NOT NULL REFERENCES merchant_profiles(merchant_id) ON DELETE CASCADE,
+                sender VARCHAR(50) NOT NULL,
+                sender_email VARCHAR(255),
+                message TEXT NOT NULL,
+                read_at TIMESTAMP,
+                created_at TIMESTAMP DEFAULT NOW()
+            )
+            """,
+        )
+        _run("idx.support_messages_merchant", "CREATE INDEX IF NOT EXISTS idx_support_messages_merchant ON support_messages(merchant_id, created_at DESC)")
+        _run("idx.support_messages_unread", "CREATE INDEX IF NOT EXISTS idx_support_messages_unread ON support_messages(merchant_id, read_at) WHERE read_at IS NULL")
+
         # Refresh PostgreSQL planner statistics after schema/index changes
         _run("analyze.daily_costs", "ANALYZE daily_costs")
         _run("analyze.order_items", "ANALYZE order_items")
