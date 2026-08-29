@@ -917,7 +917,10 @@ with app.app_context():
         cutoff = datetime.utcnow() - timedelta(hours=1)
         deleted = SystemExceptionLog.query.filter(
             SystemExceptionLog.module_origin == 'TEARDOWN',
-            SystemExceptionLog.exception_msg.ilike('%redis%'),
+            or_(
+                SystemExceptionLog.exception_msg.ilike('%6379%'),
+                SystemExceptionLog.exception_msg.ilike('%redis%'),
+            ),
             SystemExceptionLog.timestamp < cutoff,
         ).delete(synchronize_session=False)
         if deleted:
