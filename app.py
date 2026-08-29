@@ -313,9 +313,9 @@ def _profile_for_email(email: str):
 def _canonical_tier(raw_tier: str) -> str:
     """Map legacy, marketing, or plan tier names to the canonical Vantav tier."""
     mapping = {
+        "Basic Tier": "Basic Tier",
         "Vantav Operator": "Vantav Operator",
         "Operator": "Vantav Operator",
-        "Basic Tier": "Vantav Operator",
         "Vantav Growth": "Vantav Growth",
         "Growth": "Vantav Growth",
         "Beta Tier": "Vantav Growth",
@@ -2833,10 +2833,9 @@ def api_admin_update_merchant(merchant_id):
     if 'live_access_enabled' in data:
         p.live_access_enabled = 1 if data['live_access_enabled'] else 0
     if 'feature_flags' in data and isinstance(data['feature_flags'], dict):
-        flags = dict(p.feature_flags or {})
-        flags.update(data['feature_flags'])
-        # remove explicit None values so they fall back to tier gating
-        p.feature_flags = {k: v for k, v in flags.items() if v is not None}
+        # Replace the entire feature_flags map with the admin's selections.
+        # Default (unset) pages are omitted, On is True, Off is False.
+        p.feature_flags = {k: v for k, v in data['feature_flags'].items() if v is not None}
     db.session.commit()
     now = datetime.utcnow()
     return jsonify(_admin_merchant_row(p, now)), 200

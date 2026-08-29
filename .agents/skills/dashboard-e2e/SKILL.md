@@ -94,3 +94,14 @@ xrandr --output VNC-0 --mode 1600x1200
 - The CSP `script-src` in `monitoring.py` must include `https://cdn.jsdelivr.net`; otherwise the canvas stays blank even though the API returns the DEGRADED text.
 - To test the chart end-to-end locally, run the app with a CSP middleware that allows the CDN or temporarily patch `monitoring.py` during testing only.
 - Use `seed_regression_sku.py` (or a temporary deterministic seed) to populate `SKU-404-PODS` data for the target merchant; `sqlite:///shawnzyluxe.db` resolves to `instance/shawnzyluxe.db` in this repo.
+
+## Admin Members + Support Chat (PR #15)
+
+- Admin routes (`/admin/merchants`, `/admin/chat`) are restricted to the master admin `shawn@shawnzyluxe.com`.
+- A reusable test merchant is `testing-pr15-1787965267934@example.com` / `TestPass123!` (`merchant_36bd8639`). Create new ones via `POST /api/v1/tenant/register` and pre-approve via `PATCH /api/admin/merchants/<merchant_id>` (`sandbox_status: approved`, `live_access_enabled: true`).
+- Feature flags on `/admin/merchants` can be toggled through the Edit modal. Because small inline buttons may not register in this environment, prefer `javascript:` in the address bar:
+  - `javascript:editMember('merchant_36bd8639'); document.querySelector('.feature-select[data-page="products"]').value='on'; saveMember();`
+  - Default pages are omitted from the payload, On sends `true`, and Off sends `false`. `PATCH /api/admin/merchants/<id>` replaces the entire `feature_flags` map, so Default removes the override.
+- `PATCH /api/admin/merchants/<id>` canonicalizes `account_tier`; `Basic Tier` is preserved as a distinct free tier.
+- Merchant support widget functions: `toggleSupport()` and `sendSupportMessage()`. Admin chat functions: `loadThread('<merchant_id>')` and `sendMessage()`.
+- The merchant widget polls for new messages every 8 seconds. Use two Chrome windows (normal for admin, incognito for merchant) and `Alt+Tab` to test the full round trip.
