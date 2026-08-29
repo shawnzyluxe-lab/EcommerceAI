@@ -483,6 +483,42 @@ def run_migrations():
         _run("idx.support_messages_merchant", "CREATE INDEX IF NOT EXISTS idx_support_messages_merchant ON support_messages(merchant_id, created_at DESC)")
         _run("idx.support_messages_unread", "CREATE INDEX IF NOT EXISTS idx_support_messages_unread ON support_messages(merchant_id, read_at) WHERE read_at IS NULL")
 
+        _run(
+            "admin_platform_controls table",
+            """
+            CREATE TABLE IF NOT EXISTS admin_platform_controls (
+                key VARCHAR(100) PRIMARY KEY,
+                value JSONB DEFAULT '{}'::jsonb,
+                updated_at TIMESTAMP DEFAULT NOW(),
+                created_at TIMESTAMP DEFAULT NOW()
+            )
+            """,
+        )
+
+        _run(
+            "admin_audit_logs table",
+            """
+            CREATE TABLE IF NOT EXISTS admin_audit_logs (
+                id VARCHAR(36) PRIMARY KEY,
+                admin_email VARCHAR(255),
+                action VARCHAR(100) NOT NULL,
+                target_merchant_id VARCHAR(100),
+                details JSONB DEFAULT '{}'::jsonb,
+                created_at TIMESTAMP DEFAULT NOW()
+            )
+            """,
+        )
+        _run("idx.admin_audit_logs_action", "CREATE INDEX IF NOT EXISTS idx_admin_audit_logs_action ON admin_audit_logs (action, created_at DESC)")
+        _run("idx.admin_audit_logs_target", "CREATE INDEX IF NOT EXISTS idx_admin_audit_logs_target ON admin_audit_logs (target_merchant_id, created_at DESC)")
+
+        # ActiveSession impersonation columns.
+        for col, typ in [
+            ("impersonating_merchant_id", "VARCHAR(100)"),
+            ("original_merchant_id", "VARCHAR(100)"),
+            ("original_role", "VARCHAR(50)"),
+        ]:
+            _run(f"active_sessions.{col}", f"ALTER TABLE active_sessions ADD COLUMN IF NOT EXISTS {col} {typ}")
+
         # Refresh PostgreSQL planner statistics after schema/index changes
         _run("analyze.daily_costs", "ANALYZE daily_costs")
         _run("analyze.order_items", "ANALYZE order_items")

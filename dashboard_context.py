@@ -13,7 +13,7 @@ from typing import Any, Dict, List, Optional
 
 from flask import Flask, render_template, request, jsonify
 from sqlalchemy import func
-from models import db, PredictiveLogistics, MerchantSetting, SaaSBilling, Product, OrderItem, UnifiedOrder
+from models import db, PredictiveLogistics, MerchantSetting, SaaSBilling, Product, OrderItem, UnifiedOrder, AdminPlatformControl
 import profit_feed
 import alert_matrix
 import action_gate
@@ -248,6 +248,31 @@ PLACEHOLDER_DASHBOARD_PAGE_IDS = {
 }
 
 
+def sample_pages_enabled() -> bool:
+    """Global admin switch that controls whether placeholder/sample pages are visible to merchants."""
+    try:
+        return AdminPlatformControl.get_bool("sample_pages_enabled", default=True)
+    except Exception:
+        # Fail open so a startup hiccup doesn't lock the dashboard.
+        return True
+
+
+def global_sync_paused() -> bool:
+    """Return True when the admin has paused all marketplace syncs."""
+    try:
+        return AdminPlatformControl.get_bool("global_sync_paused", default=False)
+    except Exception:
+        return False
+
+
+def maintenance_mode() -> bool:
+    """Return True when the admin has enabled global maintenance mode."""
+    try:
+        return AdminPlatformControl.get_bool("maintenance_mode", default=False)
+    except Exception:
+        return False
+
+
 def _filter_nav_for_role(nav_groups, user_role, merchant=None):
     """Return nav groups filtered by role, tier, and explicit merchant feature flags."""
     if user_role in ("Admin", "Engineer"):
@@ -256,11 +281,14 @@ def _filter_nav_for_role(nav_groups, user_role, merchant=None):
     merchant_id = (merchant or {}).get("id")
     merchant_tier = (merchant or {}).get("tier")
     has_concierge = bool(merchant and merchant.get("concierge_bundle"))
+    sample_pages_on = sample_pages_enabled()
     for group in nav_groups:
         links = []
         for link in group["links"]:
             page_id = link.get("id", "")
             if not TierManager.page_enabled(merchant_id, merchant_tier, page_id):
+                continue
+            if not sample_pages_on and page_id in PLACEHOLDER_DASHBOARD_PAGE_IDS:
                 continue
             if page_id == "startup_pack" and not has_concierge:
                 continue
@@ -823,6 +851,7 @@ def context(active_page=None, merchant=None, merchant_id=None):
             "links": [
                 {"id": "admin_dashboard", "label": "Admin Home", "url": "/admin", "icon": "◈"},
                 {"id": "admin_merchants", "label": "Members", "url": "/admin/merchants", "icon": "◈"},
+                {"id": "admin_audit", "label": "Audit Log", "url": "/admin/audit", "icon": "◈"},
                 {"id": "admin_chat", "label": "Support Chat", "url": "/admin/chat", "icon": "✉"},
             ],
         }
@@ -911,10 +940,15 @@ def context(active_page=None, merchant=None, merchant_id=None):
         "sandbox_expires_at": None,
     })
     merchant_obj.setdefault("timezone", tz_name)
+    is_impersonating = bool(merchant_obj.get("is_impersonating"))
 
     return {
         "brand": BRAND,
         "nav": NAV,
+        "is_impersonating": is_impersonating,
+        "impersonating_merchant_id": merchant_obj.get("impersonating_merchant_id"),
+        "maintenance_mode": maintenance_mode(),
+        "global_sync_paused": global_sync_paused(),
         "nav_groups": nav_groups,
         "active_page": active_page or "overview",
         "show_placeholder_banner": (active_page or "overview") in PLACEHOLDER_DASHBOARD_PAGE_IDS,

@@ -145,6 +145,17 @@
       </header>
 
       <main class="main-content">
+        {% if is_impersonating %}
+        <div style="background: var(--teal-bg); border: 1px solid var(--teal); color: var(--ink); padding: 12px 18px; border-radius: 10px; margin-bottom: 18px; font-size: .9rem; display: flex; align-items: center; justify-content: space-between; gap: 12px;">
+          <span><strong>Impersonating {{ merchant.name }}</strong> ({{ merchant.email | default('unknown') }}). Data and actions are real.</span>
+          <a href="/api/admin/stop-impersonating" class="btn btn-primary" style="flex-shrink:0;">Exit impersonation</a>
+        </div>
+        {% endif %}
+        {% if maintenance_mode %}
+        <div style="background: var(--amber-bg); border: 1px solid var(--amber); color: var(--ink); padding: 12px 18px; border-radius: 10px; margin-bottom: 18px; font-size: .9rem;">
+          <strong>Maintenance mode is on.</strong> Marketplace syncs are paused and some features may be unavailable.
+        </div>
+        {% endif %}
         {% if merchant.sandbox_status == 'expired' %}
         <div style="background: var(--red-bg); border: 1px solid var(--red); color: var(--ink); padding: 12px 18px; border-radius: 10px; margin-bottom: 18px; font-size: .9rem;">
           <strong>Your 48-hour sandbox has expired.</strong> Live marketplace connections and paid features are paused. <a href="/subscribe" style="color:var(--red); text-decoration: underline; font-weight: 600;">Upgrade to keep access</a> or contact support.

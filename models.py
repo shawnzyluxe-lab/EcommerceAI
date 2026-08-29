@@ -76,6 +76,10 @@ class ActiveSession(db.Model):
     role = db.Column(db.String(50), default="Merchant")
     created_at = db.Column(db.DateTime, server_default=db.func.now())
     last_seen = db.Column(db.DateTime, server_default=db.func.now())
+    # Admin impersonation: an admin can view the dashboard as another merchant.
+    impersonating_merchant_id = db.Column(db.String(100), db.ForeignKey("merchant_profiles.merchant_id"), nullable=True)
+    original_merchant_id = db.Column(db.String(100), db.ForeignKey("merchant_profiles.merchant_id"), nullable=True)
+    original_role = db.Column(db.String(50), nullable=True)
 
 
 class BusinessMetric(db.Model):
@@ -657,3 +661,52 @@ class GeneratedMarketingAsset(db.Model):
     created_at = db.Column(db.DateTime, server_default=db.func.now())
     updated_at = db.Column(db.DateTime, server_default=db.func.now(), onupdate=db.func.now())
     __table_args__ = (db.Index("idx_marketing_assets_merchant", "merchant_id", "state"),)
+
+
+class AdminPlatformControl(db.Model):
+    """Global platform switches controlled from the admin panel."""
+    __tablename__ = "admin_platform_controls"
+    key = db.Column(db.String(100), primary_key=True)
+    value = db.Column(db.JSON, default=dict)
+    updated_at = db.Column(db.DateTime, server_default=db.func.now(), onupdate=db.func.now())
+    created_at = db.Column(db.DateTime, server_default=db.func.now())
+
+    @classmethod
+    def get(cls, key, default=None):
+        row = cls.query.get(key)
+        if not row:
+            return default
+        return row.value if row.value is not None else default
+
+    @classmethod
+    def set(cls, key, value):
+        row = cls.query.get(key)
+        if not row:
+            row = cls(key=key)
+            db.session.add(row)
+        row.value = value
+        db.session.commit()
+
+    @classmethod
+    def get_bool(cls, key, default=False):
+        val = cls.get(key, default)
+        if isinstance(val, bool):
+            return val
+        if isinstance(val, dict):
+            return bool(val.get("enabled", default))
+        return bool(val)
+
+    @classmethod
+    def set_bool(cls, key, enabled):
+        cls.set(key, bool(enabled))
+
+
+class AdminAuditLog(db.Model):
+    """Immutable admin action log for the control panel."""
+    __tablename__ = "admin_audit_logs"
+    id = db.Column(db.String(36), primary_key=True, default=_uuid)
+    admin_email = db.Column(db.String(255))
+    action = db.Column(db.String(100), nullable=False, index=True)
+    target_merchant_id = db.Column(db.String(100), index=True)
+    details = db.Column(db.JSON, default=dict)
+    created_at = db.Column(db.DateTime, server_default=db.func.now(), index=True)

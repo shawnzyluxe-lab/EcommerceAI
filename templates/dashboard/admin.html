@@ -48,6 +48,38 @@
     <div class="card-head"><h3>Feature Controls</h3></div>
     <p style="color: var(--ink-2); font-size: .9rem;">Turn Intelligence, Operations, Growth, Catalog, and Settings pages on or off for each merchant.</p>
   </a>
+  <a class="card" href="/admin/audit" style="text-decoration: none; color: inherit;">
+    <div class="card-head"><h3>Audit Log</h3></div>
+    <p style="color: var(--ink-2); font-size: .9rem;">Immutable log of admin logins, merchant updates, store unlinks, syncs, and impersonation.</p>
+  </a>
+</div>
+
+<div class="card" style="margin-bottom: 24px;">
+  <div class="card-head"><h3>Platform controls</h3></div>
+  <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 20px; margin-bottom: 18px;">
+    <label style="display:flex; align-items:center; gap:10px; cursor:pointer;">
+      <input type="checkbox" id="global-sync-paused" style="width:18px; height:18px;">
+      <span>Pause all marketplace syncs (kill switch)</span>
+    </label>
+    <label style="display:flex; align-items:center; gap:10px; cursor:pointer;">
+      <input type="checkbox" id="maintenance-mode" style="width:18px; height:18px;">
+      <span>Maintenance mode banner</span>
+    </label>
+    <label style="display:flex; align-items:center; gap:10px; cursor:pointer;">
+      <input type="checkbox" id="sample-pages-enabled" style="width:18px; height:18px;">
+      <span>Show sample/placeholder pages to merchants</span>
+    </label>
+  </div>
+  <button class="btn btn-primary" id="save-platform-controls">Save platform controls</button>
+  <div id="platform-controls-status" style="margin-top:10px; font-size:.85rem; color:var(--ink-2);"></div>
+</div>
+
+<div class="card" style="margin-bottom: 24px;">
+  <div class="card-head"><h3>Global announcement</h3></div>
+  <p style="color: var(--ink-2); font-size: .9rem; margin-top:0;">Broadcast a message to every merchant's support chat.</p>
+  <textarea id="announcement-text" rows="3" style="width:100%; border-radius:8px; padding:10px; border:1px solid var(--line); background:var(--surface-elevated); color:var(--ink); resize:vertical;"></textarea>
+  <button class="btn btn-primary" id="send-announcement" style="margin-top:10px;">Send announcement</button>
+  <div id="announcement-status" style="margin-top:10px; font-size:.85rem; color:var(--ink-2);"></div>
 </div>
 
 <div class="card" style="margin-bottom: 24px;">
@@ -138,6 +170,55 @@ async function unlinkStore(merchantId, platform, btn) {
     btn.disabled = false;
   }
 }
+
+async function loadPlatformControls() {
+  try {
+    const res = await fetch('/api/admin/platform-controls', { credentials: 'same-origin' });
+    const data = await res.json();
+    document.getElementById('global-sync-paused').checked = data.global_sync_paused;
+    document.getElementById('maintenance-mode').checked = data.maintenance_mode;
+    document.getElementById('sample-pages-enabled').checked = data.sample_pages_enabled;
+  } catch (e) { console.warn('controls load failed', e); }
+}
+
+document.getElementById('save-platform-controls')?.addEventListener('click', async () => {
+  const status = document.getElementById('platform-controls-status');
+  status.textContent = 'Saving...';
+  try {
+    const res = await fetch('/api/admin/platform-controls', {
+      method: 'POST',
+      credentials: 'same-origin',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        global_sync_paused: document.getElementById('global-sync-paused').checked,
+        maintenance_mode: document.getElementById('maintenance-mode').checked,
+        sample_pages_enabled: document.getElementById('sample-pages-enabled').checked,
+      })
+    });
+    const data = await res.json();
+    status.textContent = res.ok ? 'Saved.' : (data.error || 'Failed');
+  } catch (e) { status.textContent = 'Network error'; }
+});
+
+document.getElementById('send-announcement')?.addEventListener('click', async () => {
+  const text = document.getElementById('announcement-text').value.trim();
+  if (!text) return alert('Enter a message');
+  const status = document.getElementById('announcement-status');
+  status.textContent = 'Sending...';
+  try {
+    const res = await fetch('/api/admin/announcements', {
+      method: 'POST',
+      credentials: 'same-origin',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ message: text })
+    });
+    const data = await res.json();
+    status.textContent = res.ok ? 'Sent to ' + data.recipients + ' merchants.' : (data.error || 'Failed');
+    if (res.ok) document.getElementById('announcement-text').value = '';
+  } catch (e) { status.textContent = 'Network error'; }
+});
+
+loadPlatformControls();
 </script>
 
 {% endblock %}
