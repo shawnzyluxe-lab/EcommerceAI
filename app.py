@@ -443,7 +443,9 @@ def require_roles(permitted_roles):
         @wraps(endpoint_function)
         def wrapper(*args, **kwargs):
             s = get_current_user()
-            if not s or s.role not in [role.value for role in permitted_roles]:
+            if not s:
+                return jsonify({"error": "Session expired or missing. Please log in."}), 403
+            if s.role not in [role.value for role in permitted_roles]:
                 return jsonify({"error": "Access denied. Your session does not have the required role for this endpoint."}), 403
             return endpoint_function(*args, **kwargs)
         return wrapper
@@ -908,6 +910,21 @@ with app.app_context():
         ActiveSession.created_at < datetime.utcnow() - timedelta(days=SESSION_TIMEOUT_DAYS)
     ).delete(synchronize_session=False)
     db.session.commit()
+
+    # Clean up stale Redis TEARDOWN exception rows that were logged before the
+    # cache barrier was hardened. These are operational noise, not actionable.
+    try:
+        cutoff = datetime.utcnow() - timedelta(hours=1)
+        deleted = SystemExceptionLog.query.filter(
+            SystemExceptionLog.module_origin == 'TEARDOWN',
+            SystemExceptionLog.exception_msg.ilike('%redis%'),
+            SystemExceptionLog.timestamp < cutoff,
+        ).delete(synchronize_session=False)
+        if deleted:
+            app.logger.info(f"Cleaned up {deleted} stale Redis TEARDOWN exception(s).")
+            db.session.commit()
+    except Exception as e:
+        app.logger.warning(f"Failed to clean stale Redis TEARDOWN exceptions: {e}")
 
     # Seed / refresh multi-tenant merchant profiles first (other tables FK to it)
     temp_password = os.environ.get("TEMP_ACCOUNTS_PASSWORD") or SITE_WALL_PASSWORD
@@ -3003,10 +3020,22 @@ def _admin_merchant_row(p: MerchantProfile, now: datetime) -> dict:
         [l.updated_at for l in links if l.updated_at],
         default=None,
     )
+    # Use the canonical channels module so the count/status matches the Stores page.
+    connected_channels = [
+        c for c in channels_module.list_channels(p.merchant_id)
+        if c.get('state') == 'connected'
+    ]
+    channels = [c['platform'] for c in connected_channels]
+    channel_count = len(channels)
+
     sync_status = "No channels"
-    if last_sync:
-        age = (now - last_sync).total_seconds()
-        sync_status = "OK" if age <= monitoring_module.MAX_CHANNEL_SYNC_AGE_SECONDS else "Stale"
+    if channel_count:
+        if last_sync:
+            age = (now - last_sync).total_seconds()
+            sync_status = "OK" if age <= monitoring_module.MAX_CHANNEL_SYNC_AGE_SECONDS else "Stale"
+        else:
+            sync_status = "Never synced"
+
     pending_actions = PendingAction.query.filter_by(merchant_id=p.merchant_id, status='pending').count()
     unread = SupportMessage.query.filter_by(
         merchant_id=p.merchant_id, sender='merchant', read_at=None
@@ -3029,8 +3058,8 @@ def _admin_merchant_row(p: MerchantProfile, now: datetime) -> dict:
         "live_access": bool(p.live_access_enabled),
         "feature_flags": p.feature_flags or {},
         "concierge": bool(billing and isinstance(billing.add_ons, list) and "concierge_bundle" in billing.add_ons),
-        "channels": [l.platform for l in links if l.platform],
-        "channel_count": len(links),
+        "channels": channels,
+        "channel_count": channel_count,
         "seats": seat_count,
         "last_sync": last_sync.isoformat() if last_sync else None,
         "last_active": last_active.isoformat() if last_active else None,
@@ -3229,7 +3258,7 @@ def api_admin_chat_send(merchant_id):
 # Master admin controls
 # --------------------------------------------------------------------------
 
-@app.route('/api/admin/impersonate/<merchant_id>', methods=['POST'])
+@app.route('/api/admin/impersonate/<merchant_id>', methods=['GET', 'POST'])
 @require_roles([UserRole.ADMIN, UserRole.ENGINEER])
 def api_admin_impersonate(merchant_id):
     """Admin view-as-merchant: load the target tenant's dashboard without a password."""
@@ -3243,6 +3272,8 @@ def api_admin_impersonate(merchant_id):
     s.impersonating_merchant_id = target.merchant_id
     db.session.commit()
     log_admin_audit("impersonation.start", target_merchant_id=target.merchant_id, details={"admin_email": (MerchantProfile.query.get(s.original_merchant_id).admin_email if s.original_merchant_id else None)})
+    if request.method == 'GET' or request.headers.get('Accept', '').startswith('text/html'):
+        return redirect(url_for('dashboard'))
     return jsonify({"status": "impersonating", "merchant_id": target.merchant_id, "redirect": url_for('dashboard')}), 200
 
 
@@ -3443,7 +3474,7 @@ def _admin_summary(now):
         MerchantProfile.sandbox_status.in_(['pending', 'sandbox'])
     ).count()
     stripe_balance = billing_module.get_stripe_balance()
-    connected_stores = MerchantChannel.query.count()
+    connected_stores = len(_admin_stores())
     return {
         "total_members": total_members,
         "active_sessions": active_sessions,
@@ -7087,6 +7118,22 @@ def api_engineer_chat():
         return jsonify({"reply": "Please send a message.", "action": "noop"}), 400
     result = _engineer_chat_process(message)
     return jsonify(result), 200
+
+
+@app.route('/admin/<path:path>')
+@require_roles([UserRole.ADMIN, UserRole.ENGINEER])
+def admin_catch_all(path):
+    """Stylised 404 for unknown /admin paths."""
+    ctx = _dashboard_context('admin_dashboard')
+    s = get_current_user()
+    ctx["dashboard_title"] = "Admin" if s and s.role == UserRole.ADMIN.value else "Engineer"
+    ctx["page_title"] = "Page not found"
+    ctx["page_description"] = f"The requested admin page '/admin/{path}' does not exist."
+    ctx["page_content"] = (
+        '<div style="text-align:center;padding:40px 20px;">'
+        '<a class="btn" href="/admin">Return to Admin Home</a></div>'
+    )
+    return render_template('dashboard/page.html', **ctx), 404
 
 
 if __name__ == '__main__':

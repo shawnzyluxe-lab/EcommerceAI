@@ -142,9 +142,19 @@ xrandr --output VNC-0 --mode 1600x1200
 - The merchant login resets the tier-test account to `Basic Tier`/`sandbox_status=pending`/`live_access_enabled=false` and lands on `/choose-tier`. Tier selection can be driven by the UI cards or by `POST /api/merchant/select-tier` with `credentials:'same-origin'`.
 - Verify tier gating by refreshing `/dashboard` after each tier change and listing sidebar links from `document.querySelectorAll('.nav-group a')`. Direct access to a locked page should render an upgrade banner or redirect; a 500 is a blocker.
 - Feature flags on `/admin/merchants` take effect immediately, but the `Edit` modal caches the member's `sandbox_status`/`tier`/`live_access` values from when the page was loaded. Refresh `/admin/merchants` before editing, or use the API directly, to avoid overwriting choose-tier changes.
-- `PATCH /api/admin/merchants/<merchant_id>` merges `feature_flags`; to remove a flag, send `{"<page>": null}` rather than omitting the key.
+- `PATCH /api/admin/merchants/<merchant_id>` replaces the entire `feature_flags` dict with the payload; default/unset pages are omitted by the UI and therefore cleared. To remove a flag, simply do not include it in the request.
 - Two-way support chat: merchant uses `toggleSupport()`/`sendSupportMessage()`; admin opens `/admin/chat?merchant_id=<merchant_id>` and calls `sendMessage()`. The merchant widget polls every 8 seconds.
 - `/api/engineer/exceptions` is engineer-only and may reveal runtime exceptions (e.g. Redis connection failures). `/api/v1/monitoring/health` and `/api/v1/monitoring/metrics` work for admin and engineer.
 - Public health endpoints (`/health`, `/api/v1/health`) must return `HEALTHY`. GDPR/webhook endpoints must reject unsigned traffic without 500s.
 - Watch for stale session invalidation: accessing an engineer-only endpoint as admin (or vice-versa) returns `SECURITY PROTOCOL VIOLATION` and can invalidate the cookie, forcing a fresh login.
+
+## Public testing phase live audit
+
+- Keep `sample_pages_enabled` on for the audit via `/admin` Platform controls (`Show non-beta modules to merchants`) or `POST /api/admin/platform-controls` with `{"sample_pages_enabled": true}`. Verify with `GET /api/admin/platform-controls`.
+- Test the tier-test merchant `merchant@vantavcommerce.com` / `MerchantTest2025!` through `/choose-tier` for all four tiers; sidebar and direct `/dashboard/<page>` access should match `TIER_PAGE_ACCESS` and `page_upgrade_target`.
+- With `sample_pages_enabled` on, non-beta pages are no longer redirected for tier-test merchants, but tier gating still applies; locked pages should show the upgrade banner, not a 500.
+- Verify `/dashboard/regression_chart?sku=SKU-404-PODS` renders a Chart.js line chart and diagnostics, not the `Unable to load regression data` fallback.
+- Check console for `Failed to fetch` in `loadMessages` (merchant support widget) and for CSP errors blocking `cdn.jsdelivr.net` on the regression chart.
+- Public health `/health` and `/api/v1/health` should return `HEALTHY`; unsigned GDPR/webhook endpoints should return 401/400 without 500s.
+- Do not run the live Stripe micro-charge test; do not actually unlink stores, pause sync, broadcast announcements, or flip maintenance mode in production.
 
