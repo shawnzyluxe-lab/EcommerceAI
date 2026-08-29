@@ -220,6 +220,7 @@ def _ai_greeting(merchant_id: Optional[str], merchant: Optional[Dict[str, Any]] 
 BETA_READY_PAGE_IDS = {
     "overview",
     "alerts",
+    "action_gate",
     "profit_engine",
     "billing",
     "settings",
