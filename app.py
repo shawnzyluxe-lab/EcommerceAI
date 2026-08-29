@@ -838,7 +838,7 @@ def enforce_tier_limits(merchant_id, requested_feature):
 def site_wall_protect():
     if not site_wall_enabled():
         return None
-    if request.endpoint in ('home', 'login', 'site_login', 'site_logout', 'subscribe', 'checkout', 'thank_you', 'session_heartbeat', 'create_stripe_checkout', 'beta_apply', 'api_beta_apply', 'auth_login', 'auth_signup', 'auth_provision_node', 'shopify_orders_webhook', 'shopify_gdpr_customer_data_request', 'shopify_gdpr_customer_redact', 'shopify_gdpr_shop_redact', 'shopify_app_uninstalled', 'tiktok_orders_webhook', 'amazon_orders_webhook', 'stripe_billing_webhook', 'supplier_po_update', 'execute_mitigation', 'generate_magic_link', 'magic_login', 'register_merchant', 'shopify_oauth_callback', 'tiktok_oauth_callback', 'health_check', 'legal_terms', 'legal_privacy', 'legal_refund', 'static'):
+    if request.endpoint in ('home', 'login', 'site_login', 'site_logout', 'subscribe', 'checkout', 'thank_you', 'session_heartbeat', 'create_stripe_checkout', 'beta_apply', 'api_beta_apply', 'auth_login', 'auth_signup', 'auth_provision_node', 'shopify_orders_webhook', 'shopify_gdpr_customer_data_request', 'shopify_gdpr_customer_redact', 'shopify_gdpr_shop_redact', 'shopify_app_uninstalled', 'tiktok_orders_webhook', 'amazon_orders_webhook', 'stripe_billing_webhook', 'supplier_po_update', 'execute_mitigation', 'generate_magic_link', 'magic_login', 'register_merchant', 'shopify_oauth_callback', 'tiktok_oauth_callback', 'health_check', 'api_v1_health', 'api_monitoring_health', 'api_monitoring_alerts', 'legal_terms', 'legal_privacy', 'legal_refund', 'static'):
         return None
     if site_wall_authenticated():
         return None
@@ -6260,6 +6260,13 @@ def health_check():
 
     status_code = 200 if health["status"] == "HEALTHY" else 500
     return jsonify(health), status_code
+
+
+@app.route('/api/v1/health', methods=['GET'])
+@limiter.exempt
+def api_v1_health():
+    """Public mirror of /health for external uptime monitors."""
+    return health_check()
 
 
 @app.route('/api/v1/auth/shopify/connect')
