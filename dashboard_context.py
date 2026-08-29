@@ -980,7 +980,10 @@ def context(active_page=None, merchant=None, merchant_id=None):
         "global_sync_paused": global_sync_paused(),
         "nav_groups": nav_groups,
         "active_page": active_page or "overview",
-        "show_placeholder_banner": (active_page or "overview") in PLACEHOLDER_DASHBOARD_PAGE_IDS,
+        "show_placeholder_banner": (
+            (active_page or "overview") in PLACEHOLDER_DASHBOARD_PAGE_IDS
+            and (sample_pages_enabled() or TierManager.is_tier_test_account((merchant_obj or {}).get("email", "")))
+        ),
         "merchant": merchant_obj,
         "coo": dict(COO, greeting=_greeting_for(merchant_obj)),
         "ai_greeting": _ai_greeting(merchant_id, merchant_obj),

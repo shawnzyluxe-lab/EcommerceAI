@@ -810,6 +810,8 @@ def site_wall_protect():
         return None
     if site_wall_authenticated():
         return None
+    if request.path.startswith('/api/'):
+        return jsonify({"error": "Session expired or missing. Please log in."}), 403
     return redirect(url_for('login'))
 
 
