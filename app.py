@@ -604,6 +604,18 @@ def get_merchant_context():
     profile = MerchantProfile.query.get(s.merchant_id)
     if not profile:
         return None
+    # Re-evaluate role on every request so stale sessions pick up master-admin
+    # changes without forcing a logout/login after deploys.
+    admin_email = (profile.admin_email or "").strip().lower()
+    if admin_email in MASTER_ADMIN_EMAILS:
+        effective_role = UserRole.ADMIN.value
+    elif admin_email in ENGINEER_EMAILS:
+        effective_role = UserRole.ENGINEER.value
+    else:
+        effective_role = UserRole.MERCHANT.value
+    if s.role != effective_role:
+        s.role = effective_role
+        db.session.commit()
     # Canonicalize legacy or plan tier names so the UI and gating see the right tier.
     raw_tier = (profile.account_tier or "Basic Tier").strip()
     tier = _canonical_tier(raw_tier)
@@ -636,7 +648,7 @@ def get_merchant_context():
         "brand_color_secondary": profile.brand_color_secondary or "#a78bfa",
         "feature_flags": profile.feature_flags or {},
         "theme": theme_setting.setting_value if theme_setting else "prometheus-dark",
-        "role": s.role,
+        "role": effective_role,
     }
 
 
