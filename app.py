@@ -372,6 +372,31 @@ def _reset_test_merchant_for_tier_testing(profile: MerchantProfile) -> None:
         pass
 
 
+def _protected_merchant_ids() -> set:
+    """Merchant IDs the admin must never delete from the live database."""
+    protected = set()
+    for email in ('shawn@shawnzyluxe.com', 'engineer@shawnzyluxe.com', 'merchant@vantavcommerce.com'):
+        p = _profile_for_email(email)
+        if p:
+            protected.add(p.merchant_id)
+    return protected
+
+
+def _cascade_delete_merchant(merchant_id: str) -> None:
+    """Delete every row that references the merchant across all tables."""
+    for table in reversed(db.metadata.sorted_tables):
+        conditions = []
+        for col in table.columns:
+            if col.name in ('merchant_id', 'original_merchant_id', 'impersonating_merchant_id'):
+                conditions.append(col == merchant_id)
+        if not conditions:
+            continue
+        try:
+            db.session.execute(table.delete().where(or_(*conditions)))
+        except Exception as e:
+            logger.warning(f"[CascadeDelete] {table.name}: {e}")
+
+
 def get_current_user():
     """Return the active session record with its role, or None."""
     token = request.cookies.get(SESSION_COOKIE_NAME)
@@ -3103,6 +3128,20 @@ def api_admin_update_merchant(merchant_id):
     log_admin_audit("merchant.update", target_merchant_id=merchant_id, details={"fields": list(data.keys())})
     now = datetime.utcnow()
     return jsonify(_admin_merchant_row(p, now)), 200
+
+
+@app.route('/api/admin/merchants/<merchant_id>', methods=['DELETE'])
+@require_roles([UserRole.ADMIN])
+def api_admin_delete_merchant(merchant_id):
+    """Permanently delete a merchant and all related rows. Protected accounts are blocked."""
+    p = MerchantProfile.query.get_or_404(merchant_id)
+    if p.merchant_id in _protected_merchant_ids():
+        return jsonify({'error': 'Cannot delete protected account'}), 403
+    _cascade_delete_merchant(p.merchant_id)
+    db.session.delete(p)
+    db.session.commit()
+    log_admin_audit("merchant.delete", target_merchant_id=merchant_id, details={'admin_email': (get_merchant_context() or {}).get('email')})
+    return jsonify({'status': 'ok', 'deleted': merchant_id}), 200
 
 
 @app.route('/api/admin/stripe-balance')
