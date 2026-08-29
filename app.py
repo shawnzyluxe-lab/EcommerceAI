@@ -3052,7 +3052,7 @@ def _admin_merchant_row(p: MerchantProfile, now: datetime) -> dict:
         "business_name": p.business_name or p.merchant_id,
         "admin_email": p.admin_email or "—",
         "account_tier": (p.account_tier or "").replace("AI Tier", "Plan").strip(),
-        "current_plan": billing.current_plan if billing else p.account_tier,
+        "current_plan": billing.current_plan or p.account_tier if billing else p.account_tier,
         "metered_usage_units": billing.metered_usage_units if billing else None,
         "accrued_invoice_value": billing.accrued_invoice_value if billing else None,
         "billing_cycle_end": billing.billing_cycle_end if billing else None,
@@ -3114,7 +3114,8 @@ def api_admin_update_merchant(merchant_id):
             return jsonify({"error": "Merchant profile was modified by another session. Please reload and try again."}), 409
 
     if 'account_tier' in data:
-        p.account_tier = _canonical_tier(data['account_tier'])
+        raw_tier = (data['account_tier'] or '').strip()
+        p.account_tier = _canonical_tier(raw_tier) if raw_tier else "Basic Tier"
     if 'sandbox_status' in data:
         p.sandbox_status = data['sandbox_status']
     if 'live_access_enabled' in data:
@@ -3130,18 +3131,29 @@ def api_admin_update_merchant(merchant_id):
         billing = SaaSBilling(merchant_id=merchant_id)
         db.session.add(billing)
     if 'current_plan' in data:
-        billing.current_plan = _canonical_tier(data['current_plan'])
+        raw_plan = (data['current_plan'] or '').strip()
+        billing.current_plan = _canonical_tier(raw_plan) if raw_plan else None
     if 'add_ons' in data and isinstance(data['add_ons'], list):
         billing.add_ons = data['add_ons']
     if 'metered_usage_units' in data:
-        billing.metered_usage_units = int(data['metered_usage_units'])
+        v = data['metered_usage_units']
+        billing.metered_usage_units = int(v) if v not in (None, '') else 0
     if 'accrued_invoice_value' in data:
-        billing.accrued_invoice_value = float(data['accrued_invoice_value'])
+        v = data['accrued_invoice_value']
+        billing.accrued_invoice_value = float(v) if v not in (None, '') else 0.0
     if 'billing_cycle_end' in data:
-        billing.billing_cycle_end = data['billing_cycle_end']
+        v = data['billing_cycle_end']
+        billing.billing_cycle_end = v if v not in (None, '') else None
     if 'max_authorized_seats' in data:
+        v = data['max_authorized_seats']
         memory = action_gate.get_business_memory(merchant_id)
-        memory.max_authorized_seats = int(data['max_authorized_seats'])
+        if v in (None, ''):
+            # Reset to the current tier's default user limit.
+            tier_for_seats = p.account_tier or "Basic Tier"
+            tier_meta = TierManager.get_tier_meta(tier_for_seats)
+            memory.max_authorized_seats = tier_meta.get('max_users', 1)
+        else:
+            memory.max_authorized_seats = int(v)
     p.updated_at = datetime.utcnow()
     db.session.commit()
     log_admin_audit("merchant.update", target_merchant_id=merchant_id, details={"fields": list(data.keys())})
@@ -6862,10 +6874,31 @@ def api_refresh_materialized_views():
         return jsonify({"detail": str(e)}), 500
 
 
-@app.route('/api/engineer/exceptions', methods=['GET'])
+@app.route('/api/engineer/exceptions', methods=['GET', 'DELETE'])
 @require_roles([UserRole.ENGINEER])
 def api_engineer_exceptions():
-    """Return recent system exception logs for operational review."""
+    """Return or clear recent system exception logs for operational review."""
+    if request.method == 'DELETE':
+        confirm = request.args.get('confirm') == '1'
+        if not confirm:
+            return jsonify({"error": "Pass confirm=1 to clear exceptions"}), 400
+        exception_id = request.args.get('id', type=int)
+        if exception_id:
+            row = SystemExceptionLog.query.get(exception_id)
+            if not row:
+                return jsonify({"error": "Exception not found"}), 404
+            db.session.delete(row)
+            db.session.commit()
+            return jsonify({"deleted": 1}), 200
+        hours = request.args.get('hours', 1, type=int)
+        cutoff = datetime.utcnow() - timedelta(hours=max(hours, 1))
+        deleted = SystemExceptionLog.query.filter(
+            SystemExceptionLog.module_origin == 'TEARDOWN',
+            SystemExceptionLog.timestamp < cutoff,
+        ).delete(synchronize_session=False)
+        db.session.commit()
+        return jsonify({"deleted": deleted}), 200
+
     since = datetime.utcnow() - timedelta(hours=24)
     rows = SystemExceptionLog.query.filter(SystemExceptionLog.timestamp >= since).order_by(SystemExceptionLog.timestamp.desc()).limit(100).all()
     return jsonify({
