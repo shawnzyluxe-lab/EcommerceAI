@@ -291,15 +291,17 @@ def _filter_nav_for_role(nav_groups, user_role, merchant=None):
     filtered = []
     merchant_id = (merchant or {}).get("id")
     merchant_tier = (merchant or {}).get("tier")
+    merchant_email = (merchant or {}).get("email", "")
     has_concierge = bool(merchant and merchant.get("concierge_bundle"))
     sample_pages_on = sample_pages_enabled()
+    tier_test_account = TierManager.is_tier_test_account(merchant_email)
     for group in nav_groups:
         links = []
         for link in group["links"]:
             page_id = link.get("id", "")
             if not TierManager.page_enabled(merchant_id, merchant_tier, page_id):
                 continue
-            if not sample_pages_on and page_id in BETA_LOCKED_PAGE_IDS:
+            if not sample_pages_on and not tier_test_account and page_id in BETA_LOCKED_PAGE_IDS:
                 continue
             if page_id == "startup_pack" and not has_concierge:
                 continue

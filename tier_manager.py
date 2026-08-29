@@ -1,4 +1,5 @@
 """Central tier policy engine for Vantav."""
+import os
 from datetime import datetime, timedelta
 from typing import Any, Dict, List, Optional
 
@@ -385,6 +386,15 @@ class TierManager:
         profile.feature_flags = flags
         db.session.commit()
         return True
+
+    @staticmethod
+    def tier_test_account_emails() -> set:
+        env_emails = {e.strip().lower() for e in os.environ.get('MERCHANT_TIER_TEST_ACCOUNTS', '').split(',') if e.strip()}
+        return env_emails | {'merchant@vantavcommerce.com'}
+
+    @staticmethod
+    def is_tier_test_account(email: str) -> bool:
+        return (email or '').strip().lower() in TierManager.tier_test_account_emails()
 
     @staticmethod
     def page_upgrade_target(page: str) -> str:

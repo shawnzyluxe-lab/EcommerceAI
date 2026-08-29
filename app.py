@@ -1802,9 +1802,11 @@ def dashboard_page(page):
         return redirect(url_for('dashboard'))
     ctx = _dashboard_context(active_page)
     # Closed-beta gating: hide all non-beta modules from merchants unless the
-    # admin has enabled sample/non-beta pages for testing.
+    # admin has enabled sample/non-beta pages for testing or the merchant is a
+    # designated tier-testing account.
     if not s or s.role not in (UserRole.ADMIN.value, UserRole.ENGINEER.value):
-        if active_page in BETA_LOCKED_PAGE_IDS and not sample_pages_enabled():
+        tier_test_account = TierManager.is_tier_test_account((merchant or {}).get("email", ""))
+        if active_page in BETA_LOCKED_PAGE_IDS and not sample_pages_enabled() and not tier_test_account:
             return redirect(url_for('dashboard'))
     # Commercial gating: merchants can only reach the pages their tier allows or
     # that the admin has explicitly enabled via feature flags.
