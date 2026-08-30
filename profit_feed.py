@@ -251,9 +251,9 @@ def get_recent_orders(merchant_id, limit=50):
     return _orders_with_ad_attribution(merchant_id, limit=limit)
 
 
-def get_profit_breakdown(merchant_id):
+def get_profit_breakdown(merchant_id, window_days=30):
     """Return profit feed line items and totals for the dashboard/API."""
-    since = datetime.now(timezone.utc) - timedelta(days=30)
+    since = datetime.now(timezone.utc) - timedelta(days=window_days)
     orders = ProfitFeedOrder.query.filter(
         ProfitFeedOrder.merchant_id == merchant_id,
         ProfitFeedOrder.recorded_at >= since,
@@ -300,28 +300,28 @@ def get_profit_breakdown(merchant_id):
     }
 
 
-def get_kpis(merchant_id):
-    """High-level profit KPIs for the Profit Feed."""
-    since = datetime.now(timezone.utc) - timedelta(days=1)
-    today_orders = ProfitFeedOrder.query.filter(
+def get_kpis(merchant_id, window_days=1):
+    """High-level profit KPIs for the Profit Feed. Gross and net share one window."""
+    since = datetime.now(timezone.utc) - timedelta(days=window_days)
+    window_orders = ProfitFeedOrder.query.filter(
         ProfitFeedOrder.merchant_id == merchant_id,
         ProfitFeedOrder.recorded_at >= since,
     ).all()
 
-    gross = sum(o.gross_revenue for o in today_orders)
-    orders = len(today_orders)
-    aov = round(gross / orders, 2) if orders else 0.0
+    orders = len(window_orders)
 
-    breakdown = get_profit_breakdown(merchant_id)
+    breakdown = get_profit_breakdown(merchant_id, window_days=window_days)
+    gross = breakdown["gross_revenue"]
     net = breakdown["net_profit"]
     margin = breakdown["net_margin"]
+    aov = round(gross / orders, 2) if orders else 0.0
 
     channel_spend = _channel_ad_spend(merchant_id, since=since)
     ad_spend = sum(channel_spend.values())
 
     return {
         "merchant_id": merchant_id,
-        "window": "24h",
+        "window": f"{window_days * 24}h" if window_days < 2 else f"{window_days}d",
         "gross_revenue": round(gross, 2),
         "net_profit": round(net, 2),
         "net_margin": margin,

@@ -8,6 +8,7 @@ from typing import Any, Dict, List, Optional
 import agent_context
 import agent_memory
 import agent_tools
+import channel_analytics
 from models import db, PendingAction
 
 logger = logging.getLogger(__name__)
@@ -148,6 +149,69 @@ def _run_tool_loop(merchant_id: str, messages: List[Dict[str, Any]], max_rounds:
     return {"answer": _clean_answer(final.choices[0].message.content) if final else "Done.", "did": did}
 
 
+def _margin_answer(merchant_id: str, snap: Dict[str, Any]) -> Optional[str]:
+    """Where margin is leaking: per-channel true profit plus the cost lines behind it."""
+    try:
+        rows = channel_analytics.summarize_channels(merchant_id, days=30)
+    except Exception:
+        rows = []
+    if not rows:
+        return None
+
+    ranked = sorted(rows, key=lambda r: r.get("margin_pct", 0))
+    worst = ranked[0]
+    best = ranked[-1]
+    lines = [
+        f"Margin by channel over the last 30 days — {worst['channel'].title()} is your weakest at "
+        f"{worst['margin_pct']}% (${worst['net_profit']:,.0f} net on ${worst['revenue']:,.0f}), "
+        f"while {best['channel'].title()} runs at {best['margin_pct']}%."
+    ]
+    for row in ranked:
+        lines.append(
+            f"• {row['channel'].title()}: {row['margin_pct']}% margin · "
+            f"${row['net_profit']:,.0f} net on ${row['revenue']:,.0f} across {row['orders']} orders"
+        )
+
+    breakdown = snap.get("profit_breakdown") or {}
+    costs = [r for r in (breakdown.get("profit_rows") or []) if r.get("kind") == "out"]
+    if costs:
+        biggest = min(costs, key=lambda r: r.get("amount", 0))
+        lines.append(
+            f"Biggest cost line: {biggest['label'].lower()} at ${abs(biggest['amount']):,.0f}."
+        )
+
+    margin_alerts = [
+        a for a in (snap.get("alerts") or [])
+        if "margin" in (a.get("title", "") + a.get("detail", "")).lower()
+    ][:2]
+    for alert in margin_alerts:
+        lines.append(f"• {alert.get('title', '')}")
+
+    return "\n".join(lines)
+
+
+def _inventory_answer(snap: Dict[str, Any]) -> Optional[str]:
+    """Stockout risk pulled from the alert matrix and pending reorder actions."""
+    stock_alerts = [
+        a for a in (snap.get("alerts") or [])
+        if any(w in (a.get("title", "") + a.get("detail", "")).lower()
+               for w in ["stock", "runs out", "reorder", "inventory"])
+    ]
+    reorders = [
+        a for a in (snap.get("pending_actions") or [])
+        if "reorder" in (a.get("title", "") + a.get("action_type", "")).lower()
+    ]
+    if not stock_alerts and not reorders:
+        return None
+
+    lines = ["Inventory risk right now:"]
+    for alert in stock_alerts[:3]:
+        lines.append(f"• {alert.get('title', '')} — {alert.get('detail', '')}")
+    for action in reorders[:2]:
+        lines.append(f"• Ready to approve: {action.get('title', '')}")
+    return "\n".join(lines)
+
+
 def _local_answer(merchant_id: str, message: str) -> Dict[str, Any]:
     """Fallback when no LLM key is available: keyword-driven tool calls and summary."""
     msg = message.lower()
@@ -186,13 +250,45 @@ def _local_answer(merchant_id: str, message: str) -> Dict[str, Any]:
                 did.append(f"hook generation failed: {e}")
 
     snap = agent_context.get_snapshot(merchant_id)
-    context_str = agent_context.format_snapshot(snap)
+    logger.info("[Assistant] No LLM key configured; answering %s from live data only.", merchant_id)
 
-    answer = (
-        "Here's a quick read from your live data:\n\n" + context_str.replace("\n", "\n\n") +
-        "\n\nAdd an OPENAI_API_KEY or DEEPSEEK_API_KEY environment variable to unlock natural-language reasoning and deeper analysis."
-    )
-    return {"answer": answer, "did": did}
+    if any(w in msg for w in ["losing margin", "margin", "channel", "profit by", "least profitable"]):
+        margin_answer = _margin_answer(merchant_id, snap)
+        if margin_answer:
+            return {"answer": margin_answer, "did": did}
+
+    if any(w in msg for w in ["stock", "inventory", "reorder", "run out"]):
+        inventory_answer = _inventory_answer(snap)
+        if inventory_answer:
+            return {"answer": inventory_answer, "did": did}
+
+    kpis = snap.get("kpis") or {}
+    lines = [f"Here's where {snap.get('business_name', 'your store')} stands right now:"]
+
+    net = kpis.get("net_profit")
+    gross = kpis.get("gross_revenue")
+    margin = kpis.get("net_margin")
+    orders = kpis.get("orders")
+    if net is not None or gross is not None:
+        lines.append(
+            f"True net profit ${net:,.0f} on ${gross:,.0f} revenue "
+            f"({margin}% margin, {orders} orders)."
+            if isinstance(net, (int, float)) and isinstance(gross, (int, float))
+            else f"Net profit {net}, revenue {gross}."
+        )
+
+    connected = [c.get("name") for c in (snap.get("channels") or []) if c.get("state") == "connected"]
+    if connected:
+        lines.append("Connected channels: " + ", ".join(connected) + ".")
+
+    for alert in (snap.get("alerts") or [])[:3]:
+        lines.append(f"• {alert.get('severity', '').title()}: {alert.get('title', '')}")
+
+    top_action = (snap.get("pending_actions") or [])[:1]
+    if top_action:
+        lines.append(f"Recommended next step: {top_action[0].get('title', '')} — approve it in the Action Gate.")
+
+    return {"answer": "\n\n".join(lines), "did": did}
 
 
 def chat(merchant_id: str, user_message: str) -> Dict[str, Any]:
