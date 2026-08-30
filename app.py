@@ -65,6 +65,7 @@ import billing as billing_module
 import alert_matrix
 import vetted_operator
 import action_gate
+import welcome_pack
 import channel_auth
 import tenant_rls
 import rules_engine
@@ -3106,6 +3107,23 @@ def api_admin_merchants():
     return jsonify({"merchants": out, "count": len(out)}), 200
 
 
+@app.route('/api/admin/welcome-package/preview', methods=['GET'])
+@require_roles([UserRole.ADMIN, UserRole.ENGINEER])
+def api_admin_welcome_package_preview():
+    """Render the customer welcome package + invoice email for review (no send)."""
+    tier = request.args.get("tier", "Basic Tier")
+    paid = request.args.get("paid") == "1"
+    concierge = request.args.get("concierge") == "1"
+    sample = MerchantProfile(
+        merchant_id="tenant_preview",
+        business_name=request.args.get("business_name", ""),
+        admin_email=request.args.get("email", "merchant@vantavcommerce.com"),
+        account_tier=tier,
+    )
+    _, html, _ = welcome_pack.build_email(sample, tier=tier, paid=paid, concierge_bundle=concierge)
+    return html, 200, {"Content-Type": "text/html; charset=utf-8"}
+
+
 @app.route('/api/admin/merchants/<merchant_id>', methods=['PATCH'])
 @require_roles([UserRole.ADMIN])
 def api_admin_update_merchant(merchant_id):
@@ -4517,6 +4535,9 @@ def auth_signup():
     db.session.add(ActiveSession(token=session_token, merchant_id=merchant_id, role=UserRole.MERCHANT.value, created_at=now, last_seen=now))
     db.session.commit()
 
+    # 5. Email the welcome package + invoice. Delivery must never block sign-up.
+    welcome_pack.send_welcome_package(merchant_id, tier=tier)
+
     response = make_response(jsonify({
         "status": "SUCCESS",
         "message": "Multi-tenant engine environment provisioned flawlessly.",
@@ -5647,6 +5668,18 @@ def stripe_billing_webhook():
 
             db.session.commit()
             logger.info(f"[Stripe Pipeline] Merchant {merchant_target} upgraded to {chosen_tier}; seats={memory.max_authorized_seats}; concierge={concierge_bundle}")
+
+            # Paid receipt + tier welcome package. Only on checkout so renewals
+            # and subscription edits do not re-send the same email.
+            if event_type == "checkout.session.completed" and profile:
+                welcome_pack.send_welcome_package(
+                    merchant_target,
+                    tier=chosen_tier,
+                    amount_cents=session_obj.get("amount_total"),
+                    paid=True,
+                    concierge_bundle=concierge_bundle,
+                    invoice_reference=session_obj.get("invoice") or stripe_sub_id,
+                )
             return jsonify({"status": "tier_synchronized"}), 200
 
         if event_type == "customer.subscription.deleted":
@@ -6122,6 +6155,7 @@ def register_merchant():
         ))
         db.session.commit()
         logger.info(f"Tenant registered: {new_merchant_id} ({admin_email})")
+        welcome_pack.send_welcome_package(new_merchant_id)
         return jsonify({"success": True, "merchant_id": new_merchant_id, "status": "Workspace Schema Generated"}), 201
     except Exception as e:
         db.session.rollback()
