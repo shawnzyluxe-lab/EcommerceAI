@@ -162,8 +162,7 @@ def create_checkout_session(
         billing = SaaSBilling(merchant_id=merchant_id)
         db.session.add(billing)
     billing.stripe_customer_id = customer_id
-    billing.current_plan = selected_tier
-    billing.add_ons = list(set((billing.add_ons or []) + add_ons))
+    # Don't set current_plan/add_ons here; those are applied after successful payment.
     db.session.commit()
 
     subscription_data = {"metadata": subscription_metadata}
@@ -216,6 +215,30 @@ def verify_checkout_session(session_id: str) -> Dict[str, Any]:
         "metadata": session.get("metadata", {}),
         "subscription": session.get("subscription"),
     }
+
+
+def get_stripe_balance() -> Dict[str, Any]:
+    """Return Stripe account balance with available and pending amounts."""
+    _ensure_configured()
+    try:
+        bal = stripe.Balance.retrieve()
+        available = [
+            {"amount": b.amount, "currency": b.currency, "amount_decimal": b.amount / 100}
+            for b in bal.available
+        ]
+        pending = [
+            {"amount": b.amount, "currency": b.currency, "amount_decimal": b.amount / 100}
+            for b in bal.pending
+        ]
+        return {
+            "status": "ok",
+            "available": available,
+            "pending": pending,
+            "currency": available[0]["currency"] if available else None,
+        }
+    except Exception as e:
+        logger.error(f"[Stripe Balance] {e}")
+        return {"status": "error", "error": str(e), "available": [], "pending": []}
 
 
 def get_public_key():

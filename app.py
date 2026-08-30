@@ -26,6 +26,7 @@ from datetime import datetime, timedelta
 from enum import Enum
 from functools import wraps
 from typing import Optional
+from sqlalchemy import or_, func, text
 
 logging.basicConfig(
     level=logging.INFO,
@@ -39,6 +40,8 @@ from flask_sock import Sock
 from dotenv import load_dotenv
 
 load_dotenv()
+
+SEED_DEMO_DATA = os.environ.get("SEED_DEMO_DATA", "false").lower() in ("1", "true", "yes")
 
 SENTRY_DSN = os.environ.get("SENTRY_DSN", "")
 if SENTRY_DSN:
@@ -55,7 +58,7 @@ if SENTRY_DSN:
     except Exception as e:
         print(f"[SENTRY] Init failed: {e}")
 
-from models import db, Tenant, ConnectedChannel, ActiveSession, BusinessMetric, CommerceChannel, MerchantChannel, SupportMetric, MarketingStudio, PredictiveLogistics, OutboundTransmission, SaaSBilling, LocalProductCatalog, MerchantProfile, TenantOAuthToken, MerchantMetric, SystemExceptionLog, ProcessedWebhookEvent, AdSpendAnalytic, GeneratedPurchaseOrder, AIAgent, AgentMessage, MerchantDecisionLog, MagicLoginToken, TrendingProduct, ProductFinancialLedger, MerchantSetting, ProfitFeedOrder, AdSpendFeed, Alert, BetaWaitlistApplication, PendingAction, StartupPackProject, BusinessMemory, WorkspaceSeat, IntegrationLink, SecureChannelCredential, Product
+from models import db, Tenant, ConnectedChannel, ActiveSession, BusinessMetric, CommerceChannel, MerchantChannel, SupportMetric, MarketingStudio, PredictiveLogistics, OutboundTransmission, SaaSBilling, LocalProductCatalog, MerchantProfile, TenantOAuthToken, MerchantMetric, SystemExceptionLog, ProcessedWebhookEvent, AdSpendAnalytic, GeneratedPurchaseOrder, AIAgent, AgentMessage, SupportMessage, MerchantDecisionLog, MagicLoginToken, TrendingProduct, ProductFinancialLedger, MerchantSetting, ProfitFeedOrder, AdSpendFeed, Alert, BetaWaitlistApplication, PendingAction, StartupPackProject, BusinessMemory, WorkspaceSeat, IntegrationLink, SecureChannelCredential, Product, UnifiedOrder, OrderItem, AdminAuditLog, AdminPlatformControl
 import profit_feed
 import cache_barrier
 import billing as billing_module
@@ -98,6 +101,12 @@ from dashboard_context import (
     STRIPE,
     CATALOG,
     predictive_context,
+    ALL_DASHBOARD_PAGE_IDS,
+    PLACEHOLDER_DASHBOARD_PAGE_IDS,
+    BETA_LOCKED_PAGE_IDS,
+    sample_pages_enabled,
+    global_sync_paused,
+    maintenance_mode,
 )
 from trend_worker import run_trend_scrape, TrendingProductsScraper
 
@@ -188,7 +197,7 @@ manager = ConnectionManager()
 # ============================================================
 
 SITE_WALL_PASSWORD = os.environ.get("SITE_WALL_PASSWORD", "")
-MASTER_ADMIN_EMAIL = os.environ.get("MASTER_ADMIN_EMAIL", "shawn@shawnzyluxe.com,admin@shawnzyluxe.com")
+MASTER_ADMIN_EMAIL = os.environ.get("MASTER_ADMIN_EMAIL", "shawn@shawnzyluxe.com")
 MASTER_ADMIN_EMAILS = [e.strip().lower() for e in MASTER_ADMIN_EMAIL.split(",") if e.strip()]
 ENGINEER_EMAIL = os.environ.get("ENGINEER_EMAIL", "engineer@shawnzyluxe.com")
 ENGINEER_EMAILS = [e.strip().lower() for e in ENGINEER_EMAIL.split(",") if e.strip()]
@@ -260,23 +269,31 @@ def _delete_session_cookie(response):
 
 # Commercial-ready dashboard pages. Merchants can only reach these pages; admins and
 # engineers can still access every page in valid_pages for development.
-# Beta launch scope: overview, profit engine, alerts, billing, settings, and the
-# regression chart. All other sidebar pages are hidden from merchant nav.
+# Merchant-ready scope includes core financial and inventory views. Other pages
+# remain available to admins and engineers while they are being completed.
 COMMERCIAL_READY_DASHBOARD_PAGES = {
-    "overview", "alerts", "profit_engine", "billing", "settings", "regression_chart", "startup_pack", "onboarding_loading",
+    "overview", "alerts", "profit_engine", "inventory", "billing", "settings", "startup_pack", "onboarding_loading",
 }
 
-from tier_manager import TierManager, TIER_LIMITS, PLAN_TO_TIER
+from tier_manager import TierManager, TIER_LIMITS, PLAN_TO_TIER, DEFAULT_MERCHANT_PAGE_IDS
 
 # Backwards-compatible friendly name mapping used by auth signup/provision forms.
 TIER_NAME_MAP = {
     "Starter": "Basic Tier",
+    "operator": "Vantav Operator",
+    "growth": "Vantav Growth",
+    "scale": "Vantav Scale",
     "Operator": "Vantav Operator",
     "Growth": "Vantav Growth",
     "Scale": "Vantav Scale",
+    "Vantav Operator": "Vantav Operator",
+    "Vantav Growth": "Vantav Growth",
+    "Vantav Scale": "Vantav Scale",
+    "Basic Tier": "Basic Tier",
     "Pro": "Vantav Growth",
     "Enterprise": "Vantav Scale",
     "Concierge": "Concierge Bundle",
+    "Concierge Bundle": "Concierge Bundle",
 }
 
 
@@ -301,9 +318,9 @@ def _profile_for_email(email: str):
 def _canonical_tier(raw_tier: str) -> str:
     """Map legacy, marketing, or plan tier names to the canonical Vantav tier."""
     mapping = {
+        "Basic Tier": "Basic Tier",
         "Vantav Operator": "Vantav Operator",
         "Operator": "Vantav Operator",
-        "Basic Tier": "Vantav Operator",
         "Vantav Growth": "Vantav Growth",
         "Growth": "Vantav Growth",
         "Beta Tier": "Vantav Growth",
@@ -315,6 +332,83 @@ def _canonical_tier(raw_tier: str) -> str:
         "Concierge Bundle": "Vantav Scale",
     }
     return mapping.get(raw_tier, "Vantav Operator")
+
+
+def _merchant_requires_tier_selection(merchant: dict) -> bool:
+    """Return True when a merchant has signed in but not picked/confirmed a tier."""
+    if not merchant:
+        return False
+    if merchant.get("role") != UserRole.MERCHANT.value:
+        return False
+    if merchant.get("sandbox_status") in ("pending", "rejected", None, ""):
+        return True
+    return False
+
+
+def _tier_test_accounts() -> set:
+    """Emails that can bypass checkout for paid-tier testing."""
+    env_emails = {e.strip().lower() for e in os.environ.get('MERCHANT_TIER_TEST_ACCOUNTS', '').split(',') if e.strip()}
+    return env_emails | {'merchant@vantavcommerce.com'}
+
+
+def _reset_test_merchant_for_tier_testing(profile: MerchantProfile) -> None:
+    """Put a designated test merchant back into the tier-selection state."""
+    if not profile:
+        return
+    email = (profile.admin_email or "").strip().lower()
+    if email not in _tier_test_accounts():
+        return
+    profile.account_tier = "Basic Tier"
+    profile.sandbox_status = "pending"
+    profile.live_access_enabled = 0
+    billing = SaaSBilling.query.get(profile.merchant_id)
+    if not billing:
+        billing = SaaSBilling(merchant_id=profile.merchant_id)
+        db.session.add(billing)
+    billing.current_plan = "Basic Tier"
+    try:
+        memory = action_gate.get_business_memory(profile.merchant_id)
+        memory.max_authorized_seats = 1
+    except Exception:
+        pass
+
+
+def _protected_merchant_ids() -> set:
+    """Merchant IDs the admin must never delete from the live database."""
+    protected = set()
+    for email in ('shawn@shawnzyluxe.com', 'engineer@shawnzyluxe.com', 'merchant@vantavcommerce.com'):
+        p = _profile_for_email(email)
+        if p:
+            protected.add(p.merchant_id)
+    return protected
+
+
+def _cascade_delete_merchant(merchant_id: str) -> None:
+    """Delete every row that references the merchant across all tables except the profile itself."""
+    # Some child tables don't have a merchant_id column but hold FKs to merchant-owned rows.
+    # Remove them first so the generic merchant_id pass doesn't hit RESTRICT constraints.
+    db.session.execute(text("""
+        DELETE FROM order_items
+        WHERE order_id IN (SELECT id FROM orders WHERE merchant_id = :merchant_id)
+    """), {"merchant_id": merchant_id})
+    db.session.execute(text("""
+        DELETE FROM daily_costs
+        WHERE sku IN (SELECT sku FROM products WHERE merchant_id = :merchant_id)
+    """), {"merchant_id": merchant_id})
+
+    for table in reversed(db.metadata.sorted_tables):
+        if table.name == 'merchant_profiles':
+            continue
+        conditions = []
+        for col in table.columns:
+            if col.name in ('merchant_id', 'original_merchant_id', 'impersonating_merchant_id'):
+                conditions.append(col == merchant_id)
+        if not conditions:
+            continue
+        try:
+            db.session.execute(table.delete().where(or_(*conditions)))
+        except Exception as e:
+            logger.warning(f"[CascadeDelete] {table.name}: {e}")
 
 
 def get_current_user():
@@ -349,8 +443,10 @@ def require_roles(permitted_roles):
         @wraps(endpoint_function)
         def wrapper(*args, **kwargs):
             s = get_current_user()
-            if not s or s.role not in [role.value for role in permitted_roles]:
-                return jsonify({"error": "SECURITY PROTOCOL VIOLATION: Unauthorized endpoint access attempt. Session invalidated."}), 403
+            if not s:
+                return jsonify({"error": "Session expired or missing. Please log in."}), 403
+            if s.role not in [role.value for role in permitted_roles]:
+                return jsonify({"error": "Access denied. Your session does not have the required role for this endpoint."}), 403
             return endpoint_function(*args, **kwargs)
         return wrapper
     return decorator
@@ -359,7 +455,8 @@ def require_roles(permitted_roles):
 def verify_captcha_v3(token: str) -> float:
     """Validate a Google reCAPTCHA v3 token and return the bot score (0.0-1.0)."""
     if not RECAPTCHA_SECRET_KEY:
-        return 1.0  # If not configured, fail open for local dev
+        # Fail open only in unit tests; require a real secret in production.
+        return 1.0 if app.config.get("TESTING") else 0.0
     try:
         response = requests.post(RECAPTCHA_VERIFY_URL, data={
             "secret": RECAPTCHA_SECRET_KEY,
@@ -391,42 +488,47 @@ class WebhookOrderPayload:
         )
 
 
-class GlobalSystemCircuitBreaker:
-    """Redis-backed global kill switch for background channel sync workers."""
-    def __init__(self, redis_url: str):
-        try:
-            import redis.asyncio as redis
-            self.client = redis.from_url(redis_url)
-            self.enabled = True
-        except Exception as e:
-            logger.warning(f"Redis unavailable for circuit breaker: {e}")
-            self.client = None
-            self.enabled = False
-        self.switch_key = "sys:matrix:global_sync_lock"
-
-    async def engage_global_kill_switch(self):
-        if not self.client:
-            return
-        await self.client.set(self.switch_key, "HALTED")
-        logger.info("[HARD EXECUTABLE CONTROL] Global synchronization pipelines PAUSED.")
-
-    async def release_system_lock(self):
-        if not self.client:
-            return
-        await self.client.set(self.switch_key, "OPERATIONAL")
-        logger.info("[HARD EXECUTABLE CONTROL] Global synchronization pipelines restored.")
-
-    async def verify_pipeline_clearance(self) -> bool:
-        if not self.client:
-            return True
-        status = await self.client.get(self.switch_key)
-        if status == b"HALTED":
-            return False
-        return True
+# Global sync pause is controlled through AdminPlatformControl, not Redis.
+# No runtime Redis dependency for the order pipeline.
 
 
-REDIS_URL = os.environ.get("REDIS_URL", "redis://localhost:6379")
-circuit_breaker = GlobalSystemCircuitBreaker(REDIS_URL)
+# Admin kill switch: sync endpoints that are paused when global_sync_paused is true.
+_SYNC_ENDPOINTS = {
+    "api_sync_shopify",
+    "api_get_shopify_products",
+    "api_sync_tiktok",
+    "api_get_tiktok_products",
+    "api_sync_amazon",
+    "api_initialize_onboarding_harvest",
+    "api_admin_sync_shopify",
+    "api_admin_sync_tiktok",
+    "api_admin_sync_tiktok_marketing",
+    "api_admin_sync_amazon",
+    "api_admin_sync_ebay",
+    "api_admin_sync_walmart",
+    "api_admin_sync_bigcommerce",
+    "api_admin_sync_woocommerce",
+}
+
+
+def log_admin_audit(action: str, target_merchant_id: str = None, details: dict = None):
+    """Write an immutable admin action to the audit log."""
+    try:
+        s = get_current_user()
+        email = ""
+        if s and s.merchant_id:
+            admin_profile = MerchantProfile.query.get(s.merchant_id)
+            email = admin_profile.admin_email if admin_profile else ""
+        log = AdminAuditLog(
+            admin_email=email or "admin",
+            action=action,
+            target_merchant_id=target_merchant_id,
+            details=details or {},
+        )
+        db.session.add(log)
+        db.session.commit()
+    except Exception as e:
+        logger.warning(f"[AdminAudit] failed to write {action}: {e}")
 
 
 async def dispatch_shopify_sync(tenant_id: str, sku: str, new_stock: int):
@@ -445,7 +547,7 @@ async def dispatch_amazon_mcf(tenant_id: str, sku: str, order_payload: dict):
 
 async def process_incoming_order_event(event_data: dict):
     """Absorb webhook order data, enforce tier policy, update DB, and fire multi-channel async workers."""
-    if not await circuit_breaker.verify_pipeline_clearance():
+    if global_sync_paused():
         logger.warning("[CIRCUIT BREAKER] Incoming order dropped. System sync is HALTED.")
         return False
 
@@ -565,7 +667,12 @@ def sync_workspace_seat_count(merchant_id: str) -> int:
 
 
 def get_merchant_context():
-    """Resolve merchant_id, account_tier, and business_name from the active session cookie."""
+    """Resolve merchant_id, account_tier, and business_name from the active session cookie.
+
+    If the session is impersonating another merchant (admin view-as-merchant), the
+    returned merchant dict reflects the impersonated tenant while the session object
+    retains the admin's credentials for endpoint authorization.
+    """
     token = request.cookies.get(SESSION_COOKIE_NAME)
     if not token:
         return None
@@ -587,11 +694,35 @@ def get_merchant_context():
     if request.headers.get('X-Session-Refresh') != 'false':
         s.last_seen = now
         db.session.commit()
+
+    # Admin impersonation: view the dashboard and data as another merchant.
+    is_impersonating = bool(s.impersonating_merchant_id)
+    view_merchant_id = s.impersonating_merchant_id or s.merchant_id
+
     # Bind the database session to this tenant for RLS when using the restricted app role.
-    tenant_rls.set_tenant_scope(s.merchant_id)
-    profile = MerchantProfile.query.get(s.merchant_id)
+    tenant_rls.set_tenant_scope(view_merchant_id)
+    profile = MerchantProfile.query.get(view_merchant_id)
     if not profile:
         return None
+
+    # Re-evaluate role on every request so stale sessions pick up master-admin
+    # changes without forcing a logout/login after deploys. Never overwrite the
+    # admin role while an admin is impersonating a merchant.
+    admin_email = (profile.admin_email or "").strip().lower()
+    if is_impersonating:
+        # The merchant being viewed is always rendered with the merchant role so
+        # the admin dashboard (rather than merchant dashboard) doesn't appear.
+        effective_role = UserRole.MERCHANT.value
+    elif admin_email in MASTER_ADMIN_EMAILS:
+        effective_role = UserRole.ADMIN.value
+    elif admin_email in ENGINEER_EMAILS:
+        effective_role = UserRole.ENGINEER.value
+    else:
+        effective_role = UserRole.MERCHANT.value
+    if not is_impersonating and s.role != effective_role:
+        s.role = effective_role
+        db.session.commit()
+
     # Canonicalize legacy or plan tier names so the UI and gating see the right tier.
     raw_tier = (profile.account_tier or "Basic Tier").strip()
     tier = _canonical_tier(raw_tier)
@@ -601,15 +732,16 @@ def get_merchant_context():
     if sandbox_status == "sandbox" and profile.sandbox_expires_at and profile.sandbox_expires_at <= now:
         sandbox_status = "expired"
         sandbox_expired = True
-    display_name = profile.business_name or (profile.admin_email.split("@")[0] if profile.admin_email and "@" in profile.admin_email else s.merchant_id)
-    billing = SaaSBilling.query.get(s.merchant_id)
+    display_name = profile.business_name or (profile.admin_email.split("@")[0] if profile.admin_email and "@" in profile.admin_email else view_merchant_id)
+    billing = SaaSBilling.query.get(view_merchant_id)
     concierge_bundle = False
     if billing and billing.add_ons:
         concierge_bundle = "concierge_bundle" in (billing.add_ons if isinstance(billing.add_ons, list) else [])
-    theme_setting = MerchantSetting.query.get((s.merchant_id, "theme"))
-    account_holder_setting = MerchantSetting.query.get((s.merchant_id, "account_holder_name"))
-    return {
-        "id": s.merchant_id,
+    theme_setting = MerchantSetting.query.get((view_merchant_id, "theme"))
+    account_holder_setting = MerchantSetting.query.get((view_merchant_id, "account_holder_name"))
+
+    ctx = {
+        "id": view_merchant_id,
         "tier": tier,
         "tier_meta": tier_meta,
         "concierge_bundle": concierge_bundle,
@@ -622,9 +754,16 @@ def get_merchant_context():
         "sandbox_expired": sandbox_expired,
         "brand_color": profile.brand_color or "#8b5cf6",
         "brand_color_secondary": profile.brand_color_secondary or "#a78bfa",
+        "feature_flags": profile.feature_flags or {},
         "theme": theme_setting.setting_value if theme_setting else "prometheus-dark",
-        "role": s.role,
+        "role": effective_role,
     }
+    if is_impersonating:
+        ctx["is_impersonating"] = True
+        ctx["impersonating_merchant_id"] = s.impersonating_merchant_id
+        ctx["original_merchant_id"] = s.original_merchant_id or s.merchant_id
+        ctx["original_role"] = s.original_role or s.role
+    return ctx
 
 
 def check_tier_limits(merchant_id, requested_feature):
@@ -667,11 +806,26 @@ def enforce_tier_limits(merchant_id, requested_feature):
 def site_wall_protect():
     if not site_wall_enabled():
         return None
-    if request.endpoint in ('home', 'login', 'site_login', 'site_logout', 'subscribe', 'checkout', 'thank_you', 'session_heartbeat', 'create_stripe_checkout', 'beta_apply', 'api_beta_apply', 'auth_login', 'auth_signup', 'auth_provision_node', 'shopify_orders_webhook', 'tiktok_orders_webhook', 'amazon_orders_webhook', 'stripe_billing_webhook', 'supplier_po_update', 'execute_mitigation', 'generate_magic_link', 'magic_login', 'register_merchant', 'shopify_oauth_callback', 'tiktok_oauth_callback', 'health_check', 'legal_terms', 'legal_privacy', 'legal_refund', 'static'):
+    if request.endpoint in ('home', 'login', 'site_login', 'site_logout', 'subscribe', 'checkout', 'thank_you', 'session_heartbeat', 'create_stripe_checkout', 'beta_apply', 'api_beta_apply', 'auth_login', 'auth_signup', 'auth_provision_node', 'shopify_orders_webhook', 'shopify_gdpr_customer_data_request', 'shopify_gdpr_customer_redact', 'shopify_gdpr_shop_redact', 'shopify_app_uninstalled', 'tiktok_orders_webhook', 'amazon_orders_webhook', 'stripe_billing_webhook', 'supplier_po_update', 'execute_mitigation', 'generate_magic_link', 'magic_login', 'register_merchant', 'shopify_oauth_callback', 'tiktok_oauth_callback', 'health_check', 'api_v1_health', 'api_monitoring_health', 'api_monitoring_alerts', 'legal_terms', 'legal_privacy', 'legal_refund', 'static'):
         return None
     if site_wall_authenticated():
         return None
+    if request.path.startswith('/api/'):
+        return jsonify({"error": "Session expired or missing. Please log in."}), 403
     return redirect(url_for('login'))
+
+
+@app.before_request
+def admin_kill_switch():
+    """Reject sync requests when the admin kill switch is engaged."""
+    if request.endpoint not in _SYNC_ENDPOINTS:
+        return None
+    try:
+        if global_sync_paused():
+            return jsonify({"detail": "Platform sync is temporarily paused by the administrator."}), 503
+    except Exception as e:
+        logger.warning(f"[KillSwitch] check failed: {e}")
+    return None
 
 
 # ============================================================
@@ -720,6 +874,18 @@ TIKTOK_SERVICE_ID = os.environ.get("TIKTOK_SERVICE_ID", "")
 TIKTOK_AUTH_REGION = os.environ.get("TIKTOK_AUTH_REGION", "")
 TIKTOK_REDIRECT_URI = "https://vantavcommerce.com/api/v1/auth/tiktok/callback"
 
+
+def _tiktok_creds_for_region(region: str = ""):
+    """Return region-specific TikTok app credentials, falling back to global env."""
+    r = (region or TIKTOK_AUTH_REGION or "").strip().upper() or ""
+    if r and r != "GLOBAL":
+        app_key = os.environ.get(f"TIKTOK_APP_KEY_{r}") or TIKTOK_APP_KEY
+        app_secret = os.environ.get(f"TIKTOK_APP_SECRET_{r}") or TIKTOK_APP_SECRET
+        service_id = os.environ.get(f"TIKTOK_SERVICE_ID_{r}") or TIKTOK_SERVICE_ID
+    else:
+        app_key, app_secret, service_id = TIKTOK_APP_KEY, TIKTOK_APP_SECRET, TIKTOK_SERVICE_ID
+    return app_key, app_secret, service_id
+
 SHOPIFY_DOMAIN = os.environ.get('SHOPIFY_DOMAIN', '').strip()
 STOREFRONT_TOKEN = os.environ.get('SHOPIFY_STOREFRONT_TOKEN', '').strip()
 CUSTOMER_ACCOUNT_CLIENT_ID = os.environ.get('SHOPIFY_CUSTOMER_ACCOUNT_CLIENT_ID', '').strip()
@@ -735,6 +901,11 @@ with app.app_context():
     except Exception as e:
         app.logger.warning(f"Startup migration helper failed: {e}")
     db.create_all()
+    if DATABASE_URL.startswith("sqlite"):
+        try:
+            migrate_module.ensure_sqlite_schema(db)
+        except Exception as e:
+            app.logger.warning(f"Startup SQLite schema check failed: {e}")
 
     # Clean expired sessions
     ActiveSession.query.filter(
@@ -742,11 +913,28 @@ with app.app_context():
     ).delete(synchronize_session=False)
     db.session.commit()
 
+    # Clean up stale Redis TEARDOWN exception rows that were logged before the
+    # cache barrier was hardened. These are operational noise, not actionable.
+    try:
+        cutoff = datetime.utcnow() - timedelta(hours=1)
+        deleted = SystemExceptionLog.query.filter(
+            SystemExceptionLog.module_origin == 'TEARDOWN',
+            or_(
+                SystemExceptionLog.exception_msg.ilike('%6379%'),
+                SystemExceptionLog.exception_msg.ilike('%redis%'),
+            ),
+            SystemExceptionLog.timestamp < cutoff,
+        ).delete(synchronize_session=False)
+        if deleted:
+            app.logger.info(f"Cleaned up {deleted} stale Redis TEARDOWN exception(s).")
+            db.session.commit()
+    except Exception as e:
+        app.logger.warning(f"Failed to clean stale Redis TEARDOWN exceptions: {e}")
+
     # Seed / refresh multi-tenant merchant profiles first (other tables FK to it)
-    temp_password = os.environ.get("TEMP_ACCOUNTS_PASSWORD") or (SITE_WALL_PASSWORD if SITE_WALL_PASSWORD else "IfxSVNs4iAs")
+    temp_password = os.environ.get("TEMP_ACCOUNTS_PASSWORD") or SITE_WALL_PASSWORD
     temp_accounts = [
         ("merchant_shawn_01", "Shawnzyluxe Pro", "shawn@shawnzyluxe.com", "Beta Tier"),
-        ("merchant_admin_temp", "Temporary Admin", "admin@shawnzyluxe.com", "Enterprise AI Tier"),
         ("merchant_engineer_temp", "Temporary Engineer", "engineer@shawnzyluxe.com", "Pro Tier"),
     ]
     for mid, name, email, tier in temp_accounts:
@@ -757,7 +945,10 @@ with app.app_context():
             # Preserve tiers set by live Stripe webhooks (anything above Basic).
             if not p.account_tier or p.account_tier == "Basic Tier":
                 p.account_tier = tier
-            p.password_hash = generate_password_hash(temp_password, method="pbkdf2:sha256")
+            # Only overwrite the password hash when an explicit temp-password env var
+            # is set; otherwise preserve the existing password (e.g. a user reset).
+            if os.environ.get("TEMP_ACCOUNTS_PASSWORD"):
+                p.password_hash = generate_password_hash(temp_password, method="pbkdf2:sha256")
             p.sandbox_status = "approved"
             p.live_access_enabled = 1
         else:
@@ -766,35 +957,50 @@ with app.app_context():
                 business_name=name,
                 admin_email=email,
                 account_tier=tier,
-                password_hash=generate_password_hash(temp_password, method="pbkdf2:sha256"),
+                password_hash=generate_password_hash(temp_password, method="pbkdf2:sha256") if temp_password else "",
                 sandbox_status="approved",
                 live_access_enabled=1,
             ))
-    if not MerchantProfile.query.get("merchant_guest_02"):
-        db.session.add(MerchantProfile(merchant_id="merchant_guest_02", business_name="Alpha Storefronts", admin_email="guest@alpha.com", account_tier="Pro Tier", password_hash="", sandbox_status="approved", live_access_enabled=1))
     db.session.commit()
 
     # Seed FK-dependent merchant data now that profiles exist
     if not MerchantMetric.query.filter_by(merchant_id="merchant_shawn_01").first():
-        db.session.add(MerchantMetric(merchant_id="merchant_shawn_01", total_unified_balance=20560.00, true_net_profit=1394.00, gross_revenue=4582.00, ai_briefing="System initialized."))
-    if not MerchantMetric.query.filter_by(merchant_id="merchant_guest_02").first():
-        db.session.add(MerchantMetric(merchant_id="merchant_guest_02", total_unified_balance=1240.00, true_net_profit=410.00, gross_revenue=890.00, ai_briefing="System initialized."))
+        db.session.add(MerchantMetric(
+            merchant_id="merchant_shawn_01",
+            total_unified_balance=20560.00 if SEED_DEMO_DATA else 0.0,
+            true_net_profit=1394.00 if SEED_DEMO_DATA else 0.0,
+            gross_revenue=4582.00 if SEED_DEMO_DATA else 0.0,
+            ai_briefing="System initialized." if SEED_DEMO_DATA else "No sales data yet.",
+        ))
     if not MerchantChannel.query.filter_by(merchant_id="merchant_shawn_01").first():
-        db.session.add(MerchantChannel(merchant_id="merchant_shawn_01", channel_id="shopify", pending_orders=12, conversion_rate=3.4))
-        db.session.add(MerchantChannel(merchant_id="merchant_shawn_01", channel_id="amazon", pending_orders=4, conversion_rate=2.8))
-        db.session.add(MerchantChannel(merchant_id="merchant_shawn_01", channel_id="tiktok", pending_orders=7, conversion_rate=4.1))
+        channel_defaults = {
+            "shopify": (12, 3.4),
+            "amazon": (4, 2.8),
+            "tiktok": (7, 4.1),
+        } if SEED_DEMO_DATA else {
+            "shopify": (0, 0.0),
+            "amazon": (0, 0.0),
+            "tiktok": (0, 0.0),
+        }
+        for channel_id, (pending_orders, conversion_rate) in channel_defaults.items():
+            db.session.add(MerchantChannel(
+                merchant_id="merchant_shawn_01",
+                channel_id=channel_id,
+                pending_orders=pending_orders,
+                conversion_rate=conversion_rate,
+            ))
     if not SystemExceptionLog.query.first():
         db.session.add(SystemExceptionLog(module_origin="DATABASE_CORE", error_severity="INFO", exception_msg="Relational multi-tenant isolation layer fully hardened."))
     db.session.commit()
 
     # Seed or restore business metrics
-    if not BusinessMetric.query.first():
+    if not BusinessMetric.query.filter_by(merchant_id="merchant_shawn_01").first():
         db.session.add(BusinessMetric(
             merchant_id="merchant_shawn_01",
-            total_unified_balance=20560.00,
-            true_net_profit=1394.00,
-            gross_revenue=4582.00,
-            ai_briefing=COO["narrative"],
+            total_unified_balance=20560.00 if SEED_DEMO_DATA else 0.0,
+            true_net_profit=1394.00 if SEED_DEMO_DATA else 0.0,
+            gross_revenue=4582.00 if SEED_DEMO_DATA else 0.0,
+            ai_briefing=COO["narrative"] if SEED_DEMO_DATA else "No sales data yet.",
         ))
     latest = BusinessMetric.query.order_by(BusinessMetric.id.desc()).first()
     if latest:
@@ -806,19 +1012,33 @@ with app.app_context():
         BRIEFING["revenue"] = latest.gross_revenue
         BRIEFING["profit"] = latest.true_net_profit
 
-    # Seed the real-time Profit Feed with demo data if no orders exist yet.
-    profit_feed.seed_demo_data("merchant_shawn_01")
-    profit_feed.seed_demo_data("merchant_guest_02")
+    if SEED_DEMO_DATA:
+        profit_feed.seed_demo_data("merchant_shawn_01")
 
     # Seed / refresh the Alert Matrix from latest data.
-    alert_matrix.seed_demo_alerts("merchant_shawn_01")
+    if SEED_DEMO_DATA:
+        alert_matrix.seed_demo_alerts("merchant_shawn_01")
     alert_matrix.refresh_alerts("merchant_shawn_01")
 
     # Seed or restore commerce channels
     if not CommerceChannel.query.first():
-        db.session.add(CommerceChannel(channel_id="shopify", channel_name="Shopify Storefront", pending_orders=12, conversion_rate=3.4, performance_status="Optimal"))
-        db.session.add(CommerceChannel(channel_id="tiktok", channel_name="TikTok Shop", pending_orders=7, conversion_rate=4.1, performance_status="Trending"))
-        db.session.add(CommerceChannel(channel_id="amazon", channel_name="Amazon Marketplace", pending_orders=4, conversion_rate=2.8, performance_status="Stable"))
+        commerce_defaults = [
+            ("shopify", "Shopify Storefront", 12, 3.4, "Optimal"),
+            ("tiktok", "TikTok Shop", 7, 4.1, "Trending"),
+            ("amazon", "Amazon Marketplace", 4, 2.8, "Stable"),
+        ] if SEED_DEMO_DATA else [
+            ("shopify", "Shopify Storefront", 0, 0.0, "Not connected"),
+            ("tiktok", "TikTok Shop", 0, 0.0, "Not connected"),
+            ("amazon", "Amazon Marketplace", 0, 0.0, "Not connected"),
+        ]
+        for channel_id, channel_name, pending_orders, conversion_rate, performance_status in commerce_defaults:
+            db.session.add(CommerceChannel(
+                channel_id=channel_id,
+                channel_name=channel_name,
+                pending_orders=pending_orders,
+                conversion_rate=conversion_rate,
+                performance_status=performance_status,
+            ))
     for cc in CommerceChannel.query.all():
         DASHBOARD_STATE["channels"][cc.channel_id]["pending_orders"] = cc.pending_orders
         feed = next((f for f in DASHBOARD_STATE["conversion_feeds"] if cc.channel_name.lower() in f["store"].lower()), None)
@@ -833,9 +1053,9 @@ with app.app_context():
     # Seed or restore support metrics
     if not SupportMetric.query.first():
         db.session.add(SupportMetric(
-            active_chats=DASHBOARD_STATE["support_chats"],
-            sentiment_score=DASHBOARD_STATE["support_sentiment"],
-            recent_resolution=DASHBOARD_STATE["support_resolution"],
+            active_chats=DASHBOARD_STATE["support_chats"] if SEED_DEMO_DATA else 0,
+            sentiment_score=DASHBOARD_STATE["support_sentiment"] if SEED_DEMO_DATA else "No data",
+            recent_resolution=DASHBOARD_STATE["support_resolution"] if SEED_DEMO_DATA else "No support activity yet.",
         ))
     latest_support = SupportMetric.query.order_by(SupportMetric.id.desc()).first()
     if latest_support:
@@ -849,10 +1069,10 @@ with app.app_context():
     # Seed or restore marketing studio
     if not MarketingStudio.query.first():
         db.session.add(MarketingStudio(
-            active_campaign=DASHBOARD_STATE["mktg_campaign"],
-            generation_status=DASHBOARD_STATE["mktg_status"],
-            platform_target="Shopify / SMS",
-            copy_preview=DASHBOARD_STATE["mktg_copy"],
+            active_campaign=DASHBOARD_STATE["mktg_campaign"] if SEED_DEMO_DATA else "",
+            generation_status=DASHBOARD_STATE["mktg_status"] if SEED_DEMO_DATA else "Not started",
+            platform_target="Shopify / SMS" if SEED_DEMO_DATA else "",
+            copy_preview=DASHBOARD_STATE["mktg_copy"] if SEED_DEMO_DATA else "",
         ))
     latest_mktg = MarketingStudio.query.order_by(MarketingStudio.id.desc()).first()
     if latest_mktg:
@@ -864,7 +1084,7 @@ with app.app_context():
         MARKETING["copy"] = latest_mktg.copy_preview
 
     # Seed or restore predictive logistics
-    if not PredictiveLogistics.query.first():
+    if SEED_DEMO_DATA and not PredictiveLogistics.query.first():
         db.session.add(PredictiveLogistics(
             variant_sku="SZL-VAR-B",
             days_remaining=4,
@@ -886,14 +1106,14 @@ with app.app_context():
     if not SaaSBilling.query.first():
         db.session.add(SaaSBilling(
             merchant_id="merchant_shawn_01",
-            stripe_customer_id="cus_R8zX1042",
-            stripe_subscription_item_id="si_R8zX1042_metered",
-            current_plan="Enterprise AI Tier",
-            metered_usage_units=4820,
-            accrued_invoice_value=241.00,
-            billing_cycle_end="2026-09-01",
+            stripe_customer_id="cus_R8zX1042" if SEED_DEMO_DATA else "",
+            stripe_subscription_item_id="si_R8zX1042_metered" if SEED_DEMO_DATA else "",
+            current_plan="Enterprise AI Tier" if SEED_DEMO_DATA else "Beta Tier",
+            metered_usage_units=4820 if SEED_DEMO_DATA else 0,
+            accrued_invoice_value=241.00 if SEED_DEMO_DATA else 0.0,
+            billing_cycle_end="2026-09-01" if SEED_DEMO_DATA else "",
         ))
-    if not LocalProductCatalog.query.first():
+    if SEED_DEMO_DATA and not LocalProductCatalog.query.first():
         db.session.add(LocalProductCatalog(
             shopify_product_id="prod_882041",
             title="Shawnzyluxe Luxury Hoodie",
@@ -908,18 +1128,18 @@ with app.app_context():
             price=45.00,
             inventory_quantity=140,
         ))
-    if not AdSpendAnalytic.query.first():
+    if SEED_DEMO_DATA and not AdSpendAnalytic.query.first():
         db.session.add(AdSpendAnalytic(merchant_id="merchant_shawn_01", platform_source="Shopify Product Ads", budget_allocated=1500.00, current_spend=420.00, roas=3.4, conversion_count=28))
         db.session.add(AdSpendAnalytic(merchant_id="merchant_shawn_01", platform_source="TikTok Video Ads", budget_allocated=2000.00, current_spend=680.00, roas=4.1, conversion_count=47))
         db.session.add(AdSpendAnalytic(merchant_id="merchant_shawn_01", platform_source="Meta Retargeting Loop", budget_allocated=1200.00, current_spend=310.00, roas=2.9, conversion_count=19))
-    if not GeneratedPurchaseOrder.query.first():
+    if SEED_DEMO_DATA and not GeneratedPurchaseOrder.query.first():
         db.session.add(GeneratedPurchaseOrder(po_reference="PO-SZL-A8F2", merchant_id="merchant_shawn_01", variant_sku="SZL-VAR-B", units_ordered=450, fulfillment_status="PENDING"))
-    if not AIAgent.query.first():
+    if SEED_DEMO_DATA and not AIAgent.query.first():
         db.session.add(AIAgent(agent_id="agent_logistics", merchant_id="merchant_shawn_01", agent_name="Operations Analyst", agent_role="Operations", status="IDLE_MONITORING", last_action="Reviewed inventory levels and flagged restock needs."))
         db.session.add(AIAgent(agent_id="agent_finance", merchant_id="merchant_shawn_01", agent_name="Finance Analyst", agent_role="Finance", status="IDLE_MONITORING", last_action="Checked cash flow and ad budget headroom."))
         db.session.add(AIAgent(agent_id="agent_marketing", merchant_id="merchant_shawn_01", agent_name="Marketing Analyst", agent_role="Marketing", status="IDLE_MONITORING", last_action="Standing by for campaign instructions."))
         db.session.add(AIAgent(agent_id="agent_support", merchant_id="merchant_shawn_01", agent_name="Support Analyst", agent_role="Support", status="IDLE_MONITORING", last_action="Monitoring customer ticket trends across channels."))
-    if not AgentMessage.query.first():
+    if SEED_DEMO_DATA and not AgentMessage.query.first():
         db.session.add(AgentMessage(sender_agent="agent_logistics", recipient_agent="agent_finance", merchant_id="merchant_shawn_01",
                                     payload="Alert: SKU SZL-VAR-B inventory velocity tracking indicates total stockout threat in 96 hours.", action_taken="stockout_alert"))
         db.session.add(AgentMessage(sender_agent="agent_finance", recipient_agent="agent_marketing", merchant_id="merchant_shawn_01",
@@ -1419,7 +1639,8 @@ def checkout():
     host = request.host.split(':')[0].lower()
     if host in ('shawnzyluxe.com', 'www.shawnzyluxe.com'):
         return render_template('coming_soon.html')
-    return render_template('checkout.html')
+    merchant = get_merchant_context()
+    return render_template('checkout.html', merchant=merchant)
 
 
 @app.route('/thank-you')
@@ -1474,6 +1695,10 @@ def dashboard():
     merchant = get_merchant_context()
     if not merchant:
         return redirect(url_for('login'))
+    if merchant.get('role') == UserRole.ADMIN.value:
+        return redirect(url_for('admin_dashboard'))
+    if merchant.get('role') == UserRole.ENGINEER.value:
+        return redirect(url_for('engineer_dashboard'))
     merchant_id = merchant["id"]
 
     # If the merchant just returned from Stripe, verify the checkout session
@@ -1498,10 +1723,17 @@ def dashboard():
                         billing.current_plan = chosen_tier
                         if concierge_bundle and "concierge_bundle" not in (billing.add_ons or []):
                             billing.add_ons = list((billing.add_ons or []) + ["concierge_bundle"])
+                    # Sync workspace seat limits to the paid tier.
+                    memory = action_gate.get_business_memory(merchant_id)
+                    tier_meta = TierManager.get_tier_meta(chosen_tier)
+                    memory.max_authorized_seats = int(tier_meta.get("max_users", 1))
                     db.session.commit()
                     merchant = get_merchant_context()
         except Exception as e:
             logger.warning(f"[Dashboard] Checkout verification failed: {e}")
+
+    if _merchant_requires_tier_selection(merchant):
+        return redirect(url_for('choose_tier'))
 
     ctx = context(active_page='overview', merchant=merchant, merchant_id=merchant_id)
     ctx["show_brand_build_prompt"] = (
@@ -1538,10 +1770,13 @@ def dashboard_page(page):
     merchant = get_merchant_context()
     if not merchant:
         return redirect(url_for('login'))
+    if _merchant_requires_tier_selection(merchant):
+        return redirect(url_for('choose_tier'))
+    s = get_current_user()
     active_page = page.replace('-', '_')
     # Pages merged into the unified Settings page.
     if active_page in ('billing', 'integrations', 'themes', 'commerce_hub'):
-        redirect_kwargs = {'page': 'settings', 'tab': 'stores'}
+        redirect_kwargs = {'page': 'settings', 'tab': 'billing' if active_page == 'billing' else 'stores'}
         if request.args.get('checkout') == 'success':
             redirect_kwargs['checkout'] = 'success'
             if request.args.get('concierge_bundle') == 'true':
@@ -1558,19 +1793,27 @@ def dashboard_page(page):
     }
     if active_page not in valid_pages:
         return redirect(url_for('dashboard'))
-    # Commercial gating: merchants can only reach the pages that are live and
-    # backed by real data. Admins and engineers can still reach any page.
-    s = get_current_user()
-    if not s or s.role not in (UserRole.ADMIN.value, UserRole.ENGINEER.value):
-        if active_page not in COMMERCIAL_READY_DASHBOARD_PAGES:
-            return redirect(url_for('dashboard'))
-        # Brand Build is locked behind the Concierge Bundle add-on.
-        if active_page == 'startup_pack' and not merchant.get('concierge_bundle'):
-            return redirect(url_for('dashboard_page', page='settings', tab='billing'))
     ctx = _dashboard_context(active_page)
-    # Tier-based page gating (admins and engineers bypass tier limits).
-    if s.role not in (UserRole.ADMIN.value, UserRole.ENGINEER.value):
-        if not TierManager.can_access_page(merchant["tier"], active_page):
+    # Closed-beta gating: hide all non-beta modules from merchants unless the
+    # admin has enabled sample/non-beta pages for testing or the merchant is a
+    # designated tier-testing account.
+    if not s or s.role not in (UserRole.ADMIN.value, UserRole.ENGINEER.value):
+        tier_test_account = TierManager.is_tier_test_account((merchant or {}).get("email", ""))
+        if active_page in BETA_LOCKED_PAGE_IDS and not sample_pages_enabled() and not tier_test_account:
+            return redirect(url_for('dashboard'))
+    # Commercial gating: merchants can only reach the pages their tier allows or
+    # that the admin has explicitly enabled via feature flags.
+    # Admins and engineers can still reach any page.
+    if not s or s.role not in (UserRole.ADMIN.value, UserRole.ENGINEER.value):
+        flags = merchant.get("feature_flags") or {}
+        flag = flags.get(active_page)
+        if flag is True:
+            pass  # admin explicitly enabled this page
+        elif flag is False:
+            return redirect(url_for('dashboard'))
+        elif active_page not in DEFAULT_MERCHANT_PAGE_IDS:
+            return redirect(url_for('dashboard'))
+        elif not TierManager.can_access_page(merchant["tier"], active_page):
             target = TierManager.page_upgrade_target(active_page)
             lock_content = (
                 f'<div style="text-align:center; padding: 40px 20px;">'
@@ -1581,6 +1824,9 @@ def dashboard_page(page):
                                    page_title='Upgrade required',
                                    page_description=f'Unlock this module with {target}.',
                                    page_content=lock_content)
+        # Brand Build is locked behind the Concierge Bundle add-on.
+        if active_page == 'startup_pack' and not merchant.get('concierge_bundle'):
+            return redirect(url_for('dashboard_page', page='settings', tab='billing'))
     template = 'dashboard/{}.html'.format(page.replace('-', '_'))
     try:
         return render_template(template, **ctx)
@@ -1589,6 +1835,97 @@ def dashboard_page(page):
                                page_title=active_page.replace('_', ' ').title(),
                                page_description='This module is being rebuilt to the new commercial-grade standard.',
                                page_content='')
+
+
+@app.route('/choose-tier')
+def choose_tier():
+    merchant = get_merchant_context()
+    if not merchant:
+        return redirect(url_for('login'))
+    if merchant.get('role') in (UserRole.ADMIN.value, UserRole.ENGINEER.value):
+        return redirect(url_for('dashboard'))
+    if not _merchant_requires_tier_selection(merchant):
+        return redirect(url_for('dashboard'))
+    merchant_id = merchant['id']
+    tiers = [
+        {
+            'id': 'Basic Tier',
+            'name': 'Vantav Basic',
+            'price': 'Free',
+            'description': 'For solo operators just getting started.',
+            'features': ['Profit dashboard', 'Live alerts', 'Email support'],
+        },
+        {
+            'id': 'Vantav Operator',
+            'name': 'Vantav Operator',
+            'price': '$199/mo',
+            'description': 'Core tools to run one store end-to-end.',
+            'features': ['Everything in Basic', 'Inventory & orders', 'Product catalog', 'Multi-channel connections'],
+        },
+        {
+            'id': 'Vantav Growth',
+            'name': 'Vantav Growth',
+            'price': '$399/mo',
+            'description': 'Growth automation and advanced analytics.',
+            'features': ['Everything in Operator', 'Marketing & automations', 'AI Assistant', 'Analytics & predictions'],
+        },
+        {
+            'id': 'Vantav Scale',
+            'name': 'Vantav Scale',
+            'price': '$799/mo',
+            'description': 'Enterprise-grade controls and fraud protection.',
+            'features': ['Everything in Growth', 'Fraud & risk tools', 'Supplier hub', 'Reports & API access'],
+        },
+    ]
+    ctx = context(active_page='choose_tier', merchant=merchant, merchant_id=merchant_id)
+    ctx['nav_groups'] = []
+    ctx['active_page'] = 'choose_tier'
+    ctx['merchant'] = dict(ctx.get('merchant', {}) or {}, tier='Choose your plan')
+    ctx['tiers'] = tiers
+    return render_template('choose_tier.html', **ctx)
+
+
+@app.route('/api/merchant/select-tier', methods=['POST'])
+@require_roles([UserRole.MERCHANT])
+def api_merchant_select_tier():
+    merchant = get_merchant_context()
+    if not merchant:
+        return jsonify({'error': 'Unauthorized'}), 401
+    data = request.get_json(silent=True) or {}
+    tier = data.get('tier')
+    if tier not in ('Basic Tier', 'Vantav Operator', 'Vantav Growth', 'Vantav Scale'):
+        return jsonify({'error': 'Invalid tier'}), 400
+    # Paid tiers can be selected directly only for whitelisted test accounts.
+    # All other merchants must complete checkout before a paid tier is enabled.
+    test_tier_emails = _tier_test_accounts()
+    if tier != 'Basic Tier' and merchant.get('email', '').lower() not in test_tier_emails:
+        slug = {'Vantav Operator': 'operator', 'Vantav Growth': 'growth', 'Vantav Scale': 'scale'}.get(tier)
+        return jsonify({'error': 'Paid plan requires checkout', 'redirect': '/checkout?plan=' + quote(slug or '')}), 402
+    merchant_id = merchant['id']
+    profile = MerchantProfile.query.get(merchant_id)
+    if not profile:
+        return jsonify({'error': 'Merchant not found'}), 404
+    billing = SaaSBilling.query.get(merchant_id)
+    if not billing:
+        billing = SaaSBilling(merchant_id=merchant_id)
+        db.session.add(billing)
+    tier_meta = TierManager.get_tier_meta(tier)
+    profile.account_tier = tier
+    profile.sandbox_status = 'approved'
+    profile.live_access_enabled = 1
+    profile.approved_at = datetime.utcnow()
+    billing.current_plan = tier
+    try:
+        memory = action_gate.get_business_memory(merchant_id)
+        memory.max_authorized_seats = int(tier_meta.get('max_users', 1))
+    except Exception as e:
+        logger.warning(f"[SelectTier] Could not update seats for {merchant_id}: {e}")
+    db.session.commit()
+    try:
+        log_admin_audit('tier_selected', target_merchant_id=merchant_id, details={'tier': tier, 'source': 'choose-tier'})
+    except Exception:
+        pass
+    return jsonify({'status': 'ok', 'tier': tier, 'redirect': url_for('dashboard')})
 
 
 @app.route('/home')
@@ -2227,6 +2564,13 @@ def api_connect_shopify():
     if not shop or not token:
         return jsonify({"detail": "shop and access_token required"}), 400
     try:
+        shopify_sync._shopify_get(shop, token, "shop")
+    except Exception:
+        logger.warning("[Channels] Shopify credential validation failed for merchant %s", merchant["id"])
+        return jsonify({
+            "detail": "Shopify could not verify these credentials. Check the store domain and access token, then try again.",
+        }), 400
+    try:
         channels_module.connect_shopify(merchant["id"], shop, token)
         _trigger_initial_sync(merchant["id"], "shopify")
         return jsonify({"status": "connected", "platform": "shopify", "domain": shop, "audit_started": True}), 200
@@ -2250,10 +2594,11 @@ def api_connect_tiktok():
     app_secret = (data.get("app_secret") or "").strip()
     access_token = (data.get("access_token") or "").strip()
     shop_cipher = (data.get("shop_cipher") or "").strip()
+    region = (data.get("region") or "").strip().lower()
     if not seller_id or not app_key or not app_secret or not access_token:
         return jsonify({"detail": "seller_id, app_key, app_secret, and access_token required"}), 400
     try:
-        channels_module.connect_tiktok(merchant["id"], seller_id, app_key, app_secret, access_token, shop_cipher)
+        channels_module.connect_tiktok(merchant["id"], seller_id, app_key, app_secret, access_token, shop_cipher, region=region)
         _trigger_initial_sync(merchant["id"], "tiktok")
         return jsonify({"status": "connected", "platform": "tiktok", "audit_started": True}), 200
     except Exception as e:
@@ -2386,7 +2731,7 @@ def api_get_shopify_products():
 
 
 @app.route('/api/admin/shopify/sync/<merchant_id>', methods=['POST'])
-@require_roles([UserRole.ADMIN])
+@require_roles([UserRole.ADMIN, UserRole.ENGINEER])
 def api_admin_sync_shopify(merchant_id):
     """Admin-triggered Shopify sync for testing (bypasses live-access gate)."""
     try:
@@ -2431,7 +2776,7 @@ def api_get_tiktok_products():
 
 
 @app.route('/api/admin/tiktok/sync/<merchant_id>', methods=['POST'])
-@require_roles([UserRole.ADMIN])
+@require_roles([UserRole.ADMIN, UserRole.ENGINEER])
 def api_admin_sync_tiktok(merchant_id):
     """Admin-triggered TikTok Shop sync for testing (bypasses live-access gate)."""
     try:
@@ -2579,7 +2924,7 @@ def api_get_amazon_products():
 
 
 @app.route('/api/admin/amazon/sync/<merchant_id>', methods=['POST'])
-@require_roles([UserRole.ADMIN])
+@require_roles([UserRole.ADMIN, UserRole.ENGINEER])
 def api_admin_sync_amazon(merchant_id):
     """Admin-triggered Amazon sync for testing (bypasses live-access gate)."""
     try:
@@ -2670,72 +3015,610 @@ def api_admin_seed_regression_demo(merchant_id):
         return jsonify({"detail": str(e)}), 500
 
 
-@app.route('/admin/merchants')
-@require_roles([UserRole.ADMIN])
-def admin_merchants():
-    """Backend admin view of all merchants, tiers, sync status, and pending actions."""
-    ctx = _dashboard_context('admin_merchants')
-    merchants = []
-    now = datetime.utcnow()
-    for p in MerchantProfile.query.order_by(MerchantProfile.created_at.desc()).all():
-        billing = SaaSBilling.query.get(p.merchant_id)
-        channels = MerchantChannel.query.filter_by(merchant_id=p.merchant_id).all()
-        tokens = TenantOAuthToken.query.filter_by(merchant_id=p.merchant_id).order_by(TenantOAuthToken.updated_at.desc()).all()
-        last_sync = max([t.updated_at for t in tokens if t.updated_at], default=None)
-        sync_status = "No channels"
+def _admin_merchant_row(p: MerchantProfile, now: datetime) -> dict:
+    """Build a single merchant summary for the admin members view."""
+    billing = SaaSBilling.query.get(p.merchant_id)
+    links = IntegrationLink.query.filter_by(merchant_id=p.merchant_id).all()
+    tokens = TenantOAuthToken.query.filter_by(merchant_id=p.merchant_id).order_by(TenantOAuthToken.updated_at.desc()).all()
+    last_sync = max(
+        [t.updated_at for t in tokens if t.updated_at] +
+        [l.updated_at for l in links if l.updated_at],
+        default=None,
+    )
+    # Use the canonical channels module so the count/status matches the Stores page.
+    connected_channels = [
+        c for c in channels_module.list_channels(p.merchant_id)
+        if c.get('state') == 'connected'
+    ]
+    channels = [c['platform'] for c in connected_channels]
+    channel_count = len(channels)
+
+    sync_status = "No channels"
+    if channel_count:
         if last_sync:
             age = (now - last_sync).total_seconds()
             sync_status = "OK" if age <= monitoring_module.MAX_CHANNEL_SYNC_AGE_SECONDS else "Stale"
-        pending_actions = PendingAction.query.filter_by(merchant_id=p.merchant_id, status='pending').count()
-        merchants.append({
-            "merchant_id": p.merchant_id,
-            "business_name": p.business_name or p.merchant_id,
-            "admin_email": p.admin_email or "—",
-            "account_tier": (p.account_tier or "").replace("AI Tier", "Plan").strip(),
-            "current_plan": billing.current_plan if billing else p.account_tier,
-            "sandbox_status": p.sandbox_status or "pending",
-            "live_access": bool(p.live_access_enabled),
-            "concierge": bool(billing and isinstance(billing.add_ons, list) and "concierge_bundle" in billing.add_ons),
-            "channels": len(channels),
-            "last_sync": last_sync.isoformat() if last_sync else None,
-            "sync_status": sync_status,
-            "pending_actions": pending_actions,
-        })
-    ctx["merchants"] = merchants
+        else:
+            sync_status = "Never synced"
+
+    pending_actions = PendingAction.query.filter_by(merchant_id=p.merchant_id, status='pending').count()
+    unread = SupportMessage.query.filter_by(
+        merchant_id=p.merchant_id, sender='merchant', read_at=None
+    ).count()
+    seat_count = WorkspaceSeat.query.filter_by(merchant_id=p.merchant_id).count()
+    memory = action_gate.get_business_memory(p.merchant_id)
+    max_seats = memory.max_authorized_seats if memory else None
+    last_active = db.session.query(func.max(ActiveSession.last_seen)).filter_by(merchant_id=p.merchant_id).scalar()
+    return {
+        "merchant_id": p.merchant_id,
+        "business_name": p.business_name or p.merchant_id,
+        "admin_email": p.admin_email or "—",
+        "account_tier": (p.account_tier or "").replace("AI Tier", "Plan").strip(),
+        "current_plan": (
+            billing.current_plan if billing and billing.current_plan
+            else ("—" if billing and billing.current_plan is not None else p.account_tier)
+        ),
+        "metered_usage_units": billing.metered_usage_units if billing else None,
+        "accrued_invoice_value": billing.accrued_invoice_value if billing else None,
+        "billing_cycle_end": billing.billing_cycle_end if billing else None,
+        "max_authorized_seats": max_seats,
+        "sandbox_status": p.sandbox_status or "pending",
+        "live_access": bool(p.live_access_enabled),
+        "feature_flags": p.feature_flags or {},
+        "concierge": bool(billing and isinstance(billing.add_ons, list) and "concierge_bundle" in billing.add_ons),
+        "channels": channels,
+        "channel_count": channel_count,
+        "seats": seat_count,
+        "last_sync": last_sync.isoformat() if last_sync else None,
+        "last_active": last_active.isoformat() if last_active else None,
+        "sync_status": sync_status,
+        "pending_actions": pending_actions,
+        "unread": unread,
+        "version": p.updated_at.isoformat() if p.updated_at else None,
+    }
+
+
+@app.route('/admin/merchants')
+@require_roles([UserRole.ADMIN, UserRole.ENGINEER])
+def admin_merchants():
+    """Backend admin view of all merchants, tiers, sync status, pending actions, and live chat."""
+    ctx = _dashboard_context('admin_merchants')
+    s = get_current_user()
+    ctx["dashboard_title"] = "Admin" if s and s.role == UserRole.ADMIN.value else "Engineer"
+    now = datetime.utcnow()
+    ctx["merchants"] = [_admin_merchant_row(p, now) for p in MerchantProfile.query.order_by(MerchantProfile.created_at.desc()).all()]
+    ctx["stripe_balance"] = billing_module.get_stripe_balance()
+    ctx["total_members"] = MerchantProfile.query.count()
+    ctx["active_sessions"] = ActiveSession.query.filter(
+        ActiveSession.last_seen >= now - timedelta(minutes=15)
+    ).count()
+    ctx["paid_accounts"] = MerchantProfile.query.filter_by(live_access_enabled=1).count()
+    ctx["feature_pages"] = ALL_DASHBOARD_PAGE_IDS
     return render_template('dashboard/admin_merchants.html', **ctx)
 
 
 @app.route('/api/admin/merchants', methods=['GET'])
-@require_roles([UserRole.ADMIN])
+@require_roles([UserRole.ADMIN, UserRole.ENGINEER])
 def api_admin_merchants():
     """JSON list of merchants for admin monitoring."""
     now = datetime.utcnow()
-    out = []
-    for p in MerchantProfile.query.order_by(MerchantProfile.created_at.desc()).all():
-        billing = SaaSBilling.query.get(p.merchant_id)
-        channels = MerchantChannel.query.filter_by(merchant_id=p.merchant_id).all()
-        tokens = TenantOAuthToken.query.filter_by(merchant_id=p.merchant_id).order_by(TenantOAuthToken.updated_at.desc()).all()
-        last_sync = max([t.updated_at for t in tokens if t.updated_at], default=None)
-        sync_status = "No channels"
-        if last_sync:
-            age = (now - last_sync).total_seconds()
-            sync_status = "OK" if age <= monitoring_module.MAX_CHANNEL_SYNC_AGE_SECONDS else "Stale"
-        pending_actions = PendingAction.query.filter_by(merchant_id=p.merchant_id, status='pending').count()
-        out.append({
-            "merchant_id": p.merchant_id,
-            "business_name": p.business_name or p.merchant_id,
-            "admin_email": p.admin_email or "—",
-            "account_tier": (p.account_tier or "").replace("AI Tier", "Plan").strip(),
-            "current_plan": billing.current_plan if billing else p.account_tier,
-            "sandbox_status": p.sandbox_status or "pending",
-            "live_access": bool(p.live_access_enabled),
-            "concierge": bool(billing and isinstance(billing.add_ons, list) and "concierge_bundle" in billing.add_ons),
-            "channels": len(channels),
-            "last_sync": last_sync.isoformat() if last_sync else None,
-            "sync_status": sync_status,
-            "pending_actions": pending_actions,
-        })
+    out = [_admin_merchant_row(p, now) for p in MerchantProfile.query.order_by(MerchantProfile.created_at.desc()).all()]
     return jsonify({"merchants": out, "count": len(out)}), 200
+
+
+@app.route('/api/admin/merchants/<merchant_id>', methods=['PATCH'])
+@require_roles([UserRole.ADMIN])
+def api_admin_update_merchant(merchant_id):
+    """Admin update of merchant tier, sandbox, live access, feature flags, and billing."""
+    p = MerchantProfile.query.get_or_404(merchant_id)
+    data = request.get_json(silent=True) or {}
+
+    # Optimistic concurrency check: reject saves made against a stale version.
+    if 'version' in data and p.updated_at:
+        if data['version'] != p.updated_at.isoformat():
+            return jsonify({"error": "Merchant profile was modified by another session. Please reload and try again."}), 409
+
+    if 'account_tier' in data:
+        raw_tier = (data['account_tier'] or '').strip()
+        p.account_tier = _canonical_tier(raw_tier) if raw_tier else "Basic Tier"
+    if 'sandbox_status' in data:
+        p.sandbox_status = data['sandbox_status']
+    if 'live_access_enabled' in data:
+        p.live_access_enabled = 1 if data['live_access_enabled'] else 0
+    if 'feature_flags' in data and isinstance(data['feature_flags'], dict):
+        # Replace the entire feature_flags map with the admin's selections.
+        # Default (unset) pages are omitted, On is True, Off is False.
+        p.feature_flags = {k: v for k, v in data['feature_flags'].items() if v is not None}
+
+    # Billing override: update the merchant's SaaSBilling and seat allocation.
+    billing = SaaSBilling.query.get(merchant_id)
+    if not billing:
+        billing = SaaSBilling(merchant_id=merchant_id)
+        db.session.add(billing)
+    if 'current_plan' in data:
+        raw_plan = (data['current_plan'] or '').strip()
+        billing.current_plan = _canonical_tier(raw_plan) if raw_plan else ''
+    if 'add_ons' in data and isinstance(data['add_ons'], list):
+        billing.add_ons = data['add_ons']
+    if 'metered_usage_units' in data:
+        v = data['metered_usage_units']
+        billing.metered_usage_units = int(v) if v not in (None, '') else 0
+    if 'accrued_invoice_value' in data:
+        v = data['accrued_invoice_value']
+        billing.accrued_invoice_value = float(v) if v not in (None, '') else 0.0
+    if 'billing_cycle_end' in data:
+        v = data['billing_cycle_end']
+        billing.billing_cycle_end = v if v not in (None, '') else None
+    if 'max_authorized_seats' in data:
+        v = data['max_authorized_seats']
+        memory = action_gate.get_business_memory(merchant_id)
+        if v in (None, ''):
+            # Reset to the current tier's default user limit.
+            tier_for_seats = p.account_tier or "Basic Tier"
+            tier_meta = TierManager.get_tier_meta(tier_for_seats)
+            memory.max_authorized_seats = tier_meta.get('max_users', 1)
+        else:
+            memory.max_authorized_seats = int(v)
+    p.updated_at = datetime.utcnow()
+    db.session.commit()
+    log_admin_audit("merchant.update", target_merchant_id=merchant_id, details={"fields": list(data.keys())})
+    now = datetime.utcnow()
+    return jsonify(_admin_merchant_row(p, now)), 200
+
+
+@app.route('/api/admin/merchants/<merchant_id>', methods=['DELETE'])
+@require_roles([UserRole.ADMIN])
+def api_admin_delete_merchant(merchant_id):
+    """Permanently delete a merchant and all related rows. Protected accounts are blocked."""
+    p = MerchantProfile.query.get_or_404(merchant_id)
+    if p.merchant_id in _protected_merchant_ids():
+        return jsonify({'error': 'Cannot delete protected account'}), 403
+    _cascade_delete_merchant(p.merchant_id)
+    db.session.delete(p)
+    db.session.commit()
+    log_admin_audit("merchant.delete", target_merchant_id=merchant_id, details={'admin_email': (get_merchant_context() or {}).get('email')})
+    return jsonify({'status': 'ok', 'deleted': merchant_id}), 200
+
+
+@app.route('/api/admin/stripe-balance')
+@require_roles([UserRole.ADMIN])
+def api_admin_stripe_balance():
+    """Return the platform Stripe balance."""
+    return jsonify(billing_module.get_stripe_balance())
+
+
+@app.route('/admin/chat')
+@require_roles([UserRole.ADMIN, UserRole.ENGINEER])
+def admin_chat():
+    """Admin support chat dashboard."""
+    ctx = _dashboard_context('admin_chat')
+    s = get_current_user()
+    ctx["dashboard_title"] = "Admin" if s and s.role == UserRole.ADMIN.value else "Engineer"
+    return render_template('dashboard/admin_chat.html', **ctx)
+
+
+@app.route('/api/admin/chat/threads', methods=['GET'])
+@require_roles([UserRole.ADMIN, UserRole.ENGINEER])
+def api_admin_chat_threads():
+    """List merchants with unread support message counts."""
+    rows = db.session.query(
+        SupportMessage.merchant_id,
+        func.count(SupportMessage.id).filter(SupportMessage.read_at.is_(None), SupportMessage.sender == 'merchant').label('unread'),
+        func.max(SupportMessage.created_at).label('last_message_at'),
+    ).group_by(SupportMessage.merchant_id).all()
+    profiles = {p.merchant_id: p for p in MerchantProfile.query.all()}
+    threads = []
+    for merchant_id, unread, last_message_at in rows:
+        p = profiles.get(merchant_id)
+        threads.append({
+            "merchant_id": merchant_id,
+            "business_name": p.business_name or merchant_id if p else merchant_id,
+            "admin_email": p.admin_email if p else None,
+            "unread": unread,
+            "last_message_at": last_message_at.isoformat() if last_message_at else None,
+        })
+    # include merchants with no messages at the bottom
+    messaged = {t['merchant_id'] for t in threads}
+    for p in MerchantProfile.query.all():
+        if p.merchant_id not in messaged:
+            threads.append({
+                "merchant_id": p.merchant_id,
+                "business_name": p.business_name or p.merchant_id,
+                "admin_email": p.admin_email,
+                "unread": 0,
+                "last_message_at": None,
+            })
+    threads.sort(key=lambda x: (x['last_message_at'] is None, x['last_message_at']), reverse=True)
+    return jsonify({"threads": threads}), 200
+
+
+@app.route('/api/admin/chat/<merchant_id>', methods=['GET'])
+@require_roles([UserRole.ADMIN, UserRole.ENGINEER])
+def api_admin_chat_messages(merchant_id):
+    """Return chat history with a merchant and mark merchant messages as read."""
+    profile = MerchantProfile.query.get_or_404(merchant_id)
+    SupportMessage.query.filter_by(
+        merchant_id=merchant_id, sender='merchant', read_at=None
+    ).update({"read_at": datetime.utcnow()}, synchronize_session=False)
+    db.session.commit()
+    msgs = SupportMessage.query.filter_by(merchant_id=merchant_id).order_by(SupportMessage.created_at.asc()).all()
+    return jsonify({
+        "merchant_id": merchant_id,
+        "business_name": profile.business_name or merchant_id,
+        "messages": [
+            {"id": m.id, "sender": m.sender, "sender_email": m.sender_email, "message": m.message, "created_at": m.created_at.isoformat() if m.created_at else None, "read": m.read_at is not None}
+            for m in msgs
+        ],
+    }), 200
+
+
+@app.route('/api/admin/chat/<merchant_id>', methods=['POST'])
+@require_roles([UserRole.ADMIN, UserRole.ENGINEER])
+def api_admin_chat_send(merchant_id):
+    """Send an admin message to a merchant."""
+    profile = MerchantProfile.query.get_or_404(merchant_id)
+    data = request.get_json(silent=True) or {}
+    text = (data.get('message') or '').strip()
+    if not text:
+        return jsonify({"error": "Message is required"}), 400
+    s = get_current_user()
+    admin_profile = MerchantProfile.query.get(s.merchant_id) if s else None
+    msg = SupportMessage(
+        merchant_id=merchant_id,
+        sender='admin',
+        sender_email=admin_profile.admin_email if admin_profile else 'admin@vantavcommerce.com',
+        message=text,
+    )
+    db.session.add(msg)
+    db.session.commit()
+    return jsonify({"id": msg.id, "sender": "admin", "created_at": msg.created_at.isoformat()}), 201
+
+
+# --------------------------------------------------------------------------
+# Master admin controls
+# --------------------------------------------------------------------------
+
+@app.route('/api/admin/impersonate/<merchant_id>', methods=['GET', 'POST'])
+@require_roles([UserRole.ADMIN, UserRole.ENGINEER])
+def api_admin_impersonate(merchant_id):
+    """Admin view-as-merchant: load the target tenant's dashboard without a password."""
+    target = MerchantProfile.query.get_or_404(merchant_id)
+    s = get_current_user()
+    if not s:
+        return jsonify({"error": "Session required"}), 403
+    # Save the admin's original context so it can be restored.
+    s.original_merchant_id = s.merchant_id
+    s.original_role = s.role
+    s.impersonating_merchant_id = target.merchant_id
+    db.session.commit()
+    log_admin_audit("impersonation.start", target_merchant_id=target.merchant_id, details={"admin_email": (MerchantProfile.query.get(s.original_merchant_id).admin_email if s.original_merchant_id else None)})
+    if request.method == 'GET' or request.headers.get('Accept', '').startswith('text/html'):
+        return redirect(url_for('dashboard'))
+    return jsonify({"status": "impersonating", "merchant_id": target.merchant_id, "redirect": url_for('dashboard')}), 200
+
+
+@app.route('/api/admin/stop-impersonating', methods=['GET', 'POST'])
+@require_roles([UserRole.ADMIN, UserRole.ENGINEER])
+def api_admin_stop_impersonating():
+    """Restore the admin's original merchant context."""
+    s = get_current_user()
+    if not s:
+        return jsonify({"error": "Session required"}), 403
+    target = s.impersonating_merchant_id
+    if target:
+        log_admin_audit("impersonation.stop", target_merchant_id=target)
+    if s.original_merchant_id:
+        s.merchant_id = s.original_merchant_id
+        s.role = s.original_role or UserRole.ADMIN.value
+    s.impersonating_merchant_id = None
+    s.original_merchant_id = None
+    s.original_role = None
+    db.session.commit()
+    return redirect(url_for('admin_dashboard'))
+
+
+@app.route('/api/admin/announcements', methods=['POST'])
+@require_roles([UserRole.ADMIN])
+def api_admin_announcement():
+    """Broadcast a global admin message to every merchant's support chat."""
+    data = request.get_json(silent=True) or {}
+    text = (data.get('message') or '').strip()
+    if not text:
+        return jsonify({"error": "Message is required"}), 400
+    s = get_current_user()
+    admin_email = ""
+    if s and s.merchant_id:
+        admin_profile = MerchantProfile.query.get(s.merchant_id)
+        admin_email = admin_profile.admin_email if admin_profile else ""
+    count = 0
+    for profile in MerchantProfile.query.all():
+        msg = SupportMessage(
+            merchant_id=profile.merchant_id,
+            sender='admin',
+            sender_email=admin_email or 'admin@vantavcommerce.com',
+            message=text,
+        )
+        db.session.add(msg)
+        count += 1
+    db.session.commit()
+    log_admin_audit("announcement.broadcast", details={"message": text, "recipients": count})
+    return jsonify({"status": "broadcast", "recipients": count}), 201
+
+
+@app.route('/api/admin/audit', methods=['GET'])
+@require_roles([UserRole.ADMIN, UserRole.ENGINEER])
+def api_admin_audit():
+    """Paginated admin audit log."""
+    limit = min(int(request.args.get('limit', 50)), 200)
+    offset = int(request.args.get('offset', 0))
+    action = request.args.get('action')
+    target = request.args.get('merchant_id')
+    q = AdminAuditLog.query.order_by(AdminAuditLog.created_at.desc())
+    if action:
+        q = q.filter_by(action=action)
+    if target:
+        q = q.filter_by(target_merchant_id=target)
+    total = q.count()
+    rows = q.offset(offset).limit(limit).all()
+    return jsonify({
+        "total": total,
+        "offset": offset,
+        "limit": limit,
+        "events": [
+            {
+                "id": r.id,
+                "admin_email": r.admin_email,
+                "action": r.action,
+                "target_merchant_id": r.target_merchant_id,
+                "details": r.details,
+                "created_at": r.created_at.isoformat() if r.created_at else None,
+            }
+            for r in rows
+        ],
+    }), 200
+
+
+@app.route('/api/admin/platform-controls', methods=['GET'])
+@require_roles([UserRole.ADMIN, UserRole.ENGINEER])
+def api_admin_platform_controls_get():
+    """Return the current global platform switches."""
+    return jsonify({
+        "global_sync_paused": global_sync_paused(),
+        "maintenance_mode": maintenance_mode(),
+        "sample_pages_enabled": sample_pages_enabled(),
+    }), 200
+
+
+@app.route('/api/admin/platform-controls', methods=['POST'])
+@require_roles([UserRole.ADMIN, UserRole.ENGINEER])
+def api_admin_platform_controls_set():
+    """Update global platform switches: global_sync_paused, maintenance_mode, sample_pages_enabled."""
+    data = request.get_json(silent=True) or {}
+    for key in ('global_sync_paused', 'maintenance_mode', 'sample_pages_enabled'):
+        if key in data:
+            AdminPlatformControl.set_bool(key, bool(data[key]))
+            log_admin_audit("platform_control.set", details={"key": key, "value": bool(data[key])})
+    return jsonify({
+        "global_sync_paused": global_sync_paused(),
+        "maintenance_mode": maintenance_mode(),
+        "sample_pages_enabled": sample_pages_enabled(),
+    }), 200
+
+
+@app.route('/api/admin/<platform>/sync/<merchant_id>', methods=['POST'])
+@require_roles([UserRole.ADMIN, UserRole.ENGINEER])
+def api_admin_sync_platform(platform, merchant_id):
+    """Generic admin-triggered sync for any supported platform."""
+    if platform not in ('shopify', 'tiktok', 'amazon', 'ebay', 'walmart', 'bigcommerce', 'woocommerce'):
+        return jsonify({"error": "Invalid platform"}), 400
+    profile = MerchantProfile.query.get_or_404(merchant_id)
+    try:
+        if platform == 'shopify':
+            result = shopify_sync.sync_shopify(merchant_id)
+        elif platform == 'tiktok':
+            result = tiktok_sync.sync_tiktok(merchant_id)
+        elif platform == 'amazon':
+            result = amazon_sync.sync_amazon(merchant_id)
+        else:
+            return jsonify({"status": "not_implemented", "platform": platform}), 501
+        log_admin_audit("store.sync", target_merchant_id=merchant_id, details={"platform": platform})
+        return jsonify({"status": "synced", "merchant_id": merchant_id, "platform": platform, **result}), 200
+    except Exception as e:
+        logger.error(f"[Admin {platform.title()} Sync] Failed for {merchant_id}: {e}")
+        return jsonify({"detail": str(e)}), 400
+
+
+@app.route('/api/admin/stores/<merchant_id>/<platform>/reset', methods=['POST'])
+@require_roles([UserRole.ADMIN, UserRole.ENGINEER])
+def api_admin_store_reset(merchant_id, platform):
+    """Mark a merchant's channel connection stale (forces re-auth/re-sync)."""
+    if platform not in ('shopify', 'tiktok', 'amazon', 'ebay', 'walmart', 'bigcommerce', 'woocommerce'):
+        return jsonify({"error": "Invalid platform"}), 400
+    try:
+        token = TenantOAuthToken.query.filter_by(merchant_id=merchant_id, platform_id=platform).first()
+        if token:
+            token.updated_at = datetime(2000, 1, 1)
+            db.session.add(token)
+        for link in IntegrationLink.query.filter_by(merchant_id=merchant_id, platform=platform).all():
+            link.updated_at = datetime(2000, 1, 1)
+            db.session.add(link)
+        db.session.commit()
+        log_admin_audit("store.reset", target_merchant_id=merchant_id, details={"platform": platform})
+        return jsonify({"status": "reset", "merchant_id": merchant_id, "platform": platform}), 200
+    except Exception as e:
+        logger.error(f"[Admin Store Reset] {merchant_id}/{platform}: {e}")
+        return jsonify({"error": str(e)}), 400
+
+
+@app.route('/admin')
+@require_roles([UserRole.ADMIN])
+def admin_dashboard():
+    """Admin control panel landing page."""
+    ctx = _dashboard_context('admin_dashboard')
+    now = datetime.utcnow()
+    ctx["summary"] = _admin_summary(now)
+    ctx["stores"] = _admin_stores()
+    ctx["recent_events"] = _admin_recent_events(now)
+    return render_template('dashboard/admin.html', dashboard_title='Admin', **ctx)
+
+
+@app.route('/engineer')
+@require_roles([UserRole.ENGINEER])
+def engineer_dashboard():
+    """Engineer control panel landing page."""
+    ctx = _dashboard_context('engineer_dashboard')
+    ctx["dashboard_title"] = "Engineer"
+    return render_template('dashboard/engineer.html', **ctx)
+
+
+@app.route('/admin/audit')
+@require_roles([UserRole.ADMIN, UserRole.ENGINEER])
+def admin_audit_page():
+    """Admin audit log page."""
+    ctx = _dashboard_context('admin_audit')
+    s = get_current_user()
+    ctx["dashboard_title"] = "Admin" if s and s.role == UserRole.ADMIN.value else "Engineer"
+    ctx["events"] = AdminAuditLog.query.order_by(AdminAuditLog.created_at.desc()).limit(100).all()
+    return render_template('dashboard/admin_audit.html', **ctx)
+
+
+def _admin_summary(now):
+    """Compute platform-wide summary numbers for the admin dashboard."""
+    total_members = MerchantProfile.query.count()
+    active_sessions = ActiveSession.query.filter(
+        ActiveSession.last_seen >= now - timedelta(minutes=15)
+    ).count()
+    paid_accounts = MerchantProfile.query.filter_by(live_access_enabled=1).count()
+    unread_support = SupportMessage.query.filter_by(sender='merchant', read_at=None).count()
+    pending_sandbox = MerchantProfile.query.filter(
+        MerchantProfile.sandbox_status.in_(['pending', 'sandbox'])
+    ).count()
+    stripe_balance = billing_module.get_stripe_balance()
+    connected_stores = len(_admin_stores())
+    return {
+        "total_members": total_members,
+        "active_sessions": active_sessions,
+        "paid_accounts": paid_accounts,
+        "unread_support": unread_support,
+        "pending_sandbox": pending_sandbox,
+        "stripe_balance": stripe_balance,
+        "connected_stores": connected_stores,
+    }
+
+
+def _admin_stores():
+    """List every connected store across all merchant accounts."""
+    stores = []
+    for p in MerchantProfile.query.all():
+        try:
+            channels = channels_module.list_channels(p.merchant_id)
+        except Exception:
+            continue
+        for ch in channels:
+            if ch.get('state') != 'connected':
+                continue
+            stores.append({
+                "merchant_id": p.merchant_id,
+                "business_name": p.business_name or p.merchant_id,
+                "admin_email": p.admin_email,
+                "platform": ch.get('platform'),
+                "name": ch.get('name'),
+                "orders": ch.get('orders', 0),
+                "revenue": ch.get('revenue', 0.0),
+                "sync": ch.get('sync'),
+            })
+    return stores
+
+
+def _admin_recent_events(now):
+    """Return recent platform activity for the admin dashboard."""
+    events = []
+    for s in ActiveSession.query.order_by(ActiveSession.created_at.desc()).limit(10).all():
+        events.append({
+            "time": s.created_at.isoformat() if s.created_at else None,
+            "message": f"Session created for {s.merchant_id} ({s.role})",
+        })
+    for m in SupportMessage.query.order_by(SupportMessage.created_at.desc()).limit(10).all():
+        events.append({
+            "time": m.created_at.isoformat() if m.created_at else None,
+            "message": f"Support message from {m.sender} ({m.merchant_id})",
+        })
+    events.sort(key=lambda x: x.get('time') or '', reverse=True)
+    return events[:20]
+
+
+@app.route('/api/admin/summary', methods=['GET'])
+@require_roles([UserRole.ADMIN, UserRole.ENGINEER])
+def api_admin_summary():
+    """Return platform summary for the admin dashboard."""
+    now = datetime.utcnow()
+    return jsonify(_admin_summary(now)), 200
+
+
+@app.route('/api/admin/stores', methods=['GET'])
+@require_roles([UserRole.ADMIN, UserRole.ENGINEER])
+def api_admin_stores():
+    """Return all connected stores across merchants."""
+    return jsonify({"stores": _admin_stores()}), 200
+
+
+@app.route('/api/admin/stores/<merchant_id>/<platform>/unlink', methods=['POST'])
+@require_roles([UserRole.ADMIN])
+def api_admin_unlink_store(merchant_id, platform):
+    """Admin-only: disconnect a store from any merchant account."""
+    if platform not in ('shopify', 'tiktok', 'amazon', 'ebay', 'walmart', 'bigcommerce', 'woocommerce'):
+        return jsonify({"error": "Invalid platform"}), 400
+    try:
+        channels_module.disconnect(merchant_id, platform)
+        log_admin_audit("store.unlink", target_merchant_id=merchant_id, details={"platform": platform})
+        return jsonify({"status": "disconnected", "merchant_id": merchant_id, "platform": platform}), 200
+    except Exception as e:
+        logger.error(f"[Admin Unlink] {e}")
+        return jsonify({"error": str(e)}), 400
+
+
+@app.route('/api/v1/chat/messages', methods=['GET'])
+@require_roles([UserRole.MERCHANT, UserRole.ADMIN])
+def api_merchant_chat_messages():
+    """Return this merchant's support messages and mark admin messages as read."""
+    merchant = get_merchant_context()
+    if not merchant:
+        return jsonify({"error": "No merchant context"}), 403
+    merchant_id = merchant['id']
+    SupportMessage.query.filter_by(
+        merchant_id=merchant_id, sender='admin', read_at=None
+    ).update({"read_at": datetime.utcnow()}, synchronize_session=False)
+    db.session.commit()
+    msgs = SupportMessage.query.filter_by(merchant_id=merchant_id).order_by(SupportMessage.created_at.asc()).all()
+    return jsonify({
+        "merchant_id": merchant_id,
+        "messages": [
+            {"id": m.id, "sender": m.sender, "sender_email": m.sender_email, "message": m.message, "created_at": m.created_at.isoformat() if m.created_at else None, "read": m.read_at is not None}
+            for m in msgs
+        ],
+    }), 200
+
+
+@app.route('/api/v1/chat/message', methods=['POST'])
+@require_roles([UserRole.MERCHANT, UserRole.ADMIN])
+def api_merchant_chat_send():
+    """Post a message from the merchant to support / admin."""
+    merchant = get_merchant_context()
+    if not merchant:
+        return jsonify({"error": "No merchant context"}), 403
+    data = request.get_json(silent=True) or {}
+    text = (data.get('message') or '').strip()
+    if not text:
+        return jsonify({"error": "Message is required"}), 400
+    msg = SupportMessage(
+        merchant_id=merchant['id'],
+        sender='merchant',
+        sender_email=merchant.get('email'),
+        message=text,
+    )
+    db.session.add(msg)
+    db.session.commit()
+    return jsonify({"id": msg.id, "sender": "merchant", "created_at": msg.created_at.isoformat()}), 201
 
 
 @app.route('/api/v1/channels/writeback', methods=['POST'])
@@ -2991,6 +3874,65 @@ def api_sku_metrics():
         return jsonify({"detail": str(e)}), 500
 
 
+@app.route('/api/v1/products/<sku>', methods=['PATCH'])
+@require_roles([UserRole.ADMIN, UserRole.MERCHANT, UserRole.ENGINEER])
+def api_update_product(sku):
+    """Update unit cost and/or reorder point for a SKU and recalc profit."""
+    merchant = get_merchant_context()
+    if not merchant:
+        return jsonify({"error": "No merchant context"}), 403
+    data = request.get_json(silent=True) or {}
+    product = Product.query.filter_by(merchant_id=merchant["id"], sku=sku).first()
+    if not product:
+        return jsonify({"detail": "Product not found"}), 404
+
+    updated = False
+    if "unit_cost" in data:
+        try:
+            product.unit_cost = round(float(data["unit_cost"]), 4)
+            updated = True
+        except (TypeError, ValueError):
+            return jsonify({"detail": "unit_cost must be a number"}), 400
+    if "reorder_point" in data:
+        try:
+            product.reorder_point = int(data["reorder_point"])
+            updated = True
+        except (TypeError, ValueError):
+            return jsonify({"detail": "reorder_point must be an integer"}), 400
+
+    recalc_count = 0
+    if updated:
+        db.session.add(product)
+        db.session.commit()
+    if "unit_cost" in data:
+        try:
+            recalc_count = profit_feed.recalc_profit_for_sku(merchant["id"], sku)
+        except Exception as e:
+            logger.error(f"[Product update] Profit recalc failed for {sku}: {e}")
+
+    return jsonify({
+        "sku": product.sku,
+        "unit_cost": float(product.unit_cost or 0),
+        "reorder_point": product.reorder_point,
+        "profit_orders_recalculated": recalc_count,
+    }), 200
+
+
+@app.route('/api/v1/products/recalc-profit', methods=['POST'])
+@require_roles([UserRole.ADMIN, UserRole.MERCHANT, UserRole.ENGINEER])
+def api_recalc_profit():
+    """Recompute all profit feed orders for the merchant using current product costs."""
+    merchant = get_merchant_context()
+    if not merchant:
+        return jsonify({"error": "No merchant context"}), 403
+    try:
+        count = profit_feed.recalc_profit_for_merchant(merchant["id"])
+        return jsonify({"profit_orders_recalculated": count}), 200
+    except Exception as e:
+        logger.error(f"[Profit recalc] {e}")
+        return jsonify({"detail": str(e)}), 500
+
+
 @app.route('/api/v1/analytics/profit-regression', methods=['GET'])
 @require_roles([UserRole.ADMIN, UserRole.MERCHANT, UserRole.ENGINEER])
 def api_profit_regression():
@@ -3084,17 +4026,31 @@ def api_merchant_theme():
 @app.route('/api/v1/merchant/set-password', methods=['POST'])
 @require_roles([UserRole.ADMIN, UserRole.MERCHANT, UserRole.ENGINEER])
 def api_merchant_set_password():
-    """Allow a logged-in merchant to set or reset their password."""
+    """Allow a logged-in merchant to change their password."""
     merchant = get_merchant_context()
     if not merchant:
         return jsonify({"error": "No merchant context"}), 403
     data = request.get_json(silent=True) or {}
     new_password = (data.get("new_password") or "").strip()
+    current_password = data.get("current_password", "")
+    confirm_password = (data.get("confirm_password") or "").strip()
+
     if len(new_password) < 8:
         return jsonify({"error": "Password must be at least 8 characters"}), 400
+    if new_password != confirm_password:
+        return jsonify({"error": "New password and confirmation do not match"}), 400
+
     profile = MerchantProfile.query.get(merchant["id"])
     if not profile:
         return jsonify({"error": "Merchant profile not found"}), 404
+
+    is_privileged = merchant.get("role") in (UserRole.ADMIN.value, UserRole.ENGINEER.value)
+    if not is_privileged:
+        if not current_password:
+            return jsonify({"error": "Current password is required"}), 400
+        if not profile.password_hash or not check_password_hash(profile.password_hash, current_password):
+            return jsonify({"error": "Current password is incorrect"}), 401
+
     profile.password_hash = generate_password_hash(new_password, method="pbkdf2:sha256")
     db.session.commit()
     return jsonify({"updated": True, "merchant_id": merchant["id"]}), 200
@@ -3364,9 +4320,16 @@ def site_login():
 @app.route('/site-logout')
 def site_logout():
     token = request.cookies.get(SESSION_COOKIE_NAME)
+    merchant_id = None
     if token:
+        session_record = ActiveSession.query.filter_by(token=token).first()
+        if session_record:
+            merchant_id = session_record.merchant_id
         ActiveSession.query.filter_by(token=token).delete()
-        db.session.commit()
+    if merchant_id:
+        profile = MerchantProfile.query.get(merchant_id)
+        _reset_test_merchant_for_tier_testing(profile)
+    db.session.commit()
     response = redirect(url_for('home'))
     _delete_session_cookie(response)
     return response
@@ -3425,6 +4388,11 @@ def auth_login():
         db.session.add(profile)
         db.session.flush()
 
+    # Test merchant accounts always start at the tier chooser so the user can
+    # re-select a plan on every login.
+    if profile and not (is_admin or is_engineer):
+        _reset_test_merchant_for_tier_testing(profile)
+
     # 3. Issue encrypted session JWT (session cookie + ActiveSession row)
     session_token = secrets.token_urlsafe(32)
     if is_admin:
@@ -3436,6 +4404,16 @@ def auth_login():
     now = datetime.utcnow()
     db.session.add(ActiveSession(token=session_token, merchant_id=profile.merchant_id, role=assigned_role, created_at=now, last_seen=now))
     db.session.commit()
+
+    if assigned_role in (UserRole.ADMIN.value, UserRole.ENGINEER.value):
+        audit = AdminAuditLog(
+            admin_email=email,
+            action="admin.login",
+            target_merchant_id=profile.merchant_id,
+            details={"role": assigned_role},
+        )
+        db.session.add(audit)
+        db.session.commit()
 
     response = make_response(jsonify({
         "status": "AUTHORIZED",
@@ -3463,11 +4441,7 @@ def api_session_authenticate():
     return jsonify(result), 200
 
 
-TIER_NAME_MAP = {
-    "Starter": "Basic Tier",
-    "Pro": "Pro Tier",
-    "Enterprise": "Enterprise AI Tier",
-}
+# TIER_NAME_MAP is defined above with all plan/tier aliases.
 
 
 @app.route('/api/v1/auth/signup', methods=['POST'])
@@ -3482,9 +4456,10 @@ def auth_signup():
     if not email or not password or len(password) < 8:
         return jsonify({"detail": "A valid email and a password of at least 8 characters are required."}), 400
 
-    tier = TIER_NAME_MAP.get(selected_tier)
-    if not tier:
+    # Direct sign-up creates a free Basic Tier account; the chosen paid plan is selected at checkout.
+    if selected_tier and selected_tier not in TIER_NAME_MAP:
         return jsonify({"detail": "Invalid system tier parameters provided."}), 400
+    tier = "Basic Tier"
 
     # 1. Capture Bot Registrations
     bot_score = verify_captcha_v3(captcha_token)
@@ -3519,7 +4494,7 @@ def auth_signup():
             total_unified_balance=0.0,
             true_net_profit=0.0,
             gross_revenue=0.0,
-            ai_briefing="System initialized. Complete onboarding to activate multi-channel engine.",
+            ai_briefing="System initialized. Choose a plan and connect your first store to start tracking profit and alerts.",
         ))
         db.session.flush()
 
@@ -3554,7 +4529,7 @@ def auth_signup():
 
 
 @app.route('/api/v1/auth/provision-node', methods=['POST'])
-@require_roles([UserRole.ADMIN])
+@require_roles([UserRole.ADMIN, UserRole.ENGINEER])
 def auth_provision_node():
     """Admin-only user provisioning. Prevents self-service role escalation."""
     payload = request.get_json(silent=True) or {}
@@ -3584,6 +4559,9 @@ def auth_provision_node():
             admin_email=email,
             account_tier=tier,
             password_hash=generate_password_hash(password, method="pbkdf2:sha256"),
+            sandbox_status="approved",
+            live_access_enabled=1,
+            approved_at=datetime.utcnow(),
         ))
         db.session.flush()
         db.session.add(SaaSBilling(
@@ -3599,7 +4577,7 @@ def auth_provision_node():
             total_unified_balance=0.0,
             true_net_profit=0.0,
             gross_revenue=0.0,
-            ai_briefing=f"Provisioned {role} account. Activate multi-channel engine.",
+            ai_briefing=f"Provisioned {role} account. Choose a plan and connect your first store.",
         ))
         db.session.flush()
 
@@ -3787,29 +4765,42 @@ def create_stripe_checkout():
     concierge_bundle = bool(data.get("concierge_bundle"))
     plan = (data.get("plan") or "operator").lower().strip()
 
-    if not email or not password or len(password) < 8:
-        return jsonify({"detail": "A valid email and a password of at least 8 characters are required."}), 400
-
-    # Find or provision the merchant account so the webhook can upgrade it.
-    profile = MerchantProfile.query.filter_by(admin_email=email).first()
-    if profile:
-        # Require the existing account password; do not let a stranger start a
-        # checkout with someone else's email and take over the account.
-        if not check_password_hash(profile.password_hash or "", password):
-            return jsonify({"detail": "Email already registered. Log in to upgrade or use a different email."}), 409
+    # If the merchant is already logged in, use the existing account and ignore
+    # any email/password they typed. Anonymous users must create an account.
+    merchant_ctx = get_merchant_context()
+    profile = None
+    merchant_id = None
+    if merchant_ctx:
+        profile = MerchantProfile.query.get(merchant_ctx["id"])
+        if not profile:
+            return jsonify({"detail": "Session merchant not found."}), 403
+        email = profile.admin_email
         merchant_id = profile.merchant_id
         profile.business_name = business_name or profile.business_name
     else:
-        merchant_id = f"tenant_{uuid.uuid4().hex[:8]}"
-        db.session.add(MerchantProfile(
-            merchant_id=merchant_id,
-            business_name=business_name,
-            admin_email=email,
-            account_tier="Basic Tier",
-            password_hash=generate_password_hash(password, method="pbkdf2:sha256"),
-            sandbox_status="pending",
-            live_access_enabled=0,
-        ))
+        if not email or not password or len(password) < 8:
+            return jsonify({"detail": "A valid email and a password of at least 8 characters are required."}), 400
+
+        # Find or provision the merchant account so the webhook can upgrade it.
+        profile = MerchantProfile.query.filter_by(admin_email=email).first()
+        if profile:
+            # Require the existing account password; do not let a stranger start a
+            # checkout with someone else's email and take over the account.
+            if not check_password_hash(profile.password_hash or "", password):
+                return jsonify({"detail": "Email already registered. Log in to upgrade or use a different email."}), 409
+            merchant_id = profile.merchant_id
+            profile.business_name = business_name or profile.business_name
+        else:
+            merchant_id = f"tenant_{uuid.uuid4().hex[:8]}"
+            db.session.add(MerchantProfile(
+                merchant_id=merchant_id,
+                business_name=business_name,
+                admin_email=email,
+                account_tier="Basic Tier",
+                password_hash=generate_password_hash(password, method="pbkdf2:sha256"),
+                sandbox_status="pending",
+                live_access_enabled=0,
+            ))
         db.session.flush()
         db.session.add(SaaSBilling(
             merchant_id=merchant_id,
@@ -3822,7 +4813,7 @@ def create_stripe_checkout():
             total_unified_balance=0.0,
             true_net_profit=0.0,
             gross_revenue=0.0,
-            ai_briefing="System initialized. Complete onboarding to activate multi-channel engine.",
+            ai_briefing="System initialized. Choose a plan and connect your first store to start tracking profit and alerts.",
         ))
         tier_meta = TierManager.get_tier_meta("Basic Tier")
         memory = BusinessMemory(merchant_id=merchant_id)
@@ -4009,7 +5000,7 @@ def update_tenant_settings():
         return jsonify({"detail": "Failed to save configuration."}), 500
 
 
-SHOPIFY_WEBHOOK_SECRET = os.environ.get("SHOPIFY_WEBHOOK_SECRET", "").strip().encode()
+SHOPIFY_WEBHOOK_SECRET = os.environ.get("SHOPIFY_WEBHOOK_SECRET", "").strip().encode() or os.environ.get("SHOPIFY_CLIENT_SECRET", "").strip().encode()
 TIKTOK_WEBHOOK_SECRET = os.environ.get("TIKTOK_WEBHOOK_SECRET", "").strip().encode()
 AMAZON_WEBHOOK_SECRET = os.environ.get("AMAZON_WEBHOOK_SECRET", "").strip().encode()
 
@@ -4172,6 +5163,242 @@ def shopify_orders_webhook():
         return jsonify({"status": "rejected", "reason": "Hardened intercept"}), 400
 
 
+# ------------------------------------------------------------
+# Shopify GDPR / app-lifecycle webhooks (mandatory for public apps)
+# ------------------------------------------------------------
+
+def _parse_shopify_gdpr_webhook():
+    """Verify Shopify HMAC and map the shop domain to a merchant_id."""
+    raw_body = request.get_data()
+    hmac_header = request.headers.get("X-Shopify-Hmac-SHA256")
+
+    if SHOPIFY_WEBHOOK_SECRET:
+        if not hmac_header:
+            logger.warning("Shopify GDPR webhook dropped: missing HMAC signature.")
+            return None, jsonify({"status": "rejected", "reason": "Missing HMAC"}), 401
+        try:
+            computed = hmac.new(SHOPIFY_WEBHOOK_SECRET, raw_body, hashlib.sha256).digest()
+            if not hmac.compare_digest(computed, base64.b64decode(hmac_header)):
+                logger.warning("Shopify GDPR webhook dropped: invalid HMAC signature.")
+                return None, jsonify({"status": "rejected", "reason": "Invalid HMAC"}), 401
+        except Exception:
+            return None, jsonify({"status": "rejected", "reason": "Invalid HMAC"}), 401
+    else:
+        logger.warning("SHOPIFY_WEBHOOK_SECRET not set — accepting GDPR webhook without HMAC verification")
+
+    try:
+        payload = json.loads(raw_body.decode("utf-8"))
+    except json.JSONDecodeError:
+        return None, jsonify({"status": "rejected", "reason": "Malformed JSON"}), 400
+
+    shop_domain = (payload.get("shop_domain") or payload.get("shop") or "").strip().lower()
+    event_id = request.headers.get("X-Shopify-Webhook-Id")
+
+    token = TenantOAuthToken.query.filter_by(shop_domain=shop_domain).first()
+    merchant_id = token.merchant_id if token else None
+    if not merchant_id:
+        link = IntegrationLink.query.filter_by(shopify_shop_domain=shop_domain, platform="shopify").first()
+        if link:
+            merchant_id = link.merchant_id
+
+    return {"raw_body": raw_body, "payload": payload, "shop_domain": shop_domain, "merchant_id": merchant_id, "event_id": event_id}, None, 200
+
+
+@app.route('/api/v1/webhooks/shopify-gdpr/customers/data_request', methods=['POST'])
+@limiter.limit("60 per minute")
+def shopify_gdpr_customer_data_request():
+    """Customer data request: collect and return the customer's order history."""
+    context, error, status = _parse_shopify_gdpr_webhook()
+    if error:
+        return error, status
+
+    merchant_id = context["merchant_id"]
+    if not merchant_id:
+        return jsonify({"status": "accepted"}), 200
+
+    tenant_rls.set_tenant_scope(merchant_id)
+
+    event_id = context["event_id"]
+    if event_id and ProcessedWebhookEvent.query.get(event_id):
+        return jsonify({"status": "duplicate_ignored"}), 200
+
+    customer = context["payload"].get("customer") or {}
+    customer_id = str(customer.get("id") or customer.get("customer_id") or "").strip()
+    customer_email = (customer.get("email") or "").strip().lower()
+
+    query = UnifiedOrder.query.filter_by(merchant_id=merchant_id, channel="shopify")
+    filters = []
+    if customer_id:
+        filters.append(UnifiedOrder.customer_id == customer_id)
+    if customer_email:
+        filters.append(UnifiedOrder.ship_to.cast(db.Text).ilike(f"%{customer_email}%"))
+    if filters:
+        query = query.filter(or_(*filters))
+    orders = query.order_by(UnifiedOrder.created_at.desc()).limit(500).all()
+
+    order_ids = [o.id for o in orders]
+    items = []
+    if order_ids:
+        items = OrderItem.query.filter(OrderItem.order_id.in_(order_ids)).all()
+
+    summary_lines = []
+    for o in orders:
+        line_items = [f"{i.sku} x{i.qty} @ ${float(i.unit_price):.2f}" for i in items if i.order_id == o.id]
+        summary_lines.append(
+            f"Order {o.id} — {o.created_at} — ${float(o.revenue):.2f} — items: {', '.join(line_items) if line_items else 'none recorded'}"
+        )
+
+    body = f"""<p>Shopify customer data request for shop <b>{context['shop_domain']}</b>:</p>
+<p>Customer ID: {customer_id or 'N/A'}<br>Customer email: {customer_email or 'N/A'}</p>
+<p>Orders found: {len(orders)}</p>
+<pre>{'<br>'.join(summary_lines) or 'No orders stored.'}</pre>
+"""
+
+    merchant = MerchantProfile.query.get(merchant_id)
+    recipient = merchant.admin_email if merchant and merchant.admin_email else SUPPORT_EMAIL
+    dispatch_external_email(recipient, f"Shopify customer data request — {context['shop_domain']}", body)
+
+    if event_id:
+        db.session.add(ProcessedWebhookEvent(event_id=event_id))
+        db.session.commit()
+
+    return jsonify({"status": "accepted"}), 200
+
+
+@app.route('/api/v1/webhooks/shopify-gdpr/customers/redact', methods=['POST'])
+@limiter.limit("60 per minute")
+def shopify_gdpr_customer_redact():
+    """Customer redaction: remove PII for the specified customer."""
+    context, error, status = _parse_shopify_gdpr_webhook()
+    if error:
+        return error, status
+
+    merchant_id = context["merchant_id"]
+    if not merchant_id:
+        return jsonify({"status": "accepted"}), 200
+
+    tenant_rls.set_tenant_scope(merchant_id)
+
+    event_id = context["event_id"]
+    if event_id and ProcessedWebhookEvent.query.get(event_id):
+        return jsonify({"status": "duplicate_ignored"}), 200
+
+    customer = context["payload"].get("customer") or {}
+    customer_id = str(customer.get("id") or customer.get("customer_id") or "").strip()
+    customer_email = (customer.get("email") or "").strip().lower()
+
+    query = UnifiedOrder.query.filter_by(merchant_id=merchant_id, channel="shopify")
+    filters = []
+    if customer_id:
+        filters.append(UnifiedOrder.customer_id == customer_id)
+    if customer_email:
+        filters.append(UnifiedOrder.ship_to.cast(db.Text).ilike(f"%{customer_email}%"))
+    if filters:
+        query = query.filter(or_(*filters))
+    orders = query.all()
+
+    for order in orders:
+        order.customer_id = "redacted"
+        order.ship_to = {"redacted": True}
+
+    if event_id:
+        db.session.add(ProcessedWebhookEvent(event_id=event_id))
+    db.session.commit()
+    logger.info(f"Redacted {len(orders)} Shopify orders for merchant {merchant_id}")
+
+    return jsonify({"status": "accepted"}), 200
+
+
+@app.route('/api/v1/webhooks/shopify-gdpr/shop/redact', methods=['POST'])
+@limiter.limit("60 per minute")
+def shopify_gdpr_shop_redact():
+    """Shop redaction: delete all Shopify data for the store."""
+    context, error, status = _parse_shopify_gdpr_webhook()
+    if error:
+        return error, status
+
+    merchant_id = context["merchant_id"]
+    shop_domain = context["shop_domain"]
+    if not merchant_id:
+        return jsonify({"status": "accepted"}), 200
+
+    tenant_rls.set_tenant_scope(merchant_id)
+
+    event_id = context["event_id"]
+    if event_id and ProcessedWebhookEvent.query.get(event_id):
+        return jsonify({"status": "duplicate_ignored"}), 200
+
+    # Remove Shopify orders and their line items first (products are RESTRICTed by order_items).
+    shopify_order_ids = [
+        row[0] for row in
+        db.session.query(UnifiedOrder.id).filter_by(merchant_id=merchant_id, channel="shopify").all()
+    ]
+    if shopify_order_ids:
+        OrderItem.query.filter(OrderItem.order_id.in_(shopify_order_ids)).delete(synchronize_session=False)
+        UnifiedOrder.query.filter_by(merchant_id=merchant_id, channel="shopify").delete(synchronize_session=False)
+
+    ProfitFeedOrder.query.filter_by(merchant_id=merchant_id, channel="shopify").delete(synchronize_session=False)
+    AdSpendFeed.query.filter_by(merchant_id=merchant_id, platform_source="shopify").delete(synchronize_session=False)
+
+    # Remove only Shopify-only products; keep products shared with other channels.
+    for product in Product.query.filter_by(merchant_id=merchant_id).all():
+        channel_ids = product.channel_ids or {}
+        if isinstance(channel_ids, str):
+            try:
+                channel_ids = json.loads(channel_ids)
+            except json.JSONDecodeError:
+                channel_ids = {}
+        if isinstance(channel_ids, dict) and "shopify" in channel_ids:
+            del channel_ids["shopify"]
+        if not channel_ids:
+            db.session.delete(product)
+        else:
+            product.channel_ids = channel_ids
+
+    # Clean up integration artifacts.
+    TenantOAuthToken.query.filter_by(shop_domain=shop_domain).delete(synchronize_session=False)
+    IntegrationLink.query.filter_by(merchant_id=merchant_id, platform="shopify", shopify_shop_domain=shop_domain).delete(synchronize_session=False)
+    MerchantChannel.query.filter_by(merchant_id=merchant_id, channel_id="shopify").delete(synchronize_session=False)
+
+    if event_id:
+        db.session.add(ProcessedWebhookEvent(event_id=event_id))
+    db.session.commit()
+    logger.info(f"Redacted all Shopify data for merchant {merchant_id}, shop {shop_domain}")
+
+    return jsonify({"status": "accepted"}), 200
+
+
+@app.route('/api/v1/webhooks/shopify/app/uninstalled', methods=['POST'])
+@limiter.limit("60 per minute")
+def shopify_app_uninstalled():
+    """App uninstalled: revoke tokens and mark the Shopify integration inactive."""
+    context, error, status = _parse_shopify_gdpr_webhook()
+    if error:
+        return error, status
+
+    merchant_id = context["merchant_id"]
+    shop_domain = context["shop_domain"]
+    if not merchant_id:
+        return jsonify({"status": "accepted"}), 200
+
+    tenant_rls.set_tenant_scope(merchant_id)
+
+    event_id = context["event_id"]
+    if event_id and ProcessedWebhookEvent.query.get(event_id):
+        return jsonify({"status": "duplicate_ignored"}), 200
+
+    TenantOAuthToken.query.filter_by(shop_domain=shop_domain).delete(synchronize_session=False)
+    IntegrationLink.query.filter_by(merchant_id=merchant_id, platform="shopify", shopify_shop_domain=shop_domain).delete(synchronize_session=False)
+    MerchantChannel.query.filter_by(merchant_id=merchant_id, channel_id="shopify").delete(synchronize_session=False)
+
+    if event_id:
+        db.session.add(ProcessedWebhookEvent(event_id=event_id))
+    db.session.commit()
+    logger.info(f"Uninstalled Shopify integration for merchant {merchant_id}, shop {shop_domain}")
+
+    return jsonify({"status": "accepted"}), 200
+
+
 def process_idempotent_channel_event(event_id, merchant_id, platform_id, amount=0.0):
     """Record a webhook event idempotently and bump the per-merchant channel order count."""
     if not event_id:
@@ -4191,16 +5418,47 @@ def process_idempotent_channel_event(event_id, merchant_id, platform_id, amount=
 @limiter.limit("60 per minute")
 def tiktok_orders_webhook():
     """Ingest TikTok Shop order events into the isolated merchant channel."""
+    raw_body = request.get_data()
     event_id = request.headers.get("X-Tiktok-Event-Id") or request.headers.get("X-TikTok-Event-Id")
-    merchant_target = request.args.get("merchant_id", "merchant_shawn_01")
+    merchant_target = request.args.get("merchant_id")
+    signature = request.headers.get("X-Tiktok-Signature") or request.headers.get("X-Webhook-Signature")
+
+    if not merchant_target:
+        return jsonify({"status": "rejected", "reason": "Missing merchant_id query parameter"}), 400
+    if not event_id:
+        return jsonify({"status": "rejected", "reason": "Missing X-Tiktok-Event-Id"}), 400
+
+    if TIKTOK_WEBHOOK_SECRET:
+        if not signature:
+            log_system_exception("TIKTOK_WEBHOOK", "WARNING", "Dropped inbound TikTok webhook: missing signature.")
+            return jsonify({"status": "rejected", "reason": "Missing signature"}), 401
+        computed = hmac.new(TIKTOK_WEBHOOK_SECRET, raw_body, hashlib.sha256).hexdigest()
+        if not hmac.compare_digest(computed, signature):
+            log_system_exception("TIKTOK_WEBHOOK", "WARNING", "Dropped inbound TikTok webhook: invalid signature.")
+            return jsonify({"status": "rejected", "reason": "Invalid signature"}), 401
+    else:
+        logger.warning("TIKTOK_WEBHOOK_SECRET not set — accepting webhook without signature verification")
+
+    try:
+        raw = json.loads(raw_body.decode("utf-8"))
+    except json.JSONDecodeError as je:
+        log_system_exception("TIKTOK_WEBHOOK", "WARNING", f"Malformed JSON: {je}")
+        return jsonify({"status": "rejected", "reason": "Malformed JSON"}), 400
+
     tenant_rls.set_tenant_scope(merchant_target)
     blocked = enforce_tier_limits(merchant_target, "tiktok")
     if blocked:
         return blocked
-    raw = request.get_json() or {}
-    order_price = float(raw.get("order_amount", raw.get("total_amount", 0.00)))
+
+    try:
+        order_price = float(raw.get("order_amount", raw.get("total_amount", 0.00)))
+    except (TypeError, ValueError):
+        return jsonify({"status": "rejected", "reason": "Invalid order_amount"}), 400
+
     try:
         created = process_idempotent_channel_event(event_id, merchant_target, "tiktok", order_price)
+        if not created:
+            return jsonify({"status": "duplicate_ignored"}), 200
         db.session.commit()
         # Feed the real-time Profit Feed for TikTok Shop.
         line_items = raw.get("line_items") or raw.get("skus") or raw.get("items") or []
@@ -4235,7 +5493,7 @@ def tiktok_orders_webhook():
         )
         # Trigger real-time multi-channel routing pipeline in the background
         run_async_task(lambda: asyncio.run(process_incoming_order_event(raw)))
-        return jsonify({"status": "synchronized" if created else "ignored"}), 200
+        return jsonify({"status": "synchronized"}), 200
     except Exception as e:
         log_system_exception("TIKTOK_WEBHOOK", "CRITICAL", str(e))
         db.session.rollback()
@@ -4246,17 +5504,48 @@ def tiktok_orders_webhook():
 @limiter.limit("60 per minute")
 def amazon_orders_webhook():
     """Ingest Amazon Seller Central order events into the isolated merchant channel."""
+    raw_body = request.get_data()
     event_id = request.headers.get("X-Amazon-Sqs-Message-Id")
-    merchant_target = request.args.get("merchant_id", "merchant_shawn_01")
+    merchant_target = request.args.get("merchant_id")
+    signature = request.headers.get("X-Amazon-Signature") or request.headers.get("X-Webhook-Signature")
+
+    if not merchant_target:
+        return jsonify({"status": "rejected", "reason": "Missing merchant_id query parameter"}), 400
+    if not event_id:
+        return jsonify({"status": "rejected", "reason": "Missing X-Amazon-Sqs-Message-Id"}), 400
+
+    if AMAZON_WEBHOOK_SECRET:
+        if not signature:
+            log_system_exception("AMAZON_WEBHOOK", "WARNING", "Dropped inbound Amazon webhook: missing signature.")
+            return jsonify({"status": "rejected", "reason": "Missing signature"}), 401
+        computed = hmac.new(AMAZON_WEBHOOK_SECRET, raw_body, hashlib.sha256).hexdigest()
+        if not hmac.compare_digest(computed, signature):
+            log_system_exception("AMAZON_WEBHOOK", "WARNING", "Dropped inbound Amazon webhook: invalid signature.")
+            return jsonify({"status": "rejected", "reason": "Invalid signature"}), 401
+    else:
+        logger.warning("AMAZON_WEBHOOK_SECRET not set — accepting webhook without signature verification")
+
+    try:
+        raw = json.loads(raw_body.decode("utf-8"))
+    except json.JSONDecodeError as je:
+        log_system_exception("AMAZON_WEBHOOK", "WARNING", f"Malformed JSON: {je}")
+        return jsonify({"status": "rejected", "reason": "Malformed JSON"}), 400
+
     tenant_rls.set_tenant_scope(merchant_target)
     blocked = enforce_tier_limits(merchant_target, "amazon")
     if blocked:
         return blocked
-    raw = request.get_json() or {}
+
     payload = raw.get("payload", raw)
-    order_price = float(payload.get("AmazonOrderTotal", payload.get("total", 0.00)))
+    try:
+        order_price = float(payload.get("AmazonOrderTotal", payload.get("total", 0.00)))
+    except (TypeError, ValueError):
+        return jsonify({"status": "rejected", "reason": "Invalid AmazonOrderTotal"}), 400
+
     try:
         created = process_idempotent_channel_event(event_id, merchant_target, "amazon", order_price)
+        if not created:
+            return jsonify({"status": "duplicate_ignored"}), 200
         db.session.commit()
         # Feed the real-time Profit Feed for Amazon.
         items = payload.get("NumberOfItemsShipped") or payload.get("items") or []
@@ -4297,7 +5586,7 @@ def amazon_orders_webhook():
             state="shipped" if payload.get("OrderStatus") != "Canceled" else "cancelled",
             order_items=order_items,
         )
-        return jsonify({"status": "synchronized" if created else "ignored"}), 200
+        return jsonify({"status": "synchronized"}), 200
     except Exception as e:
         log_system_exception("AMAZON_WEBHOOK", "CRITICAL", str(e))
         db.session.rollback()
@@ -4938,24 +6227,26 @@ def magic_login():
 
 
 @app.route('/api/v1/admin/kill-switch', methods=['POST'])
-@require_roles([UserRole.ADMIN])
+@require_roles([UserRole.ADMIN, UserRole.ENGINEER])
 def admin_kill_switch():
     """Halt all background channel synchronization."""
     try:
-        asyncio.run(circuit_breaker.engage_global_kill_switch())
+        AdminPlatformControl.set_bool('global_sync_paused', True)
         return jsonify({"status": "HALTED"}), 200
     except Exception as e:
+        logger.error(f"[KILL SWITCH] Failed to engage: {e}")
         return jsonify({"status": "error", "reason": str(e)}), 500
 
 
 @app.route('/api/v1/admin/release-lock', methods=['POST'])
-@require_roles([UserRole.ADMIN])
+@require_roles([UserRole.ADMIN, UserRole.ENGINEER])
 def admin_release_lock():
     """Restore global synchronization."""
     try:
-        asyncio.run(circuit_breaker.release_system_lock())
+        AdminPlatformControl.set_bool('global_sync_paused', False)
         return jsonify({"status": "OPERATIONAL"}), 200
     except Exception as e:
+        logger.error(f"[RELEASE LOCK] Failed to release: {e}")
         return jsonify({"status": "error", "reason": str(e)}), 500
 
 
@@ -5067,6 +6358,13 @@ def health_check():
     return jsonify(health), status_code
 
 
+@app.route('/api/v1/health', methods=['GET'])
+@limiter.exempt
+def api_v1_health():
+    """Public mirror of /health for external uptime monitors."""
+    return health_check()
+
+
 @app.route('/api/v1/auth/shopify/connect')
 def shopify_oauth_connect():
     """Step 1: Redirect merchant to Shopify OAuth grant screen."""
@@ -5084,19 +6382,24 @@ def shopify_oauth_connect():
     return redirect(oauth_url)
 
 
-def _tiktok_oauth_state(merchant_id: str, secret: str) -> str:
-    sig = hmac.new(secret.encode("utf-8"), merchant_id.encode("utf-8"), hashlib.sha256).hexdigest()[:16]
-    return f"{merchant_id}:{sig}"
+def _tiktok_oauth_state(merchant_id: str, secret: str, region: str = "") -> str:
+    payload = f"{merchant_id}:{region}"
+    sig = hmac.new(secret.encode("utf-8"), payload.encode("utf-8"), hashlib.sha256).hexdigest()[:16]
+    return f"{merchant_id}:{region}:{sig}"
 
 
-def _verify_tiktok_oauth_state(state: str, secret: str) -> Optional[str]:
+def _verify_tiktok_oauth_state(state: str, secret: str) -> tuple:
     if not state or ":" not in state:
-        return None
-    merchant_id, sig = state.split(":", 1)
-    expected = hmac.new(secret.encode("utf-8"), merchant_id.encode("utf-8"), hashlib.sha256).hexdigest()[:16]
+        return None, ""
+    parts = state.split(":", 2)
+    if len(parts) < 3:
+        return None, ""
+    merchant_id, region, sig = parts
+    payload = f"{merchant_id}:{region}"
+    expected = hmac.new(secret.encode("utf-8"), payload.encode("utf-8"), hashlib.sha256).hexdigest()[:16]
     if not hmac.compare_digest(sig, expected):
-        return None
-    return merchant_id
+        return None, ""
+    return merchant_id, region
 
 
 @app.route('/api/v1/auth/shopify/callback')
@@ -5140,16 +6443,19 @@ def tiktok_oauth_connect():
         return redirect("/login?error=auth_required")
     if not merchant.get("live_access_enabled"):
         return redirect("/dashboard/commerce-hub?oauth_sync=error")
-    if not TIKTOK_APP_KEY or not TIKTOK_APP_SECRET or not TIKTOK_SERVICE_ID:
+
+    region = (request.args.get("region") or TIKTOK_AUTH_REGION or "").strip().lower()
+    app_key, app_secret, service_id = _tiktok_creds_for_region(region)
+    if not app_key or not app_secret or not service_id:
         return redirect("/dashboard/commerce-hub?oauth_sync=error")
 
-    state = _tiktok_oauth_state(merchant["id"], TIKTOK_APP_SECRET)
+    state = _tiktok_oauth_state(merchant["id"], app_secret, region)
     auth_url = tiktok_sync.build_auth_url(
-        service_id=TIKTOK_SERVICE_ID,
-        app_key=TIKTOK_APP_KEY,
+        service_id=service_id,
+        app_key=app_key,
         redirect_uri=TIKTOK_REDIRECT_URI,
         state=state,
-        region=TIKTOK_AUTH_REGION,
+        region=region,
     )
     return redirect(auth_url)
 
@@ -5163,8 +6469,9 @@ def tiktok_oauth_callback():
         return redirect("/dashboard/commerce-hub?oauth_sync=error")
 
     merchant_id = None
+    region = ""
     if TIKTOK_APP_SECRET:
-        merchant_id = _verify_tiktok_oauth_state(state, TIKTOK_APP_SECRET)
+        merchant_id, region = _verify_tiktok_oauth_state(state, TIKTOK_APP_SECRET)
     if not merchant_id:
         merchant = get_merchant_context()
         if merchant:
@@ -5172,19 +6479,20 @@ def tiktok_oauth_callback():
         else:
             return redirect("/login?error=auth_required")
 
-    if not TIKTOK_APP_KEY or not TIKTOK_APP_SECRET:
+    app_key, app_secret, _ = _tiktok_creds_for_region(region)
+    if not app_key or not app_secret:
         return redirect("/dashboard/commerce-hub?oauth_sync=error")
 
     try:
-        token_data = tiktok_sync.exchange_auth_code(code, TIKTOK_APP_KEY, TIKTOK_APP_SECRET)
+        token_data = tiktok_sync.exchange_auth_code(code, app_key, app_secret)
         access_token = token_data.get("access_token") or token_data.get("accessToken", "")
         refresh_token = token_data.get("refresh_token") or token_data.get("refreshToken", "")
 
         shops = tiktok_sync.get_authorized_shops(
             access_token=access_token,
-            app_key=TIKTOK_APP_KEY,
-            app_secret=TIKTOK_APP_SECRET,
-            region=TIKTOK_AUTH_REGION,
+            app_key=app_key,
+            app_secret=app_secret,
+            region=region,
         )
         if not shops:
             return redirect("/dashboard/commerce-hub?oauth_sync=error")
@@ -5198,11 +6506,12 @@ def tiktok_oauth_callback():
         channels_module.connect_tiktok(
             merchant_id=merchant_id,
             seller_id=shop_id,
-            app_key=TIKTOK_APP_KEY,
-            app_secret=TIKTOK_APP_SECRET,
+            app_key=app_key,
+            app_secret=app_secret,
             access_token=access_token,
             shop_cipher=shop_cipher,
             refresh_token=refresh_token,
+            region=region,
         )
         _trigger_initial_sync(merchant_id, "tiktok")
         return_url = "/dashboard/settings?tab=stores&onboarding=1&oauth_sync=success"
@@ -5477,7 +6786,7 @@ def api_admin_reset_password():
     password = (data.get("password") or "").strip()
     if not email:
         return jsonify({"detail": "Email is required"}), 400
-    profile = MerchantProfile.query.filter_by(admin_email=email).first()
+    profile = _profile_for_email(email)
     if not profile:
         return jsonify({"detail": "Merchant not found"}), 404
     if not password:
@@ -5524,7 +6833,7 @@ def api_monitoring_alerts():
 
 
 @app.route('/api/v1/monitoring/alert-test', methods=['POST'])
-@require_roles([UserRole.ADMIN])
+@require_roles([UserRole.ADMIN, UserRole.ENGINEER])
 def api_monitoring_alert_test():
     """Send a test alert through configured channels."""
     monitoring_module.send_alert({
@@ -5568,6 +6877,304 @@ def api_refresh_materialized_views():
     except Exception as e:
         logger.error(f"[mview refresh] {e}")
         return jsonify({"detail": str(e)}), 500
+
+
+@app.route('/api/engineer/exceptions', methods=['GET', 'DELETE'])
+@require_roles([UserRole.ENGINEER])
+def api_engineer_exceptions():
+    """Return or clear recent system exception logs for operational review."""
+    if request.method == 'DELETE':
+        confirm = request.args.get('confirm') == '1'
+        if not confirm:
+            return jsonify({"error": "Pass confirm=1 to clear exceptions"}), 400
+        exception_id = request.args.get('id', type=int)
+        if exception_id:
+            row = SystemExceptionLog.query.get(exception_id)
+            if not row:
+                return jsonify({"error": "Exception not found"}), 404
+            db.session.delete(row)
+            db.session.commit()
+            return jsonify({"deleted": 1}), 200
+        hours = request.args.get('hours', 1, type=int)
+        cutoff = datetime.utcnow() - timedelta(hours=max(hours, 1))
+        deleted = SystemExceptionLog.query.filter(
+            SystemExceptionLog.module_origin == 'TEARDOWN',
+            SystemExceptionLog.timestamp < cutoff,
+        ).delete(synchronize_session=False)
+        db.session.commit()
+        return jsonify({"deleted": deleted}), 200
+
+    since = datetime.utcnow() - timedelta(hours=24)
+    rows = SystemExceptionLog.query.filter(SystemExceptionLog.timestamp >= since).order_by(SystemExceptionLog.timestamp.desc()).limit(100).all()
+    return jsonify({
+        "exceptions": [
+            {
+                "id": r.id,
+                "module": r.module_origin,
+                "severity": r.error_severity,
+                "message": r.exception_msg,
+                "timestamp": r.timestamp.isoformat() if r.timestamp else None,
+            }
+            for r in rows
+        ]
+    }), 200
+
+
+def _engineer_chat_extract_platform(text):
+    """Extract a platform name and merchant_id from a chat message."""
+    # platform then merchant
+    m = re.search(
+        r'\b(shopify|tiktok|amazon|ebay|walmart|bigcommerce|woocommerce)\b.*?\b'
+        r'(merchant_[a-zA-Z0-9_]+|tenant_[a-zA-Z0-9_]+|demo_[a-zA-Z0-9_]+|shawn_[a-zA-Z0-9_]+)\b',
+        text, re.I,
+    )
+    if m:
+        return m.group(1).lower(), m.group(2)
+    # merchant then platform
+    m = re.search(
+        r'\b(merchant_[a-zA-Z0-9_]+|tenant_[a-zA-Z0-9_]+|demo_[a-zA-Z0-9_]+|shawn_[a-zA-Z0-9_]+)\b.*?\b'
+        r'(shopify|tiktok|amazon|ebay|walmart|bigcommerce|woocommerce)\b',
+        text, re.I,
+    )
+    if m:
+        return m.group(2).lower(), m.group(1)
+    return None, None
+
+
+def _engineer_chat_process(message):
+    """Parse a natural-language engineer command and execute the matching action."""
+    text = message.strip().lower()
+
+    if any(k in text for k in ('help', 'commands', 'what can you do', 'what can i')):
+        return {
+            "reply": (
+                "Available commands:\n"
+                "• health / status\n"
+                "• metrics\n"
+                "• alerts / sla\n"
+                "• exceptions / logs\n"
+                "• stores / connected stores\n"
+                "• audit / recent events\n"
+                "• summary\n"
+                "• sync <platform> for <merchant_id>\n"
+                "• reset <platform> for <merchant_id>\n"
+                "• run migrations\n"
+                "• pause sync / resume sync\n"
+                "• maintenance on / off\n"
+                "• non-beta on / off"
+            ),
+            "action": "help",
+        }
+
+    if re.search(r'\b(health|status|is .* (?:up|running))\b', text):
+        health = monitoring_module.deep_health()
+        status = health.get('status') or ('ok' if health.get('ok') else 'degraded')
+        return {"reply": f"Platform health is {status}.", "result": health, "action": "health"}
+
+    if re.search(r'\b(metrics|request count|latency|p95|p99)\b', text):
+        metrics = monitoring_module.current_metrics()
+        latency = metrics.get('latency_ms') or {}
+        return {
+            "reply": (
+                f"Requests (last minute): {metrics.get('requests_per_minute')}; "
+                f"p95 latency: {latency.get('p95')} ms; "
+                f"error rate: {metrics.get('error_rate_percent', 0):.2f}%."
+            ),
+            "result": metrics,
+            "action": "metrics",
+        }
+
+    if re.search(r'\b(alerts|sla|problems|issues|warnings)\b', text):
+        alerts = monitoring_module.check_sla()
+        return {"reply": f"Active SLA alerts: {len(alerts)}.", "result": {"alerts": alerts}, "action": "alerts"}
+
+    if re.search(r'\b(exceptions|errors|logs|failures)\b', text):
+        since = datetime.utcnow() - timedelta(hours=24)
+        rows = SystemExceptionLog.query.filter(
+            SystemExceptionLog.timestamp >= since
+        ).order_by(SystemExceptionLog.timestamp.desc()).limit(20).all()
+        exceptions = [
+            {
+                "id": r.id,
+                "module": r.module_origin,
+                "severity": r.error_severity,
+                "message": r.exception_msg,
+                "timestamp": r.timestamp.isoformat() if r.timestamp else None,
+            }
+            for r in rows
+        ]
+        return {
+            "reply": f"{len(exceptions)} exceptions in the last 24 hours.",
+            "result": {"exceptions": exceptions},
+            "action": "exceptions",
+        }
+
+    if re.search(r'\b(stores|connected stores|channels|connections)\b', text):
+        stores = _admin_stores()
+        return {"reply": f"{len(stores)} connected stores.", "result": {"stores": stores}, "action": "stores"}
+
+    if re.search(r'\b(audit|recent events|activity log|admin log)\b', text):
+        rows = AdminAuditLog.query.order_by(AdminAuditLog.created_at.desc()).limit(20).all()
+        events = [
+            {
+                "id": r.id,
+                "admin": r.admin_email,
+                "action": r.action,
+                "target": r.target_merchant_id,
+                "details": r.details,
+                "timestamp": r.created_at.isoformat() if r.created_at else None,
+            }
+            for r in rows
+        ]
+        return {
+            "reply": f"Last {len(events)} audit events.",
+            "result": {"events": events},
+            "action": "audit",
+        }
+
+    if re.search(r'\b(summary|overview|platform summary|kpi)\b', text):
+        summary = _admin_summary(datetime.utcnow())
+        return {
+            "reply": (
+                f"Members: {summary.get('total_members')}; "
+                f"paid: {summary.get('paid_accounts')}; "
+                f"active sessions (15m): {summary.get('active_sessions')}; "
+                f"connected stores: {summary.get('connected_stores')}; "
+                f"unread support messages: {summary.get('unread_support')}."
+            ),
+            "result": summary,
+            "action": "summary",
+        }
+
+    platform, merchant_id = _engineer_chat_extract_platform(text)
+
+    if re.search(r'\b(sync|resync|force\s*sync|run\s*sync)\b', text) and platform and merchant_id:
+        profile = MerchantProfile.query.get(merchant_id)
+        if not profile:
+            return {"reply": f"Merchant {merchant_id} not found.", "action": "sync"}
+        try:
+            if platform == 'shopify':
+                result = shopify_sync.sync_shopify(merchant_id)
+            elif platform == 'tiktok':
+                result = tiktok_sync.sync_tiktok(merchant_id)
+            elif platform == 'amazon':
+                result = amazon_sync.sync_amazon(merchant_id)
+            else:
+                return {"reply": f"Sync not implemented for {platform}.", "action": "sync"}
+            log_admin_audit("engineer_chat.sync", target_merchant_id=merchant_id, details={"platform": platform})
+            return {"reply": f"Synced {platform} for {merchant_id}.", "result": result, "action": "sync"}
+        except Exception as e:
+            logger.error(f"[engineer_chat sync] {e}")
+            return {"reply": f"Sync failed: {str(e)}", "action": "sync"}
+
+    if re.search(r'\b(reset|mark stale|force reconnect|re-auth)\b', text) and platform and merchant_id:
+        profile = MerchantProfile.query.get(merchant_id)
+        if not profile:
+            return {"reply": f"Merchant {merchant_id} not found.", "action": "reset"}
+        if platform not in ('shopify', 'tiktok', 'amazon', 'ebay', 'walmart', 'bigcommerce', 'woocommerce'):
+            return {"reply": f"Invalid platform: {platform}.", "action": "reset"}
+        try:
+            token = TenantOAuthToken.query.filter_by(merchant_id=merchant_id, platform_id=platform).first()
+            if token:
+                token.updated_at = datetime(2000, 1, 1)
+                db.session.add(token)
+            for link in IntegrationLink.query.filter_by(merchant_id=merchant_id, platform=platform).all():
+                link.updated_at = datetime(2000, 1, 1)
+                db.session.add(link)
+            db.session.commit()
+            log_admin_audit("engineer_chat.reset", target_merchant_id=merchant_id, details={"platform": platform})
+            return {"reply": f"Reset {platform} connection for {merchant_id}. It will be re-synced on next connect.", "action": "reset"}
+        except Exception as e:
+            db.session.rollback()
+            logger.error(f"[engineer_chat reset] {e}")
+            return {"reply": f"Reset failed: {str(e)}", "action": "reset"}
+
+    if re.search(r'\b(run\s+)?migrations?\b|\brefresh\s+(?:materialized\s+)?views?\b|\bschema\s+sync\b', text):
+        try:
+            db.create_all()
+            migrate_module.refresh_materialized_views()
+            log_admin_audit("engineer_chat.migrations")
+            return {"reply": "Schema synced and materialized views refreshed.", "action": "migrations"}
+        except Exception as e:
+            logger.error(f"[engineer_chat migrations] {e}")
+            return {"reply": f"Migrations failed: {str(e)}", "action": "migrations"}
+
+    if re.search(r'\b(pause|resume|stop|start|on|off)\b.*\b(sync|synchronization|marketplace|all syncs)\b', text) or \
+       re.search(r'\b(sync|synchronization|marketplace|all syncs)\b.*\b(pause|resume|stop|start|on|off)\b', text):
+        if any(w in text for w in ('pause', 'stop', 'off')):
+            enabled = True
+        elif any(w in text for w in ('resume', 'start', 'on')):
+            enabled = False
+        else:
+            enabled = True
+        AdminPlatformControl.set_bool('global_sync_paused', enabled)
+        log_admin_audit("engineer_chat.platform_control", details={"key": "global_sync_paused", "value": enabled})
+        return {"reply": f"Global sync {'paused' if enabled else 'resumed'}.", "action": "platform_control"}
+
+    maint_match = re.search(r'\bmaintenance(?:\s+mode)?\s+(on|off|enable|disable|true|false)\b', text)
+    if maint_match:
+        val = maint_match.group(1) in ('on', 'enable', 'true')
+        AdminPlatformControl.set_bool('maintenance_mode', val)
+        log_admin_audit("engineer_chat.platform_control", details={"key": "maintenance_mode", "value": val})
+        return {"reply": f"Maintenance mode {'enabled' if val else 'disabled'}.", "action": "platform_control"}
+
+    sample_match = re.search(r'\b(?:sample\s+pages?|non[-\s]?beta)\s+(on|off|show|hide|enable|disable)\b', text, re.IGNORECASE)
+    if sample_match:
+        val = sample_match.group(1) in ('on', 'show', 'enable', 'true')
+        AdminPlatformControl.set_bool('sample_pages_enabled', val)
+        log_admin_audit("engineer_chat.platform_control", details={"key": "sample_pages_enabled", "value": val})
+        return {"reply": f"Non-beta modules {'shown' if val else 'hidden'} for merchants.", "action": "platform_control"}
+
+    return {
+        "reply": (
+            "I didn't understand. Try: health, metrics, sync shopify for merchant_xxx, "
+            "reset tiktok for merchant_xxx, run migrations, pause sync, maintenance on, "
+            "non-beta on, audit, exceptions, stores, summary, or help."
+        ),
+        "action": "unknown",
+    }
+
+
+@app.route('/api/engineer/migrations', methods=['POST'])
+@require_roles([UserRole.ENGINEER])
+def api_engineer_migrations():
+    """Run safe, idempotent schema migrations and refresh materialized views."""
+    try:
+        import migrate as _migrate
+        db.create_all()
+        _migrate.refresh_materialized_views()
+        return jsonify({"status": "ok", "message": "Schema synced and materialized views refreshed."}), 200
+    except Exception as e:
+        logger.error(f"[engineer migrations] {e}")
+        return jsonify({"status": "error", "error": str(e)}), 500
+
+
+@app.route('/api/engineer/chat', methods=['POST'])
+@require_roles([UserRole.ENGINEER])
+def api_engineer_chat():
+    """Natural-language engineer assistant: parse a command and run operational actions."""
+    data = request.get_json(silent=True) or {}
+    message = (data.get('message') or '').strip()
+    if not message:
+        return jsonify({"reply": "Please send a message.", "action": "noop"}), 400
+    result = _engineer_chat_process(message)
+    return jsonify(result), 200
+
+
+@app.route('/admin/<path:path>')
+@require_roles([UserRole.ADMIN, UserRole.ENGINEER])
+def admin_catch_all(path):
+    """Stylised 404 for unknown /admin paths."""
+    ctx = _dashboard_context('admin_dashboard')
+    s = get_current_user()
+    ctx["dashboard_title"] = "Admin" if s and s.role == UserRole.ADMIN.value else "Engineer"
+    ctx["page_title"] = "Page not found"
+    ctx["page_description"] = f"The requested admin page '/admin/{path}' does not exist."
+    ctx["page_content"] = (
+        '<div style="text-align:center;padding:40px 20px;">'
+        '<a class="btn" href="/admin">Return to Admin Home</a></div>'
+    )
+    return render_template('dashboard/page.html', **ctx), 404
 
 
 if __name__ == '__main__':

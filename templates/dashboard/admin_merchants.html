@@ -1,56 +1,91 @@
 {% extends 'dashboard/base.html' %}
-{% block title %}Admin — Merchants{% endblock %}
+{% block title %}{{ dashboard_title | default('Admin') }} — Members{% endblock %}
 {% block content %}
 
+{% set is_admin = (merchant.role == 'Admin') %}
+
 <section class="page-header">
-  <h1>Merchant Operations</h1>
-  <p>Backend overview of every tenant: tier, sync status, and open actions.</p>
+  <h1>Members</h1>
+  <p>{% if is_admin %}Manage all merchants, tiers, feature access, support chat, and platform balance.{% else %}View all merchants, sync status, support threads, and channel health.{% endif %}</p>
 </section>
 
+<div class="kpi-grid" style="margin-bottom: 24px;">
+  {% if is_admin %}
+  <div class="card kpi-card">
+    <div class="kpi-label">Stripe available</div>
+    <div class="kpi-value" id="stripe-available">—</div>
+    <div class="kpi-delta" id="stripe-currency">{{ stripe_balance.currency | upper if stripe_balance.currency else 'USD' }}</div>
+  </div>
+  <div class="card kpi-card">
+    <div class="kpi-label">Stripe pending</div>
+    <div class="kpi-value" id="stripe-pending">—</div>
+  </div>
+  {% endif %}
+  <div class="card kpi-card">
+    <div class="kpi-label">Total members</div>
+    <div class="kpi-value">{{ total_members }}</div>
+  </div>
+  <div class="card kpi-card">
+    <div class="kpi-label">Active now</div>
+    <div class="kpi-value">{{ active_sessions }}</div>
+  </div>
+  <div class="card kpi-card">
+    <div class="kpi-label">Paid accounts</div>
+    <div class="kpi-value">{{ paid_accounts }}</div>
+  </div>
+</div>
+
 <div class="card">
-  <div class="card-head" style="display:flex; justify-content:space-between; align-items:center;">
-    <h3>All merchants ({{ merchants|length }})</h3>
-    <button class="btn" style="font-size:.75rem; padding:6px 12px;" onclick="window.location.reload()">Refresh</button>
+  <div class="card-head" style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:12px;">
+    <h3>All members ({{ merchants|length }})</h3>
+    <div style="display:flex; gap:8px; align-items:center;">
+      <input type="search" id="member-search" placeholder="Search members…" style="padding:6px 10px; border:1px solid var(--line); border-radius:8px; min-width:220px; background:var(--surface);">
+      <button class="btn" style="font-size:.75rem; padding:6px 12px;" onclick="window.location.reload()">Refresh</button>
+    </div>
   </div>
   <div class="table-wrap" style="overflow-x:auto;">
-    <table>
+    <table id="members-table">
       <thead>
         <tr>
           <th>Merchant</th>
-          <th>Tier</th>
-          <th>Plan</th>
+          <th>Tier / Plan</th>
           <th>Sandbox</th>
           <th>Channels</th>
-          <th>Last sync</th>
+          <th>Seats</th>
+          <th>Last active</th>
           <th>Sync status</th>
-          <th>Pending actions</th>
+          <th>Features</th>
           <th>Actions</th>
         </tr>
       </thead>
       <tbody>
         {% for m in merchants %}
-        <tr>
+        <tr data-search="{{ (m.business_name ~ ' ' ~ m.admin_email ~ ' ' ~ m.merchant_id) | lower }}">
           <td>
             <div style="font-weight:600; color:var(--ink);">{{ m.business_name }}</div>
             <div style="font-size:.75rem; color:var(--ink-3);">{{ m.merchant_id }}</div>
             <div style="font-size:.75rem; color:var(--ink-2);">{{ m.admin_email }}</div>
           </td>
-          <td><span class="tag tag-ghost">{{ m.account_tier }}</span></td>
           <td>
-            <div>{{ m.current_plan }}</div>
+            <span class="tag tag-ghost">{{ m.account_tier }}</span>
             {% if m.concierge %}<div class="tag tag-blue" style="margin-top:4px;">Concierge</div>{% endif %}
+            <div style="font-size:.75rem; color:var(--ink-3); margin-top:2px;">{{ m.current_plan or '—' }}</div>
           </td>
           <td>
             {% if m.sandbox_status == 'approved' %}<span style="color:var(--green);">Approved</span>
             {% elif m.sandbox_status == 'sandbox' %}<span style="color:var(--amber);">Sandbox</span>
             {% elif m.sandbox_status == 'expired' %}<span style="color:var(--red);">Expired</span>
             {% elif m.sandbox_status == 'rejected' %}<span style="color:var(--red);">Rejected</span>
-            {% else %}<span style="color:var(--ink-3);">{{ m.sandbox_status | title }}</span>
-            {% endif %}
+            {% else %}<span style="color:var(--ink-3);">{{ m.sandbox_status | title }}</span>{% endif %}
+            {% if m.live_access %}<div class="tag tag-green" style="margin-top:4px;">Live</div>{% endif %}
           </td>
-          <td>{{ m.channels }}</td>
           <td>
-            {% if m.last_sync %}{{ m.last_sync[:19] | replace('T',' ') }}{% else %}—{% endif %}
+            <div style="font-weight:600;">{{ m.channel_count }}</div>
+            <div style="font-size:.72rem; color:var(--ink-3);">{{ m.channels | join(', ') or '—' }}</div>
+          </td>
+          <td>{{ m.seats }}</td>
+          <td>
+            {% if m.last_active %}{{ m.last_active[:19] | replace('T',' ') }}{% else %}—{% endif %}
           </td>
           <td>
             {% if m.sync_status == 'OK' %}<span style="color:var(--green);">OK</span>
@@ -58,13 +93,18 @@
             {% else %}<span style="color:var(--ink-3);">{{ m.sync_status }}</span>{% endif %}
           </td>
           <td>
-            {% if m.pending_actions %}<strong style="color:var(--red);">{{ m.pending_actions }}</strong>{% else %}{{ m.pending_actions }}{% endif %}
+            {% set enabled = m.feature_flags.values() | select('true') | list | length %}
+            {% set disabled = m.feature_flags.values() | select('false') | list | length %}
+            <div style="font-size:.78rem; color:var(--ink-3);">{{ enabled }} on / {{ disabled }} off</div>
           </td>
           <td>
             <div style="display:flex; gap:6px; flex-wrap:wrap;">
-              <button class="btn" style="font-size:.7rem; padding:4px 8px;" onclick="syncChannel('{{ m.merchant_id }}', 'shopify')">Sync Shopify</button>
-              <button class="btn" style="font-size:.7rem; padding:4px 8px;" onclick="syncChannel('{{ m.merchant_id }}', 'tiktok')">Sync TikTok</button>
-              <button class="btn" style="font-size:.7rem; padding:4px 8px;" onclick="syncChannel('{{ m.merchant_id }}', 'amazon')">Sync Amazon</button>
+              {% if is_admin %}<button class="btn btn-primary" style="font-size:.7rem; padding:4px 8px;" onclick="editMember('{{ m.merchant_id }}')">Edit</button>{% endif %}
+              <a class="btn" style="font-size:.7rem; padding:4px 8px; text-decoration:none;" href="/admin/chat?merchant_id={{ m.merchant_id }}">Chat {% if m.unread %}<span class="tag tag-red" style="margin-left:4px;">{{ m.unread }}</span>{% endif %}</a>
+              <a class="btn" style="font-size:.7rem; padding:4px 8px; text-decoration:none;" href="/api/admin/impersonate/{{ m.merchant_id }}" target="_blank">Impersonate</a>
+              <button class="btn" style="font-size:.7rem; padding:4px 8px;" onclick="syncChannel('{{ m.merchant_id }}', 'shopify')">Sync S</button>
+              <button class="btn" style="font-size:.7rem; padding:4px 8px;" onclick="syncChannel('{{ m.merchant_id }}', 'tiktok')">Sync T</button>
+              <button class="btn" style="font-size:.7rem; padding:4px 8px;" onclick="resetChannel('{{ m.merchant_id }}', 'shopify')">Reset S</button>
             </div>
           </td>
         </tr>
@@ -76,12 +116,236 @@
   </div>
 </div>
 
+<div id="edit-modal" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,.5); z-index:1000; align-items:center; justify-content:center; padding:20px;">
+  <div style="background:var(--surface); border:1px solid var(--line); border-radius:16px; width:100%; max-width:720px; max-height:90vh; overflow:auto; box-shadow:0 20px 60px rgba(0,0,0,.2);">
+    <div style="padding:20px; border-bottom:1px solid var(--line); display:flex; justify-content:space-between; align-items:center;">
+      <h3 style="margin:0;">Edit member</h3>
+      <button class="btn" onclick="closeModal()">Close</button>
+    </div>
+    <div style="padding:20px;">
+      <div style="display:grid; grid-template-columns:1fr 1fr; gap:16px; margin-bottom:20px;">
+        <div>
+          <label style="font-size:.78rem; color:var(--ink-3); display:block; margin-bottom:6px;">Tier</label>
+          <select id="edit-tier" style="width:100%; padding:8px; border:1px solid var(--line); border-radius:8px; background:var(--surface);">
+            <option>Basic Tier</option>
+            <option>Vantav Operator</option>
+            <option>Vantav Growth</option>
+            <option>Vantav Scale</option>
+          </select>
+        </div>
+        <div>
+          <label style="font-size:.78rem; color:var(--ink-3); display:block; margin-bottom:6px;">Sandbox status</label>
+          <select id="edit-sandbox" style="width:100%; padding:8px; border:1px solid var(--line); border-radius:8px; background:var(--surface);">
+            <option value="pending">Pending</option>
+            <option value="sandbox">Sandbox</option>
+            <option value="approved">Approved</option>
+            <option value="rejected">Rejected</option>
+            <option value="expired">Expired</option>
+          </select>
+        </div>
+      </div>
+      <label style="display:flex; align-items:center; gap:8px; margin-bottom:20px; cursor:pointer;">
+        <input type="checkbox" id="edit-live" style="width:18px; height:18px;">
+        <span>Live access enabled</span>
+      </label>
+
+      <h4 style="margin:0 0 12px; font-size:.95rem;">Billing override</h4>
+      <div style="display:grid; grid-template-columns:repeat(auto-fill, minmax(160px, 1fr)); gap:14px; margin-bottom:20px;">
+        <div>
+          <label style="font-size:.78rem; color:var(--ink-3); display:block; margin-bottom:6px;">Current plan</label>
+          <select id="edit-current-plan" style="width:100%; padding:8px; border:1px solid var(--line); border-radius:8px; background:var(--surface);">
+            <option value="">— no override —</option>
+            <option value="Basic Tier">Basic Tier</option>
+            <option value="Vantav Operator">Vantav Operator</option>
+            <option value="Vantav Growth">Vantav Growth</option>
+            <option value="Vantav Scale">Vantav Scale</option>
+          </select>
+        </div>
+        <div>
+          <label style="font-size:.78rem; color:var(--ink-3); display:block; margin-bottom:6px;">Metered usage</label>
+          <input type="number" id="edit-metered-usage" min="0" placeholder="units" style="width:100%; padding:8px; border:1px solid var(--line); border-radius:8px; background:var(--surface);">
+        </div>
+        <div>
+          <label style="font-size:.78rem; color:var(--ink-3); display:block; margin-bottom:6px;">Accrued invoice ($)</label>
+          <input type="number" step="0.01" id="edit-accrued-invoice" placeholder="0.00" style="width:100%; padding:8px; border:1px solid var(--line); border-radius:8px; background:var(--surface);">
+        </div>
+        <div>
+          <label style="font-size:.78rem; color:var(--ink-3); display:block; margin-bottom:6px;">Billing cycle end</label>
+          <input type="date" id="edit-billing-cycle" style="width:100%; padding:8px; border:1px solid var(--line); border-radius:8px; background:var(--surface);">
+        </div>
+        <div>
+          <label style="font-size:.78rem; color:var(--ink-3); display:block; margin-bottom:6px;">Max seats</label>
+          <input type="number" id="edit-max-seats" min="1" placeholder="seats" style="width:100%; padding:8px; border:1px solid var(--line); border-radius:8px; background:var(--surface);">
+        </div>
+      </div>
+
+      <h4 style="margin:0 0 12px; font-size:.95rem;">Feature overrides</h4>
+      <p style="font-size:.78rem; color:var(--ink-3); margin-top:-8px; margin-bottom:12px;">Set to On/Off to override tier gating, or leave as Default to use the merchant's tier rules.</p>
+      <div id="feature-toggles" style="display:grid; grid-template-columns:repeat(auto-fill, minmax(180px, 1fr)); gap:12px; max-height:360px; overflow:auto; padding-right:8px;"></div>
+    </div>
+    <div style="padding:20px; border-top:1px solid var(--line); display:flex; justify-content:flex-end; gap:10px;">
+      <span id="edit-status" style="font-size:.8rem; align-self:center; color:var(--ink-3);"></span>
+      <button class="btn" onclick="closeModal()">Cancel</button>
+      <button class="btn btn-primary" id="save-btn" onclick="saveMember()">Save changes</button>
+    </div>
+  </div>
+</div>
+
 <script>
+const members = {{ merchants | tojson }};
+const featurePages = {{ feature_pages | tojson }};
+let editingId = null;
+let editingVersion = null;
+
+function formatMoney(cents) {
+  if (cents === undefined || cents === null) return '—';
+  return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(cents / 100);
+}
+
+const stripeBalance = {{ stripe_balance | tojson }};
+(function renderStripe() {
+  if (!document.getElementById('stripe-available')) return;
+  const available = (stripeBalance.available || []).reduce((s, b) => s + (b.amount || 0), 0);
+  const pending = (stripeBalance.pending || []).reduce((s, b) => s + (b.amount || 0), 0);
+  const currency = (stripeBalance.currency || 'usd').toUpperCase();
+  document.getElementById('stripe-available').textContent = formatMoney(available);
+  document.getElementById('stripe-pending').textContent = formatMoney(pending);
+  document.getElementById('stripe-currency').textContent = currency;
+})();
+
+document.getElementById('member-search').addEventListener('input', (e) => {
+  const q = e.target.value.toLowerCase();
+  document.querySelectorAll('#members-table tbody tr').forEach(row => {
+    row.style.display = (row.dataset.search || '').includes(q) ? '' : 'none';
+  });
+});
+
+function labelForPage(id) {
+  return id.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
+}
+
+function editMember(merchantId) {
+  const m = members.find(x => x.merchant_id === merchantId);
+  if (!m) return;
+  editingId = merchantId;
+  editingVersion = m.version || null;
+  document.getElementById('edit-tier').value = m.account_tier || 'Basic Tier';
+  document.getElementById('edit-sandbox').value = m.sandbox_status || 'pending';
+  document.getElementById('edit-live').checked = m.live_access;
+  document.getElementById('edit-current-plan').value = m.current_plan || '';
+  document.getElementById('edit-metered-usage').value = m.metered_usage_units ?? '';
+  document.getElementById('edit-accrued-invoice').value = m.accrued_invoice_value ?? '';
+  document.getElementById('edit-billing-cycle').value = m.billing_cycle_end || '';
+  document.getElementById('edit-max-seats').value = m.max_authorized_seats ?? '';
+  const flags = m.feature_flags || {};
+  const container = document.getElementById('feature-toggles');
+  container.innerHTML = '';
+  featurePages.forEach(page => {
+    const val = flags[page];
+    const wrap = document.createElement('div');
+    wrap.style.cssText = 'display:flex; flex-direction:column; gap:4px;';
+    wrap.innerHTML = `
+      <label style="font-size:.78rem; color:var(--ink-2);">${labelForPage(page)}</label>
+      <select class="feature-select" data-page="${page}" style="padding:6px; border:1px solid var(--line); border-radius:8px; background:var(--surface);">
+        <option value="" ${val === undefined || val === null ? 'selected' : ''}>Default</option>
+        <option value="on" ${val === true ? 'selected' : ''}>On</option>
+        <option value="off" ${val === false ? 'selected' : ''}>Off</option>
+      </select>
+    `;
+    container.appendChild(wrap);
+  });
+  document.getElementById('edit-status').textContent = '';
+  document.getElementById('edit-modal').style.display = 'flex';
+}
+
+function closeModal() {
+  editingId = null;
+  editingVersion = null;
+  document.getElementById('edit-modal').style.display = 'none';
+}
+
+async function saveMember() {
+  if (!editingId) return;
+  const btn = document.getElementById('save-btn');
+  btn.disabled = true;
+  document.getElementById('edit-status').textContent = 'Saving…';
+  const original = members.find(x => x.merchant_id === editingId) || {};
+
+  const featureFlags = {};
+  document.querySelectorAll('.feature-select').forEach(sel => {
+    if (sel.value === 'on') featureFlags[sel.dataset.page] = true;
+    else if (sel.value === 'off') featureFlags[sel.dataset.page] = false;
+  });
+
+  const payload = {};
+  if (editingVersion) payload.version = editingVersion;
+
+  const tier = document.getElementById('edit-tier').value;
+  if (tier !== (original.account_tier || 'Basic Tier')) payload.account_tier = tier;
+
+  const sandbox = document.getElementById('edit-sandbox').value;
+  if (sandbox !== (original.sandbox_status || 'pending')) payload.sandbox_status = sandbox;
+
+  const live = document.getElementById('edit-live').checked;
+  if (live !== original.live_access) payload.live_access_enabled = live;
+
+  const originalFlags = JSON.stringify(original.feature_flags || {});
+  if (JSON.stringify(featureFlags) !== originalFlags) payload.feature_flags = featureFlags;
+
+  const currentPlan = document.getElementById('edit-current-plan').value;
+  if (currentPlan !== (original.current_plan || '')) payload.current_plan = currentPlan;
+
+  const metered = document.getElementById('edit-metered-usage').value;
+  const origMetered = (original.metered_usage_units === undefined || original.metered_usage_units === null) ? '' : String(original.metered_usage_units);
+  if (metered !== '' && metered !== origMetered) payload.metered_usage_units = parseInt(metered, 10);
+
+  const accrued = document.getElementById('edit-accrued-invoice').value;
+  const origAccrued = (original.accrued_invoice_value === undefined || original.accrued_invoice_value === null) ? '' : String(original.accrued_invoice_value);
+  if (accrued !== '' && accrued !== origAccrued) payload.accrued_invoice_value = parseFloat(accrued);
+
+  const cycle = document.getElementById('edit-billing-cycle').value;
+  if (cycle !== (original.billing_cycle_end || '')) payload.billing_cycle_end = cycle;
+
+  const seats = document.getElementById('edit-max-seats').value;
+  const origSeats = (original.max_authorized_seats === undefined || original.max_authorized_seats === null) ? '' : String(original.max_authorized_seats);
+  if (seats !== '' && seats !== origSeats) payload.max_authorized_seats = parseInt(seats, 10);
+  try {
+    const res = await fetch(`/api/admin/merchants/${editingId}`, {
+      method: 'PATCH',
+      credentials: 'same-origin',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify(payload),
+    });
+    if (res.ok) {
+      document.getElementById('edit-status').textContent = 'Saved. Reloading…';
+      setTimeout(() => window.location.reload(), 600);
+    } else {
+      const data = await res.json();
+      document.getElementById('edit-status').textContent = data.error || 'Save failed';
+    }
+  } catch (e) {
+    document.getElementById('edit-status').textContent = 'Network error';
+  } finally {
+    btn.disabled = false;
+  }
+}
+
 async function syncChannel(merchantId, platform) {
   try {
     const res = await fetch(`/api/admin/${platform}/sync/${merchantId}`, { method: 'POST', credentials: 'same-origin' });
     const data = await res.json();
-    alert(res.ok ? `${platform} sync queued for ${merchantId}` : (data.detail || 'Sync failed'));
+    alert(res.ok ? `${platform} synced for ${merchantId}` : (data.detail || data.error || 'Sync failed'));
+  } catch (e) {
+    alert('Network error');
+  }
+}
+
+async function resetChannel(merchantId, platform) {
+  if (!confirm(`Mark ${platform} connection stale for ${merchantId}?`)) return;
+  try {
+    const res = await fetch(`/api/admin/stores/${merchantId}/${platform}/reset`, { method: 'POST', credentials: 'same-origin' });
+    const data = await res.json();
+    alert(res.ok ? `${platform} reset for ${merchantId}` : (data.error || 'Reset failed'));
   } catch (e) {
     alert('Network error');
   }

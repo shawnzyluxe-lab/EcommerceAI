@@ -13,7 +13,7 @@ from typing import Any, Dict, List, Optional
 
 from flask import Flask, render_template, request, jsonify
 from sqlalchemy import func
-from models import db, PredictiveLogistics, MerchantSetting, SaaSBilling, Product, OrderItem, UnifiedOrder
+from models import db, PredictiveLogistics, MerchantSetting, SaaSBilling, Product, OrderItem, UnifiedOrder, AdminPlatformControl
 import profit_feed
 import alert_matrix
 import action_gate
@@ -212,25 +212,101 @@ def _ai_greeting(merchant_id: Optional[str], merchant: Optional[Dict[str, Any]] 
 # backed by real data. Admins and engineers can still see every page so development
 # and internal demos can continue.
 # Beta launch scope: overview, profit engine, alerts, billing, settings, and the
-# regression chart. All other sidebar pages are hidden from merchant nav.
+# inventory, billing, settings, and regression. Other pages remain admin-only
+# until they are ready for merchant use.
+# Closed-beta gating: only these pages are visible to merchants by default.
+# All other pages are hidden unless the admin flips the "sample_pages_enabled"
+# switch (which now acts as a "show non-beta modules" toggle).
+BETA_READY_PAGE_IDS = {
+    "overview",
+    "alerts",
+    "action_gate",
+    "profit_engine",
+    "billing",
+    "settings",
+    "support",
+}
+
 COMMERCIAL_READY_PAGE_IDS = {
     "overview",
     "alerts",
     "profit_engine",
-    "regression_chart",
+    "inventory",
     "billing",
     "settings",
     "startup_pack",
 }
 
+# These pages still contain sample business content and show a placeholder
+# banner when the admin enables them for testing.
+PLACEHOLDER_DASHBOARD_PAGE_IDS = {
+    "analytics",
+    "apps",
+    "automations",
+    "customers",
+    "discounts",
+    "fulfillment",
+    "health_score",
+    "marketing",
+    "mobile",
+    "mobile_copilot",
+    "predictions",
+    "product_research",
+    "products",
+    "reports",
+    "returns",
+    "store_catalog",
+    "suppliers",
+}
 
-def _filter_nav_for_role(nav_groups, user_role):
-    """Return a copy of nav_groups with only commercial-ready pages for merchants."""
+
+def sample_pages_enabled() -> bool:
+    """Global admin switch that controls whether placeholder/sample pages are visible to merchants."""
+    try:
+        return AdminPlatformControl.get_bool("sample_pages_enabled", default=False)
+    except Exception:
+        # Fail closed for production; hide sample pages if the control lookup breaks.
+        return False
+
+
+def global_sync_paused() -> bool:
+    """Return True when the admin has paused all marketplace syncs."""
+    try:
+        return AdminPlatformControl.get_bool("global_sync_paused", default=False)
+    except Exception:
+        return False
+
+
+def maintenance_mode() -> bool:
+    """Return True when the admin has enabled global maintenance mode."""
+    try:
+        return AdminPlatformControl.get_bool("maintenance_mode", default=False)
+    except Exception:
+        return False
+
+
+def _filter_nav_for_role(nav_groups, user_role, merchant=None):
+    """Return nav groups filtered by role, tier, and explicit merchant feature flags."""
     if user_role in ("Admin", "Engineer"):
         return nav_groups
     filtered = []
+    merchant_id = (merchant or {}).get("id")
+    merchant_tier = (merchant or {}).get("tier")
+    merchant_email = (merchant or {}).get("email", "")
+    has_concierge = bool(merchant and merchant.get("concierge_bundle"))
+    sample_pages_on = sample_pages_enabled()
+    tier_test_account = TierManager.is_tier_test_account(merchant_email)
     for group in nav_groups:
-        links = [link for link in group["links"] if link.get("id") in COMMERCIAL_READY_PAGE_IDS]
+        links = []
+        for link in group["links"]:
+            page_id = link.get("id", "")
+            if not TierManager.page_enabled(merchant_id, merchant_tier, page_id):
+                continue
+            if not sample_pages_on and not tier_test_account and page_id in BETA_LOCKED_PAGE_IDS:
+                continue
+            if page_id == "startup_pack" and not has_concierge:
+                continue
+            links.append(link)
         if links:
             filtered.append({**group, "links": links})
     return filtered
@@ -646,7 +722,6 @@ NAV_GROUPS = [
             {"id": "alerts", "label": "Alerts", "url": "/dashboard/alerts", "icon": "⚠", "badge": str(len(ALERTS))},
             {"id": "action_gate", "label": "Action Gate", "url": "/dashboard/action-gate", "icon": "✓"},
             {"id": "profit_engine", "label": "Profit Dashboard", "url": "/dashboard/profit-engine", "icon": "$"},
-            {"id": "regression_chart", "label": "Regression", "url": "/dashboard/regression-chart", "icon": "◯"},
             {"id": "predictions", "label": "Predictions", "url": "/dashboard/predictions", "icon": "◐"},
             {"id": "product_research", "label": "Product Research", "url": "/dashboard/product-research", "icon": "◎"},
             {"id": "analytics", "label": "Analytics", "url": "/dashboard/analytics", "icon": "▤"},
@@ -695,6 +770,18 @@ NAV_GROUPS = [
     },
 ]
 
+ALL_DASHBOARD_PAGE_IDS = sorted({
+    link["id"]
+    for group in NAV_GROUPS
+    for link in group["links"]
+    if link.get("id")
+} | COMMERCIAL_READY_PAGE_IDS | PLACEHOLDER_DASHBOARD_PAGE_IDS | {
+    "command_center", "commerce_hub", "monitoring", "regression_chart",
+    "onboarding_loading", "tiktok_studio", "startup_pack", "engineer_dashboard",
+})
+
+BETA_LOCKED_PAGE_IDS = set(ALL_DASHBOARD_PAGE_IDS) - BETA_READY_PAGE_IDS
+
 
 def context(active_page=None, merchant=None, merchant_id=None):
     tz_name = _merchant_timezone(merchant_id)
@@ -714,6 +801,39 @@ def context(active_page=None, merchant=None, merchant_id=None):
         costs = feed["total_costs"]
         net = feed["net_profit"]
         profit_rows = feed["profit_rows"]
+    has_sales = bool(orders)
+
+    inventory_rows = []
+    if active_page == "inventory" and merchant_id:
+        products = Product.query.filter_by(merchant_id=merchant_id).all()
+        for product in products:
+            on_hand = int(product.on_hand or 0)
+            reorder_point = int(product.reorder_point or 0)
+            if on_hand == 0:
+                status = "Out"
+            elif on_hand <= reorder_point:
+                status = "Low"
+            else:
+                status = "OK"
+            inventory_rows.append({
+                "sku": product.sku,
+                "title": product.title,
+                "on_hand": on_hand,
+                "inbound": int(product.inbound or 0),
+                "reorder_point": reorder_point,
+                "unit_cost": float(product.unit_cost or 0),
+                "status": status,
+            })
+        inventory_rows.sort(
+            key=lambda row: ({"Out": 0, "Low": 1, "OK": 2}[row["status"]], row["on_hand"], row["sku"])
+        )
+    inventory_kpis = {
+        "total_skus": len(inventory_rows),
+        "low_stock": sum(row["status"] == "Low" for row in inventory_rows),
+        "out_of_stock": sum(row["status"] == "Out" for row in inventory_rows),
+        "inventory_value": sum(row["on_hand"] * row["unit_cost"] for row in inventory_rows),
+    }
+    inventory_needs_cost_setup = bool(inventory_rows) and any(row["unit_cost"] == 0 for row in inventory_rows)
     # Always serve fresh headline numbers even if BRIEFING is mutated elsewhere.
     briefing = dict(BRIEFING)
     briefing["revenue"] = gross
@@ -726,8 +846,8 @@ def context(active_page=None, merchant=None, merchant_id=None):
             live_alerts = [alert_matrix.alert_to_dict(a) for a in alert_matrix.get_alerts(merchant_id)]
             fraud_alerts = [alert_matrix.fraud_alert_to_dict(a) for a in alert_matrix.get_fraud_alerts(merchant_id)]
         except Exception:
-            live_alerts = ALERTS
-            fraud_alerts = FRAUD
+            live_alerts = []
+            fraud_alerts = []
     else:
         live_alerts = ALERTS
         fraud_alerts = FRAUD
@@ -738,31 +858,35 @@ def context(active_page=None, merchant=None, merchant_id=None):
         for link in group["links"]:
             if link.get("id") == "alerts":
                 link["badge"] = str(len(live_alerts))
-    nav_groups = _filter_nav_for_role(nav_groups, user_role)
+    nav_groups = _filter_nav_for_role(nav_groups, user_role, merchant)
 
-    # Brand Build (startup_pack) is only visible when the Concierge Bundle add-on is active.
-    has_concierge = bool(merchant and merchant.get("concierge_bundle"))
-    if not has_concierge and user_role not in ("Admin", "Engineer"):
-        for group in nav_groups:
-            group["links"] = [link for link in group["links"] if link.get("id") != "startup_pack"]
-
-    # Sidebar only shows pages the merchant's tier is allowed to access.
-    merchant_tier = (merchant or {}).get("tier")
-    if merchant_tier and user_role not in ("Admin", "Engineer"):
-        for group in nav_groups:
-            group["links"] = [
-                link for link in group["links"]
-                if TierManager.can_access_page(merchant_tier, link.get("id", ""))
-            ]
-
-    # Admin-only backend navigation.
-    if user_role in ("Admin", "Engineer"):
-        nav_groups.append({
+    # Admin/engineer backend navigation.
+    if user_role == "Admin":
+        admin_group = {
             "label": "Admin",
             "links": [
-                {"id": "admin_merchants", "label": "Merchants", "url": "/admin/merchants", "icon": "⚙"},
+                {"id": "admin_dashboard", "label": "Admin Home", "url": "/admin", "icon": "◈"},
+                {"id": "admin_merchants", "label": "Members", "url": "/admin/merchants", "icon": "◈"},
+                {"id": "admin_audit", "label": "Audit Log", "url": "/admin/audit", "icon": "◈"},
+                {"id": "admin_chat", "label": "Support Chat", "url": "/admin/chat", "icon": "✉"},
             ],
-        })
+        }
+        nav_groups.append(admin_group)
+        # Master admins land in a dedicated control panel, not the merchant dashboard.
+        nav_groups = [admin_group]
+    elif user_role == "Engineer":
+        engineer_group = {
+            "label": "Engineer",
+            "links": [
+                {"id": "engineer_dashboard", "label": "Engineer Home", "url": "/engineer", "icon": "◈"},
+                {"id": "admin_merchants", "label": "Members", "url": "/admin/merchants", "icon": "◈"},
+                {"id": "admin_audit", "label": "Audit Log", "url": "/admin/audit", "icon": "◈"},
+                {"id": "admin_chat", "label": "Support Chat", "url": "/admin/chat", "icon": "✉"},
+            ],
+        }
+        nav_groups.append(engineer_group)
+        # Engineers land in a dedicated control panel, not the merchant dashboard.
+        nav_groups = [engineer_group]
 
     # Action Gate: draft approvals from open alerts.
     pending_actions = []
@@ -816,6 +940,19 @@ def context(active_page=None, merchant=None, merchant_id=None):
         except Exception:
             pass
 
+    # Usage overview for the settings page.
+    usage_overview = []
+    if merchant_id:
+        try:
+            order_count = UnifiedOrder.query.filter_by(merchant_id=merchant_id).count()
+            product_count = Product.query.filter_by(merchant_id=merchant_id).count()
+            usage_overview = [
+                ("Orders", order_count, tier_limits.get("orders", 500)),
+                ("Products", product_count, tier_limits.get("products", 10000)),
+            ]
+        except Exception:
+            pass
+
     # Channel list from persistent connections.
     try:
         channel_data = channels_module.list_channels(merchant_id) if merchant_id else CHANNELS
@@ -832,12 +969,21 @@ def context(active_page=None, merchant=None, merchant_id=None):
         "sandbox_expires_at": None,
     })
     merchant_obj.setdefault("timezone", tz_name)
+    is_impersonating = bool(merchant_obj.get("is_impersonating"))
 
     return {
         "brand": BRAND,
         "nav": NAV,
+        "is_impersonating": is_impersonating,
+        "impersonating_merchant_id": merchant_obj.get("impersonating_merchant_id"),
+        "maintenance_mode": maintenance_mode(),
+        "global_sync_paused": global_sync_paused(),
         "nav_groups": nav_groups,
         "active_page": active_page or "overview",
+        "show_placeholder_banner": (
+            (active_page or "overview") in PLACEHOLDER_DASHBOARD_PAGE_IDS
+            and (sample_pages_enabled() or TierManager.is_tier_test_account((merchant_obj or {}).get("email", "")))
+        ),
         "merchant": merchant_obj,
         "coo": dict(COO, greeting=_greeting_for(merchant_obj)),
         "ai_greeting": _ai_greeting(merchant_id, merchant_obj),
@@ -852,6 +998,11 @@ def context(active_page=None, merchant=None, merchant_id=None):
         "net": net,
         "net_margin": round(net / gross * 100, 1) if gross else 0.0,
         "orders": orders,
+        "has_sales": has_sales,
+        "inventory_rows": inventory_rows,
+        "inventory_kpis": inventory_kpis,
+        "inventory_needs_cost_setup": inventory_needs_cost_setup,
+        "usage_overview": usage_overview,
         "series": SALES_SERIES,
         "series_max": max(p["value"] for p in SALES_SERIES),
         "forecasts": FORECASTS,
@@ -893,4 +1044,3 @@ def context(active_page=None, merchant=None, merchant_id=None):
         },
         "generated": now.strftime("%A, %d %b %Y · %H:%M %Z"),
     }
-

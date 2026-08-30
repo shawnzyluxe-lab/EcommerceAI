@@ -1,0 +1,224 @@
+{% extends 'dashboard/base.html' %}
+{% block title %}{{ dashboard_title | default('Admin') }} — Dashboard{% endblock %}
+{% block content %}
+
+<section class="page-header">
+  <h1>{{ dashboard_title | default('Admin') }} Dashboard</h1>
+  <p>Platform overview, connected stores, and quick actions.</p>
+</section>
+
+<div class="kpi-grid" style="margin-bottom: 24px;">
+  <div class="card kpi-card">
+    <div class="kpi-label">Total members</div>
+    <div class="kpi-value" id="summary-total-members">{{ summary.total_members }}</div>
+  </div>
+  <div class="card kpi-card">
+    <div class="kpi-label">Active sessions</div>
+    <div class="kpi-value" id="summary-active-sessions">{{ summary.active_sessions }}</div>
+  </div>
+  <div class="card kpi-card">
+    <div class="kpi-label">Paid accounts</div>
+    <div class="kpi-value" id="summary-paid-accounts">{{ summary.paid_accounts }}</div>
+  </div>
+  <div class="card kpi-card">
+    <div class="kpi-label">Unread support</div>
+    <div class="kpi-value" id="summary-unread-support">{{ summary.unread_support }}</div>
+  </div>
+  <div class="card kpi-card">
+    <div class="kpi-label">Connected stores</div>
+    <div class="kpi-value" id="summary-connected-stores">{{ summary.connected_stores }}</div>
+  </div>
+  <div class="card kpi-card">
+    <div class="kpi-label">Stripe available</div>
+    <div class="kpi-value" id="summary-stripe-available">—</div>
+    <div class="kpi-delta" id="summary-stripe-currency">{{ (summary.stripe_balance.currency or 'USD') | upper }}</div>
+  </div>
+</div>
+
+<div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 20px; margin-bottom: 24px;">
+  <a class="card" href="/admin/merchants" style="text-decoration: none; color: inherit;">
+    <div class="card-head"><h3>Members</h3></div>
+    <p style="color: var(--ink-2); font-size: .9rem;">Manage merchants, tiers, live access, and per-page feature flags.</p>
+  </a>
+  <a class="card" href="/admin/chat" style="text-decoration: none; color: inherit;">
+    <div class="card-head"><h3>Support Chat</h3></div>
+    <p style="color: var(--ink-2); font-size: .9rem;">Read and reply to merchant messages.</p>
+  </a>
+  <a class="card" href="/admin/merchants#feature-flags" style="text-decoration: none; color: inherit;">
+    <div class="card-head"><h3>Feature Controls</h3></div>
+    <p style="color: var(--ink-2); font-size: .9rem;">Turn Intelligence, Operations, Growth, Catalog, and Settings pages on or off for each merchant.</p>
+  </a>
+  <a class="card" href="/admin/audit" style="text-decoration: none; color: inherit;">
+    <div class="card-head"><h3>Audit Log</h3></div>
+    <p style="color: var(--ink-2); font-size: .9rem;">Immutable log of admin logins, merchant updates, store unlinks, syncs, and impersonation.</p>
+  </a>
+</div>
+
+<div class="card" style="margin-bottom: 24px;">
+  <div class="card-head"><h3>Platform controls</h3></div>
+  <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 20px; margin-bottom: 18px;">
+    <label style="display:flex; align-items:center; gap:10px; cursor:pointer;">
+      <input type="checkbox" id="global-sync-paused" style="width:18px; height:18px;">
+      <span>Pause all marketplace syncs (kill switch)</span>
+    </label>
+    <label style="display:flex; align-items:center; gap:10px; cursor:pointer;">
+      <input type="checkbox" id="maintenance-mode" style="width:18px; height:18px;">
+      <span>Maintenance mode banner</span>
+    </label>
+    <label style="display:flex; align-items:center; gap:10px; cursor:pointer;">
+      <input type="checkbox" id="sample-pages-enabled" style="width:18px; height:18px;">
+      <span>Show non-beta modules to merchants</span>
+    </label>
+  </div>
+  <button class="btn btn-primary" id="save-platform-controls">Save platform controls</button>
+  <div id="platform-controls-status" style="margin-top:10px; font-size:.85rem; color:var(--ink-2);"></div>
+</div>
+
+<div class="card" style="margin-bottom: 24px;">
+  <div class="card-head"><h3>Global announcement</h3></div>
+  <p style="color: var(--ink-2); font-size: .9rem; margin-top:0;">Broadcast a message to every merchant's support chat.</p>
+  <textarea id="announcement-text" rows="3" style="width:100%; border-radius:8px; padding:10px; border:1px solid var(--line); background:var(--surface-elevated); color:var(--ink); resize:vertical;"></textarea>
+  <button class="btn btn-primary" id="send-announcement" style="margin-top:10px;">Send announcement</button>
+  <div id="announcement-status" style="margin-top:10px; font-size:.85rem; color:var(--ink-2);"></div>
+</div>
+
+<div class="card" style="margin-bottom: 24px;">
+  <div class="card-head" style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:12px;">
+    <h3>Connected stores</h3>
+    <button class="btn" style="font-size:.75rem; padding:6px 12px;" onclick="window.location.reload()">Refresh</button>
+  </div>
+  <div class="table-wrap" style="overflow-x:auto;">
+    <table id="stores-table">
+      <thead>
+        <tr>
+          <th>Merchant</th>
+          <th>Platform</th>
+          <th>Name</th>
+          <th>Orders</th>
+          <th>Revenue</th>
+          <th>Last sync</th>
+          <th>Action</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for s in stores %}
+        <tr>
+          <td>
+            <div style="font-weight:600; color:var(--ink);">{{ s.business_name }}</div>
+            <div style="font-size:.72rem; color:var(--ink-3);">{{ s.merchant_id }}</div>
+            <div style="font-size:.72rem; color:var(--ink-2);">{{ s.admin_email }}</div>
+          </td>
+          <td><span class="tag" style="text-transform:capitalize;">{{ s.platform }}</span></td>
+          <td>{{ s.name }}</td>
+          <td>{{ s.orders }}</td>
+          <td>${{ "%.2f" | format(s.revenue) }}</td>
+          <td>{{ s.sync or '—' }}</td>
+          <td><button class="btn" style="font-size:.7rem; padding:4px 8px;" onclick="unlinkStore('{{ s.merchant_id }}','{{ s.platform }}', this)">Unlink</button></td>
+        </tr>
+        {% else %}
+        <tr><td colspan="7" style="text-align:center; color:var(--ink-3);">No connected stores.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<div class="card">
+  <div class="card-head"><h3>Recent activity</h3></div>
+  <ul style="list-style:none; padding:0; margin:0; display:flex; flex-direction:column; gap:10px;">
+    {% for e in recent_events %}
+    <li style="padding:10px; border:1px solid var(--line); border-radius:8px; font-size:.85rem;">
+      <span style="color:var(--ink-3); display:block; font-size:.72rem;">{{ e.time or '—' }}</span>
+      {{ e.message }}
+    </li>
+    {% else %}
+    <li style="color:var(--ink-3);">No recent activity.</li>
+    {% endfor %}
+  </ul>
+</div>
+
+<script>
+function formatMoney(cents) {
+  if (cents === undefined || cents === null) return '—';
+  return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(cents / 100);
+}
+const stripeBalance = {{ summary.stripe_balance | tojson }};
+(function renderStripe(){
+  const available = (stripeBalance.available || []).reduce((s, b) => s + (b.amount || 0), 0);
+  const currency = (stripeBalance.currency || 'usd').toUpperCase();
+  document.getElementById('summary-stripe-available').textContent = formatMoney(available);
+  document.getElementById('summary-stripe-currency').textContent = currency;
+})();
+
+async function unlinkStore(merchantId, platform, btn) {
+  if (!confirm('Unlink ' + platform + ' from ' + merchantId + '?')) return;
+  btn.disabled = true;
+  try {
+    const res = await fetch('/api/admin/stores/' + encodeURIComponent(merchantId) + '/' + encodeURIComponent(platform) + '/unlink', {
+      method: 'POST',
+      credentials: 'same-origin'
+    });
+    const data = await res.json();
+    if (res.ok) {
+      btn.closest('tr').remove();
+    } else {
+      alert(data.error || 'Unlink failed');
+      btn.disabled = false;
+    }
+  } catch (e) {
+    alert('Network error');
+    btn.disabled = false;
+  }
+}
+
+async function loadPlatformControls() {
+  try {
+    const res = await fetch('/api/admin/platform-controls', { credentials: 'same-origin' });
+    const data = await res.json();
+    document.getElementById('global-sync-paused').checked = data.global_sync_paused;
+    document.getElementById('maintenance-mode').checked = data.maintenance_mode;
+    document.getElementById('sample-pages-enabled').checked = data.sample_pages_enabled;
+  } catch (e) { console.warn('controls load failed', e); }
+}
+
+document.getElementById('save-platform-controls')?.addEventListener('click', async () => {
+  const status = document.getElementById('platform-controls-status');
+  status.textContent = 'Saving...';
+  try {
+    const res = await fetch('/api/admin/platform-controls', {
+      method: 'POST',
+      credentials: 'same-origin',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        global_sync_paused: document.getElementById('global-sync-paused').checked,
+        maintenance_mode: document.getElementById('maintenance-mode').checked,
+        sample_pages_enabled: document.getElementById('sample-pages-enabled').checked,
+      })
+    });
+    const data = await res.json();
+    status.textContent = res.ok ? 'Saved.' : (data.error || 'Failed');
+  } catch (e) { status.textContent = 'Network error'; }
+});
+
+document.getElementById('send-announcement')?.addEventListener('click', async () => {
+  const text = document.getElementById('announcement-text').value.trim();
+  if (!text) return alert('Enter a message');
+  const status = document.getElementById('announcement-status');
+  status.textContent = 'Sending...';
+  try {
+    const res = await fetch('/api/admin/announcements', {
+      method: 'POST',
+      credentials: 'same-origin',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ message: text })
+    });
+    const data = await res.json();
+    status.textContent = res.ok ? 'Sent to ' + data.recipients + ' merchants.' : (data.error || 'Failed');
+    if (res.ok) document.getElementById('announcement-text').value = '';
+  } catch (e) { status.textContent = 'Network error'; }
+});
+
+loadPlatformControls();
+</script>
+
+{% endblock %}

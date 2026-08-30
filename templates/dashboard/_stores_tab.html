@@ -4,9 +4,17 @@
 <div class="card" style="border: 1px solid var(--accent); background: var(--accent-bg); margin-bottom: 24px;">
   <div style="display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap;">
     <div>
+      {% if connected|length > 0 %}
+      <div style="font-weight: 700; color: var(--ink); margin-bottom: 4px;">Store connected</div>
+      <div style="font-size: .85rem; color: var(--ink-2);">Set unit costs and reorder points in Inventory so true profit and low-stock alerts are accurate.</div>
+      {% else %}
       <div style="font-weight: 700; color: var(--ink); margin-bottom: 4px;">Connect your first store</div>
       <div style="font-size: .85rem; color: var(--ink-2);">Choose your platform and enter your credentials. Shopify can also connect with one click via OAuth.</div>
+      {% endif %}
     </div>
+    {% if connected|length > 0 %}
+    <a href="/dashboard/inventory" class="btn btn-primary">Set unit costs</a>
+    {% endif %}
   </div>
 </div>
 {% endif %}
@@ -31,7 +39,20 @@
           <span class="tag tag-ghost" style="margin-top: 10px; display: inline-block;">Disabled in sandbox</span>
           {% endif %}
         {% else %}
-        <button class="btn" style="margin-top: 10px; width: 100%; font-size: .72rem; padding: 5px 8px;" onclick="openConnectModal('{{ ch.platform }}')">{{ 'Manage' if ch.state == 'connected' else 'Connect' }}</button>
+        {% if ch.state == 'connected' %}
+        <button class="btn" style="margin-top: 10px; width: 100%; font-size: .72rem; padding: 5px 8px;" onclick="openConnectModal('{{ ch.platform }}')">Manage</button>
+        {% elif not merchant.live_access_enabled %}
+        <a href="/subscribe" class="tag tag-ghost" style="margin-top: 10px; display: inline-block;">Subscribe to connect</a>
+        {% elif ch.platform == 'tiktok' and ch.state != 'connected' %}
+        <select id="tiktok-region" style="margin-top: 8px; width: 100%; padding: 5px; font-size: .72rem; border-radius: 6px; border: 1px solid var(--line); background: var(--surface); color: var(--ink);">
+          <option value="us" selected>US TikTok Shop</option>
+          <option value="uk">UK / EU TikTok Shop</option>
+          <option value="">Global / Other</option>
+        </select>
+        <button class="btn" style="margin-top: 6px; width: 100%; font-size: .72rem; padding: 5px 8px;" onclick="openConnectModal('tiktok')">Connect</button>
+        {% else %}
+        <button class="btn" style="margin-top: 10px; width: 100%; font-size: .72rem; padding: 5px 8px;" onclick="openConnectModal('{{ ch.platform }}')">Connect</button>
+        {% endif %}
         {% endif %}
       {% else %}
       <span class="tag tag-ghost" style="margin-top: 10px; display: inline-block;">Coming soon</span>
@@ -69,7 +90,8 @@
   </div>
 
   <div class="card" id="connect-panel">
-    <div class="card-head"><h3>Connect Manually</h3></div>
+    <div class="card-head"><h3>Manual connection (advanced)</h3></div>
+    <p style="font-size:.8rem; color:var(--ink-3); margin:0 16px 12px;">Use this only when you have custom app or developer credentials. For Shopify, the Connect button above is the normal route.</p>
     <form id="connect-form" onsubmit="submitConnect(event)">
       <label style="font-size: .75rem; color: var(--ink-3); font-weight: 600;">Platform</label>
       <select id="platform" style="width: 100%; padding: 10px; margin: 6px 0 12px; border: 1px solid var(--line); border-radius: 8px; background: var(--surface); color: var(--ink);" onchange="toggleFields()">
@@ -81,11 +103,17 @@
       <div id="shopify-fields">
         <label style="font-size: .75rem; color: var(--ink-3); font-weight: 600;">Store domain</label>
         <input id="shopify-shop" type="text" placeholder="store.myshopify.com" style="width: 100%; padding: 10px; margin: 6px 0 12px; border: 1px solid var(--line); border-radius: 8px; background: var(--surface); color: var(--ink);">
-        <label style="font-size: .75rem; color: var(--ink-3); font-weight: 600;">Access token</label>
+        <label style="font-size: .75rem; color: var(--ink-3); font-weight: 600;">Access token (custom app)</label>
         <input id="shopify-token" type="password" placeholder="shpat_…" style="width: 100%; padding: 10px; margin: 6px 0 12px; border: 1px solid var(--line); border-radius: 8px; background: var(--surface); color: var(--ink);">
       </div>
 
       <div id="tiktok-fields" style="display:none;">
+        <label style="font-size: .75rem; color: var(--ink-3); font-weight: 600;">Region</label>
+        <select id="tiktok-manual-region" style="width: 100%; padding: 10px; margin: 6px 0 12px; border: 1px solid var(--line); border-radius: 8px; background: var(--surface); color: var(--ink);">
+          <option value="us" selected>US TikTok Shop</option>
+          <option value="uk">UK / EU TikTok Shop</option>
+          <option value="">Global / Other</option>
+        </select>
         <label style="font-size: .75rem; color: var(--ink-3); font-weight: 600;">Shop / Seller ID</label>
         <input id="tiktok-seller" type="text" placeholder="Your TikTok shop ID" style="width: 100%; padding: 10px; margin: 6px 0 12px; border: 1px solid var(--line); border-radius: 8px; background: var(--surface); color: var(--ink);">
         <label style="font-size: .75rem; color: var(--ink-3); font-weight: 600;">App key</label>
@@ -117,7 +145,7 @@
         <input id="amazon-role-arn" type="text" style="width: 100%; padding: 10px; margin: 6px 0 12px; border: 1px solid var(--line); border-radius: 8px; background: var(--surface); color: var(--ink);">
       </div>
 
-      <button class="btn btn-primary" style="width: 100%;" type="submit" {% if SANDBOX %}disabled{% endif %}>{% if SANDBOX %}Live connect disabled in sandbox{% else %}Encrypt &amp; Save Connection{% endif %}</button>
+      <button class="btn btn-primary" style="width: 100%;" type="submit" {% if SANDBOX %}disabled{% endif %}>{% if SANDBOX %}Live connect disabled in sandbox{% else %}Save manual connection{% endif %}</button>
       {% if SANDBOX %}
       <p style="font-size:.75rem; color:var(--ink-3); margin-top:8px;">Simulated demo channels are already connected for your 48-hour sandbox. Request live access to connect your real stores.</p>
       {% endif %}
@@ -165,6 +193,21 @@ function toggleFields() {
   document.getElementById('amazon-fields').style.display = p === 'amazon' ? 'block' : 'none';
 }
 
+function getShopifyDomain() {
+  const shopInput = document.getElementById('shopify-shop');
+  let shop = shopInput ? shopInput.value.trim().toLowerCase() : '';
+  if (!shop) {
+    shop = (window.prompt('Enter your Shopify store domain (for example, store.myshopify.com):') || '').trim().toLowerCase();
+  }
+  shop = shop.replace(/^https?:\/\//, '').replace(/\/.*$/, '');
+  if (!/^[a-z0-9](?:[a-z0-9-]*[a-z0-9])?\.myshopify\.com$/.test(shop)) {
+    alert('Enter a Shopify store domain like store.myshopify.com.');
+    return '';
+  }
+  if (shopInput) shopInput.value = shop;
+  return shop;
+}
+
 function openConnectModal(platform) {
   if (!['shopify','tiktok','amazon'].includes(platform)) return;
   if (SANDBOX) {
@@ -172,7 +215,15 @@ function openConnectModal(platform) {
     return;
   }
   if (platform === 'tiktok') {
-    window.location.href = '/api/v1/auth/tiktok/connect';
+    const regionSelect = document.getElementById('tiktok-region');
+    const region = regionSelect ? regionSelect.value : 'us';
+    window.location.href = '/api/v1/auth/tiktok/connect?region=' + encodeURIComponent(region);
+    return;
+  }
+  if (platform === 'shopify') {
+    const shop = getShopifyDomain();
+    if (!shop) return;
+    window.location.href = '/api/v1/auth/shopify/connect?shop=' + encodeURIComponent(shop);
     return;
   }
   document.getElementById('platform').value = platform;
@@ -199,7 +250,8 @@ async function submitConnect(e) {
       app_key: document.getElementById('tiktok-key').value,
       app_secret: document.getElementById('tiktok-secret').value,
       access_token: document.getElementById('tiktok-access-token').value,
-      shop_cipher: document.getElementById('tiktok-shop-cipher').value
+      shop_cipher: document.getElementById('tiktok-shop-cipher').value,
+      region: document.getElementById('tiktok-manual-region').value
     };
   } else if (platform === 'amazon') {
     body = {

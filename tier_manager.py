@@ -1,4 +1,5 @@
 """Central tier policy engine for Vantav."""
+import os
 from datetime import datetime, timedelta
 from typing import Any, Dict, List, Optional
 
@@ -211,13 +212,22 @@ PLAN_TO_TIER = {
 }
 
 TIER_PAGE_ACCESS = {
-    "overview": "Vantav Operator",
-    "alerts": "Vantav Operator",
-    "action_gate": "Vantav Operator",
-    "profit_engine": "Vantav Operator",
-    "regression_chart": "Vantav Operator",
-    "billing": "Vantav Operator",
+    # Basic Tier
+    "overview": "Basic Tier",
+    "alerts": "Basic Tier",
+    "settings": "Basic Tier",
+    "billing": "Basic Tier",
+    "support": "Basic Tier",
+    "profit_engine": "Basic Tier",
+    "action_gate": "Basic Tier",
+    # Vantav Operator
+    "inventory": "Vantav Operator",
+    "orders": "Vantav Operator",
+    "products": "Vantav Operator",
+    "store_catalog": "Vantav Operator",
     "commerce_hub": "Vantav Operator",
+    "customers": "Vantav Operator",
+    # Vantav Growth
     "command_center": "Vantav Growth",
     "monitoring": "Vantav Growth",
     "predictions": "Vantav Growth",
@@ -227,10 +237,22 @@ TIER_PAGE_ACCESS = {
     "team_ai": "Vantav Growth",
     "product_research": "Vantav Growth",
     "fulfillment": "Vantav Growth",
+    "returns": "Vantav Growth",
+    "shipments": "Vantav Growth",
+    "suppliers": "Vantav Growth",
+    "tiktok_studio": "Vantav Growth",
+    "discounts": "Vantav Growth",
+    "analytics": "Vantav Growth",
+    "mobile": "Vantav Growth",
+    # Vantav Scale
     "fraud": "Vantav Scale",
-    "suppliers": "Vantav Scale",
     "startup_pack": "Vantav Scale",
+    "apps": "Vantav Scale",
+    "reports": "Vantav Scale",
+    "regression_chart": "Vantav Scale",
 }
+
+DEFAULT_MERCHANT_PAGE_IDS: set = set(TIER_PAGE_ACCESS.keys())
 
 
 class TierManager:
@@ -323,6 +345,56 @@ class TierManager:
         if not required:
             return True
         return TierManager.tier_rank(tier) >= TierManager.tier_rank(required)
+
+    @staticmethod
+    def get_feature_flags(merchant_id: str) -> Dict[str, Any]:
+        profile = MerchantProfile.query.get(merchant_id)
+        if not profile:
+            return {}
+        flags = profile.feature_flags
+        if not flags:
+            return {}
+        return dict(flags)
+
+    @staticmethod
+    def page_enabled(merchant_id: str, tier: str, page: str) -> bool:
+        """Return True if a merchant can access a dashboard page.
+
+        An explicit feature_flag override takes precedence:
+        - True allows access regardless of tier.
+        - False blocks access regardless of tier.
+        If no override exists, the page must be in the default merchant set and
+        the merchant's tier must allow it.
+        """
+        flags = TierManager.get_feature_flags(merchant_id)
+        if page in flags:
+            return bool(flags[page])
+        if page not in DEFAULT_MERCHANT_PAGE_IDS:
+            return False
+        return TierManager.can_access_page(tier, page)
+
+    @staticmethod
+    def set_feature_flag(merchant_id: str, page: str, enabled: bool) -> bool:
+        profile = MerchantProfile.query.get(merchant_id)
+        if not profile:
+            return False
+        flags = dict(profile.feature_flags or {})
+        if enabled:
+            flags[page] = True
+        else:
+            flags[page] = False
+        profile.feature_flags = flags
+        db.session.commit()
+        return True
+
+    @staticmethod
+    def tier_test_account_emails() -> set:
+        env_emails = {e.strip().lower() for e in os.environ.get('MERCHANT_TIER_TEST_ACCOUNTS', '').split(',') if e.strip()}
+        return env_emails | {'merchant@vantavcommerce.com'}
+
+    @staticmethod
+    def is_tier_test_account(email: str) -> bool:
+        return (email or '').strip().lower() in TierManager.tier_test_account_emails()
 
     @staticmethod
     def page_upgrade_target(page: str) -> str:

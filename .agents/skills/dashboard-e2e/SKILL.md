@@ -95,6 +95,30 @@ xrandr --output VNC-0 --mode 1600x1200
 - To test the chart end-to-end locally, run the app with a CSP middleware that allows the CDN or temporarily patch `monitoring.py` during testing only.
 - Use `seed_regression_sku.py` (or a temporary deterministic seed) to populate `SKU-404-PODS` data for the target merchant; `sqlite:///shawnzyluxe.db` resolves to `instance/shawnzyluxe.db` in this repo.
 
+## Admin Members + Support Chat (PR #15)
+
+- Admin routes (`/admin/merchants`, `/admin/chat`) are restricted to the master admin `shawn@shawnzyluxe.com`.
+- A reusable test merchant is `testing-pr15-1787965267934@example.com` / `TestPass123!` (`merchant_36bd8639`). Create new ones via `POST /api/v1/tenant/register` and pre-approve via `PATCH /api/admin/merchants/<merchant_id>` (`sandbox_status: approved`, `live_access_enabled: true`).
+- Feature flags on `/admin/merchants` can be toggled through the Edit modal. Because small inline buttons may not register in this environment, prefer `javascript:` in the address bar:
+  - `javascript:editMember('merchant_36bd8639'); document.querySelector('.feature-select[data-page="products"]').value='on'; saveMember();`
+  - Default pages are omitted from the payload, On sends `true`, and Off sends `false`. `PATCH /api/admin/merchants/<id>` replaces the entire `feature_flags` map, so Default removes the override.
+- `PATCH /api/admin/merchants/<id>` canonicalizes `account_tier`; `Basic Tier` is preserved as a distinct free tier.
+- Merchant support widget functions: `toggleSupport()` and `sendSupportMessage()`. Admin chat functions: `loadThread('<merchant_id>')` and `sendMessage()`.
+- The merchant widget polls for new messages every 8 seconds. Use two Chrome windows (normal for admin, incognito for merchant) and `Alt+Tab` to test the full round trip.
+
+## Admin Control Panel (full set)
+
+- `/admin` is the admin home with cards for member count, support threads, Stripe balance, connected stores, recent audit events, and platform controls.
+- `/admin/merchants` has inline **Impersonate**, **Sync**, **Reset**, and **Edit** actions for each merchant.
+- `/admin/audit` renders the latest `AdminAuditLog` entries; `GET /api/admin/audit` supports `limit`, `offset`, `action`, and `merchant_id` filters.
+- `POST /api/admin/impersonate/<merchant_id>` and `GET/POST /api/admin/stop-impersonating` let the admin view the dashboard as a merchant; a banner on `base.html` shows the impersonation and offers an exit link.
+- `POST /api/admin/announcements` broadcasts a message to every merchant's support chat.
+- `POST /api/admin/platform-controls` toggles `global_sync_paused`, `maintenance_mode`, and `sample_pages_enabled`.
+- `POST /api/admin/<platform>/sync/<merchant_id>` triggers a store sync for `shopify`, `tiktok`, or `amazon`.
+- `POST /api/admin/stores/<merchant_id>/<platform>/reset` marks a connection stale.
+- `POST /api/admin/stores/<merchant_id>/<platform>/unlink` disconnects the store.
+- Billing override: `PATCH /api/admin/merchants/<id>` accepts `current_plan`, `add_ons`, `metered_usage_units`, `accrued_invoice_value`, `billing_cycle_end`, and `max_authorized_seats`.
+
 ## Cost and reorder-point E2E
 
 - `/dashboard/inventory` lists Shopify products with editable `Unit cost` and `Reorder point` inputs and per-row `Save` buttons.
@@ -111,3 +135,26 @@ xrandr --output VNC-0 --mode 1600x1200
 - Revision `5899e7d` is testable locally with the existing Growth/Admin account `shawn@shawnzyluxe.com`; the live deployment may lag and show the old headings-only sidebar.
 - On the local build, click the `Intelligence` and `Operations` buttons in the sidebar to reveal `Profit Dashboard` and `Inventory`; route checks should confirm `/dashboard/profit-engine`, `/dashboard/inventory`, and `/dashboard/settings` render with active highlighting.
 - The Shopify UI is under `/dashboard/settings?tab=stores`, where `Connect Manually` exposes Shopify, store-domain, and access-token fields. Do not submit a real token during navigation tests; actual OAuth/token exchange requires authorized store credentials and can mutate connected-store state.
+
+## Adversarial live full-site audit
+
+- Run three separate Chrome profiles for admin (`shawn@shawnzyluxe.com` / `VantavMaster2025!`), engineer (`engineer@shawnzyluxe.com` / `EngVantav2025!`), and the tier-test merchant (`merchant@vantavcommerce.com` / `MerchantTest2025!`). Use the direct Chrome for Testing binary with `--incognito --user-data-dir=/tmp/...` to avoid password-save popups and cross-session cookie leaks.
+- The merchant login resets the tier-test account to `Basic Tier`/`sandbox_status=pending`/`live_access_enabled=false` and lands on `/choose-tier`. Tier selection can be driven by the UI cards or by `POST /api/merchant/select-tier` with `credentials:'same-origin'`.
+- Verify tier gating by refreshing `/dashboard` after each tier change and listing sidebar links from `document.querySelectorAll('.nav-group a')`. Direct access to a locked page should render an upgrade banner or redirect; a 500 is a blocker.
+- Feature flags on `/admin/merchants` take effect immediately, but the `Edit` modal caches the member's `sandbox_status`/`tier`/`live_access` values from when the page was loaded. Refresh `/admin/merchants` before editing, or use the API directly, to avoid overwriting choose-tier changes.
+- `PATCH /api/admin/merchants/<merchant_id>` replaces the entire `feature_flags` dict with the payload; default/unset pages are omitted by the UI and therefore cleared. To remove a flag, simply do not include it in the request.
+- Two-way support chat: merchant uses `toggleSupport()`/`sendSupportMessage()`; admin opens `/admin/chat?merchant_id=<merchant_id>` and calls `sendMessage()`. The merchant widget polls every 8 seconds.
+- `/api/engineer/exceptions` is engineer-only and may reveal runtime exceptions (e.g. Redis connection failures). `/api/v1/monitoring/health` and `/api/v1/monitoring/metrics` work for admin and engineer.
+- Public health endpoints (`/health`, `/api/v1/health`) must return `HEALTHY`. GDPR/webhook endpoints must reject unsigned traffic without 500s.
+- Watch for stale session invalidation: accessing an engineer-only endpoint as admin (or vice-versa) returns `SECURITY PROTOCOL VIOLATION` and can invalidate the cookie, forcing a fresh login.
+
+## Public testing phase live audit
+
+- Keep `sample_pages_enabled` on for the audit via `/admin` Platform controls (`Show non-beta modules to merchants`) or `POST /api/admin/platform-controls` with `{"sample_pages_enabled": true}`. Verify with `GET /api/admin/platform-controls`.
+- Test the tier-test merchant `merchant@vantavcommerce.com` / `MerchantTest2025!` through `/choose-tier` for all four tiers; sidebar and direct `/dashboard/<page>` access should match `TIER_PAGE_ACCESS` and `page_upgrade_target`.
+- With `sample_pages_enabled` on, non-beta pages are no longer redirected for tier-test merchants, but tier gating still applies; locked pages should show the upgrade banner, not a 500.
+- Verify `/dashboard/regression_chart?sku=SKU-404-PODS` renders a Chart.js line chart and diagnostics, not the `Unable to load regression data` fallback.
+- Check console for `Failed to fetch` in `loadMessages` (merchant support widget) and for CSP errors blocking `cdn.jsdelivr.net` on the regression chart.
+- Public health `/health` and `/api/v1/health` should return `HEALTHY`; unsigned GDPR/webhook endpoints should return 401/400 without 500s.
+- Do not run the live Stripe micro-charge test; do not actually unlink stores, pause sync, broadcast announcements, or flip maintenance mode in production.
+

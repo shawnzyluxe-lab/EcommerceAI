@@ -42,7 +42,11 @@
   <div class="wrap">
     <div class="topbar">Vantav</div>
     <h1>Complete your subscription</h1>
-    <p class="sub">Choose your plan and create your account. You'll be redirected to Stripe to enter payment details.</p>
+    {% if merchant %}
+    <p class="sub">Choose your plan for <strong>{{ merchant.email }}</strong>. You&rsquo;ll be redirected to Stripe to enter payment details.</p>
+    {% else %}
+    <p class="sub">Choose your plan and create your account. You&rsquo;ll be redirected to Stripe to enter payment details.</p>
+    {% endif %}
 
     <form id="checkout-form" onsubmit="submitCheckout(event)">
       <label class="plan" id="plan-operator-label">
@@ -81,15 +85,19 @@
       <div class="grid-2">
         <div>
           <label>Email</label>
-          <input type="email" id="email" placeholder="you@yourbrand.com" required>
+          <input type="email" id="email" placeholder="you@yourbrand.com" value="{{ merchant.email if merchant else '' }}" {% if merchant %}readonly{% endif %} required>
         </div>
         <div>
           <label>Business name</label>
-          <input type="text" id="business_name" placeholder="Your brand">
+          <input type="text" id="business_name" placeholder="Your brand" value="{{ merchant.name if merchant else '' }}">
         </div>
       </div>
+      {% if merchant %}
+      <input type="hidden" id="password" value="">
+      {% else %}
       <label>Create password</label>
       <input type="password" id="password" placeholder="At least 8 characters" minlength="8" required>
+      {% endif %}
 
       <button type="submit" id="checkout-btn">Continue to secure payment</button>
       <div id="message" class="message"></div>

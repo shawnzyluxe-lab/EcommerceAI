@@ -1,7 +1,7 @@
 """One-off database migration runner for Render pre/post deploy."""
 import os
 import sys
-from sqlalchemy import create_engine, text
+from sqlalchemy import create_engine, inspect, text
 
 
 def run_migrations():
@@ -36,6 +36,7 @@ def run_migrations():
             ("sandbox_expires_at", "TIMESTAMP"),
             ("live_access_enabled", "INTEGER"),
             ("approved_at", "TIMESTAMP"),
+            ("updated_at", "TIMESTAMP DEFAULT NOW()"),
             ("brand_color", "VARCHAR(7)"),
             ("brand_color_secondary", "VARCHAR(7)"),
         ]:
@@ -464,6 +465,61 @@ def run_migrations():
         _run("idx.user_auth_lookup", "CREATE INDEX IF NOT EXISTS idx_user_auth_lookup ON user_authentication(email, account_status)")
         _run("idx.session_vault_expiry", "CREATE INDEX IF NOT EXISTS idx_session_vault_expiry ON active_session_vault(session_token, expires_at)")
 
+        _run("merchant_profiles.feature_flags", "ALTER TABLE merchant_profiles ADD COLUMN IF NOT EXISTS feature_flags JSONB DEFAULT '{}'::jsonb")
+
+        _run(
+            "support_messages table",
+            """
+            CREATE TABLE IF NOT EXISTS support_messages (
+                id SERIAL PRIMARY KEY,
+                merchant_id VARCHAR(100) NOT NULL REFERENCES merchant_profiles(merchant_id) ON DELETE CASCADE,
+                sender VARCHAR(50) NOT NULL,
+                sender_email VARCHAR(255),
+                message TEXT NOT NULL,
+                read_at TIMESTAMP,
+                created_at TIMESTAMP DEFAULT NOW()
+            )
+            """,
+        )
+        _run("idx.support_messages_merchant", "CREATE INDEX IF NOT EXISTS idx_support_messages_merchant ON support_messages(merchant_id, created_at DESC)")
+        _run("idx.support_messages_unread", "CREATE INDEX IF NOT EXISTS idx_support_messages_unread ON support_messages(merchant_id, read_at) WHERE read_at IS NULL")
+
+        _run(
+            "admin_platform_controls table",
+            """
+            CREATE TABLE IF NOT EXISTS admin_platform_controls (
+                key VARCHAR(100) PRIMARY KEY,
+                value JSONB DEFAULT '{}'::jsonb,
+                updated_at TIMESTAMP DEFAULT NOW(),
+                created_at TIMESTAMP DEFAULT NOW()
+            )
+            """,
+        )
+
+        _run(
+            "admin_audit_logs table",
+            """
+            CREATE TABLE IF NOT EXISTS admin_audit_logs (
+                id VARCHAR(36) PRIMARY KEY,
+                admin_email VARCHAR(255),
+                action VARCHAR(100) NOT NULL,
+                target_merchant_id VARCHAR(100),
+                details JSONB DEFAULT '{}'::jsonb,
+                created_at TIMESTAMP DEFAULT NOW()
+            )
+            """,
+        )
+        _run("idx.admin_audit_logs_action", "CREATE INDEX IF NOT EXISTS idx_admin_audit_logs_action ON admin_audit_logs (action, created_at DESC)")
+        _run("idx.admin_audit_logs_target", "CREATE INDEX IF NOT EXISTS idx_admin_audit_logs_target ON admin_audit_logs (target_merchant_id, created_at DESC)")
+
+        # ActiveSession impersonation columns.
+        for col, typ in [
+            ("impersonating_merchant_id", "VARCHAR(100)"),
+            ("original_merchant_id", "VARCHAR(100)"),
+            ("original_role", "VARCHAR(50)"),
+        ]:
+            _run(f"active_sessions.{col}", f"ALTER TABLE active_sessions ADD COLUMN IF NOT EXISTS {col} {typ}")
+
         # Refresh PostgreSQL planner statistics after schema/index changes
         _run("analyze.daily_costs", "ANALYZE daily_costs")
         _run("analyze.order_items", "ANALYZE order_items")
@@ -498,6 +554,34 @@ def refresh_materialized_views():
                 print(f"[migrate] mv_daily_sku_profitability refreshed (non-concurrent): {e}")
             except Exception as inner:
                 print(f"[migrate] materialized view refresh failed: {inner}")
+
+
+def ensure_sqlite_schema(db):
+    """Add missing columns to existing SQLite tables so db.create_all() changes are honored."""
+    if db.engine.dialect.name != "sqlite":
+        return
+    inspector = inspect(db.engine)
+    existing_tables = set(inspector.get_table_names())
+    for table in db.metadata.sorted_tables:
+        if table.name not in existing_tables:
+            continue
+        existing_cols = {c["name"] for c in inspector.get_columns(table.name)}
+        for column in table.columns:
+            if column.name in existing_cols:
+                continue
+            try:
+                type_str = str(column.type)
+            except Exception:
+                type_str = "TEXT"
+            nullable = "NOT NULL" if column.nullable is False else ""
+            alter = f"ALTER TABLE {table.name} ADD COLUMN {column.name} {type_str} {nullable}".strip()
+            try:
+                with db.engine.connect() as conn:
+                    conn.execute(text(alter))
+                    conn.commit()
+                print(f"[migrate] SQLite added {table.name}.{column.name}")
+            except Exception as e:
+                print(f"[migrate] SQLite {table.name}.{column.name}: {e}")
 
 
 if __name__ == "__main__":

@@ -1,0 +1,111 @@
+{% extends 'dashboard/base.html' %}
+
+{% block title %}Choose your Vantav plan{% endblock %}
+
+{% block content %}
+<style>
+  .tier-shell { min-height: 100%; display: flex; align-items: center; justify-content: center; padding: 40px 20px; }
+  .tier-card { width: 100%; max-width: 520px; text-align: center; }
+  .tier-heading { font-size: 1.5rem; font-weight: 700; margin-bottom: 8px; color: var(--ink); }
+  .tier-sub { color: var(--ink-2); margin-bottom: 28px; font-size: .95rem; }
+  .tier-grid { display: grid; grid-template-columns: 1fr; gap: 16px; margin-bottom: 20px; }
+  @media (min-width: 700px) {
+    .tier-grid { grid-template-columns: 1fr 1fr; }
+  }
+  .tier-option {
+    background: var(--surface);
+    border: 1.5px solid var(--line);
+    border-radius: 16px;
+    padding: 20px;
+    text-align: left;
+    cursor: pointer;
+    transition: transform .1s ease, border-color .1s ease, box-shadow .1s ease;
+    position: relative;
+  }
+  .tier-option:hover { border-color: var(--accent); transform: translateY(-2px); }
+  .tier-option.selected { border-color: var(--accent); box-shadow: 0 0 0 2px var(--accent); }
+  .tier-name { font-size: 1.1rem; font-weight: 700; color: var(--ink); margin-bottom: 2px; }
+  .tier-price { font-size: .9rem; color: var(--accent); font-weight: 600; margin-bottom: 8px; }
+  .tier-desc { font-size: .85rem; color: var(--ink-2); margin-bottom: 14px; line-height: 1.45; }
+  .tier-features { list-style: none; padding: 0; margin: 0; }
+  .tier-features li { font-size: .8rem; color: var(--ink-2); padding: 4px 0; padding-left: 18px; position: relative; }
+  .tier-features li::before { content: "✓"; position: absolute; left: 0; color: var(--accent); font-weight: 700; }
+  .tier-note { font-size: .8rem; color: var(--ink-2); margin-top: 14px; }
+  .tier-action { margin-top: 20px; }
+  .tier-action button { width: 100%; padding: 14px 22px; border-radius: 10px; border: none; background: var(--accent); color: #fff; font-weight: 600; cursor: pointer; font-size: .95rem; }
+  .tier-action button:disabled { opacity: .5; cursor: not-allowed; }
+  .tier-spinner { display: none; width: 16px; height: 16px; border: 2px solid rgba(255,255,255,.3); border-top-color: #fff; border-radius: 50%; vertical-align: middle; margin-left: 8px; animation: spin .8s linear infinite; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+</style>
+
+<div class="tier-shell">
+  <div class="tier-card">
+    <h1 class="tier-heading">Choose your Vantav plan</h1>
+    <p class="tier-sub">Select the plan that matches your stage. You can change tiers anytime from Settings.</p>
+
+    <div class="tier-grid" id="tier-grid">
+      {% for tier in tiers %}
+      <div class="tier-option" data-tier="{{ tier.id }}">
+        <div class="tier-name">{{ tier.name }}</div>
+        <div class="tier-price">{{ tier.price }}</div>
+        <div class="tier-desc">{{ tier.description }}</div>
+        <ul class="tier-features">
+          {% for feature in tier.features %}
+          <li>{{ feature }}</li>
+          {% endfor %}
+        </ul>
+      </div>
+      {% endfor %}
+    </div>
+
+    <div class="tier-action">
+      <button id="select-tier-btn" disabled>
+        Continue with selected plan
+        <span class="tier-spinner" id="tier-spinner"></span>
+      </button>
+    </div>
+    <p class="tier-note">Test accounts can select paid plans without a card. Production accounts will complete checkout first.</p>
+  </div>
+</div>
+
+<script>
+  let selectedTier = null;
+  const options = document.querySelectorAll('.tier-option');
+  const btn = document.getElementById('select-tier-btn');
+  const spinner = document.getElementById('tier-spinner');
+
+  options.forEach(option => {
+    option.addEventListener('click', () => {
+      options.forEach(o => o.classList.remove('selected'));
+      option.classList.add('selected');
+      selectedTier = option.dataset.tier;
+      btn.disabled = false;
+    });
+  });
+
+  btn.addEventListener('click', async () => {
+    if (!selectedTier) return;
+    btn.disabled = true;
+    spinner.style.display = 'inline-block';
+    try {
+      const resp = await fetch('/api/merchant/select-tier', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ tier: selectedTier })
+      });
+      const result = await resp.json();
+      if (resp.ok && result.redirect) {
+        window.location.href = result.redirect;
+      } else {
+        alert(result.error || 'Could not select plan. Please try again or contact support.');
+        btn.disabled = false;
+      }
+    } catch (err) {
+      alert('Network error. Please try again.');
+      btn.disabled = false;
+    } finally {
+      spinner.style.display = 'none';
+    }
+  });
+</script>
+{% endblock %}
