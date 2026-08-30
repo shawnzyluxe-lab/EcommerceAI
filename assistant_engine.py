@@ -2,6 +2,7 @@
 import json
 import logging
 import os
+import re
 from typing import Any, Dict, List, Optional
 
 import agent_context
@@ -13,6 +14,17 @@ logger = logging.getLogger(__name__)
 
 DEFAULT_OPENAI_MODEL = "gpt-4o-mini"
 DEFAULT_DEEPSEEK_MODEL = "deepseek-v4-pro"
+
+
+_TOOL_MARKUP_RE = re.compile(r"<[^>]*(?:DSML|tool_calls|invoke name=)[^>]*>", re.IGNORECASE)
+
+
+def _clean_answer(text: Optional[str]) -> str:
+    """Strip leaked tool-call markup so merchants never see raw model syntax."""
+    cleaned = _TOOL_MARKUP_RE.sub("", text or "").strip()
+    if not cleaned:
+        return "Let me pull that up — ask me again with a bit more detail."
+    return cleaned
 
 
 def _active_provider() -> Dict[str, str]:
@@ -99,7 +111,7 @@ def _run_tool_loop(merchant_id: str, messages: List[Dict[str, Any]], max_rounds:
         message = choice.message
 
         if not message.tool_calls:
-            return {"answer": message.content or "Done.", "did": did}
+            return {"answer": _clean_answer(message.content), "did": did}
 
         # Append assistant message with tool_calls
         messages.append({
@@ -133,7 +145,7 @@ def _run_tool_loop(merchant_id: str, messages: List[Dict[str, Any]], max_rounds:
 
     # Final summarization call after tools.
     final = _call_llm(messages)
-    return {"answer": final.choices[0].message.content if final else "Done.", "did": did}
+    return {"answer": _clean_answer(final.choices[0].message.content) if final else "Done.", "did": did}
 
 
 def _local_answer(merchant_id: str, message: str) -> Dict[str, Any]:
