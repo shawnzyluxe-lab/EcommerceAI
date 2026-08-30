@@ -12,10 +12,10 @@ def ctx():
         yield
 
 
-def _profile(tier="Basic Tier"):
+def _profile(tier="Basic Tier", business_name="Northside Goods"):
     return MerchantProfile(
         merchant_id="tenant_test01",
-        business_name="Test Storefront",
+        business_name=business_name,
         admin_email="owner@example.com",
         account_tier=tier,
     )
@@ -43,9 +43,16 @@ def test_free_registration_email_is_customer_facing(ctx):
     assert "No payment due" in html
     assert "$0.00" in html
     assert "How Vantav works" in html
-    assert "Test Storefront" in text
+    assert "Northside Goods" in text
     for internal in ("sandbox", "webhook", "merchant profile", "feature flag", "RLS"):
         assert internal.lower() not in html.lower()
+
+
+def test_auto_generated_business_name_is_not_shown_to_customer(ctx):
+    _, html, text = welcome_pack.build_email(_profile(business_name="Storefront tenant_ab12"))
+    assert "tenant_ab12" not in html
+    assert "Welcome to Vantav." in text
+    assert "Welcome to Vantav." in html
 
 
 def test_paid_email_shows_invoice_total_and_concierge(ctx):

@@ -167,6 +167,18 @@ def _money(amount: float) -> str:
     return f"${amount:,.2f}"
 
 
+def _greeting_name(profile: MerchantProfile) -> str:
+    """Auto-generated placeholder names must never be read back to a customer."""
+    name = (profile.business_name or "").strip()
+    placeholder = (
+        not name
+        or name.lower().startswith(("storefront ", "provisioned ", "new storefront"))
+        or "merchant_" in name
+        or "tenant_" in name
+    )
+    return "" if placeholder else name
+
+
 def build_email(
     profile: MerchantProfile,
     tier: Optional[str] = None,
@@ -199,7 +211,7 @@ def build_email(
     context = {
         "app_url": APP_URL,
         "support_address": SUPPORT_ADDRESS,
-        "business_name": profile.business_name or profile.admin_email,
+        "business_name": _greeting_name(profile),
         "admin_email": profile.admin_email,
         "package": package,
         "how_it_works": HOW_IT_WORKS,
@@ -224,8 +236,9 @@ def build_email(
 
 def _plain_text(ctx: Dict[str, Any]) -> str:
     package = ctx["package"]
+    greeting = f"Welcome to Vantav, {ctx['business_name']}." if ctx["business_name"] else "Welcome to Vantav."
     lines = [
-        f"Welcome to Vantav, {ctx['business_name']}.",
+        greeting,
         "",
         package["tagline"],
         "",

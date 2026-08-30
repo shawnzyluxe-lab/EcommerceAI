@@ -3116,8 +3116,8 @@ def api_admin_welcome_package_preview():
     concierge = request.args.get("concierge") == "1"
     sample = MerchantProfile(
         merchant_id="tenant_preview",
-        business_name=request.args.get("business_name", "Sample Storefront"),
-        admin_email=request.args.get("email", "merchant@example.com"),
+        business_name=request.args.get("business_name", ""),
+        admin_email=request.args.get("email", "merchant@vantavcommerce.com"),
         account_tier=tier,
     )
     _, html, _ = welcome_pack.build_email(sample, tier=tier, paid=paid, concierge_bundle=concierge)
