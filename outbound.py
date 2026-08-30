@@ -286,6 +286,11 @@ def _send_email(to: str, subject: str, html_body: str, bcc: Optional[str] = None
         return False
 
 
+def send_transactional_email(to: str, subject: str, html_body: str, text_body: Optional[str] = None) -> bool:
+    """Public wrapper so other modules reuse the Mailgun/SMTP transport."""
+    return _send_email(to, subject, html_body, text_body=text_body)
+
+
 def send_supplier_po(
     merchant_id: str,
     po: GeneratedPurchaseOrder,
