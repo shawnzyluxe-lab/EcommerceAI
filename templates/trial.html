@@ -1,0 +1,183 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <link rel="icon" type="image/x-icon" href="/static/images/favicon.ico">
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Request your {{ trial_hours }}-hour Vantav trial</title>
+  <meta name="description" content="Request {{ trial_hours }} hours of free access to Vantav. Open to sellers already live on Shopify, TikTok Shop or Amazon doing ${{ '{:,.0f}'.format(min_revenue) }} a month or more. No card required.">
+  <link rel="canonical" href="https://vantavcommerce.com/trial">
+  <meta property="og:type" content="website">
+  <meta property="og:site_name" content="Vantav">
+  <meta property="og:url" content="https://vantavcommerce.com/trial">
+  <meta property="og:title" content="Request your {{ trial_hours }}-hour Vantav trial">
+  <meta property="og:description" content="{{ trial_hours }} hours of free access to your commerce command centre. For sellers already doing ${{ '{:,.0f}'.format(min_revenue) }} a month on Shopify, TikTok Shop or Amazon.">
+  <meta property="og:image" content="https://vantavcommerce.com/static/videos/how-it-works.jpg">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="Request your {{ trial_hours }}-hour Vantav trial">
+  <meta name="twitter:description" content="{{ trial_hours }} hours of free access to your commerce command centre. Approval required.">
+  <meta name="twitter:image" content="https://vantavcommerce.com/static/videos/how-it-works.jpg">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg: #08080c; --card: #12121b; --ink: #f7f6fb; --muted: #b9b6c8; --dim: #837f95;
+      --line: #22222e; --purple: #7c5cff; --purple-2: #a78bfa; --teal: #2dd4bf; --red: #fb7185;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0; background: var(--bg); color: var(--ink); line-height: 1.6;
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+      -webkit-font-smoothing: antialiased;
+    }
+    a { color: var(--purple-2); text-decoration: none; }
+    .wrap { max-width: 620px; margin: 0 auto; padding: 2.5rem 1.5rem 4rem; }
+    .brand { font-weight: 900; letter-spacing: -0.03em; font-size: 1.25rem; margin-bottom: 2.5rem; }
+    .brand a { color: var(--ink); }
+    .eyebrow {
+      display: inline-flex; align-items: center; gap: .5rem; color: var(--teal);
+      font-size: .72rem; text-transform: uppercase; letter-spacing: .16em; font-weight: 700;
+    }
+    h1 { font-size: clamp(1.9rem, 5vw, 2.6rem); letter-spacing: -0.03em; line-height: 1.1; margin: .75rem 0 .9rem; font-weight: 800; }
+    .lede { color: var(--muted); margin: 0 0 1.75rem; }
+    .who { background: var(--card); border: 1px solid var(--line); border-radius: 16px; padding: 1.1rem 1.25rem; margin-bottom: 1.75rem; }
+    .who b { display: block; font-size: .85rem; margin-bottom: .5rem; }
+    .who ul { margin: 0; padding-left: 1.1rem; color: var(--muted); font-size: .9rem; }
+    form { background: var(--card); border: 1px solid var(--line); border-radius: 18px; padding: 1.5rem; }
+    label { display: block; font-size: .82rem; font-weight: 600; margin: 1rem 0 .4rem; }
+    label:first-of-type { margin-top: 0; }
+    input[type=text], input[type=email], input[type=url], select, textarea {
+      width: 100%; padding: .7rem .8rem; border-radius: 10px; border: 1px solid var(--line);
+      background: #0c0c13; color: var(--ink); font: inherit; font-size: .92rem;
+    }
+    textarea { min-height: 84px; resize: vertical; }
+    .channels { display: grid; gap: .5rem; }
+    .channels label { display: flex; align-items: center; gap: .6rem; margin: 0; font-weight: 500; font-size: .92rem; }
+    .channels input { width: 16px; height: 16px; accent-color: var(--purple); }
+    button {
+      width: 100%; margin-top: 1.5rem; padding: .85rem 1rem; border: 0; border-radius: 12px;
+      background: var(--purple); color: #fff; font: inherit; font-weight: 700; font-size: .95rem; cursor: pointer;
+    }
+    button:disabled { opacity: .6; cursor: default; }
+    .note { color: var(--dim); font-size: .78rem; margin-top: .9rem; text-align: center; }
+    .msg { margin-top: 1rem; padding: .85rem 1rem; border-radius: 12px; font-size: .9rem; display: none; }
+    .msg.ok { display: block; background: rgba(45,212,191,.1); border: 1px solid rgba(45,212,191,.35); color: #7ff0e0; }
+    .msg.err { display: block; background: rgba(251,113,133,.1); border: 1px solid rgba(251,113,133,.35); color: #ffb3c0; }
+    .foot { margin-top: 2rem; text-align: center; color: var(--dim); font-size: .82rem; }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="brand"><a href="/">Vantav</a></div>
+    <span class="eyebrow">AI-powered commerce assistant</span>
+    <h1>Try your command centre free for {{ trial_hours }} hours</h1>
+    <p class="lede">Tell us about your store and we will review it the same day. Approved sellers get full access for {{ trial_hours }} hours &mdash; no card, nothing to cancel.</p>
+
+    <div class="who">
+      <b>Who this is for</b>
+      <ul>
+        <li>You already sell on Shopify, TikTok Shop or Amazon</li>
+        <li>You are doing at least ${{ '{:,.0f}'.format(min_revenue) }} a month across your channels</li>
+        <li>You can be reached at a business email we can verify</li>
+      </ul>
+    </div>
+
+    <form id="trial-form" novalidate>
+      <label for="email">Business email</label>
+      <input type="email" id="email" name="email" autocomplete="email" placeholder="you@yourstore.com" required>
+
+      <label for="business_name">Store or brand name</label>
+      <input type="text" id="business_name" name="business_name" autocomplete="organization" placeholder="Aurora Supply" required>
+
+      <label for="store_url">Store link</label>
+      <input type="url" id="store_url" name="store_url" autocomplete="url" placeholder="https://yourstore.com">
+
+      <label id="channels-label">Where do you sell today?</label>
+      <div class="channels" role="group" aria-labelledby="channels-label">
+        <label><input type="checkbox" name="channels" value="shopify"> Shopify</label>
+        <label><input type="checkbox" name="channels" value="tiktok shop"> TikTok Shop</label>
+        <label><input type="checkbox" name="channels" value="amazon"> Amazon</label>
+      </div>
+
+      <label for="monthly_revenue">Monthly revenue across those channels</label>
+      <select id="monthly_revenue" name="monthly_revenue" required>
+        <option value="">Select a range</option>
+        <option value="0">Under ${{ '{:,.0f}'.format(min_revenue) }}</option>
+        <option value="5000">${{ '{:,.0f}'.format(min_revenue) }} &ndash; $15,000</option>
+        <option value="15000">$15,000 &ndash; $50,000</option>
+        <option value="50000">$50,000 &ndash; $150,000</option>
+        <option value="150000">$150,000+</option>
+      </select>
+
+      <label for="goal">What would you want Vantav to fix first? <span style="color:var(--dim);font-weight:400">(optional)</span></label>
+      <textarea id="goal" name="goal" placeholder="I think my TikTok orders are losing money but I cannot prove it."></textarea>
+
+      <button type="submit" id="submit-btn">Request my {{ trial_hours }}-hour trial</button>
+      <p class="note">No card required &middot; Approval required &middot; Read-only store access</p>
+      <div class="msg" id="msg" role="status" aria-live="polite"></div>
+    </form>
+
+    <p class="foot">Ready to start now instead? <a href="/subscribe">See plans</a> &middot; <a href="/">Back to home</a></p>
+  </div>
+
+  <script>
+    const form = document.getElementById('trial-form');
+    const btn = document.getElementById('submit-btn');
+    const msg = document.getElementById('msg');
+
+    function show(kind, text) {
+      msg.className = 'msg ' + kind;
+      msg.textContent = text;
+    }
+
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const channels = Array.from(form.querySelectorAll('input[name=channels]:checked')).map(c => c.value);
+      const payload = {
+        email: form.email.value.trim(),
+        business_name: form.business_name.value.trim(),
+        store_url: form.store_url.value.trim(),
+        channels: channels,
+        monthly_revenue: form.monthly_revenue.value,
+        goal: form.goal.value.trim(),
+      };
+
+      if (!payload.email || !payload.email.includes('@')) {
+        show('err', 'Please enter the business email we should reply to.');
+        return;
+      }
+      if (!channels.length) {
+        show('err', 'Select at least one channel you already sell on.');
+        return;
+      }
+      if (!payload.monthly_revenue) {
+        show('err', 'Select your monthly revenue range.');
+        return;
+      }
+
+      btn.disabled = true;
+      btn.textContent = 'Sending…';
+      try {
+        const res = await fetch('/api/trial/apply', {
+          method: 'POST',
+          headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify(payload),
+        });
+        const data = await res.json().catch(() => ({}));
+        if (res.status === 201) {
+          form.querySelectorAll('input, select, textarea').forEach(el => el.disabled = true);
+          btn.style.display = 'none';
+          show('ok', 'Request received. We review applications the same day and email your access link once you are approved.');
+          return;
+        }
+        show('err', data.detail || 'Something went wrong. Please try again.');
+      } catch (err) {
+        show('err', 'Network error. Please try again.');
+      }
+      btn.disabled = false;
+      btn.textContent = 'Request my {{ trial_hours }}-hour trial';
+    });
+  </script>
+</body>
+</html>
