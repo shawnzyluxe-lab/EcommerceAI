@@ -7514,9 +7514,18 @@ def _seed_and_reset_internal():
                 else:
                     os.environ[k] = v
 
-    profile = MerchantProfile.query.get(merchant_id)
-    if not profile:
-        profile = MerchantProfile.query.filter_by(admin_email=email).first()
+    if not MerchantProfile.query.get(merchant_id) and not MerchantProfile.query.filter_by(admin_email=email).first():
+        db.session.add(MerchantProfile(
+            merchant_id=merchant_id,
+            business_name=business_name,
+            admin_email=email,
+            account_tier=tier,
+            sandbox_status="approved",
+            live_access_enabled=1,
+        ))
+        db.session.commit()
+
+    profile = MerchantProfile.query.get(merchant_id) or MerchantProfile.query.filter_by(admin_email=email).first()
     if not profile:
         return jsonify({"error": "Merchant profile not found after seed", "stdout": stdout_capture.getvalue()}), 500
     profile.admin_email = email
