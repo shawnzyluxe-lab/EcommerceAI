@@ -964,8 +964,8 @@ with app.app_context():
     # Seed / refresh multi-tenant merchant profiles first (other tables FK to it)
     temp_password = os.environ.get("TEMP_ACCOUNTS_PASSWORD") or SITE_WALL_PASSWORD
     temp_accounts = [
-        ("merchant_shawn_01", "Shawnzyluxe Pro", "shawn@shawnzyluxe.com", "Beta Tier"),
-        ("merchant_engineer_temp", "Temporary Engineer", "engineer@shawnzyluxe.com", "Pro Tier"),
+        ("merchant_shawn_01", "Shawnzyluxe Pro", "shawn@vantavcommerce.com", "Vantav Scale"),
+        ("merchant_engineer_temp", "Temporary Engineer", "engineer@vantavcommerce.com", "Vantav Scale"),
     ]
     for mid, name, email, tier in temp_accounts:
         p = MerchantProfile.query.get(mid)
