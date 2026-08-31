@@ -369,8 +369,7 @@ def _merchant_requires_tier_selection(merchant: dict) -> bool:
 
 def _tier_test_accounts() -> set:
     """Emails that can bypass checkout for paid-tier testing."""
-    env_emails = {e.strip().lower() for e in os.environ.get('MERCHANT_TIER_TEST_ACCOUNTS', '').split(',') if e.strip()}
-    return env_emails | {'merchant@vantavcommerce.com'}
+    return {e.strip().lower() for e in os.environ.get('MERCHANT_TIER_TEST_ACCOUNTS', '').split(',') if e.strip()}
 
 
 def _reset_test_merchant_for_tier_testing(profile: MerchantProfile) -> None:
