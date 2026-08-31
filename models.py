@@ -382,6 +382,7 @@ class MagicLoginToken(db.Model):
     merchant_id = db.Column(db.String(100), db.ForeignKey("merchant_profiles.merchant_id"))
     expires_at = db.Column(db.DateTime)
     is_used = db.Column(db.Integer, default=0)
+    purpose = db.Column(db.String(50), default="magic")  # 'magic' or 'reset'
 
 
 class Alert(db.Model):

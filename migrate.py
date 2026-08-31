@@ -525,6 +525,21 @@ def run_migrations():
         _run("analyze.order_items", "ANALYZE order_items")
         _run("analyze.orders", "ANALYZE orders")
 
+        _run(
+            "magic_login_tokens table",
+            """
+            CREATE TABLE IF NOT EXISTS magic_login_tokens (
+                token VARCHAR(255) PRIMARY KEY,
+                admin_email VARCHAR(255),
+                merchant_id VARCHAR(100),
+                expires_at TIMESTAMP,
+                is_used INTEGER DEFAULT 0,
+                purpose VARCHAR(50) DEFAULT 'magic'
+            )
+            """,
+        )
+        _run("magic_login_tokens.purpose", "ALTER TABLE magic_login_tokens ADD COLUMN IF NOT EXISTS purpose VARCHAR(50) DEFAULT 'magic'")
+
 
 def refresh_materialized_views():
     """Refresh materialized views concurrently so dashboard reads stay fast."""

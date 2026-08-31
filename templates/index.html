@@ -69,9 +69,23 @@
                 <form id="loginForm" onsubmit="handleAuthSubmit(event, 'login')">
                     <input type="email" id="login-email" class="w-full bg-onyx border border-borderMuted focus:border-accentGold rounded-sm px-3 py-2 text-sm text-white font-mono placeholder:text-gray-600 focus:outline-none transition mb-3" placeholder="Email" required>
                     <input type="password" id="login-password" class="w-full bg-onyx border border-borderMuted focus:border-accentGold rounded-sm px-3 py-2 text-sm text-white font-mono placeholder:text-gray-600 focus:outline-none transition mb-3" placeholder="Password" required>
+                    <div class="flex items-center justify-between mb-3">
+                        <label class="flex items-center text-xs font-mono text-gray-400 cursor-pointer">
+                            <input type="checkbox" class="accent-accentGold mr-2" onchange="togglePassword('login-password')">
+                            Show password
+                        </label>
+                        <button type="button" class="text-xs font-mono text-accentGold hover:text-white underline" onclick="showForgotForm(true)">Forgot password?</button>
+                    </div>
                     <button type="submit" class="w-full bg-white hover:bg-accentGold text-onyx font-bold uppercase text-xs tracking-widest py-3 px-4 transition font-mono rounded-sm shadow-md">
                         Log in
                     </button>
+                </form>
+                <form id="forgotForm" class="hidden" onsubmit="submitForgotPassword(event)">
+                    <input type="email" id="forgot-email" class="w-full bg-onyx border border-borderMuted focus:border-accentGold rounded-sm px-3 py-2 text-sm text-white font-mono placeholder:text-gray-600 focus:outline-none transition mb-3" placeholder="Email" required>
+                    <button type="submit" class="w-full bg-white hover:bg-accentGold text-onyx font-bold uppercase text-xs tracking-widest py-3 px-4 transition font-mono rounded-sm shadow-md">
+                        Send reset link
+                    </button>
+                    <button type="button" class="w-full mt-2 text-xs font-mono text-gray-400 hover:text-white underline" onclick="showForgotForm(false)">Back to log in</button>
                 </form>
             </div>
 
@@ -79,6 +93,10 @@
                 <form id="signupForm" onsubmit="handleAuthSubmit(event, 'signup')">
                     <input type="email" id="signup-email" class="w-full bg-onyx border border-borderMuted focus:border-accentGold rounded-sm px-3 py-2 text-sm text-white font-mono placeholder:text-gray-600 focus:outline-none transition mb-3" placeholder="Enter Registration Email" required>
                     <input type="password" id="signup-password" class="w-full bg-onyx border border-borderMuted focus:border-accentGold rounded-sm px-3 py-2 text-sm text-white font-mono placeholder:text-gray-600 focus:outline-none transition mb-3" placeholder="Set Secure Password" minlength="8" required>
+                    <label class="flex items-center text-xs font-mono text-gray-400 mb-3 cursor-pointer">
+                        <input type="checkbox" class="accent-accentGold mr-2" onchange="togglePassword('signup-password')">
+                        Show password
+                    </label>
                     <label class="text-xs font-mono text-gray-400 mb-1 block">Select your plan:</label>
                     <select id="signup-tier" class="w-full bg-onyx border border-borderMuted focus:border-accentGold rounded-sm px-3 py-2 text-sm text-white font-mono mb-3">
                         <option value="operator">Vantav Operator — $199/mo (2 stores, 1K orders/mo)</option>
@@ -213,6 +231,29 @@
         const urlParams = new URLSearchParams(window.location.search);
         if (urlParams.get('oauth_sync') === 'success') {
             alert('Channel connected successfully.');
+        }
+
+        function togglePassword(inputId) {
+            const input = document.getElementById(inputId);
+            if (input) input.type = input.type === 'password' ? 'text' : 'password';
+        }
+
+        function showForgotForm(show) {
+            document.getElementById('loginForm').classList.toggle('hidden', show);
+            document.getElementById('forgotForm').classList.toggle('hidden', !show);
+        }
+
+        async function submitForgotPassword(event) {
+            event.preventDefault();
+            const email = document.getElementById('forgot-email').value.trim().toLowerCase();
+            const response = await fetch('/api/v1/auth/forgot-password', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ email })
+            });
+            const result = await response.json();
+            alert(result.detail || "Request submitted.");
+            if (response.ok) showForgotForm(false);
         }
     </script>
 
