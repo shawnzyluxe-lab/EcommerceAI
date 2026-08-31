@@ -369,15 +369,25 @@ def _merchant_requires_tier_selection(merchant: dict) -> bool:
 
 def _tier_test_accounts() -> set:
     """Emails that can bypass checkout for paid-tier testing."""
-    return {e.strip().lower() for e in os.environ.get('MERCHANT_TIER_TEST_ACCOUNTS', '').split(',') if e.strip()}
+    env_emails = {e.strip().lower() for e in os.environ.get('MERCHANT_TIER_TEST_ACCOUNTS', '').split(',') if e.strip()}
+    return env_emails | {
+        'merchant@vantavcommerce.com',
+        'ian@vantavcommerce.com',
+        'tester@vantavcommerce.com',
+        'tiktok-reviewer@vantavcommerce.com',
+    }
 
 
 def _reset_test_merchant_for_tier_testing(profile: MerchantProfile) -> None:
-    """Put a designated test merchant back into the tier-selection state."""
+    """Put a designated test merchant back into the tier-selection state once."""
     if not profile:
         return
     email = (profile.admin_email or "").strip().lower()
     if email not in _tier_test_accounts():
+        return
+    # Once a merchant has selected a paid tier and been approved, do not keep
+    # sending them back to the chooser on every login.
+    if profile.sandbox_status == "approved":
         return
     profile.account_tier = "Basic Tier"
     profile.sandbox_status = "pending"
@@ -7448,6 +7458,46 @@ def admin_catch_all(path):
         '<a class="btn" href="/admin">Return to Admin Home</a></div>'
     )
     return render_template('dashboard/page.html', **ctx), 404
+
+
+@app.route('/api/internal/set-pending', methods=['POST'])
+@limiter.limit("10 per minute")
+def _set_pending_internal():
+    """Protected endpoint to put a test merchant back into tier-selection state."""
+    token = request.headers.get('X-Internal-Seed-Token', '')
+    expected = os.environ.get('INTERNAL_SEED_TOKEN', '')
+    if not expected or not hmac.compare_digest(token, expected):
+        return jsonify({"error": "Forbidden"}), 403
+
+    data = request.get_json(silent=True) or {}
+    email = (data.get("email") or "").strip().lower()
+    if not email or "@" not in email:
+        return jsonify({"error": "Missing or invalid email"}), 400
+
+    profile = (
+        MerchantProfile.query.filter_by(admin_email=email)
+        .order_by(MerchantProfile.created_at.desc())
+        .first()
+    )
+    if not profile:
+        return jsonify({"error": "Merchant not found"}), 404
+
+    profile.account_tier = "Basic Tier"
+    profile.sandbox_status = "pending"
+    profile.live_access_enabled = 0
+    billing = SaaSBilling.query.get(profile.merchant_id)
+    if not billing:
+        billing = SaaSBilling(merchant_id=profile.merchant_id)
+        db.session.add(billing)
+    billing.current_plan = "Basic Tier"
+    db.session.commit()
+
+    return jsonify({
+        "status": "ok",
+        "merchant_id": profile.merchant_id,
+        "email": profile.admin_email,
+        "sandbox_status": profile.sandbox_status,
+    }), 200
 
 
 if __name__ == '__main__':
