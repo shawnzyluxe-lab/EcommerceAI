@@ -378,17 +378,23 @@ def _tier_test_accounts() -> set:
     }
 
 
+def _tier_chooser_test_accounts() -> set:
+    """Emails that should always land on the tier chooser after login for testing."""
+    return {
+        'merchant@vantavcommerce.com',
+        'ian@vantavcommerce.com',
+    }
+
+
 def _reset_test_merchant_for_tier_testing(profile: MerchantProfile) -> None:
-    """Put a designated test merchant back into the tier-selection state once."""
+    """Put merchant@ and ian@ back into the tier-selection state on every login."""
     if not profile:
         return
     email = (profile.admin_email or "").strip().lower()
-    if email not in _tier_test_accounts():
+    if email not in _tier_chooser_test_accounts():
         return
-    # Once a merchant has selected a paid tier and been approved, do not keep
-    # sending them back to the chooser on every login.
-    if profile.sandbox_status == "approved":
-        return
+    # These two test accounts must always see the chooser after login so the
+    # tier-selection experience can be reviewed; real merchants follow normal onboarding.
     profile.account_tier = "Basic Tier"
     profile.sandbox_status = "pending"
     profile.live_access_enabled = 0
