@@ -35,7 +35,7 @@ logging.basicConfig(
 )
 logger = logging.getLogger("shawnzyluxe_core")
 from urllib.parse import urlencode, quote
-from flask import Flask, render_template, request, redirect, url_for, session, flash, jsonify, send_file, make_response, after_this_request, current_app, g
+from flask import Flask, render_template, request, redirect, url_for, session, flash, jsonify, send_file, send_from_directory, make_response, after_this_request, current_app, g, Response
 from flask_sock import Sock
 from dotenv import load_dotenv
 
@@ -826,7 +826,10 @@ def enforce_tier_limits(merchant_id, requested_feature):
 def site_wall_protect():
     if not site_wall_enabled():
         return None
-    if request.endpoint in ('home', 'login', 'site_login', 'site_logout', 'subscribe', 'checkout', 'thank_you', 'session_heartbeat', 'create_stripe_checkout', 'beta_apply', 'api_beta_apply', 'auth_login', 'auth_signup', 'auth_provision_node', 'shopify_orders_webhook', 'shopify_gdpr_customer_data_request', 'shopify_gdpr_customer_redact', 'shopify_gdpr_shop_redact', 'shopify_app_uninstalled', 'tiktok_orders_webhook', 'amazon_orders_webhook', 'stripe_billing_webhook', 'supplier_po_update', 'execute_mitigation', 'generate_magic_link', 'magic_login', 'register_merchant', 'shopify_oauth_callback', 'tiktok_oauth_callback', 'health_check', 'api_v1_health', 'api_monitoring_health', 'api_monitoring_alerts', 'legal_terms', 'legal_privacy', 'legal_refund', 'static'):
+    if request.endpoint is None:
+        # Unknown path: let Flask return a real 404 instead of hiding it behind a login redirect.
+        return None
+    if request.endpoint in ('home', 'login', 'site_login', 'site_logout', 'subscribe', 'checkout', 'thank_you', 'session_heartbeat', 'create_stripe_checkout', 'beta_apply', 'api_beta_apply', 'trial', 'api_trial_apply', 'auth_login', 'auth_signup', 'auth_provision_node', 'shopify_orders_webhook', 'shopify_gdpr_customer_data_request', 'shopify_gdpr_customer_redact', 'shopify_gdpr_shop_redact', 'shopify_app_uninstalled', 'tiktok_orders_webhook', 'amazon_orders_webhook', 'stripe_billing_webhook', 'supplier_po_update', 'execute_mitigation', 'generate_magic_link', 'magic_login', 'register_merchant', 'shopify_oauth_callback', 'tiktok_oauth_callback', 'health_check', 'api_v1_health', 'api_monitoring_health', 'api_monitoring_alerts', 'legal_terms', 'legal_privacy', 'legal_refund', 'legal_security', 'status_page', 'demo', 'robots_txt', 'sitemap_xml', 'favicon_ico', 'static'):
         return None
     if site_wall_authenticated():
         return None
@@ -1708,6 +1711,59 @@ def status_page():
     health_response, _ = health_check()
     health = health_response.get_json()
     return render_template('status.html', health=health)
+
+
+PUBLIC_PATHS = ('/', '/subscribe', '/trial', '/demo', '/security', '/status', '/terms', '/privacy', '/refund', '/login')
+
+
+def _site_root() -> str:
+    return (os.environ.get('SITE_BASE_URL') or 'https://vantavcommerce.com').rstrip('/')
+
+
+@app.route('/robots.txt')
+@limiter.exempt
+def robots_txt():
+    body = "\n".join([
+        "User-agent: *",
+        "Allow: /",
+        "Disallow: /dashboard",
+        "Disallow: /admin",
+        "Disallow: /engineer",
+        "Disallow: /api/",
+        "Disallow: /checkout",
+        f"Sitemap: {_site_root()}/sitemap.xml",
+        "",
+    ])
+    return Response(body, mimetype='text/plain')
+
+
+@app.route('/sitemap.xml')
+@limiter.exempt
+def sitemap_xml():
+    root = _site_root()
+    today = datetime.utcnow().date().isoformat()
+    urls = "".join(
+        f"<url><loc>{root}{path}</loc><lastmod>{today}</lastmod></url>"
+        for path in PUBLIC_PATHS
+    )
+    body = (
+        '<?xml version="1.0" encoding="UTF-8"?>'
+        '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">'
+        f'{urls}</urlset>'
+    )
+    return Response(body, mimetype='application/xml')
+
+
+@app.route('/favicon.ico')
+@limiter.exempt
+def favicon_ico():
+    return send_from_directory(os.path.join(app.root_path, 'static', 'images'), 'favicon.ico',
+                              mimetype='image/vnd.microsoft.icon')
+
+
+@app.errorhandler(404)
+def not_found(_error):
+    return render_template('404.html'), 404
 
 
 @app.route('/dashboard')
@@ -6615,6 +6671,64 @@ def beta_apply():
     return redirect(url_for('subscribe'), code=301)
 
 
+@app.route('/trial', methods=['GET'])
+@limiter.exempt
+def trial():
+    """Public application page for the approval-gated 24-hour trial."""
+    return render_template(
+        'trial.html',
+        trial_hours=vetted_operator.TRIAL_HOURS,
+        min_revenue=vetted_operator.TRIAL_MIN_MONTHLY_REVENUE,
+    )
+
+
+@app.route('/api/trial/apply', methods=['POST'])
+@limiter.limit("10 per hour")
+def api_trial_apply():
+    """Accept a trial application. Qualified applicants still wait for manual approval."""
+    data = request.get_json(silent=True) or request.form or {}
+    email = (data.get("email") or "").strip().lower()
+    business_name = (data.get("business_name") or "").strip()
+    store_url = (data.get("store_url") or "").strip()
+    channels = data.get("channels")
+    if isinstance(channels, str):
+        channels = [c for c in channels.split(",") if c.strip()]
+    elif not isinstance(channels, list):
+        channels = request.form.getlist("channels") if request.form else []
+    goal = (data.get("goal") or "").strip()
+
+    if not email or "@" not in email:
+        return jsonify({"detail": "A valid business email is required."}), 400
+
+    check = vetted_operator.trial_qualification(channels, data.get("monthly_revenue"))
+    if not check["qualified"]:
+        return jsonify({"status": "not_eligible", "detail": check["reason"]}), 422
+
+    try:
+        application = vetted_operator.submit_application(
+            email=email,
+            business_name=business_name,
+            monthly_volume=f"${check['revenue']:,.0f}/mo",
+            ad_channels=", ".join(check["channels"]),
+            bottleneck="\n".join(filter(None, [goal, f"Store: {store_url}" if store_url else ""])),
+            selected_plan=vetted_operator.TRIAL_PLAN,
+        )
+        try:
+            _notify_team_new_waitlist(application, f"{vetted_operator.TRIAL_HOURS}-hour trial request")
+            _confirm_waitlist_to_applicant(application, f"{vetted_operator.TRIAL_HOURS}-hour trial request")
+        except Exception as notify_err:
+            logger.warning(f"[Trial Apply] Notify hook failed: {notify_err}")
+        return jsonify({
+            "status": "received",
+            "id": application.id,
+            "email": application.email,
+            "trial_hours": vetted_operator.TRIAL_HOURS,
+        }), 201
+    except Exception as e:
+        logger.error(f"[Trial Apply] Failed: {e}")
+        return jsonify({"detail": "Could not submit your application."}), 500
+
+
 @app.route('/api/beta/apply', methods=['POST'])
 @limiter.limit("10 per minute")
 def api_beta_apply():
@@ -6693,16 +6807,17 @@ def api_admin_beta_applications():
 @app.route('/api/admin/beta-applications/<int:app_id>/sandbox', methods=['POST'])
 @require_roles([UserRole.ADMIN])
 def api_admin_approve_sandbox(app_id):
-    """Approve an application into the 48-hour sandbox and email login credentials."""
+    """Approve an application into its time-boxed sandbox and email login credentials."""
     try:
-        result = vetted_operator.approve_to_sandbox(app_id)
+        app_obj = BetaWaitlistApplication.query.get_or_404(app_id)
+        hours = vetted_operator.sandbox_hours_for(app_obj)
+        result = vetted_operator.approve_to_sandbox(app_id, hours=hours)
         merchant_id = result["merchant_id"]
         email = result["email"]
         temp_password = result.get("temp_password")
         expires_at_str = result["sandbox_expires_at"]
         expires_at = datetime.fromisoformat(expires_at_str)
 
-        app_obj = BetaWaitlistApplication.query.get_or_404(app_id)
         sandbox_demo.seed_sandbox_demo(merchant_id, app_obj.business_name or "")
 
         # One-time magic login link that lives as long as the sandbox window.
@@ -6722,8 +6837,8 @@ def api_admin_approve_sandbox(app_id):
 
         body = f"""
         <p>Hi there,</p>
-        <p>Your Vantav beta 48-hour sandbox is ready. You can log in instantly below and explore the dashboard with simulated data.</p>
-        <p><b>Sandbox expires:</b> {expires_at_str} UTC</p>
+        <p>Your Vantav {hours}-hour access is approved. You can log in instantly below and explore your command centre.</p>
+        <p><b>Access expires:</b> {expires_at_str} UTC</p>
         <p><a href="{magic_url}" style="display:inline-block;padding:10px 18px;background:#d4af37;color:#000;border-radius:8px;text-decoration:none;font-weight:700;">Open Dashboard</a></p>
         <p>Or log in with your email and temporary password at <a href="{login_url}">{login_url}</a>:</p>
         <ul>
@@ -6735,7 +6850,7 @@ def api_admin_approve_sandbox(app_id):
         <p>— Vantav Team</p>
         """
 
-        email_sent = dispatch_external_email(email, "Your Vantav 48-Hour Sandbox is Ready", body)
+        email_sent = dispatch_external_email(email, f"Your Vantav {hours}-hour access is ready", body)
         db.session.commit()
 
         return jsonify({
@@ -6746,6 +6861,7 @@ def api_admin_approve_sandbox(app_id):
             "magic_url": magic_url,
             "login_url": login_url,
             "sandbox_expires_at": expires_at_str,
+            "sandbox_hours": hours,
             "email_sent": email_sent,
         }), 200
     except Exception as e:

@@ -11,6 +11,33 @@ from sqlalchemy import text
 from models import db, MerchantProfile, BetaWaitlistApplication, MerchantMetric, SaaSBilling
 
 DEFAULT_SANDBOX_HOURS = int(os.environ.get("BETA_SANDBOX_HOURS", "48"))
+TRIAL_HOURS = int(os.environ.get("TRIAL_HOURS", "24"))
+TRIAL_PLAN = "trial_24h"
+TRIAL_MIN_MONTHLY_REVENUE = int(os.environ.get("TRIAL_MIN_MONTHLY_REVENUE", "5000"))
+TRIAL_CHANNELS = ("shopify", "tiktok shop", "amazon")
+
+
+def trial_qualification(channels: Optional[List[str]], monthly_revenue: Any) -> Dict[str, Any]:
+    """Check a trial applicant against the selling-channel and monthly revenue requirements."""
+    picked = [str(c).strip().lower() for c in (channels or []) if str(c).strip()]
+    valid_channels = [c for c in picked if c in TRIAL_CHANNELS]
+    try:
+        revenue = float(str(monthly_revenue).replace(",", "").replace("$", "").strip() or 0)
+    except ValueError:
+        revenue = 0.0
+
+    if not valid_channels:
+        reason = "The trial is for sellers already live on Shopify, TikTok Shop or Amazon."
+    elif revenue < TRIAL_MIN_MONTHLY_REVENUE:
+        reason = f"The trial is for stores doing at least ${TRIAL_MIN_MONTHLY_REVENUE:,.0f} a month across their channels."
+    else:
+        reason = ""
+    return {
+        "qualified": not reason,
+        "revenue": revenue,
+        "channels": valid_channels,
+        "reason": reason,
+    }
 
 
 def _now():
@@ -105,9 +132,16 @@ def _create_merchant_for_application(app: BetaWaitlistApplication, tier: str = "
     return profile, temp_password
 
 
-def approve_to_sandbox(app_id: int, hours: int = DEFAULT_SANDBOX_HOURS) -> Dict[str, Any]:
-    """Approve an application to the 48-hour sandbox. Creates merchant and returns temp credentials."""
+def sandbox_hours_for(app: BetaWaitlistApplication) -> int:
+    """Trial applicants get the trial window; beta applicants keep the longer sandbox window."""
+    return TRIAL_HOURS if (app.selected_plan or "") == TRIAL_PLAN else DEFAULT_SANDBOX_HOURS
+
+
+def approve_to_sandbox(app_id: int, hours: Optional[int] = None) -> Dict[str, Any]:
+    """Approve an application to a time-boxed sandbox. Creates merchant and returns temp credentials."""
     app = BetaWaitlistApplication.query.get_or_404(app_id)
+    if hours is None:
+        hours = sandbox_hours_for(app)
     if app.status in ("approved", "rejected"):
         raise ValueError(f"Application already {app.status}")
 

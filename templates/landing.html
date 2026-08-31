@@ -4,11 +4,52 @@
   <link rel="icon" type="image/x-icon" href="/static/images/favicon.ico">
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Vantav | Know exactly what your store keeps, not just what it sells</title>
-  <meta name="description" content="Vantav brings Shopify, TikTok Shop and Amazon into one dashboard, subtracts every fee, ad, shipping label and refund, and tells you which products and channels actually make money.">
-  <meta property="og:title" content="Vantav | Know exactly what your store keeps">
-  <meta property="og:description" content="One dashboard for Shopify, TikTok Shop and Amazon that shows real profit per order, warns you before a product loses money, and suggests the fix.">
-  <meta property="og:image" content="/static/videos/how-it-works.jpg">
+  <title>Vantav | The command centre for your online store</title>
+  <meta name="description" content="Vantav is the command centre for Shopify, TikTok Shop and Amazon sellers. It watches every channel, tells you the one thing to fix today, and carries out the fix the moment you approve it.">
+  <link rel="canonical" href="https://vantavcommerce.com/">
+  <meta property="og:type" content="website">
+  <meta property="og:site_name" content="Vantav">
+  <meta property="og:url" content="https://vantavcommerce.com/">
+  <meta property="og:title" content="Vantav | The command centre for your online store">
+  <meta property="og:description" content="Vantav watches Shopify, TikTok Shop and Amazon for you, tells you what is costing you money today, and does the fix once you approve it.">
+  <meta property="og:image" content="https://vantavcommerce.com/static/videos/how-it-works.jpg">
+  <meta property="og:image:alt" content="Vantav command centre showing what a store kept today and the fixes waiting for approval">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="Vantav | The command centre for your online store">
+  <meta name="twitter:description" content="Vantav watches Shopify, TikTok Shop and Amazon for you, tells you what is costing you money today, and does the fix once you approve it.">
+  <meta name="twitter:image" content="https://vantavcommerce.com/static/videos/how-it-works.jpg">
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@graph": [
+      {
+        "@type": "Organization",
+        "@id": "https://vantavcommerce.com/#organization",
+        "name": "Vantav",
+        "url": "https://vantavcommerce.com/",
+        "logo": "https://vantavcommerce.com/static/images/favicon.ico",
+        "email": "support@vantavcommerce.com"
+      },
+      {
+        "@type": "SoftwareApplication",
+        "name": "Vantav",
+        "url": "https://vantavcommerce.com/",
+        "applicationCategory": "BusinessApplication",
+        "operatingSystem": "Web",
+        "description": "AI-powered commerce assistant that watches Shopify, TikTok Shop and Amazon, tells store owners what is costing them money, and carries out the fix on approval.",
+        "publisher": { "@id": "https://vantavcommerce.com/#organization" },
+        "offers": {
+          "@type": "AggregateOffer",
+          "priceCurrency": "USD",
+          "lowPrice": "199",
+          "highPrice": "799",
+          "offerCount": "3",
+          "url": "https://vantavcommerce.com/subscribe"
+        }
+      }
+    ]
+  }
+  </script>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
@@ -44,7 +85,7 @@
       line-height: 1.6;
     }
     a { color: inherit; text-decoration: none; }
-    img { max-width: 100%; display: block; }
+    img { max-width: 100%; height: auto; display: block; }
     h1, h2, h3 { letter-spacing: -0.03em; line-height: 1.1; margin: 0; font-weight: 800; }
     p { margin: 0; }
     .wrap { max-width: 1160px; margin: 0 auto; padding: 0 1.5rem; }
@@ -131,6 +172,7 @@
     }
     .hero p.lede { font-size: 1.12rem; max-width: 52ch; }
     .hero-ctas { display: flex; gap: .75rem; flex-wrap: wrap; margin: 1.9rem 0 1rem; }
+    .trust-line { color: var(--muted); font-size: .84rem; font-weight: 600; margin: 0 0 1.1rem; }
     .hero-note { color: var(--dim); font-size: .85rem; display: flex; gap: 1.1rem; flex-wrap: wrap; }
     .hero-note span { display: inline-flex; align-items: center; gap: .35rem; }
     .hero-note svg { width: 14px; height: 14px; color: var(--green); }
@@ -152,7 +194,7 @@
       padding: .18rem .6rem; font-style: normal;
     }
     .hero .shot { width: calc(100% + 5rem); max-width: none; }
-    .hero .shot img { max-height: 460px; object-fit: cover; object-position: top left; }
+    .hero .shot img { object-fit: contain; }
 
     /* logo strip */
     .strip {
@@ -332,7 +374,7 @@
   <div class="header-inner">
     <a class="brand" href="/">
       <span class="brand-mark">
-        <svg viewBox="0 0 24 24" fill="none"><path d="M3 4l9 16 9-16" stroke="#a78bfa" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        <svg viewBox="0 0 24 24" fill="none" aria-hidden="true" focusable="false"><path d="M3 4l9 16 9-16" stroke="#a78bfa" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg>
       </span>
       <span>Vantav</span>
     </a>
@@ -342,7 +384,7 @@
       <a class="link hide-sm" href="#pricing">Pricing</a>
       <a class="link hide-sm" href="#faq">FAQ</a>
       <a class="link" href="/login">Log in</a>
-      <a class="btn btn-primary btn-sm" href="/subscribe">Start free</a>
+      <a class="btn btn-primary btn-sm" href="/trial">Start free trial</a>
     </nav>
   </div>
 </header>
@@ -351,25 +393,26 @@
 <section class="hero">
   <div class="wrap hero-grid">
     <div>
-      <span class="pill"><span class="dot"></span> Live for Shopify, TikTok Shop &amp; Amazon sellers</span>
-      <h1>Sell everywhere.<br><span class="grad">Keep more of it.</span></h1>
-      <p class="lede">Vantav is the profit dashboard for Shopify, TikTok Shop and Amazon sellers. It subtracts every fee, ad, shipping label and refund, shows you what you truly kept, and tells you exactly what to fix today — before it costs you another week.</p>
+      <span class="pill"><span class="dot"></span> AI-powered commerce assistant</span>
+      <h1>Stop switching tabs between<br><span class="grad">Shopify, TikTok Shop and Amazon.</span></h1>
+      <p class="lede">Run all three from one calm command centre. Vantav watches your channels, tells you the one thing worth fixing today, and gets it done the moment you say yes. No spreadsheets, no month-end surprises.</p>
       <div class="hero-ctas">
-        <a class="btn btn-primary" href="/subscribe">Start free — no card required</a>
+        <a class="btn btn-primary" href="/trial">Start your free 24-hour trial</a>
         <a class="btn btn-ghost" href="#how-it-works">
           <svg viewBox="0 0 24 24" fill="currentColor" style="width:15px;height:15px"><path d="M8 5v14l11-7z"/></svg>
           Watch the 84-second tour
         </a>
       </div>
+      <p class="trust-line">Free 24-hour trial &middot; No credit card &middot; Approval required</p>
       <div class="hero-note">
-        <span><svg viewBox="0 0 24 24" fill="none"><path d="M20 6L9 17l-5-5" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg> Set up in an afternoon</span>
-        <span><svg viewBox="0 0 24 24" fill="none"><path d="M20 6L9 17l-5-5" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg> Read-only store access</span>
-        <span><svg viewBox="0 0 24 24" fill="none"><path d="M20 6L9 17l-5-5" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg> Cancel anytime</span>
+        <span><svg viewBox="0 0 24 24" fill="none" aria-hidden="true" focusable="false"><path d="M20 6L9 17l-5-5" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg> Reviewed the same day</span>
+        <span><svg viewBox="0 0 24 24" fill="none" aria-hidden="true" focusable="false"><path d="M20 6L9 17l-5-5" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg> Read-only store access</span>
+        <span><svg viewBox="0 0 24 24" fill="none" aria-hidden="true" focusable="false"><path d="M20 6L9 17l-5-5" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg> Nothing installed on your store</span>
       </div>
     </div>
     <div class="shot">
       <div class="shot-bar"><i></i><i></i><i></i><span class="url">Live account &middot; today</span></div>
-      <img src="{{ url_for('static', filename='images/shots/hero.webp') }}" alt="Vantav showing actual net earnings, warnings about ad spend and stock, and the assistant briefing a store owner" width="1418" height="840" loading="eager">
+      <img src="{{ url_for('static', filename='images/shots/hero.webp') }}" alt="Vantav showing profit per order, an alert about TikTok ad spend, and a recommended fix waiting to be approved" width="1418" height="781" loading="eager">
     </div>
   </div>
   <div class="wrap">
@@ -389,11 +432,11 @@
       </div>
       <div>
         <b>$198 / week</b>
-        <small>Wasted ad spend the assistant caught in a single ad set</small>
+        <small>Wasted ad spend Vantav caught, and paused on approval, in one ad set</small>
       </div>
       <div>
-        <b>One afternoon</b>
-        <small>From connecting a channel to reading accurate profit</small>
+        <b>Two clicks</b>
+        <small>From spotting the problem to the fix being carried out</small>
       </div>
     </div>
   </div>
@@ -404,26 +447,26 @@
   <div class="wrap">
     <div class="head center">
       <span class="eyebrow">The problem</span>
-      <h2>Your sales dashboard is lying to you by omission</h2>
-      <p>Every channel reports revenue its own way, and none of them subtract everything. That is how a best-selling product quietly loses money for weeks.</p>
+      <h2>Reports tell you what happened. They never tell you what to do.</h2>
+      <p>Every channel shows you its own numbers, none of them subtract everything, and none of them act. That is how a best seller quietly loses money for weeks while you are busy running the business.</p>
     </div>
     <div class="compare">
       <div class="bad">
         <h3>Running your store today</h3>
         <ul>
-          <li><svg viewBox="0 0 24 24" fill="none"><path d="M18 6L6 18M6 6l12 12" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"/></svg> Three dashboards, a spreadsheet, and a guess at the end of the month</li>
-          <li><svg viewBox="0 0 24 24" fill="none"><path d="M18 6L6 18M6 6l12 12" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"/></svg> Ad spend and marketplace fees never land in the same place as sales</li>
-          <li><svg viewBox="0 0 24 24" fill="none"><path d="M18 6L6 18M6 6l12 12" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"/></svg> You find out a product was unprofitable after you have reordered it</li>
-          <li><svg viewBox="0 0 24 24" fill="none"><path d="M18 6L6 18M6 6l12 12" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"/></svg> Best sellers go out of stock while slow movers tie up cash</li>
+          <li><svg viewBox="0 0 24 24" fill="none" aria-hidden="true" focusable="false"><path d="M18 6L6 18M6 6l12 12" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"/></svg> Three dashboards, a spreadsheet, and a guess at the end of the month</li>
+          <li><svg viewBox="0 0 24 24" fill="none" aria-hidden="true" focusable="false"><path d="M18 6L6 18M6 6l12 12" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"/></svg> Ad spend and marketplace fees never land in the same place as sales</li>
+          <li><svg viewBox="0 0 24 24" fill="none" aria-hidden="true" focusable="false"><path d="M18 6L6 18M6 6l12 12" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"/></svg> You find out a product was unprofitable after you have reordered it</li>
+          <li><svg viewBox="0 0 24 24" fill="none" aria-hidden="true" focusable="false"><path d="M18 6L6 18M6 6l12 12" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"/></svg> Even when you spot a problem, fixing it means logging into three places</li>
         </ul>
       </div>
       <div class="good">
         <h3>Running your store on Vantav</h3>
         <ul>
-          <li><svg viewBox="0 0 24 24" fill="none"><path d="M20 6L9 17l-5-5" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg> One number you can trust: what you kept today, after everything</li>
-          <li><svg viewBox="0 0 24 24" fill="none"><path d="M20 6L9 17l-5-5" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg> Profit broken down by channel, product and individual order</li>
-          <li><svg viewBox="0 0 24 24" fill="none"><path d="M20 6L9 17l-5-5" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg> A warning the same day a product or ad starts losing money</li>
-          <li><svg viewBox="0 0 24 24" fill="none"><path d="M20 6L9 17l-5-5" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg> A suggested fix, with the numbers behind it, waiting for your yes</li>
+          <li><svg viewBox="0 0 24 24" fill="none" aria-hidden="true" focusable="false"><path d="M20 6L9 17l-5-5" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg> One number you can trust: what you kept today, after everything</li>
+          <li><svg viewBox="0 0 24 24" fill="none" aria-hidden="true" focusable="false"><path d="M20 6L9 17l-5-5" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg> Profit broken down by channel, product and individual order</li>
+          <li><svg viewBox="0 0 24 24" fill="none" aria-hidden="true" focusable="false"><path d="M20 6L9 17l-5-5" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg> A warning the same day a product or ad starts losing money</li>
+          <li><svg viewBox="0 0 24 24" fill="none" aria-hidden="true" focusable="false"><path d="M20 6L9 17l-5-5" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg> The fix already drafted and carried out for you the moment you approve it</li>
         </ul>
       </div>
     </div>
@@ -435,8 +478,8 @@
   <div class="wrap">
     <div class="head center">
       <span class="eyebrow" style="justify-content:center">See how it works</span>
-      <h2>Watch a $24,806 month get audited in 84 seconds</h2>
-      <p>No slides, no mock-ups. A live account: signing in, reading true profit, catching a TikTok ad set burning $198 a week, and approving the fix in two clicks.</p>
+      <h2>Watch a $24,806 month get audited and fixed in 84 seconds</h2>
+      <p>No slides, no mock-ups. A live account: signing in to the briefing, reading what was actually kept, catching a TikTok ad set burning $198 a week, and approving the fix in two clicks.</p>
     </div>
     <div class="video-wrap">
       <video id="tour-video" controls preload="metadata" playsinline
@@ -465,37 +508,37 @@
   <div class="wrap">
     <div class="head center">
       <span class="eyebrow" style="justify-content:center">What you get</span>
-      <h2>Run your store on profit, not vanity revenue</h2>
-      <p>Built for owners running more than one channel who are done reconciling three dashboards and a spreadsheet.</p>
+      <h2>One place to see it, decide it and do it</h2>
+      <p>Built for owners running more than one channel who would rather approve a decision than build a spreadsheet.</p>
     </div>
     <div class="rows">
 
       <div class="row">
         <div class="copy">
           <span class="num">01</span>
-          <h3>See the profit on every order</h3>
+          <h3>Every order, with the real profit attached</h3>
           <p>Vantav pulls in each order with its real costs attached: product cost, the platform's cut, the shipping label, the discount, the ad spend it took to win the sale, and any refund. What is left is your profit — and you can see it order by order.</p>
           <ul>
-            <li><svg viewBox="0 0 24 24" fill="none"><path d="M20 6L9 17l-5-5" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg> Revenue, costs and net profit side by side for any date range</li>
-            <li><svg viewBox="0 0 24 24" fill="none"><path d="M20 6L9 17l-5-5" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg> Losing orders flagged in red so patterns are obvious</li>
-            <li><svg viewBox="0 0 24 24" fill="none"><path d="M20 6L9 17l-5-5" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg> Margin per channel, so you know where to spend next</li>
+            <li><svg viewBox="0 0 24 24" fill="none" aria-hidden="true" focusable="false"><path d="M20 6L9 17l-5-5" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg> Revenue, costs and net profit side by side for any date range</li>
+            <li><svg viewBox="0 0 24 24" fill="none" aria-hidden="true" focusable="false"><path d="M20 6L9 17l-5-5" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg> Losing orders flagged in red so patterns are obvious</li>
+            <li><svg viewBox="0 0 24 24" fill="none" aria-hidden="true" focusable="false"><path d="M20 6L9 17l-5-5" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg> Margin per channel, so you know where to spend next</li>
           </ul>
         </div>
         <div class="shot">
-          <div class="shot-bar"><i></i><i></i><i></i><span class="url">Profit dashboard</span></div>
-          <img src="{{ url_for('static', filename='images/shots/profit.webp') }}" alt="Profit dashboard listing gross revenue, product cost, ad spend, fees, shipping and refunds, with profit shown per order" width="1800" loading="lazy">
+          <div class="shot-bar"><i></i><i></i><i></i><span class="url">Profit by order</span></div>
+          <img src="{{ url_for('static', filename='images/shots/profit.webp') }}" alt="Profit view listing gross revenue, product cost, ad spend, fees, shipping and refunds, with profit shown per order" width="1800" loading="lazy">
         </div>
       </div>
 
       <div class="row flip">
         <div class="copy">
           <span class="num">02</span>
-          <h3>Get warned while it still matters</h3>
+          <h3>It flags the problem while it still matters</h3>
           <p>Vantav watches your channels around the clock and tells you in plain English what changed: an ad set now losing $14 an order, a best seller five days from selling out, an Amazon listing that breaks even at best. Each warning explains the numbers behind it.</p>
           <ul>
-            <li><svg viewBox="0 0 24 24" fill="none"><path d="M20 6L9 17l-5-5" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg> Ranked by how much money is at stake</li>
-            <li><svg viewBox="0 0 24 24" fill="none"><path d="M20 6L9 17l-5-5" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg> Snooze, resolve, or turn one straight into a purchase order</li>
-            <li><svg viewBox="0 0 24 24" fill="none"><path d="M20 6L9 17l-5-5" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg> Stock-out and delivery-delay warnings included</li>
+            <li><svg viewBox="0 0 24 24" fill="none" aria-hidden="true" focusable="false"><path d="M20 6L9 17l-5-5" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg> Ranked by how much money is at stake</li>
+            <li><svg viewBox="0 0 24 24" fill="none" aria-hidden="true" focusable="false"><path d="M20 6L9 17l-5-5" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg> Snooze, resolve, or turn one straight into a purchase order</li>
+            <li><svg viewBox="0 0 24 24" fill="none" aria-hidden="true" focusable="false"><path d="M20 6L9 17l-5-5" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg> Stock-out and delivery-delay warnings included</li>
           </ul>
         </div>
         <div class="shot">
@@ -507,12 +550,12 @@
       <div class="row">
         <div class="copy">
           <span class="num">03</span>
-          <h3>A recommended fix — nothing happens without your yes</h3>
-          <p>For every problem it finds, Vantav drafts the action: pause that ad set, reorder 240 units, raise the price on Amazon. You see the expected impact and the reasoning first. Approve it and Vantav carries it out; dismiss it and nothing changes.</p>
+          <h3>It does the work — nothing happens without your yes</h3>
+          <p>For every problem it finds, Vantav drafts the action: pause that ad set, reorder 240 units, raise the price on Amazon. You see the expected impact and the reasoning first. Approve it and Vantav carries it out for you; dismiss it and nothing changes.</p>
           <ul>
-            <li><svg viewBox="0 0 24 24" fill="none"><path d="M20 6L9 17l-5-5" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg> Every action shows expected weekly impact before you approve</li>
-            <li><svg viewBox="0 0 24 24" fill="none"><path d="M20 6L9 17l-5-5" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg> Edit it first if you would do it differently</li>
-            <li><svg viewBox="0 0 24 24" fill="none"><path d="M20 6L9 17l-5-5" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg> Full history of what was approved and what it changed</li>
+            <li><svg viewBox="0 0 24 24" fill="none" aria-hidden="true" focusable="false"><path d="M20 6L9 17l-5-5" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg> Every action shows expected weekly impact before you approve</li>
+            <li><svg viewBox="0 0 24 24" fill="none" aria-hidden="true" focusable="false"><path d="M20 6L9 17l-5-5" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg> Edit it first if you would do it differently</li>
+            <li><svg viewBox="0 0 24 24" fill="none" aria-hidden="true" focusable="false"><path d="M20 6L9 17l-5-5" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg> Full history of what was approved and what it changed</li>
           </ul>
         </div>
         <div class="shot">
@@ -524,12 +567,12 @@
       <div class="row flip">
         <div class="copy">
           <span class="num">04</span>
-          <h3>Ask your store a question, in plain English</h3>
+          <h3>Ask it anything, in plain English</h3>
           <p>"Where am I losing margin?" "What needs my attention?" Vantav's assistant answers from your own live numbers, not generic advice. It greets you with a briefing the moment you log in, so you know the state of the business before your first coffee.</p>
           <ul>
-            <li><svg viewBox="0 0 24 24" fill="none"><path d="M20 6L9 17l-5-5" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg> A daily briefing on sign-in: profit, warnings, top priority</li>
-            <li><svg viewBox="0 0 24 24" fill="none"><path d="M20 6L9 17l-5-5" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg> Answers cite the channels, products and orders behind them</li>
-            <li><svg viewBox="0 0 24 24" fill="none"><path d="M20 6L9 17l-5-5" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg> Approve the recommended action right from the chat</li>
+            <li><svg viewBox="0 0 24 24" fill="none" aria-hidden="true" focusable="false"><path d="M20 6L9 17l-5-5" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg> A daily briefing on sign-in: profit, warnings, top priority</li>
+            <li><svg viewBox="0 0 24 24" fill="none" aria-hidden="true" focusable="false"><path d="M20 6L9 17l-5-5" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg> Answers cite the channels, products and orders behind them</li>
+            <li><svg viewBox="0 0 24 24" fill="none" aria-hidden="true" focusable="false"><path d="M20 6L9 17l-5-5" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg> Approve the recommended action right from the chat</li>
           </ul>
         </div>
         <div class="shot">
@@ -551,32 +594,32 @@
     </div>
     <div class="cards">
       <div class="card">
-        <div class="ico"><svg viewBox="0 0 24 24" fill="none"><path d="M3 3v18h18" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><path d="M7 14l4-4 3 3 5-6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+        <div class="ico"><svg viewBox="0 0 24 24" fill="none" aria-hidden="true" focusable="false"><path d="M3 3v18h18" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><path d="M7 14l4-4 3 3 5-6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
         <h4>Inventory &amp; reorder timing</h4>
         <p>How fast each product sells, how many days of stock are left, and when to reorder so you stop selling out of winners and over-buying the rest.</p>
       </div>
       <div class="card">
-        <div class="ico"><svg viewBox="0 0 24 24" fill="none"><rect x="3" y="4" width="18" height="16" rx="2" stroke="currentColor" stroke-width="2"/><path d="M3 9h18M9 20V9" stroke="currentColor" stroke-width="2"/></svg></div>
+        <div class="ico"><svg viewBox="0 0 24 24" fill="none" aria-hidden="true" focusable="false"><rect x="3" y="4" width="18" height="16" rx="2" stroke="currentColor" stroke-width="2"/><path d="M3 9h18M9 20V9" stroke="currentColor" stroke-width="2"/></svg></div>
         <h4>Orders, suppliers and returns</h4>
         <p>Fulfilment, late deliveries, supplier lead times and returns for every channel in one list — with a health score that points you at what to look at first.</p>
       </div>
       <div class="card">
-        <div class="ico"><svg viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="2"/><path d="M12 8v4l3 2" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg></div>
+        <div class="ico"><svg viewBox="0 0 24 24" fill="none" aria-hidden="true" focusable="false"><circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="2"/><path d="M12 8v4l3 2" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg></div>
         <h4>Forecasts you can plan around</h4>
         <p>Projected sales and cash needs for the coming weeks, based on your own history rather than a generic industry curve.</p>
       </div>
       <div class="card">
-        <div class="ico"><svg viewBox="0 0 24 24" fill="none"><path d="M12 3l8 4v6c0 4.5-3.4 7.3-8 8-4.6-.7-8-3.5-8-8V7l8-4z" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/></svg></div>
+        <div class="ico"><svg viewBox="0 0 24 24" fill="none" aria-hidden="true" focusable="false"><path d="M12 3l8 4v6c0 4.5-3.4 7.3-8 8-4.6-.7-8-3.5-8-8V7l8-4z" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/></svg></div>
         <h4>Fraud &amp; chargeback screening</h4>
         <p>Risky orders flagged before you ship them, so a fake order does not cost you the product and the fee.</p>
       </div>
       <div class="card">
-        <div class="ico"><svg viewBox="0 0 24 24" fill="none"><path d="M20 7H4a1 1 0 00-1 1v9a1 1 0 001 1h16a1 1 0 001-1V8a1 1 0 00-1-1z" stroke="currentColor" stroke-width="2"/><path d="M16 7V5a2 2 0 00-2-2h-4a2 2 0 00-2 2v2" stroke="currentColor" stroke-width="2"/></svg></div>
+        <div class="ico"><svg viewBox="0 0 24 24" fill="none" aria-hidden="true" focusable="false"><path d="M20 7H4a1 1 0 00-1 1v9a1 1 0 001 1h16a1 1 0 001-1V8a1 1 0 00-1-1z" stroke="currentColor" stroke-width="2"/><path d="M16 7V5a2 2 0 00-2-2h-4a2 2 0 00-2 2v2" stroke="currentColor" stroke-width="2"/></svg></div>
         <h4>Product research</h4>
         <p>See which of your categories carry real margin and which competitors are pricing you out, before you commit to the next order.</p>
       </div>
       <div class="card">
-        <div class="ico"><svg viewBox="0 0 24 24" fill="none"><path d="M4 6h16M4 12h10M4 18h7" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg></div>
+        <div class="ico"><svg viewBox="0 0 24 24" fill="none" aria-hidden="true" focusable="false"><path d="M4 6h16M4 12h10M4 18h7" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg></div>
         <h4>Weekly summary by email</h4>
         <p>A short recap of profit, what changed and what you approved — useful for a partner, an accountant or an investor update.</p>
       </div>
@@ -617,42 +660,42 @@
     <div class="head center">
       <span class="eyebrow" style="justify-content:center">Pricing</span>
       <h2>One caught mistake pays for the month</h2>
-      <p>Start free, connect a channel, and see your real numbers before you pay for anything. Cancel any time.</p>
+      <p>Try it free for 24 hours first, or pick a plan and be working from real numbers this afternoon. No setup fee, no contract, cancel any time.</p>
     </div>
     <div class="plans">
       <div class="plan">
-        <span class="tag">Operator</span>
+        <span class="tag">Starter &middot; 1 store</span>
         <div class="price">$199<span>/month</span></div>
         <p class="who">For a single-channel store getting its numbers straight.</p>
         <ul>
-          <li><svg viewBox="0 0 24 24" fill="none"><path d="M20 6L9 17l-5-5" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg> One sales channel</li>
-          <li><svg viewBox="0 0 24 24" fill="none"><path d="M20 6L9 17l-5-5" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg> True profit per order and product</li>
-          <li><svg viewBox="0 0 24 24" fill="none"><path d="M20 6L9 17l-5-5" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg> Warnings and daily briefing</li>
-          <li><svg viewBox="0 0 24 24" fill="none"><path d="M20 6L9 17l-5-5" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg> Email support</li>
+          <li><svg viewBox="0 0 24 24" fill="none" aria-hidden="true" focusable="false"><path d="M20 6L9 17l-5-5" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg> One sales channel</li>
+          <li><svg viewBox="0 0 24 24" fill="none" aria-hidden="true" focusable="false"><path d="M20 6L9 17l-5-5" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg> True profit per order and product</li>
+          <li><svg viewBox="0 0 24 24" fill="none" aria-hidden="true" focusable="false"><path d="M20 6L9 17l-5-5" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg> Warnings and daily briefing</li>
+          <li><svg viewBox="0 0 24 24" fill="none" aria-hidden="true" focusable="false"><path d="M20 6L9 17l-5-5" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg> Email support</li>
         </ul>
-        <a class="btn btn-ghost" href="/subscribe">Choose Operator</a>
+        <a class="btn btn-ghost" href="/subscribe">Choose Starter</a>
       </div>
       <div class="plan featured">
-        <span class="tag">Growth &middot; most popular</span>
+        <span class="tag">Growth &middot; up to 5 stores &middot; most popular</span>
         <div class="price">$399<span>/month</span></div>
         <p class="who">For multi-channel stores that need the assistant and recommended actions.</p>
         <ul>
-          <li><svg viewBox="0 0 24 24" fill="none"><path d="M20 6L9 17l-5-5" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg> Everything in Operator</li>
-          <li><svg viewBox="0 0 24 24" fill="none"><path d="M20 6L9 17l-5-5" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg> All three channels connected</li>
-          <li><svg viewBox="0 0 24 24" fill="none"><path d="M20 6L9 17l-5-5" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg> Assistant with recommended actions</li>
-          <li><svg viewBox="0 0 24 24" fill="none"><path d="M20 6L9 17l-5-5" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg> Inventory and reorder timing</li>
+          <li><svg viewBox="0 0 24 24" fill="none" aria-hidden="true" focusable="false"><path d="M20 6L9 17l-5-5" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg> Everything in Starter</li>
+          <li><svg viewBox="0 0 24 24" fill="none" aria-hidden="true" focusable="false"><path d="M20 6L9 17l-5-5" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg> All three channels connected</li>
+          <li><svg viewBox="0 0 24 24" fill="none" aria-hidden="true" focusable="false"><path d="M20 6L9 17l-5-5" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg> Assistant with recommended actions</li>
+          <li><svg viewBox="0 0 24 24" fill="none" aria-hidden="true" focusable="false"><path d="M20 6L9 17l-5-5" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg> Inventory and reorder timing</li>
         </ul>
         <a class="btn btn-primary" href="/subscribe">Choose Growth</a>
       </div>
       <div class="plan">
-        <span class="tag">Scale</span>
+        <span class="tag">Scale &middot; 15+ stores</span>
         <div class="price">$799<span>/month</span></div>
         <p class="who">For larger operations that want every module and higher limits.</p>
         <ul>
-          <li><svg viewBox="0 0 24 24" fill="none"><path d="M20 6L9 17l-5-5" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg> Everything in Growth</li>
-          <li><svg viewBox="0 0 24 24" fill="none"><path d="M20 6L9 17l-5-5" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg> Forecasting, fraud screening, product research</li>
-          <li><svg viewBox="0 0 24 24" fill="none"><path d="M20 6L9 17l-5-5" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg> Unlimited history and exports</li>
-          <li><svg viewBox="0 0 24 24" fill="none"><path d="M20 6L9 17l-5-5" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg> Priority support</li>
+          <li><svg viewBox="0 0 24 24" fill="none" aria-hidden="true" focusable="false"><path d="M20 6L9 17l-5-5" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg> Everything in Growth</li>
+          <li><svg viewBox="0 0 24 24" fill="none" aria-hidden="true" focusable="false"><path d="M20 6L9 17l-5-5" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg> Forecasting, fraud screening, product research</li>
+          <li><svg viewBox="0 0 24 24" fill="none" aria-hidden="true" focusable="false"><path d="M20 6L9 17l-5-5" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg> Unlimited history and exports</li>
+          <li><svg viewBox="0 0 24 24" fill="none" aria-hidden="true" focusable="false"><path d="M20 6L9 17l-5-5" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg> Priority support</li>
         </ul>
         <a class="btn btn-ghost" href="/subscribe">Choose Scale</a>
       </div>
@@ -682,8 +725,12 @@
         <p>No. It drafts the recommendation and shows you the numbers behind it. Nothing is paused, reordered or repriced until you approve it, and you can edit or dismiss any suggestion.</p>
       </details>
       <details>
-        <summary>Can I try it before paying?</summary>
-        <p>Yes. Create an account and you get a full workspace to explore with your own connected data before you commit to a plan.</p>
+        <summary>How does the free 24-hour trial work?</summary>
+        <p>Tell us about your store and we review it the same day. Once you are approved you get full access for 24 hours &mdash; no card, nothing to cancel. The trial is for sellers already live on Shopify, TikTok Shop or Amazon doing at least $5,000 a month, so we can show you real findings instead of an empty screen.</p>
+      </details>
+      <details>
+        <summary>What if it is not right for my store?</summary>
+        <p>Cancel any time and your access runs to the end of the billing period. If you have just signed up and no onboarding work has started, email support within 48 hours and we refund the charge in full.</p>
       </details>
       <details>
         <summary>How do you handle my store credentials?</summary>
@@ -693,10 +740,7 @@
         <summary>How long does setup take?</summary>
         <p>Connecting a channel takes a few minutes. Most stores are looking at accurate profit the same afternoon; the only manual part is entering product costs, and you can import those from a spreadsheet.</p>
       </details>
-      <details>
-        <summary>Do I need an analyst or a developer?</summary>
-        <p>No. Vantav is built for the owner or operator. If you can read your Shopify dashboard, you can run Vantav — and you can always just ask the assistant.</p>
-      </details>
+
     </div>
   </div>
 </section>
@@ -705,10 +749,10 @@
 <section class="band tight">
   <div class="wrap">
     <div class="final">
-      <h2>Find out what your store actually keeps &mdash; today</h2>
-      <p>Connect a channel, add your costs, and read your real margin this afternoon instead of at the end of the month. No card required, cancel any time.</p>
+      <h2>Stop reading reports. Start approving fixes.</h2>
+      <p>Connect a channel, add your costs, and this afternoon your store tells you what it kept and what to do about it. No setup fee, cancel any time.</p>
       <div class="hero-ctas">
-        <a class="btn btn-primary" href="/subscribe">Start free — no card required</a>
+        <a class="btn btn-primary" href="/trial">Start your free 24-hour trial</a>
         <a class="btn btn-ghost" href="#how-it-works">Watch the tour first</a>
       </div>
     </div>
@@ -720,7 +764,7 @@
     <div>
       <a class="brand" href="/">
         <span class="brand-mark">
-          <svg viewBox="0 0 24 24" fill="none"><path d="M3 4l9 16 9-16" stroke="#a78bfa" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          <svg viewBox="0 0 24 24" fill="none" aria-hidden="true" focusable="false"><path d="M3 4l9 16 9-16" stroke="#a78bfa" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg>
         </span>
         <span>Vantav</span>
       </a>
@@ -732,7 +776,7 @@
       <a href="#pricing">Pricing</a>
       <a href="#faq">FAQ</a>
       <a href="/login">Log in</a>
-      <a href="/subscribe">Start free</a>
+      <a href="/subscribe">Pricing</a>
     </div>
   </div>
   <div class="wrap" style="margin-top:1.5rem"><small style="color:var(--dim);font-size:.8rem">&copy; {{ current_year or 2025 }} Vantav. All rights reserved.</small></div>

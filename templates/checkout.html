@@ -5,6 +5,19 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Checkout — Vantav</title>
+  <meta name="description" content="Complete your Vantav subscription. Pick Starter, Growth or Scale, create your account, and pay securely through Stripe. Cancel anytime from Billing.">
+  <link rel="canonical" href="https://vantavcommerce.com/checkout">
+  <meta name="robots" content="noindex, follow">
+  <meta property="og:type" content="website">
+  <meta property="og:site_name" content="Vantav">
+  <meta property="og:url" content="https://vantavcommerce.com/checkout">
+  <meta property="og:title" content="Checkout — Vantav">
+  <meta property="og:description" content="Create your Vantav account and pay securely through Stripe.">
+  <meta property="og:image" content="https://vantavcommerce.com/static/videos/how-it-works.jpg">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="Checkout — Vantav">
+  <meta name="twitter:description" content="Create your Vantav account and pay securely through Stripe.">
+  <meta name="twitter:image" content="https://vantavcommerce.com/static/videos/how-it-works.jpg">
   <style>
     :root { --bg: #0c0c11; --card: #14141c; --ink: #f4f2f9; --muted: #c6c3d2; --line: #23232d; --accent: #8b5cf6; --accent-2: #a78bfa; --accent-bg: rgba(139,92,246,0.12); --success: #34d399; --error: #fb7185; }
     * { box-sizing: border-box; }
@@ -31,6 +44,10 @@
     @media (max-width: 520px) { .grid-2 { grid-template-columns: 1fr; } }
     button { width: 100%; padding: 1rem; border: none; border-radius: 10px; background: linear-gradient(135deg, var(--accent) 0%, #0c0c11 100%); color: var(--ink); font-weight: 700; font-size: 1rem; cursor: pointer; margin-top: .5rem; }
     button:disabled { opacity: .6; cursor: not-allowed; }
+    .agree { display: flex; align-items: flex-start; gap: .65rem; margin: .25rem 0 1rem; }
+    .agree input { width: 18px; height: 18px; accent-color: var(--accent); margin: .15rem 0 0; flex: 0 0 auto; }
+    .agree label { display: inline; margin: 0; text-transform: none; letter-spacing: 0; font-size: .82rem; line-height: 1.5; color: var(--muted); }
+    .agree a { color: var(--accent-2); }
     .message { text-align: center; margin-top: 1rem; font-size: .85rem; }
     .success { color: var(--success); }
     .error { color: #fb7185; }
@@ -52,7 +69,7 @@
       <label class="plan" id="plan-operator-label">
         <input type="radio" name="plan" value="operator" onchange="selectPlan(this)">
         <div>
-          <div class="title">Vantav Operator</div>
+          <div class="title">Vantav Starter</div>
           <div class="price">$199/mo</div>
           <div class="desc">Full Vantav toolkit for up to 2 stores. Track, alert, recommend, approve.</div>
         </div>
@@ -84,20 +101,25 @@
 
       <div class="grid-2">
         <div>
-          <label>Email</label>
-          <input type="email" id="email" placeholder="you@yourbrand.com" value="{{ merchant.email if merchant else '' }}" {% if merchant %}readonly{% endif %} required>
+          <label for="email">Email</label>
+          <input type="email" id="email" name="email" autocomplete="email" placeholder="you@yourbrand.com" value="{{ merchant.email if merchant else '' }}" {% if merchant %}readonly{% endif %} required>
         </div>
         <div>
-          <label>Business name</label>
-          <input type="text" id="business_name" placeholder="Your brand" value="{{ merchant.name if merchant else '' }}">
+          <label for="business_name">Business name</label>
+          <input type="text" id="business_name" name="business_name" autocomplete="organization" placeholder="Your brand" value="{{ merchant.name if merchant else '' }}">
         </div>
       </div>
       {% if merchant %}
       <input type="hidden" id="password" value="">
       {% else %}
-      <label>Create password</label>
-      <input type="password" id="password" placeholder="At least 8 characters" minlength="8" required>
+      <label for="password">Create password</label>
+      <input type="password" id="password" name="password" autocomplete="new-password" placeholder="At least 8 characters" minlength="8" required>
       {% endif %}
+
+      <div class="agree">
+        <input type="checkbox" id="agree_terms" name="agree_terms" required>
+        <label for="agree_terms">I agree to the <a href="/terms">Terms of Service</a>, <a href="/privacy">Privacy Policy</a> and <a href="/refund">Refund Policy</a>.</label>
+      </div>
 
       <button type="submit" id="checkout-btn">Continue to secure payment</button>
       <div id="message" class="message"></div>
