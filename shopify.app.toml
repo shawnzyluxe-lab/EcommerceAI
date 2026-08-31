@@ -1,7 +1,7 @@
 # Shopify app configuration
 # Learn more at https://shopify.dev/docs/apps/tools/cli/configuration
 name = "Vantav"
-client_id = "3930a4f6e32959513d3f30872a3c13c9"
+client_id = "c29ad26cbdb891be3c4c96b567b7ccba"
 application_url = "https://vantavcommerce.com"
 embedded = false
 
