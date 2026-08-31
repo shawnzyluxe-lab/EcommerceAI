@@ -7,11 +7,9 @@ embedded = false
 
 [build]
 automatically_update_urls_on_dev = true
-include_config_on_deploy = true
 
 [access_scopes]
 scopes = "read_products,write_products,read_orders,read_inventory,read_fulfillments"
-use_legacy_install_flow = true
 
 [auth]
 redirect_urls = [
