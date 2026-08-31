@@ -4581,6 +4581,71 @@ def auth_login():
     return response, 200
 
 
+@app.route('/api/v1/auth/forgot-password', methods=['POST'])
+@limiter.limit("5 per hour")
+def auth_forgot_password():
+    """Send a one-time password-reset link to the account email."""
+    payload = request.get_json(silent=True) or {}
+    email = (payload.get("email") or "").strip().lower()
+    if not email or "@" not in email:
+        return jsonify({"detail": "A valid email is required."}), 400
+
+    # Always return the same message to avoid email enumeration.
+    profile = _profile_for_email(email)
+    if profile and profile.admin_email:
+        token = secrets.token_urlsafe(32)
+        expires = datetime.utcnow() + timedelta(hours=1)
+        db.session.add(MagicLoginToken(
+            token=token,
+            admin_email=profile.admin_email,
+            merchant_id=profile.merchant_id,
+            expires_at=expires,
+            is_used=0,
+            purpose="reset",
+        ))
+        db.session.commit()
+        reset_url = f"{_site_root()}{url_for('reset_password', token=token)}"
+        html = (
+            "<p>Click the link below to reset your Vantav password.</p>"
+            f"<p><a href='{reset_url}'>{reset_url}</a></p>"
+            "<p>This link expires in 1 hour.</p>"
+        )
+        dispatch_external_email(profile.admin_email, "Reset your Vantav password", html)
+
+    return jsonify({"detail": "If an account exists for that email, a reset link has been sent."}), 200
+
+
+@app.route('/reset-password', methods=['GET'])
+def reset_password():
+    """Render the new-password form for a reset token."""
+    token = (request.args.get('token') or '').strip()
+    return render_template('reset_password.html', token=token)
+
+
+@app.route('/api/v1/auth/reset-password', methods=['POST'])
+@limiter.limit("5 per hour")
+def auth_reset_password():
+    """Validate a reset token and update the merchant password."""
+    payload = request.get_json(silent=True) or {}
+    token = (payload.get("token") or "").strip()
+    new_password = payload.get("new_password", "")
+    if not token or not new_password or len(new_password) < 8:
+        return jsonify({"detail": "A valid token and a password of at least 8 characters are required."}), 400
+
+    mlink = MagicLoginToken.query.get(token)
+    if not mlink or mlink.purpose != "reset" or mlink.is_used or (mlink.expires_at and mlink.expires_at < datetime.utcnow()):
+        return jsonify({"detail": "Invalid or expired reset token."}), 401
+
+    profile = MerchantProfile.query.get(mlink.merchant_id)
+    if not profile:
+        return jsonify({"detail": "Account not found."}), 404
+
+    profile.password_hash = generate_password_hash(new_password, method="pbkdf2:sha256")
+    mlink.is_used = 1
+    db.session.commit()
+    return jsonify({"detail": "Password updated. You can now log in.", "redirect": "/"}), 200
+
+
 @app.route('/api/v1/session/authenticate', methods=['POST'])
 @limiter.limit("10 per minute")
 def api_session_authenticate():
@@ -6365,6 +6430,7 @@ def generate_magic_link():
             merchant_id=merchant_id,
             expires_at=expires,
             is_used=0,
+            purpose="magic",
         ))
         db.session.commit()
 
@@ -6394,6 +6460,9 @@ def magic_login():
 
     mlink = MagicLoginToken.query.get(token)
     if not mlink:
+        return redirect("/login?error=invalid_token")
+
+    if mlink.purpose and mlink.purpose != "magic":
         return redirect("/login?error=invalid_token")
 
     if mlink.is_used or datetime.utcnow() > mlink.expires_at:
