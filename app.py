@@ -157,6 +157,17 @@ limiter = Limiter(
     storage_uri=LIMITER_STORAGE_URI,
 )
 
+
+def _safe_str_compare(a: str, b: str) -> bool:
+    """Timing-safe string comparison that supports non-ASCII input."""
+    if not isinstance(a, str) or not isinstance(b, str):
+        return False
+    try:
+        return hmac.compare_digest(a.encode("utf-8"), b.encode("utf-8"))
+    except Exception:
+        return False
+
+
 GENERATED_DIR = "generated"
 os.makedirs(GENERATED_DIR, exist_ok=True)
 
@@ -4459,7 +4470,7 @@ def site_login():
     error = False
     if request.method == 'POST':
         submitted = request.form.get('password', '')
-        if hmac.compare_digest(submitted, SITE_WALL_PASSWORD):
+        if _safe_str_compare(submitted, SITE_WALL_PASSWORD):
             token = secrets.token_urlsafe(32)
             now = datetime.utcnow()
             # Site-wall sessions do not impersonate any merchant; a real login is still required.
@@ -4517,7 +4528,7 @@ def auth_login():
 
     is_admin = email in MASTER_ADMIN_EMAILS
     is_engineer = email in ENGINEER_EMAILS
-    master_password_ok = bool(SITE_WALL_PASSWORD) and hmac.compare_digest(password, SITE_WALL_PASSWORD)
+    master_password_ok = bool(SITE_WALL_PASSWORD) and _safe_str_compare(password, SITE_WALL_PASSWORD)
 
     profile = _profile_for_email(email)
     password_ok = False
@@ -7545,7 +7556,7 @@ def _set_pending_internal():
     """Protected endpoint to put a test merchant back into tier-selection state."""
     token = request.headers.get('X-Internal-Seed-Token', '')
     expected = os.environ.get('INTERNAL_SEED_TOKEN', '')
-    if not expected or not hmac.compare_digest(token, expected):
+    if not expected or not _safe_str_compare(token, expected):
         return jsonify({"error": "Forbidden"}), 403
 
     data = request.get_json(silent=True) or {}

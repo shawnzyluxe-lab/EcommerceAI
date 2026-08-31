@@ -56,7 +56,7 @@ def verify_password(password: str, password_hash: str) -> bool:
         except Exception:
             return False
     # Legacy fallback: allow migration from deterministic SHA-256 hashes.
-    return hmac.compare_digest(password_hash, _hash_sha256_legacy(password))
+    return hmac.compare_digest(password_hash.encode("utf-8"), _hash_sha256_legacy(password).encode("utf-8"))
 
 
 class VantavSecurityTokenEngine:
