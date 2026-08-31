@@ -7493,27 +7493,28 @@ def _seed_and_reset_internal():
     ]
     original = {k: os.environ.get(k) for k in env_keys}
     stdout_capture = io.StringIO()
-    try:
-        os.environ["SHOWCASE_MERCHANT_ID"] = merchant_id
-        os.environ["SHOWCASE_EMAIL"] = email
-        os.environ["SHOWCASE_PASSWORD"] = password
-        os.environ["SHOWCASE_BUSINESS_NAME"] = business_name
-        os.environ["SHOWCASE_SKU_PREFIX"] = prefix
-        os.environ["SHOWCASE_TIER"] = tier
-        os.environ["SEED_DEMO_DATA"] = "true" if data.get("seed_data", True) else "false"
+    if data.get("seed_data", True):
+        try:
+            os.environ["SHOWCASE_MERCHANT_ID"] = merchant_id
+            os.environ["SHOWCASE_EMAIL"] = email
+            os.environ["SHOWCASE_PASSWORD"] = password
+            os.environ["SHOWCASE_BUSINESS_NAME"] = business_name
+            os.environ["SHOWCASE_SKU_PREFIX"] = prefix
+            os.environ["SHOWCASE_TIER"] = tier
+            os.environ["SEED_DEMO_DATA"] = "true"
 
-        script_path = os.path.join(os.path.dirname(__file__), "scripts", "seed_showcase_merchant.py")
-        with contextlib.redirect_stdout(stdout_capture):
-            runpy.run_path(script_path, run_name="__main__")
-    except Exception as e:
-        logger.exception("seed-and-reset failed")
-        return jsonify({"error": "Seed failed", "detail": str(e), "stdout": stdout_capture.getvalue()}), 500
-    finally:
-        for k, v in original.items():
-            if v is None:
-                os.environ.pop(k, None)
-            else:
-                os.environ[k] = v
+            script_path = os.path.join(os.path.dirname(__file__), "scripts", "seed_showcase_merchant.py")
+            with contextlib.redirect_stdout(stdout_capture):
+                runpy.run_path(script_path, run_name="__main__")
+        except Exception as e:
+            logger.exception("seed-and-reset failed")
+            return jsonify({"error": "Seed failed", "detail": str(e), "stdout": stdout_capture.getvalue()}), 500
+        finally:
+            for k, v in original.items():
+                if v is None:
+                    os.environ.pop(k, None)
+                else:
+                    os.environ[k] = v
 
     # Re-fetch inside the current request context and force the password hash.
     profile = MerchantProfile.query.get(merchant_id)
