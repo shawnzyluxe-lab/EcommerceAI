@@ -1,13 +1,11 @@
 import os
 import re
-import sys
 import hmac
 import hashlib
 import base64
 import json
 import secrets
 import uuid
-import importlib.util
 import requests
 import smtplib
 import logging
@@ -7504,131 +7502,6 @@ def _set_pending_internal():
         "email": profile.admin_email,
         "sandbox_status": profile.sandbox_status,
     }), 200
-
-
-def _clear_merchant_data(merchant_id):
-    """Remove all seeded/order/alert data for a merchant, committing per table."""
-    stmts = [
-        ("DELETE FROM action_evidence WHERE action_id IN (SELECT id FROM pending_actions WHERE merchant_id=:mid)", None),
-        ("DELETE FROM pending_actions WHERE merchant_id=:mid", None),
-        ("DELETE FROM alert_matrix_alerts WHERE merchant_id=:mid", None),
-        ("DELETE FROM profit_feed_orders WHERE merchant_id=:mid", None),
-        ("DELETE FROM ad_spend_feed WHERE merchant_id=:mid", None),
-        ("DELETE FROM order_items WHERE order_id IN (SELECT id FROM orders WHERE merchant_id=:mid)", None),
-        ("DELETE FROM orders WHERE merchant_id=:mid", None),
-        ("DELETE FROM product_financial_ledger WHERE tenant_id=:mid", None),
-        ("DELETE FROM daily_costs WHERE sku IN (SELECT sku FROM products WHERE merchant_id=:mid)", None),
-        ("DELETE FROM products WHERE merchant_id=:mid", None),
-        ("DELETE FROM merchant_channels WHERE merchant_id=:mid", None),
-        ("DELETE FROM merchant_settings WHERE merchant_id=:mid", None),
-        ("DELETE FROM marketing_campaigns WHERE merchant_id=:mid", None),
-    ]
-    for sql, _ in stmts:
-        try:
-            db.session.execute(text(sql), {"mid": merchant_id})
-            db.session.commit()
-        except Exception as e:
-            logger.warning(f"[Seed] Could not clear data for {merchant_id}: {e}")
-            try:
-                db.session.rollback()
-            except Exception:
-                pass
-
-
-def _ensure_billing(merchant_id, plan):
-    billing = SaaSBilling.query.get(merchant_id)
-    if not billing:
-        billing = SaaSBilling(merchant_id=merchant_id)
-        db.session.add(billing)
-    billing.current_plan = plan
-    db.session.commit()
-    return billing
-
-
-def _seed_business_accounts():
-    """Reset/create the fixed internal business/test accounts with known passwords."""
-    accounts = [
-        {"email": "shawn@vantavcommerce.com", "merchant_id": "merchant_shawn_01", "business_name": "Vantav Admin", "password": "IfxSVNs4iAs", "role": "admin"},
-        {"email": "engineer@vantavcommerce.com", "merchant_id": "merchant_engineer_temp", "business_name": "Vantav Engineer", "password": "IfxSVNs4iAs", "role": "engineer"},
-        {"email": "merchant@vantavcommerce.com", "merchant_id": "tenant_4732bbf6", "business_name": "Vantav Merchant", "password": "x0tI0tvHdKQFauYmp2gBuw", "role": "merchant", "tier": "Basic Tier", "sandbox_status": "pending", "seed_data": False},
-        {"email": "ian@vantavcommerce.com", "merchant_id": "merchant_eea706de", "business_name": "Vantav Marketing", "password": "VantavMarketing2024!", "role": "merchant", "tier": "Vantav Scale", "sandbox_status": "pending", "seed_data": True, "sku_prefix": "IAN-"},
-        {"email": "tester@vantavcommerce.com", "merchant_id": "merchant_4ddac865", "business_name": "Vantav Tester", "password": "onvwwT-2FKj5mDsL4hOTpwtiL6g", "role": "merchant", "tier": "Vantav Scale", "sandbox_status": "approved", "seed_data": False},
-        {"email": "tiktok-reviewer@vantavcommerce.com", "merchant_id": "merchant_440cc5b0", "business_name": "Vantav TikTok Reviewer", "password": "bRfA8yHOKzrVkma2uBHg5g", "role": "merchant", "tier": "Vantav Scale", "sandbox_status": "approved", "seed_data": False},
-    ]
-
-    result = []
-    for acct in accounts:
-        email = acct["email"].lower()
-        merchant_id = acct["merchant_id"]
-        profile = MerchantProfile.query.get(merchant_id)
-        if not profile:
-            profile = MerchantProfile.query.filter_by(admin_email=email).order_by(MerchantProfile.created_at.desc()).first()
-        if not profile:
-            profile = MerchantProfile(merchant_id=merchant_id, admin_email=email)
-        profile.business_name = acct["business_name"]
-        profile.password_hash = generate_password_hash(acct["password"], method="pbkdf2:sha256")
-        profile.account_tier = acct.get("tier", "Vantav Scale")
-        profile.sandbox_status = acct.get("sandbox_status", "approved")
-        profile.live_access_enabled = 1 if profile.sandbox_status == "approved" else 0
-        db.session.add(profile)
-        db.session.commit()
-
-        _clear_merchant_data(merchant_id)
-        if acct.get("seed_data"):
-            showcase_keys = [
-                "SHOWCASE_MERCHANT_ID", "SHOWCASE_EMAIL", "SHOWCASE_PASSWORD",
-                "SHOWCASE_BUSINESS_NAME", "SHOWCASE_TIER", "SHOWCASE_SKU_PREFIX"
-            ]
-            original = {k: os.environ.get(k) for k in showcase_keys}
-            os.environ["SHOWCASE_MERCHANT_ID"] = merchant_id
-            os.environ["SHOWCASE_EMAIL"] = email
-            os.environ["SHOWCASE_PASSWORD"] = acct["password"]
-            os.environ["SHOWCASE_BUSINESS_NAME"] = acct["business_name"]
-            os.environ["SHOWCASE_TIER"] = "Vantav Scale"
-            os.environ["SHOWCASE_SKU_PREFIX"] = acct.get("sku_prefix", "")
-            seed_path = os.path.join(os.path.dirname(__file__), "scripts", "seed_showcase_merchant.py")
-            spec = importlib.util.spec_from_file_location(f"seed_showcase_{merchant_id}", seed_path)
-            mod = importlib.util.module_from_spec(spec)
-            sys.modules[spec.name] = mod
-            spec.loader.exec_module(mod)
-            mod.main()
-            for k, v in original.items():
-                if v is None:
-                    os.environ.pop(k, None)
-                else:
-                    os.environ[k] = v
-            # Put ian back into tier-selection after seeding so he gets the chooser once.
-            profile.account_tier = "Basic Tier"
-            profile.sandbox_status = "pending"
-            profile.live_access_enabled = 0
-            db.session.commit()
-
-        _ensure_billing(merchant_id, profile.account_tier)
-        result.append({
-            "email": email,
-            "merchant_id": merchant_id,
-            "sandbox_status": profile.sandbox_status,
-            "tier": profile.account_tier,
-            "live_access_enabled": profile.live_access_enabled,
-        })
-    return result
-
-
-@app.route('/api/internal/seed-business-accounts', methods=['POST'])
-@limiter.limit("10 per minute")
-def _seed_business_accounts_route():
-    """Protected endpoint to create/reset the fixed business/test accounts."""
-    token = request.headers.get('X-Internal-Seed-Token', '')
-    expected = os.environ.get('INTERNAL_SEED_TOKEN', '')
-    if not expected or not hmac.compare_digest(token, expected):
-        return jsonify({"error": "Forbidden"}), 403
-    try:
-        result = _seed_business_accounts()
-        return jsonify({"status": "ok", "accounts": result}), 200
-    except Exception as e:
-        db.session.rollback()
-        logger.exception("[Seed] Business account seeding failed")
-        return jsonify({"error": str(e)}), 500
 
 
 if __name__ == '__main__':
