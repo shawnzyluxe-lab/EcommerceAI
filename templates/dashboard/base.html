@@ -418,9 +418,13 @@
     function addMessage(role, text){
       const div = document.createElement('div');
       div.className = 'ai-chat-msg ' + role;
+      div.style.whiteSpace = 'pre-line';
       div.textContent = text;
       log.appendChild(div);
+      const body = document.getElementById('ai-popup-body');
+      if(body) body.scrollTop = body.scrollHeight;
       log.scrollTop = log.scrollHeight;
+      div.scrollIntoView({block:'end', behavior:'smooth'});
     }
 
     window.sendAIPopupMessage = async function(){
@@ -439,15 +443,21 @@
 
     window.useAIPopupChip = function(el){ input.value = el.textContent; sendAIPopupMessage(); };
 
-    // On the page merchants land on after login, greet them and open the assistant once per session.
-    if (page === 'overview' && !sessionStorage.getItem('vantavAssistantGreeted')) {
-      sessionStorage.setItem('vantavAssistantGreeted', '1');
-      const name = document.body.dataset.accountHolderName || document.body.dataset.merchantName || 'there';
+    // Every merchant login lands on the overview: greet by name, open the assistant
+    // and run the first briefing automatically.
+    {% if assistant_login_greeting %}
+    (function greetOnLogin(){
+      const name = (document.body.dataset.accountHolderName || document.body.dataset.merchantName || 'there').split(' ')[0];
       const hour = new Date().getHours();
       const salutation = hour < 5 || hour >= 22 ? 'Good night' : hour < 12 ? 'Good morning' : hour < 17 ? 'Good afternoon' : 'Good evening';
-      addMessage('assistant', `${salutation}, ${name}. I reviewed your channels overnight — here's what needs you today.`);
-      setTimeout(() => { if(!popup.classList.contains('open')) toggleAIPopup(); }, 900);
-    }
+      addMessage('assistant', `${salutation}, ${name}. I reviewed your channels overnight — pulling today's briefing now.`);
+      if(!popup.classList.contains('open')) toggleAIPopup();
+      setTimeout(() => {
+        input.value = 'What needs my attention today?';
+        sendAIPopupMessage();
+      }, 700);
+    })();
+    {% endif %}
 
     loadAIHero();
   })();

@@ -242,7 +242,7 @@ def main():
         profile.business_name = BUSINESS_NAME
         profile.admin_email = EMAIL
         profile.password_hash = generate_password_hash(PASSWORD, method="pbkdf2:sha256")
-        profile.account_tier = "Enterprise AI Tier"
+        profile.account_tier = os.environ.get("SHOWCASE_TIER", "Vantav Scale")
         profile.sandbox_status = "approved"
         profile.live_access_enabled = 1
         db.session.add(profile)

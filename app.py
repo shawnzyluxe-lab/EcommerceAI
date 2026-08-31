@@ -260,6 +260,25 @@ def _set_session_cookie(response, token, max_age=None):
     return response
 
 
+LOGIN_GREETING_COOKIE = "vantav_greet"
+
+
+def _flag_login_greeting(response):
+    """Mark a fresh login so the overview dashboard opens the assistant greeting once."""
+    response.set_cookie(
+        LOGIN_GREETING_COOKIE,
+        "1",
+        **_session_cookie_kwargs(max_age=600),
+    )
+    return response
+
+
+def _consume_login_greeting(response):
+    """Clear the greeting flag so it only fires on the first overview load per login."""
+    response.delete_cookie(LOGIN_GREETING_COOKIE, **_session_cookie_kwargs())
+    return response
+
+
 def _delete_session_cookie(response):
     """Clear the session token cookie using the same flags that set it."""
     response.delete_cookie(
@@ -1746,7 +1765,13 @@ def dashboard():
         request.args.get('onboarding') == '1'
         or (request.args.get('checkout') == 'success' and not ctx.get('connected'))
     )
-    return render_template('dashboard/overview.html', **ctx)
+    # Fresh merchant logins get the Vantav AI greeting + quick run on arrival.
+    greet = request.cookies.get(LOGIN_GREETING_COOKIE) == "1"
+    ctx["assistant_login_greeting"] = greet
+    response = make_response(render_template('dashboard/overview.html', **ctx))
+    if greet:
+        _consume_login_greeting(response)
+    return response
 
 
 # Commercial-grade dashboard page routes
@@ -4439,6 +4464,8 @@ def auth_login():
         "merchant_id": profile.merchant_id,
     }))
     _set_session_cookie(response, session_token)
+    if assigned_role == UserRole.MERCHANT.value:
+        _flag_login_greeting(response)
     return response, 200
 
 
@@ -4546,6 +4573,7 @@ def auth_signup():
         "monthly_order_limit": TierManager.get_order_limit(tier),
     }))
     _set_session_cookie(response, session_token)
+    _flag_login_greeting(response)
     return response, 201
 
 
@@ -6257,6 +6285,8 @@ def magic_login():
 
     response = make_response(redirect("/"))
     _set_session_cookie(response, session_token)
+    if assigned_role == UserRole.MERCHANT.value:
+        _flag_login_greeting(response)
     return response
 
 
