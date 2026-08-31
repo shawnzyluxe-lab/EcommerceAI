@@ -5136,6 +5136,33 @@ TIKTOK_WEBHOOK_SECRET = os.environ.get("TIKTOK_WEBHOOK_SECRET", "").strip().enco
 AMAZON_WEBHOOK_SECRET = os.environ.get("AMAZON_WEBHOOK_SECRET", "").strip().encode()
 
 
+def _shopify_hmac_candidates():
+    """Return the list of secrets to try for Shopify webhook HMAC verification."""
+    candidates = []
+    webhook_secret = os.environ.get("SHOPIFY_WEBHOOK_SECRET", "").strip().encode()
+    client_secret = os.environ.get("SHOPIFY_CLIENT_SECRET", "").strip().encode()
+    if webhook_secret:
+        candidates.append(webhook_secret)
+    if client_secret and client_secret not in candidates:
+        candidates.append(client_secret)
+    return candidates
+
+
+def _verify_shopify_hmac(raw_body: bytes, hmac_header: str | None) -> bool:
+    """Timing-safe HMAC verification, trying webhook secret then client secret."""
+    if not hmac_header:
+        return False
+    try:
+        expected = base64.b64decode(hmac_header)
+    except Exception:
+        return False
+    for secret in _shopify_hmac_candidates():
+        computed = hmac.new(secret, raw_body, hashlib.sha256).digest()
+        if hmac.compare_digest(computed, expected):
+            return True
+    return False
+
+
 @app.route('/api/v1/webhooks/shopify-orders', methods=['POST'])
 @limiter.limit("60 per minute")
 def shopify_orders_webhook():
@@ -5147,16 +5174,13 @@ def shopify_orders_webhook():
         merchant_target = request.args.get("merchant_id", "merchant_shawn_01")
         tenant_rls.set_tenant_scope(merchant_target)
 
-        if SHOPIFY_WEBHOOK_SECRET:
-            if not hmac_header:
-                log_system_exception("SHOPIFY_WEBHOOK", "WARNING", "Dropped inbound webhook: missing HMAC signature.")
-                return jsonify({"status": "rejected", "reason": "Missing HMAC"}), 401
-            computed = hmac.new(SHOPIFY_WEBHOOK_SECRET, raw_body, hashlib.sha256).digest()
-            if not hmac.compare_digest(computed, base64.b64decode(hmac_header)):
-                log_system_exception("SHOPIFY_WEBHOOK", "WARNING", "Dropped inbound webhook: invalid HMAC signature.")
-                return jsonify({"status": "rejected", "reason": "Invalid HMAC"}), 401
+        candidates = _shopify_hmac_candidates()
+        if candidates:
+            if not _verify_shopify_hmac(raw_body, hmac_header):
+                log_system_exception("SHOPIFY_WEBHOOK", "WARNING", "Dropped inbound webhook: invalid or missing HMAC signature.")
+                return jsonify({"status": "rejected", "reason": "Invalid or missing HMAC"}), 401
         else:
-            logger.warning("SHOPIFY_WEBHOOK_SECRET not set — accepting webhook without HMAC verification")
+            logger.warning("No Shopify HMAC secret configured — accepting webhook without verification")
 
         if not event_id:
             log_system_exception("SHOPIFY_WEBHOOK", "WARNING", "Dropped inbound webhook: missing X-Shopify-Webhook-Id.")
@@ -5303,19 +5327,13 @@ def _parse_shopify_gdpr_webhook():
     raw_body = request.get_data()
     hmac_header = request.headers.get("X-Shopify-Hmac-SHA256")
 
-    if SHOPIFY_WEBHOOK_SECRET:
-        if not hmac_header:
-            logger.warning("Shopify GDPR webhook dropped: missing HMAC signature.")
-            return None, jsonify({"status": "rejected", "reason": "Missing HMAC"}), 401
-        try:
-            computed = hmac.new(SHOPIFY_WEBHOOK_SECRET, raw_body, hashlib.sha256).digest()
-            if not hmac.compare_digest(computed, base64.b64decode(hmac_header)):
-                logger.warning("Shopify GDPR webhook dropped: invalid HMAC signature.")
-                return None, jsonify({"status": "rejected", "reason": "Invalid HMAC"}), 401
-        except Exception:
-            return None, jsonify({"status": "rejected", "reason": "Invalid HMAC"}), 401
+    candidates = _shopify_hmac_candidates()
+    if candidates:
+        if not _verify_shopify_hmac(raw_body, hmac_header):
+            logger.warning("Shopify GDPR webhook dropped: invalid or missing HMAC signature.")
+            return None, jsonify({"status": "rejected", "reason": "Invalid or missing HMAC"}), 401
     else:
-        logger.warning("SHOPIFY_WEBHOOK_SECRET not set — accepting GDPR webhook without HMAC verification")
+        logger.warning("No Shopify HMAC secret configured — accepting GDPR webhook without verification")
 
     try:
         payload = json.loads(raw_body.decode("utf-8"))
