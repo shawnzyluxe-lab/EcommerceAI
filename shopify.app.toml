@@ -3,7 +3,7 @@
 name = "Vantav"
 client_id = "3930a4f6e32959513d3f30872a3c13c9"
 application_url = "https://vantavcommerce.com"
-embedded = true
+embedded = false
 
 [build]
 automatically_update_urls_on_dev = true
