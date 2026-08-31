@@ -7507,7 +7507,7 @@ def _set_pending_internal():
 
 
 def _clear_merchant_data(merchant_id):
-    for model in (ProfitFeedOrder, AdSpendFeed, UnifiedOrder, OrderItem, Alert, ActionEvidence, PendingAction, Product, MerchantChannel, MerchantSetting):
+    for model in (ProfitFeedOrder, AdSpendFeed, UnifiedOrder, ActionEvidence, PendingAction, Alert, Product, MerchantChannel, MerchantSetting):
         try:
             model.query.filter_by(merchant_id=merchant_id).delete()
         except Exception as e:
