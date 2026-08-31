@@ -1868,7 +1868,9 @@ def dashboard_page(page):
     active_page = page.replace('-', '_')
     page_label = None
     canonical_map = {
+        'actions': ('action_gate', 'Pending Actions'),
         'pending_actions': ('action_gate', 'Pending Actions'),
+        'profit': ('profit_engine', 'Profit Dashboard'),
         'profit_dashboard': ('profit_engine', 'Profit Dashboard'),
     }
     if active_page in canonical_map:
@@ -1882,7 +1884,7 @@ def dashboard_page(page):
                 redirect_kwargs['concierge_bundle'] = 'true'
         return redirect(url_for('dashboard_page', **redirect_kwargs))
     valid_pages = {
-        'overview', 'command_center', 'commerce_hub', 'alerts', 'action_gate', 'pending_actions', 'profit_engine', 'profit_dashboard', 'startup_pack',
+        'overview', 'command_center', 'commerce_hub', 'alerts', 'action_gate', 'actions', 'pending_actions', 'profit_engine', 'profit', 'profit_dashboard', 'startup_pack',
         'predictions', 'product_research', 'fulfillment', 'fraud', 'suppliers',
         'marketing', 'support', 'automations', 'team_ai', 'health_score',
         'mobile', 'store_catalog', 'products', 'orders', 'customers',
@@ -2477,13 +2479,13 @@ def dispatch_alert(alert_id):
 
 
 # ============================================================
-# ACTION GATE
+# ACTIONS
 # ============================================================
 
 @app.route('/api/actions', methods=['GET'])
 @require_roles([UserRole.ADMIN, UserRole.MERCHANT, UserRole.ENGINEER])
 def api_actions():
-    """Return pending Action Gate approvals and recent history."""
+    """Return pending action approvals and recent history."""
     merchant = get_merchant_context()
     if not merchant:
         return jsonify({"error": "No merchant context"}), 403
@@ -2492,14 +2494,14 @@ def api_actions():
         history = [action_gate.action_to_dict(a) for a in action_gate.list_action_history(merchant["id"])]
         return jsonify({"pending": pending, "history": history}), 200
     except Exception as e:
-        logger.error(f"[Action Gate] List failed: {e}")
+        logger.error(f"[Actions] List failed: {e}")
         return jsonify({"detail": "Could not load actions."}), 500
 
 
 @app.route('/api/actions/<int:action_id>/approve', methods=['POST'])
 @require_roles([UserRole.ADMIN, UserRole.MERCHANT, UserRole.ENGINEER])
 def api_approve_action(action_id):
-    """Approve and execute a pending Action Gate action."""
+    """Approve and execute a pending action."""
     merchant = get_merchant_context()
     if not merchant:
         return jsonify({"error": "No merchant context"}), 403
@@ -2507,14 +2509,14 @@ def api_approve_action(action_id):
         result = action_gate.approve_action(action_id, merchant["id"], decided_by=merchant["id"])
         return jsonify(result), 200
     except Exception as e:
-        logger.error(f"[Action Gate] Approve failed: {e}")
+        logger.error(f"[Actions] Approve failed: {e}")
         return jsonify({"detail": str(e)}), 400
 
 
 @app.route('/api/actions/<int:action_id>/deny', methods=['POST'])
 @require_roles([UserRole.ADMIN, UserRole.MERCHANT, UserRole.ENGINEER])
 def api_deny_action(action_id):
-    """Deny a pending Action Gate action."""
+    """Deny a pending action."""
     merchant = get_merchant_context()
     if not merchant:
         return jsonify({"error": "No merchant context"}), 403
@@ -2523,14 +2525,14 @@ def api_deny_action(action_id):
         result = action_gate.deny_action(action_id, merchant["id"], reason=data.get("reason", ""), decided_by=merchant["id"])
         return jsonify(result), 200
     except Exception as e:
-        logger.error(f"[Action Gate] Deny failed: {e}")
+        logger.error(f"[Actions] Deny failed: {e}")
         return jsonify({"detail": str(e)}), 400
 
 
 @app.route('/api/actions/<int:action_id>/modify', methods=['POST'])
 @require_roles([UserRole.ADMIN, UserRole.MERCHANT, UserRole.ENGINEER])
 def api_modify_action(action_id):
-    """Modify payload of a pending Action Gate action."""
+    """Modify payload of a pending action."""
     merchant = get_merchant_context()
     if not merchant:
         return jsonify({"error": "No merchant context"}), 403
@@ -2539,7 +2541,7 @@ def api_modify_action(action_id):
         result = action_gate.modify_action(action_id, merchant["id"], payload_updates=data.get("payload", {}))
         return jsonify(result), 200
     except Exception as e:
-        logger.error(f"[Action Gate] Modify failed: {e}")
+        logger.error(f"[Actions] Modify failed: {e}")
         return jsonify({"detail": str(e)}), 400
 
 
@@ -2554,14 +2556,14 @@ def api_verify_action(action_id):
         result = action_gate.verify_action(action_id, merchant["id"])
         return jsonify(result), 200
     except Exception as e:
-        logger.error(f"[Action Gate] Verify failed: {e}")
+        logger.error(f"[Actions] Verify failed: {e}")
         return jsonify({"detail": str(e)}), 400
 
 
 @app.route('/api/actions/<int:action_id>/rollback', methods=['POST'])
 @require_roles([UserRole.ADMIN, UserRole.MERCHANT, UserRole.ENGINEER])
 def api_rollback_action(action_id):
-    """Rollback an approved/executed Action Gate action using the captured audit snapshot."""
+    """Rollback an approved/executed action using the captured audit snapshot."""
     merchant = get_merchant_context()
     if not merchant:
         return jsonify({"error": "No merchant context"}), 403
@@ -2569,20 +2571,20 @@ def api_rollback_action(action_id):
         result = action_gate.rollback_action(action_id, merchant["id"], decided_by=merchant["id"])
         return jsonify(result), 200
     except Exception as e:
-        logger.error(f"[Action Gate] Rollback failed: {e}")
+        logger.error(f"[Actions] Rollback failed: {e}")
         return jsonify({"detail": str(e)}), 400
 
 
 @app.route('/api/v1/actions/<int:action_id>/approve', methods=['POST'])
 @master_auth_engine.require_clearance("admin")
 def api_v1_approve_action(action_id):
-    """Hardened Action Gate approve endpoint protected by signed X-Session-Token."""
+    """Hardened action approve endpoint protected by signed X-Session-Token."""
     merchant_id = g.session_ctx.get("merchant_id")
     try:
         result = action_gate.approve_action(action_id, merchant_id, decided_by=merchant_id)
         return jsonify(result), 200
     except Exception as e:
-        logger.error(f"[Action Gate] V1 approve failed: {e}")
+        logger.error(f"[Actions] V1 approve failed: {e}")
         return jsonify({"detail": str(e)}), 400
 
 
@@ -2599,7 +2601,7 @@ def api_verify_actions_cron():
         results = action_gate.verify_overdue_actions(merchant["id"], hours=hours)
         return jsonify({"verified": len(results), "results": results}), 200
     except Exception as e:
-        logger.error(f"[Action Gate] Verify-cron failed: {e}")
+        logger.error(f"[Actions] Verify-cron failed: {e}")
         return jsonify({"detail": str(e)}), 500
 
 

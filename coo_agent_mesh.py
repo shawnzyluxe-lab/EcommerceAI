@@ -2,7 +2,7 @@
 
 Specialized Finance and Logistics agents evaluate live SKU telemetry, then a
 controller synthesizes recommendations and validates them against merchant
-business memory before staging actions through the Action Gate.
+business memory before staging actions through Actions.
 """
 import asyncio
 import datetime
@@ -376,7 +376,7 @@ def _build_snapshots(merchant_id: str, days: int = 1) -> List[ChannelTelemetrySn
 
 
 def run_diagnostic(merchant_id: str, days: int = 1, create_actions: bool = True) -> List[Dict]:
-    """Run the COO mesh for a merchant and optionally stage actions through the Action Gate."""
+    """Run the COO mesh for a merchant and optionally stage actions through Actions."""
     memory = BusinessMemory.query.filter_by(merchant_id=merchant_id).first()
     constraints = BusinessConstraints(
         merchant_id=merchant_id,

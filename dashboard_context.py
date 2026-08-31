@@ -422,7 +422,7 @@ ALERTS = [
 ]
 
 # --------------------------------------------------------------------------
-# Profit Engine — true profit per order
+# Profit Dashboard — true profit per order
 # --------------------------------------------------------------------------
 
 PROFIT_BREAKDOWN = [
@@ -518,7 +518,7 @@ FRAUD = [
 ]
 
 # --------------------------------------------------------------------------
-# Supply Chain Intelligence
+# Suppliers
 # --------------------------------------------------------------------------
 
 SUPPLIERS = [
@@ -717,11 +717,11 @@ NAV_GROUPS = [
         ],
     },
     {
-        "label": "Intelligence",
+        "label": "Insights",
         "links": [
             {"id": "alerts", "label": "Alerts", "url": "/dashboard/alerts", "icon": "⚠", "badge": str(len(ALERTS))},
-            {"id": "action_gate", "label": "Pending Actions", "url": "/dashboard/pending-actions", "icon": "✓"},
-            {"id": "profit_engine", "label": "Profit Dashboard", "url": "/dashboard/profit-dashboard", "icon": "$"},
+            {"id": "action_gate", "label": "Pending Actions", "url": "/dashboard/actions", "icon": "✓"},
+            {"id": "profit_engine", "label": "Profit Dashboard", "url": "/dashboard/profit", "icon": "$"},
             {"id": "predictions", "label": "Predictions", "url": "/dashboard/predictions", "icon": "◐"},
             {"id": "product_research", "label": "Product Research", "url": "/dashboard/product-research", "icon": "◎"},
             {"id": "analytics", "label": "Analytics", "url": "/dashboard/analytics", "icon": "▤"},
@@ -918,7 +918,7 @@ def context(active_page=None, merchant=None, merchant_id=None):
         # Engineers land in a dedicated control panel, not the merchant dashboard.
         nav_groups = [engineer_group]
 
-    # Action Gate: draft approvals from open alerts.
+    # Actions: draft approvals from open alerts.
     pending_actions = []
     action_history = []
     if merchant_id and (active_page in ("overview", "action_gate") or active_page is None):

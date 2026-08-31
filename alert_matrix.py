@@ -1,4 +1,4 @@
-"""Alert Matrix for Prometheus OS.
+"""Alert Matrix for Vantav.
 
 Generates, persists, and dispatches real-time operational alerts:
 - Inventory runout / low-stock warnings from PredictiveLogistics
@@ -273,7 +273,7 @@ def _dispatch_sms(alert, to_number):
     try:
         from twilio.rest import Client
         client = Client(TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN)
-        body = f"Prometheus OS Alert: {alert.title} — {alert.detail[:80]}"
+        body = f"Vantav Alert: {alert.title} — {alert.detail[:80]}"
         message = client.messages.create(body=body, from_=TWILIO_FROM_NUMBER, to=to_number)
         return message.sid is not None
     except Exception as e:

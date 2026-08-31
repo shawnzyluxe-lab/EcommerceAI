@@ -213,7 +213,7 @@ def _inventory_answer(snap: Dict[str, Any]) -> Optional[str]:
 
 
 def _action_answer(snap: Dict[str, Any]) -> Optional[str]:
-    """Rank pending Action Gate items by expected weekly impact."""
+    """Rank pending actions by expected weekly impact."""
     actions = snap.get("pending_actions") or []
     if not actions:
         return None
@@ -236,9 +236,9 @@ def _action_answer(snap: Dict[str, Any]) -> Optional[str]:
     if confidence:
         facts.append(f"{round(float(confidence) * 100 if float(confidence) <= 1 else float(confidence))}% confidence")
     if facts:
-        lines.append("Vantav rates it " + " at ".join(facts) + ". Approve it in the Action Gate.")
+        lines.append("Vantav rates it " + " at ".join(facts) + ". Approve it in Pending Actions.")
     else:
-        lines.append("Approve it in the Action Gate.")
+        lines.append("Approve it in Pending Actions.")
 
     if len(ranked) > 1:
         lines.append("Then, in order:")
@@ -326,7 +326,7 @@ def _local_answer(merchant_id: str, message: str) -> Dict[str, Any]:
 
     top_action = (snap.get("pending_actions") or [])[:1]
     if top_action:
-        lines.append(f"Recommended next step: {top_action[0].get('title', '')} — approve it in the Action Gate.")
+        lines.append(f"Recommended next step: {top_action[0].get('title', '')} — approve it in Pending Actions.")
 
     return {"answer": "\n\n".join(lines), "did": did}
 

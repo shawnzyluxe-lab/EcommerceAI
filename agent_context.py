@@ -45,7 +45,7 @@ def get_snapshot(merchant_id: str) -> Dict[str, Any]:
     breakdown = profit_feed.get_profit_breakdown(merchant_id)
     recent_orders = profit_feed.get_recent_orders(merchant_id, limit=20)
     alerts = alert_matrix.get_alerts(merchant_id, limit=10)
-    # Query pending actions directly to avoid recursive refresh when Action Gate is building evidence.
+    # Query pending actions directly to avoid recursive refresh when Actions is building evidence.
     actions = PendingAction.query.filter_by(
         merchant_id=merchant_id, status="pending"
     ).order_by(PendingAction.created_at.desc()).limit(10).all()

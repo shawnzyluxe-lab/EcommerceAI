@@ -34,7 +34,7 @@ HOW_IT_WORKS = [
      "Vantav raises an alert when margin slips, stock is running out, or refunds "
      "spike, so you see the problem before it costs you money."),
     ("Approve the next step",
-     "Recommendations arrive in the Action Gate with the reasoning behind them. "
+     "Recommendations arrive in Pending Actions with the reasoning behind them. "
      "Nothing is changed in your store until you approve it."),
 ]
 

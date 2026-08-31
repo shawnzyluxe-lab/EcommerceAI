@@ -16,7 +16,7 @@ def _default_checklist(brand_name: str, niche: str) -> List[Dict[str, Any]]:
         {"id": "tiktok_content", "title": "Create TikTok account and post 3-5 organic videos", "done": False},
         {"id": "ad_launch", "title": "Launch first $20/day TikTok or Meta ad test", "done": False},
         {"id": "profit_review", "title": "Review true-profit report after first 10 orders", "done": False},
-        {"id": "automation", "title": "Approve first Action Gate reorder / ad adjustment", "done": False},
+        {"id": "automation", "title": "Approve first Pending Actions reorder / ad adjustment", "done": False},
         {"id": "milestone_90", "title": "90-day: refine top 2 winning products and double down", "done": False},
         {"id": "milestone_1yr", "title": "1-year: expand to Amazon + wholesale B2B channel", "done": False},
     ]
