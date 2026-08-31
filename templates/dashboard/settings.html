@@ -53,8 +53,8 @@
     <div class="card">
       <div class="card-head"><h3>Your Plan</h3></div>
       <div style="background: var(--accent); color: var(--ink); border-radius: var(--radius); padding: 18px; margin-bottom: 14px;">
-        <div style="font-size: 1.2rem; font-weight: 700; margin-bottom: 4px;">♛ {{ tier_limits.display_name | default(merchant.tier) | default('Enterprise Plan') }}</div>
-        <div style="font-size: .85rem; color: var(--ink-2); margin-bottom: 14px;">{% if concierge %}Concierge Bundle + {{ tier_limits.display_name | default(merchant.tier) | default('Enterprise Plan') }}{% else %}Your current plan. Upgrade anytime to unlock more stores and features.{% endif %}</div>
+        <div style="font-size: 1.2rem; font-weight: 700; margin-bottom: 4px;">♛ {{ tier_limits.display_name | default(merchant.tier) | default('Vantav Basic') }}</div>
+        <div style="font-size: .85rem; color: var(--ink-2); margin-bottom: 14px;">{{ tier_limits.who | default('') }}{% if tier_limits.description %} · {{ tier_limits.description }}{% endif %}</div>
         <button class="btn" style="background: rgba(0,0,0,.25); color: var(--ink); border-color: rgba(0,0,0,.2);" onclick="switchSettingsTab('billing')">Manage Plan</button>
       </div>
       <div style="font-size: .85rem; font-weight: 600; margin-bottom: 10px;">Usage Overview</div>
@@ -109,8 +109,8 @@
     <div class="card">
       <div class="card-head"><h3>Current Plan</h3></div>
       <div style="background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); padding: 18px; margin-bottom: 14px;">
-        <div style="font-size: 1.2rem; font-weight: 700; margin-bottom: 4px; color: var(--ink);">{{ tier_limits.display_name | default(plan) | default('Basic Tier') }}</div>
-        <div id="plan-desc" style="font-size: .85rem; color: var(--ink-2); margin-bottom: 14px;">{% if concierge %}Concierge Bundle included{% else %}Upgrade anytime to unlock more stores, actions, and advanced features.{% endif %}</div>
+        <div style="font-size: 1.2rem; font-weight: 700; margin-bottom: 4px; color: var(--ink);">{{ tier_limits.display_name | default(plan) | default('Vantav Basic') }}</div>
+        <div id="plan-desc" style="font-size: .85rem; color: var(--ink-2); margin-bottom: 14px;">{% if concierge %}Concierge Bundle included · {% endif %}{% if tier_limits.who %}{{ tier_limits.who }} · {% endif %}{{ tier_limits.description | default('Upgrade anytime to unlock more stores, actions, and advanced features.') }}</div>
         <div style="font-size: 1.6rem; font-weight: 800; margin-bottom: 4px; color: var(--ink);">{% if tier_limits.monthly_price %}${{ tier_limits.monthly_price }}{% else %}Custom{% endif %}<span style="font-size: .85rem; color: var(--ink-3);">/mo</span></div>
         {% if concierge %}<div style="font-size: .85rem; color: var(--ink-2); margin-top: 6px;">+ Concierge Bundle $999</div>{% endif %}
         {% if billing_account and billing_account.billing_cycle_end %}
@@ -183,8 +183,45 @@
 <div class="settings-panel" id="panel-integrations" {% if active_tab != 'integrations' %}style="display:none;"{% endif %}>
   <div class="card">
     <div class="card-head"><h3>Developer / API</h3></div>
-    <p style="font-size: .9rem; color: var(--ink-2); line-height: 1.5;">Public API keys, secret keys, and secure webhook endpoints are managed on request. Contact support to enable developer access or rotate credentials.</p>
-    <button class="btn" style="margin-top: 14px;" disabled>Request developer access</button>
+
+    <div style="margin-bottom: 18px;">
+      <label style="font-size: .75rem; color: var(--ink-3); font-weight: 600; display: block; margin-bottom: 6px;">Public API key</label>
+      <div style="display: flex; gap: 10px; align-items: center;">
+        <input id="api-public-key" type="text" value="{{ api_credential.public_key_masked | default('No key generated yet') }}" readonly style="flex: 1; padding: 10px; border: 1px solid var(--line); border-radius: 8px; background: var(--line-2); color: var(--ink); font-family: monospace; font-size: .9rem;">
+        <button class="btn" {% if not api_credential %}disabled{% endif %} onclick="copyApiField('api-public-key')">Copy</button>
+      </div>
+      <p style="font-size: .8rem; color: var(--ink-3); margin-top: 6px;">Use this in public integrations and client-side code.</p>
+    </div>
+
+    <div style="margin-bottom: 18px;">
+      <label style="font-size: .75rem; color: var(--ink-3); font-weight: 600; display: block; margin-bottom: 6px;">Secret API key</label>
+      <div style="display: flex; gap: 10px; align-items: center;">
+        <input type="text" value="••••••••••••••••••••••••••" readonly style="flex: 1; padding: 10px; border: 1px solid var(--line); border-radius: 8px; background: var(--line-2); color: var(--ink-3); font-family: monospace; font-size: .9rem;">
+        <button class="btn btn-primary" onclick="regenerateApiKey()">Regenerate</button>
+      </div>
+      <p style="font-size: .8rem; color: var(--ink-3); margin-top: 6px;">The secret key is never shown again. Regenerating immediately revokes the previous secret.</p>
+    </div>
+
+    <div style="margin-bottom: 18px;">
+      <label style="font-size: .75rem; color: var(--ink-3); font-weight: 600; display: block; margin-bottom: 6px;">Incoming webhook URL</label>
+      <div style="display: flex; gap: 10px; align-items: center;">
+        <input id="api-webhook-url" type="text" value="{{ api_credential.webhook_url | default('No webhook alias generated yet') }}" readonly style="flex: 1; padding: 10px; border: 1px solid var(--line); border-radius: 8px; background: var(--line-2); color: var(--ink); font-family: monospace; font-size: .9rem;">
+        <button class="btn" {% if not api_credential %}disabled{% endif %} onclick="copyApiField('api-webhook-url')">Copy</button>
+      </div>
+      <p style="font-size: .8rem; color: var(--ink-3); margin-top: 6px;">Your tenant ID is hidden behind this secure alias.</p>
+    </div>
+
+    <div id="api-key-modal" style="display:none; position: fixed; inset: 0; background: rgba(0,0,0,.6); backdrop-filter: blur(4px); z-index: 100; align-items: center; justify-content: center; padding: 20px;">
+      <div style="background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); max-width: 520px; width: 100%; padding: 24px; box-shadow: var(--shadow);">
+        <h3 style="margin: 0 0 8px; color: var(--ink);">Your new secret key</h3>
+        <p style="color: var(--red); font-size: .85rem; margin-bottom: 14px;">Copy it now. It will not be shown again.</p>
+        <input id="new-secret-key" type="text" readonly style="width: 100%; padding: 10px; border: 1px solid var(--line); border-radius: 8px; background: var(--line-2); color: var(--ink); font-family: monospace; font-size: .9rem; margin-bottom: 14px;">
+        <div style="display: flex; gap: 10px;">
+          <button class="btn" style="flex: 1;" onclick="closeApiKeyModal()">Close</button>
+          <button class="btn btn-primary" style="flex: 1;" onclick="copyApiField('new-secret-key')">Copy secret</button>
+        </div>
+      </div>
+    </div>
   </div>
 </div>
 
@@ -215,27 +252,18 @@
     <h3 style="margin: 0 0 8px; color: var(--ink);">Choose a plan</h3>
     <p style="color: var(--ink-2); font-size: .85rem; margin-bottom: 16px;">Select the plan that fits your business. You will be redirected to Stripe to complete payment.</p>
     <div style="display: flex; flex-direction: column; gap: 10px; margin-bottom: 18px;">
-      <label class="upgrade-plan-label" style="display: flex; align-items: center; gap: 10px; padding: 12px; border: 1px solid var(--line); border-radius: 10px; cursor: pointer; background: var(--bg);">
-        <input type="radio" name="upgrade-plan" value="operator" {% if plan == 'Vantav Operator' %}checked{% endif %} style="accent-color: var(--purple);">
+      {% for p in plan_options %}
+      {% if p.price != 'Free' %}
+      {% set plan_slug = {'Vantav Operator':'operator','Vantav Growth':'growth','Vantav Scale':'scale'}[p.name] %}
+      <label class="upgrade-plan-label" style="display: flex; align-items: center; gap: 10px; padding: 12px; border: 1px solid {% if p.popular %}var(--purple){% else %}var(--line){% endif %}; border-radius: 10px; cursor: pointer; background: {% if p.popular %}var(--surface){% else %}var(--bg){% endif %}; position: relative;">
+        <input type="radio" name="upgrade-plan" value="{{ plan_slug }}" {% if plan == p.name or tier_limits.display_name == p.name %}checked{% endif %} style="accent-color: var(--purple);">
         <div>
-          <div style="font-weight: 700; color: var(--ink);">Vantav Starter — $199/mo</div>
-          <div style="font-size: .8rem; color: var(--ink-3);">Up to 2 stores with recommendations, alerts, and standard support</div>
+          <div style="font-weight: 700; color: var(--ink);">{{ p.name }} — {{ p.price }}{% if p.popular %} <span style="font-size:.65rem; color:var(--purple);">MOST POPULAR</span>{% endif %}</div>
+          <div style="font-size: .8rem; color: var(--ink-3);">{{ p.summary }}</div>
         </div>
       </label>
-      <label class="upgrade-plan-label" style="display: flex; align-items: center; gap: 10px; padding: 12px; border: 1px solid var(--purple); border-radius: 10px; cursor: pointer; background: var(--surface); position: relative;">
-        <input type="radio" name="upgrade-plan" value="growth" {% if plan == 'Vantav Growth' %}checked{% endif %} style="accent-color: var(--purple);">
-        <div>
-          <div style="font-weight: 700; color: var(--ink);">Vantav Growth — $399/mo <span style="font-size:.65rem; color:var(--purple);">MOST POPULAR</span></div>
-          <div style="font-size: .8rem; color: var(--ink-3);">Up to 5 stores with forecasting, cross-store reporting, and priority support</div>
-        </div>
-      </label>
-      <label class="upgrade-plan-label" style="display: flex; align-items: center; gap: 10px; padding: 12px; border: 1px solid var(--line); border-radius: 10px; cursor: pointer; background: var(--bg);">
-        <input type="radio" name="upgrade-plan" value="scale" {% if plan == 'Vantav Scale' %}checked{% endif %} style="accent-color: var(--purple);">
-        <div>
-          <div style="font-weight: 700; color: var(--ink);">Vantav Scale — $799/mo</div>
-          <div style="font-size: .8rem; color: var(--ink-3);">Up to 15 stores with portfolio reporting, API access, and priority onboarding</div>
-        </div>
-      </label>
+      {% endif %}
+      {% endfor %}
       <label style="display: flex; align-items: flex-start; gap: 10px; padding: 12px; border: 1px dashed var(--line); border-radius: 10px; cursor: pointer; background: var(--bg); margin-top: 4px;">
         <input type="checkbox" id="upgrade-concierge" style="width: 18px; height: 18px; accent-color: var(--purple); margin-top: 2px;">
         <div>
@@ -424,6 +452,31 @@ async function startCheckout(plan, concierge=false) {
     btn.addEventListener('click', () => activateTheme(btn.dataset.theme));
   });
 })();
+
+// Developer / API
+function copyApiField(id) {
+  const el = document.getElementById(id);
+  if (!el || !el.value) return;
+  el.select();
+  navigator.clipboard.writeText(el.value).catch(() => {});
+}
+
+async function regenerateApiKey() {
+  if (!confirm('Regenerating the API key will immediately revoke the previous secret. Continue?')) return;
+  try {
+    const res = await fetch('/api/v1/developer/api-key', {method: 'POST', credentials: 'same-origin'});
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || 'Could not regenerate key');
+    document.getElementById('api-public-key').value = data.public_key_masked;
+    document.getElementById('api-webhook-url').value = data.webhook_url;
+    document.getElementById('new-secret-key').value = data.secret_key;
+    document.getElementById('api-key-modal').style.display = 'flex';
+  } catch (e) { alert(e.message); }
+}
+
+function closeApiKeyModal() {
+  document.getElementById('api-key-modal').style.display = 'none';
+}
 </script>
 
 <style>

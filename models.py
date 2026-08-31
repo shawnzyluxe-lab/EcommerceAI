@@ -1,6 +1,8 @@
 import uuid
+import secrets
 from datetime import datetime
 from flask_sqlalchemy import SQLAlchemy
+from werkzeug.security import generate_password_hash, check_password_hash
 
 db = SQLAlchemy()
 
@@ -518,6 +520,36 @@ class WorkspaceSeat(db.Model):
     role = db.Column(db.String(50), nullable=False, default="merchant")  # admin, engineer, merchant
     created_at = db.Column(db.DateTime, server_default=db.func.now())
     __table_args__ = (db.UniqueConstraint("merchant_id", "user_email", name="unique_merchant_email"),)
+
+
+class ApiCredential(db.Model):
+    __tablename__ = "api_credentials"
+    id = db.Column(db.String(36), primary_key=True, default=_uuid)
+    merchant_id = db.Column(db.String(100), db.ForeignKey("merchant_profiles.merchant_id", ondelete="CASCADE"), nullable=False, index=True, unique=True)
+    public_key = db.Column(db.String(255), nullable=False)
+    secret_hash = db.Column(db.String(255), nullable=False)
+    webhook_alias = db.Column(db.String(36), nullable=False, default=_uuid)
+    created_at = db.Column(db.DateTime, server_default=db.func.now())
+    updated_at = db.Column(db.DateTime, server_default=db.func.now(), onupdate=db.func.now())
+
+    def mask_public(self):
+        if len(self.public_key) <= 12:
+            return self.public_key
+        return f"{self.public_key[:12]}…{self.public_key[-4:]}"
+
+    @staticmethod
+    def generate_for(merchant_id: str) -> tuple[str, str, "ApiCredential"]:
+        public_key = "vantav_pk_" + secrets.token_urlsafe(24)
+        secret_key = "vantav_sk_" + secrets.token_urlsafe(24)
+        credential = ApiCredential.query.filter_by(merchant_id=merchant_id).first()
+        if not credential:
+            credential = ApiCredential(merchant_id=merchant_id)
+        credential.public_key = public_key
+        credential.secret_hash = generate_password_hash(secret_key)
+        credential.webhook_alias = _uuid()
+        db.session.add(credential)
+        db.session.commit()
+        return public_key, secret_key, credential
 
 
 class ActionEvidence(db.Model):

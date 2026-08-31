@@ -98,71 +98,25 @@
     </ul>
 
     <div class="plans">
-      <div class="plan">
-        <span class="badge">START</span>
-        <h3>Vantav Starter</h3>
-        <p class="who">For 1 store getting its numbers straight</p>
-        <div class="price">$199<span>/mo</span></div>
+      {% for tier in tiers %}
+      {% set plan_slug = {'Basic Tier':'basic','Vantav Operator':'operator','Vantav Growth':'growth','Vantav Scale':'scale'}[tier.id] %}
+      <div class="plan{% if tier.popular %} popular{% endif %}">
+        <span class="badge">{% if tier.popular %}MOST POPULAR{% elif tier.id == 'Basic Tier' %}FREE{% else %}{{ tier.id.split()[-1] | upper }}{% endif %}</span>
+        <h3>{{ tier.name }}</h3>
+        <p class="who">{{ tier.who }}</p>
+        <div class="price">{% if tier.price == 'Free' %}Free{% else %}{{ tier.price.split('/')[0] }}<span>/mo</span>{% endif %}</div>
         <ul>
-          <li>Up to 2 connected stores</li>
-          <li>All supported ecommerce integrations</li>
-          <li>True-profit reporting</li>
-          <li>Full revenue, cost, margin, refund, and inventory view</li>
-          <li>Alerts when something needs attention</li>
-          <li>Clear, actionable recommendations</li>
-          <li>See the reasoning behind every recommendation</li>
-          <li>Approve, edit, or skip any suggestion</li>
-          <li>Basic inventory forecasting</li>
-          <li>3 users</li>
-          <li>Standard support</li>
+          {% for feature in tier.all_features %}
+          <li>{{ feature }}</li>
+          {% endfor %}
         </ul>
-        <button onclick="goCheckout('operator')">Start with Starter</button>
+        {% if tier.price == 'Free' %}
+        <button onclick="window.location.href='/login'">Get started free</button>
+        {% else %}
+        <button onclick="goCheckout('{{ plan_slug }}')">Start with {{ tier.name.replace('Vantav ', '') }}</button>
+        {% endif %}
       </div>
-      <div class="plan popular">
-        <span class="badge">MOST POPULAR</span>
-        <h3>Vantav Growth</h3>
-        <p class="who">For up to 5 stores across several channels</p>
-        <div class="price">$399<span>/mo</span></div>
-        <ul>
-          <li>Everything in Starter</li>
-          <li>Up to 5 connected stores</li>
-          <li>Updates every 15 minutes</li>
-          <li>Smarter issue detection</li>
-          <li>Product sell-through and stockout forecasting</li>
-          <li>Recommended reorder timing</li>
-          <li>See projected financial impact of each suggestion</li>
-          <li>More recommendations each month</li>
-          <li>Compare performance across stores</li>
-          <li>Longer historical analysis</li>
-          <li>Track completed actions and results</li>
-          <li>Action history & business context</li>
-          <li>10 users</li>
-          <li>Priority support</li>
-        </ul>
-        <button onclick="goCheckout('growth')">Start with Growth</button>
-      </div>
-      <div class="plan">
-        <span class="badge">SCALE</span>
-        <h3>Vantav Scale</h3>
-        <p class="who">For 15+ stores, multi-brand portfolios and agencies</p>
-        <div class="price">$799<span>/mo</span></div>
-        <ul>
-          <li>Everything in Growth</li>
-          <li>Up to 15 stores</li>
-          <li>Portfolio-wide intelligence</li>
-          <li>Advanced cross-store monitoring</li>
-          <li>Higher monthly action allowance</li>
-          <li>Advanced forecasting</li>
-          <li>Multi-brand reporting</li>
-          <li>Custom alert rules</li>
-          <li>Advanced permissions</li>
-          <li>Complete action / audit history</li>
-          <li>API and data access</li>
-          <li>Priority onboarding</li>
-          <li>Priority support</li>
-        </ul>
-        <button onclick="goCheckout('scale')">Start with Scale</button>
-      </div>
+      {% endfor %}
     </div>
 
     <div class="bundle">

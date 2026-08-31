@@ -13,7 +13,7 @@ from typing import Any, Dict, List, Optional
 
 from flask import Flask, render_template, request, jsonify
 from sqlalchemy import func
-from models import db, PredictiveLogistics, MerchantSetting, SaaSBilling, Product, OrderItem, UnifiedOrder, AdminPlatformControl
+from models import db, PredictiveLogistics, MerchantSetting, SaaSBilling, Product, OrderItem, UnifiedOrder, WorkspaceSeat, PendingAction, ApiCredential, AdminPlatformControl
 import profit_feed
 import alert_matrix
 import action_gate
@@ -25,6 +25,44 @@ from tier_manager import TierManager
 
 
 from zoneinfo import ZoneInfo
+from markupsafe import Markup
+
+
+def _nav_svg(inner: str) -> str:
+    return (
+        '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="18" height="18" '
+        'fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" '
+        'aria-hidden="true" role="img">' + inner + '</svg>'
+    )
+
+
+ICON_SVGS = {
+    "◈": Markup(_nav_svg('<path d="M12 2L22 12 12 22 2 12Z"/>')),
+    "◉": Markup(_nav_svg('<circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="4"/><circle cx="12" cy="12" r="1" fill="currentColor"/>')),
+    "⚠": Markup(_nav_svg('<path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h14.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/>')),
+    "✓": Markup(_nav_svg('<polyline points="20 6 9 17 4 12"/>')),
+    "$": Markup(_nav_svg('<line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6"/>')),
+    "◐": Markup(_nav_svg('<path d="M12 2a10 10 0 100 20 10 10 0 000-20v20"/>')),
+    "◎": Markup(_nav_svg('<circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>')),
+    "▤": Markup(_nav_svg('<line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/>')),
+    "⚡": Markup(_nav_svg('<polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/>')),
+    "◫": Markup(_nav_svg('<rect x="3" y="3" width="18" height="18" rx="2"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="9" y1="21" x2="9" y2="9"/>')),
+    "▣": Markup(_nav_svg('<polygon points="12 2 2 7 12 12 22 7 12 2"/><polyline points="2 17 12 22 22 17"/><polyline points="2 12 12 17 22 12"/>')),
+    "✈": Markup(_nav_svg('<line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/>')),
+    "▩": Markup(_nav_svg('<rect x="1" y="3" width="15" height="13"/><polygon points="16 8 20 8 23 11 23 16 16 16"/><circle cx="5.5" cy="18.5" r="2.5"/><circle cx="18.5" cy="18.5" r="2.5"/>')),
+    "↩": Markup(_nav_svg('<polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 111.13-9.36L1 10"/>')),
+    "⛟": Markup(_nav_svg('<path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>')),
+    "⏵": Markup(_nav_svg('<polygon points="5 3 19 12 5 21 5 3"/>')),
+    "✦": Markup(_nav_svg('<polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/>')),
+    "%": Markup(_nav_svg('<line x1="19" y1="5" x2="5" y2="19"/><circle cx="6.5" cy="6.5" r="2.5"/><circle cx="17.5" cy="17.5" r="2.5"/>')),
+    "✉": Markup(_nav_svg('<path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22 6 12 13 2 6"/>')),
+    "♥": Markup(_nav_svg('<path d="M20.84 4.61a5.5 5.5 0 00-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 00-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 000-7.78z"/>')),
+    "☎": Markup(_nav_svg('<rect x="5" y="2" width="14" height="20" rx="2" ry="2"/><line x1="12" y1="18" x2="12.01" y2="18"/>')),
+    "□": Markup(_nav_svg('<rect x="3" y="3" width="18" height="18" rx="2"/>')),
+    "☆": Markup(_nav_svg('<polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/>')),
+    "▦": Markup(_nav_svg('<path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><line x1="10" y1="9" x2="8" y2="9"/>')),
+    "⚙": Markup(_nav_svg('<circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-2 2 2 2 0 01-2-2v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83 0 2 2 0 010-2.83l.06-.06a1.65 1.65 0 00.33-1.82 1.65 1.65 0 00-1.51-1H3a2 2 0 01-2-2 2 2 0 012-2h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 010-2.83 2 2 0 012.83 0l.06.06a1.65 1.65 0 001.82.33H9a1.65 1.65 0 001-1.51V3a2 2 0 012-2 2 2 0 012 2v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 0 2 2 0 010 2.83l-.06.06a1.65 1.65 0 00-.33 1.82V9a1.65 1.65 0 001.51 1H21a2 2 0 012 2 2 2 0 01-2 2h-.09a1.65 1.65 0 00-1.51 1z"/>')),
+}
 
 
 def _merchant_timezone(merchant_id=None) -> str:
@@ -225,6 +263,7 @@ BETA_READY_PAGE_IDS = {
     "billing",
     "settings",
     "support",
+    "catalog",
 }
 
 COMMERCIAL_READY_PAGE_IDS = {
@@ -235,6 +274,7 @@ COMMERCIAL_READY_PAGE_IDS = {
     "billing",
     "settings",
     "startup_pack",
+    "catalog",
 }
 
 # These pages still contain sample business content and show a placeholder
@@ -755,8 +795,7 @@ NAV_GROUPS = [
     {
         "label": "Catalog",
         "links": [
-            {"id": "products", "label": "Products", "url": "/dashboard/products", "icon": "□"},
-            {"id": "store_catalog", "label": "Store Catalog", "url": "/dashboard/store-catalog", "icon": "▤"},
+            {"id": "catalog", "label": "Catalog", "url": "/dashboard/catalog", "icon": "□"},
             {"id": "startup_pack", "label": "Brand Build", "url": "/dashboard/startup-pack", "icon": "☆"},
             {"id": "apps", "label": "Apps", "url": "/dashboard/apps", "icon": "◫"},
             {"id": "reports", "label": "Reports", "url": "/dashboard/reports", "icon": "▦"},
@@ -769,6 +808,13 @@ NAV_GROUPS = [
         ],
     },
 ]
+
+# Replace raw Unicode nav icons with accessible SVGs.
+for _nav_group in NAV_GROUPS:
+    for _nav_link in _nav_group.get("links", []):
+        _nav_icon = _nav_link.get("icon")
+        if _nav_icon in ICON_SVGS:
+            _nav_link["icon"] = ICON_SVGS[_nav_icon]
 
 ALL_DASHBOARD_PAGE_IDS = sorted({
     link["id"]
@@ -838,7 +884,7 @@ def context(active_page=None, merchant=None, merchant_id=None):
     # Product catalog rows: Vantav-managed vs synced from connected channels.
     products_rows = []
     catalog_rows = []
-    if active_page in ("products", "store_catalog") and merchant_id:
+    if active_page in ("products", "store_catalog", "catalog") and merchant_id:
         try:
             for p in Product.query.filter_by(merchant_id=merchant_id).all():
                 on_hand = int(p.on_hand or 0)
@@ -945,7 +991,7 @@ def context(active_page=None, merchant=None, merchant_id=None):
     if merchant_id:
         try:
             billing = SaaSBilling.query.get(merchant_id)
-            tier_key = (merchant_obj.get("tier") or "Basic Tier").replace("AI Tier", "Plan").strip()
+            tier_key = ((merchant or {}).get("tier") or "Basic Tier").replace("AI Tier", "Plan").strip()
             meta = TierManager.get_tier_meta(tier_key)
             billing_account = {
                 "current_plan": billing.current_plan if billing else tier_key,
@@ -958,9 +1004,10 @@ def context(active_page=None, merchant=None, merchant_id=None):
                 "accrued_invoice_value": billing.accrued_invoice_value if billing else 0.0,
                 "billing_cycle_end": billing.billing_cycle_end if billing else "",
             }
+            tier_desc = TierManager.get_tier_description(tier_key)
             tier_limits = {
                 "name": tier_key,
-                "display_name": meta.get("display_name", tier_key),
+                "display_name": tier_desc.get("name", meta.get("display_name", tier_key)),
                 "monthly_price": meta.get("monthly_price", 0),
                 "orders": meta.get("monthly_order_limit", 500),
                 "actions": meta.get("max_monthly_actions", 50),
@@ -969,6 +1016,12 @@ def context(active_page=None, merchant=None, merchant_id=None):
                 "products": 10000,
                 "customers": 100000,
                 "storage": 500,
+                "description": tier_desc.get("summary", ""),
+                "who": tier_desc.get("who", ""),
+                "features": tier_desc.get("features", []),
+                "all_features": tier_desc.get("all_features", []),
+                "popular": tier_desc.get("popular", False),
+                "price": tier_desc.get("price", ""),
             }
         except Exception:
             pass
@@ -980,20 +1033,49 @@ def context(active_page=None, merchant=None, merchant_id=None):
         channel_data = CHANNELS
 
     connected = [c for c in channel_data if c.get("state") == "connected"]
-    team_users = []
 
-    # Single source of truth for account/billing usage bars.
+    # Single source of truth for account/billing usage bars and sidebar badges.
+    usage = TierManager.get_usage(merchant_id) if merchant_id else {}
     usage_overview = []
+    if usage:
+        usage_overview = [
+            ("Orders", usage.get("orders", {}).get("used", 0), usage.get("orders", {}).get("limit", 500)),
+            ("Stores", usage.get("stores", {}).get("used", 0), usage.get("stores", {}).get("limit", 2)),
+            ("Users", usage.get("users", {}).get("used", 0), usage.get("users", {}).get("limit", 1)),
+            ("Approved actions", usage.get("actions", {}).get("used", 0), usage.get("actions", {}).get("limit", 50)),
+        ]
+    order_count = usage.get("orders", {}).get("used", 0)
+    team_users = []  # kept for backward-compatible templates
+
+    # Sidebar badges draw from the same usage source.
+    for group in nav_groups:
+        for link in group["links"]:
+            if link.get("id") == "alerts":
+                link["badge"] = str(len(live_alerts))
+            elif link.get("id") == "action_gate":
+                link["badge"] = str(len(pending_actions)) if pending_actions else "0"
+            elif link.get("id") == "orders":
+                link["badge"] = str(order_count)
+
+    plan_options = []
     if merchant_id:
         try:
-            order_count = UnifiedOrder.query.filter_by(merchant_id=merchant_id).count()
-            product_count = Product.query.filter_by(merchant_id=merchant_id).count()
-            usage_overview = [
-                ("Orders", order_count, tier_limits.get("orders", 500)),
-                ("Products", product_count, tier_limits.get("products", 10000)),
-                ("Connected stores", len(connected), tier_limits.get("stores", 2)),
-                ("Team seats", len(team_users), tier_limits.get("users", 1)),
-            ]
+            current_tier = tier_limits.get("name") or (merchant or {}).get("tier") or "Basic Tier"
+            plan_options = TierManager.get_plan_options(current_tier)
+        except Exception:
+            pass
+
+    api_credential = None
+    if merchant_id:
+        try:
+            cred = ApiCredential.query.filter_by(merchant_id=merchant_id).first()
+            if cred:
+                api_credential = {
+                    "public_key_masked": cred.mask_public(),
+                    "public_key": cred.public_key,
+                    "webhook_alias": cred.webhook_alias,
+                    "webhook_url": f"{request.url_root.rstrip('/')}/api/v1/webhooks/incoming/{cred.webhook_alias}",
+                }
         except Exception:
             pass
 
@@ -1042,7 +1124,6 @@ def context(active_page=None, merchant=None, merchant_id=None):
         "inventory_needs_cost_setup": inventory_needs_cost_setup,
         "products": products_rows,
         "catalog_rows": catalog_rows,
-        "usage_overview": usage_overview,
         "series": SALES_SERIES,
         "series_max": max(p["value"] for p in SALES_SERIES),
         "forecasts": FORECASTS,
@@ -1068,6 +1149,10 @@ def context(active_page=None, merchant=None, merchant_id=None):
         "channel_totals": channel_totals,
         "billing_account": billing_account,
         "tier_limits": tier_limits,
+        "usage": usage,
+        "usage_overview": usage_overview,
+        "plan_options": plan_options,
+        "api_credential": api_credential,
         "team_users": team_users,
         "thresholds": {
             "slow_p95_ms": monitoring_module.SLOW_P95_MS,

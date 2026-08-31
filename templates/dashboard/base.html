@@ -92,7 +92,7 @@
           <div class="nav-group-links">
             {% for item in group.links %}
             <a class="nav-item {% if active_page == item.id %}active{% endif %}" href="{{ item.url }}">
-              <span class="nav-icon">{{ item.icon }}</span>
+              <span class="nav-icon">{{ item.icon | safe }}</span>
               <span class="nav-text">{{ item.label }}</span>
               {% if item.badge %}<span class="nav-badge">{{ item.badge }}</span>{% endif %}
             </a>
@@ -107,7 +107,7 @@
         <div class="plan-card">
           <div class="plan-icon">{% if merchant.tier and 'Enterprise' in merchant.tier %}♛{% else %}★{% endif %}</div>
           <div class="plan-name">{{ tier_limits.display_name | default(merchant.tier) | default('Enterprise Plan') }}</div>
-          <div class="plan-note">{% if tier_limits.monthly_price %}${{ tier_limits.monthly_price }}/mo · {% endif %}{{ tier_limits.orders | default('—') }} orders · {{ tier_limits.stores | default('—') }} stores</div>
+          <div class="plan-note">{% if tier_limits.monthly_price %}${{ tier_limits.monthly_price }}/mo · {% endif %}{{ usage.orders.used | default(0) }} / {{ usage.orders.limit | default('—') }} orders · {{ usage.stores.used | default(0) }} / {{ usage.stores.limit | default('—') }} stores</div>
           <a href="/dashboard/settings?tab=billing" class="plan-link">View Plan</a>
         </div>
         <div class="user-row">
@@ -178,6 +178,10 @@
         {% endif %}
         {% block content %}{% endblock %}
       </main>
+      <footer class="app-footer" style="padding: 16px 24px; border-top: 1px solid var(--line); margin-top: auto; font-size: .75rem; color: var(--ink-3); display: flex; justify-content: space-between; flex-wrap: wrap; gap: 8px;">
+        <span>SOC 2 Type II in progress · 256-bit encryption · Data never sold</span>
+        <span><a href="/security" style="color: var(--ink-3);">Security</a> · <a href="/status" style="color: var(--ink-3);">Status</a></span>
+      </footer>
     </div>
   </div>
 
@@ -444,17 +448,16 @@
     window.useAIPopupChip = function(el){ input.value = el.textContent; sendAIPopupMessage(); };
 
     // Every merchant login lands on the overview: greet by name, open the assistant
-    // and run the first briefing automatically.
-    {% if assistant_login_greeting %}
-    (function greetOnLogin(){
+    // and run the first briefing automatically on the first dashboard load of the session.
+    (function greetOnFirstLoad(){
+      if (page !== 'overview' || sessionStorage.getItem('vantav_assistant_greeted')) return;
+      sessionStorage.setItem('vantav_assistant_greeted', '1');
       const name = (document.body.dataset.accountHolderName || document.body.dataset.merchantName || 'there').split(' ')[0];
       const connectedCount = parseInt(document.body.dataset.connectedCount || '0', 10);
-      const hour = new Date().getHours();
-      const salutation = hour < 5 || hour >= 22 ? 'Good night' : hour < 12 ? 'Good morning' : hour < 17 ? 'Good afternoon' : 'Good evening';
       if (connectedCount === 0) {
         addMessage('assistant', `Hi ${name}. To start, connect one store. I can then watch for low inventory, missed profits, and late orders.`);
       } else {
-        addMessage('assistant', `${salutation}, ${name}. I reviewed your channels overnight — pulling today's briefing now.`);
+        addMessage('assistant', `Hi ${name}. I reviewed your channels overnight — pulling today's briefing now.`);
       }
       if(!popup.classList.contains('open')) toggleAIPopup();
       if (connectedCount > 0) {
@@ -464,7 +467,6 @@
         }, 700);
       }
     })();
-    {% endif %}
 
     loadAIHero();
   })();
@@ -484,8 +486,9 @@
         <button class="btn btn-primary" style="padding:6px 12px;" onclick="sendSupportMessage()">Send</button>
       </div>
     </div>
-    <button id="support-fab" onclick="toggleSupport()" aria-label="Open support" title="Open support" style="width:52px; height:52px; border-radius:50%; border:none; background:var(--accent); color:#fff; font-size:22px; cursor:pointer; box-shadow:0 6px 20px rgba(0,0,0,.2); display:flex; align-items:center; justify-content:center; position:relative;">
-      ✉
+    <button id="support-fab" onclick="toggleSupport()" aria-label="Support" title="Support" style="height:52px; border-radius:26px; border:none; background:var(--accent); color:#fff; font-size:18px; cursor:pointer; box-shadow:0 6px 20px rgba(0,0,0,.2); display:flex; align-items:center; justify-content:center; gap:6px; padding:0 18px; position:relative; font-weight:600;">
+      <span aria-hidden="true">✉</span>
+      <span style="font-size:.8rem;">Support</span>
       <span id="support-badge" style="display:none; position:absolute; top:-2px; right:-2px; background:var(--red); color:#fff; font-size:.65rem; padding:2px 6px; border-radius:99px; font-weight:700;">0</span>
     </button>
   </div>

@@ -22,7 +22,7 @@
     </div>
   {% else %}
     <div id="action-feed" class="alert-feed">
-      <div style="padding:24px; color:var(--ink-3);">No pending actions. You're all caught up.</div>
+      <div style="padding:24px; color:var(--ink-3);">Nothing needs your approval right now — your assistant will surface the next recommendation when it finds a margin leak, low-stock risk, or delayed order.</div>
     </div>
   {% endif %}
 </div>
@@ -61,7 +61,7 @@
       </tbody>
     </table>
     {% else %}
-    <div style="padding:24px; color:var(--ink-3);">No decisions yet.</div>
+    <div style="padding:24px; color:var(--ink-3);">Approved and dismissed actions will appear here once you start using Vantav.</div>
     {% endif %}
   </div>
 </div>
@@ -83,7 +83,7 @@ async function loadActions() {
 function renderActions(pending, history) {
   const feed = document.getElementById('action-feed');
   if (!pending.length) {
-    feed.innerHTML = '<div style="padding:24px; color:var(--ink-3);">No pending actions. You\'re all caught up.</div>';
+    feed.innerHTML = '<div style="padding:24px; color:var(--ink-3);">Nothing needs your approval right now — your assistant will surface the next recommendation when it finds a margin leak, low-stock risk, or delayed order.</div>';
   } else {
     feed.innerHTML = pending.map(a => `
       <div class="alert-item warn" data-id="${a.id}">
@@ -97,8 +97,7 @@ function renderActions(pending, history) {
         </div>
         <div class="alert-actions" style="align-items:center; gap:6px;">
           <button class="btn btn-primary" style="padding:5px 12px;font-size:.76rem;" onclick="approveAction(${a.id})">Approve</button>
-          <button class="btn" style="padding:5px 12px;font-size:.76rem;" onclick="modifyAction(${a.id})">Modify</button>
-          <button class="btn" style="padding:5px 12px;font-size:.76rem;background:var(--red-bg);color:var(--red);" onclick="denyAction(${a.id})">Deny</button>
+          <button class="btn" style="padding:5px 12px;font-size:.76rem;background:var(--red-bg);color:var(--red);" onclick="denyAction(${a.id})">Dismiss</button>
         </div>
       </div>
     `).join('');
@@ -106,7 +105,7 @@ function renderActions(pending, history) {
 
   const histBox = document.getElementById('action-history');
   if (!history.length) {
-    histBox.innerHTML = '<div style="padding:24px; color:var(--ink-3);">No decisions yet.</div>';
+    histBox.innerHTML = '<div style="padding:24px; color:var(--ink-3);">Approved and dismissed actions will appear here once you start using Vantav.</div>';
     return;
   }
   histBox.innerHTML = `<table style="width:100%; border-collapse:collapse;">
