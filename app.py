@@ -12,6 +12,8 @@ import logging
 import asyncio
 import time
 import dataclasses
+import subprocess
+import sys
 from threading import Thread
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
@@ -6301,6 +6303,49 @@ def register_merchant():
         db.session.rollback()
         logger.warning(f"Tenant registration failed for {admin_email}: {e}")
         return jsonify({"success": False, "error": "Administrative profile email already registered"}), 400
+
+
+@app.route('/api/internal/seed-showcase', methods=['POST'])
+@limiter.limit("10 per minute")
+def _seed_showcase_internal():
+    """One-off endpoint to seed a showcase merchant in the live DB.
+
+    Protected by an environment secret so it can be removed/disabled later.
+    """
+    token = request.headers.get('X-Internal-Seed-Token', '')
+    expected = os.environ.get('INTERNAL_SEED_TOKEN', '')
+    if not expected or not hmac.compare_digest(token, expected):
+        return jsonify({"error": "Forbidden"}), 403
+
+    data = request.get_json(silent=True) or {}
+    required = ['merchant_id', 'email', 'password', 'business_name']
+    for field in required:
+        if not data.get(field):
+            return jsonify({"error": f"Missing {field}"}), 400
+
+    env = os.environ.copy()
+    env['SHOWCASE_MERCHANT_ID'] = data['merchant_id']
+    env['SHOWCASE_EMAIL'] = data['email']
+    env['SHOWCASE_PASSWORD'] = data['password']
+    env['SHOWCASE_BUSINESS_NAME'] = data['business_name']
+    env['SHOWCASE_SKU_PREFIX'] = data.get('sku_prefix', '')
+    env['SHOWCASE_TIER'] = data.get('tier', 'Vantav Scale')
+    env['SEED_DEMO_DATA'] = 'true'
+
+    script_path = os.path.join(os.path.dirname(__file__), 'scripts', 'seed_showcase_merchant.py')
+    try:
+        result = subprocess.run(
+            [sys.executable, script_path],
+            env=env,
+            capture_output=True,
+            text=True,
+            timeout=180,
+            check=True,
+        )
+        return jsonify({"status": "ok", "stdout": result.stdout, "stderr": result.stderr}), 200
+    except subprocess.CalledProcessError as e:
+        logger.error(f"seed-showcase failed: {e.stderr}")
+        return jsonify({"error": "Seed failed", "stdout": e.stdout, "stderr": e.stderr}), 500
 
 
 @app.route('/api/v1/tenant/generate-magic-link', methods=['POST'])

@@ -42,15 +42,21 @@ MERCHANT_ID = os.environ.get("SHOWCASE_MERCHANT_ID", "merchant_demo_video")
 EMAIL = os.environ.get("SHOWCASE_EMAIL", "demo@vantavcommerce.com")
 PASSWORD = os.environ.get("SHOWCASE_PASSWORD") or secrets.token_urlsafe(12)
 BUSINESS_NAME = os.environ.get("SHOWCASE_BUSINESS_NAME", "Aurora Supply")
+SKU_PREFIX = os.environ.get("SHOWCASE_SKU_PREFIX", "")
+
+
+def _sku(sku: str) -> str:
+    return f"{SKU_PREFIX}{sku}" if SKU_PREFIX else sku
+
 
 CATALOG = [
     # sku, title, channel, price, unit_cost, on_hand, reorder_point, weight
-    ("AUR-SLK-001", "Satin Sleep Set", "shopify", 128.00, 67.50, 68, 90, 26),
-    ("AUR-SLK-002", "Silk Pillowcase Pair", "shopify", 64.00, 30.50, 412, 120, 22),
-    ("AUR-CND-010", "Amber Soy Candle", "tiktok", 34.00, 15.20, 780, 200, 18),
-    ("AUR-ROB-004", "Waffle Lounge Robe", "amazon", 96.00, 55.60, 143, 80, 14),
-    ("AUR-BAG-021", "Quilted Weekender", "shopify", 214.00, 117.00, 54, 40, 8),
-    ("AUR-CND-011", "Cedar + Fig Diffuser", "tiktok", 48.00, 22.10, 96, 150, 12),
+    (_sku("AUR-SLK-001"), "Satin Sleep Set", "shopify", 128.00, 67.50, 68, 90, 26),
+    (_sku("AUR-SLK-002"), "Silk Pillowcase Pair", "shopify", 64.00, 30.50, 412, 120, 22),
+    (_sku("AUR-CND-010"), "Amber Soy Candle", "tiktok", 34.00, 15.20, 780, 200, 18),
+    (_sku("AUR-ROB-004"), "Waffle Lounge Robe", "amazon", 96.00, 55.60, 143, 80, 14),
+    (_sku("AUR-BAG-021"), "Quilted Weekender", "shopify", 214.00, 117.00, 54, 40, 8),
+    (_sku("AUR-CND-011"), "Cedar + Fig Diffuser", "tiktok", 48.00, 22.10, 96, 150, 12),
 ]
 
 CHANNEL_MIX = {"shopify": 0.52, "tiktok": 0.28, "amazon": 0.20}
@@ -171,7 +177,7 @@ ALERTS = [
      "showcase:tiktok_spend"),
     ("inventory_runout", "high", "Satin Sleep Set runs out in 5 days",
      "68 units on hand, selling 13/day. Supplier lead time is 6 days — reorder today to avoid a stockout.",
-     "showcase:AUR-SLK-001"),
+     f"showcase:{_sku('AUR-SLK-001')}"),
     ("margin_drop", "high", "Amazon orders are breaking even at best",
      "Waffle Lounge Robe sells for $96 on Amazon and nets -$1.80 after fees, shipping and product cost. 7 of the last 11 Amazon orders lost money.",
      "showcase:amazon_margin"),
@@ -190,10 +196,10 @@ ACTIONS = [
      {"platform": "tiktok", "adjustment": -100, "campaign": "Sleep Set — Broad"}, (164.0, 231.0)),
     ("reorder", "Reorder 240 units of Satin Sleep Set",
      "At 13 units/day and a 6-day lead time, stock runs out in 5 days. A 240-unit purchase order covers 18 days of demand and protects $2,120 in sales.",
-     {"sku": "AUR-SLK-001", "quantity": 240, "supplier": "Lumen Textiles"}, (410.0, 530.0)),
+     {"sku": _sku("AUR-SLK-001"), "quantity": 240, "supplier": "Lumen Textiles"}, (410.0, 530.0)),
     ("price_change", "Raise Waffle Lounge Robe to $104 on Amazon",
      "Amazon fees and shipping leave $1.80 of loss per unit at $96. An $8 increase restores a 6% net margin; competitor median is $109.",
-     {"sku": "AUR-ROB-004", "new_price": 104.00, "old_price": 96.00, "channel": "amazon"}, (120.0, 186.0)),
+     {"sku": _sku("AUR-ROB-004"), "new_price": 104.00, "old_price": 96.00, "channel": "amazon"}, (120.0, 186.0)),
 ]
 
 
