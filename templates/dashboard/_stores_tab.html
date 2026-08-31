@@ -44,10 +44,9 @@
         {% elif not merchant.live_access_enabled %}
         <a href="/subscribe" class="tag tag-ghost" style="margin-top: 10px; display: inline-block;">Subscribe to connect</a>
         {% elif ch.platform == 'tiktok' and ch.state != 'connected' %}
-        <select id="tiktok-region" style="margin-top: 8px; width: 100%; padding: 5px; font-size: .72rem; border-radius: 6px; border: 1px solid var(--line); background: var(--surface); color: var(--ink);">
+        <select id="tiktok-region" style="margin-top: 8px; width: 100%; padding: 5px; font-size: .72rem; border-radius: 6px; border: 1px solid var(--line); background: var(--surface); color: var(--ink);" aria-label="TikTok Shop region">
           <option value="us" selected>US TikTok Shop</option>
           <option value="uk">UK / EU TikTok Shop</option>
-          <option value="">Global / Other</option>
         </select>
         <button class="btn" style="margin-top: 6px; width: 100%; font-size: .72rem; padding: 5px 8px;" onclick="openConnectModal('tiktok')">Connect</button>
         {% else %}
@@ -102,17 +101,16 @@
 
       <div id="shopify-fields">
         <label style="font-size: .75rem; color: var(--ink-3); font-weight: 600;">Store domain</label>
-        <input id="shopify-shop" type="text" placeholder="store.myshopify.com" style="width: 100%; padding: 10px; margin: 6px 0 12px; border: 1px solid var(--line); border-radius: 8px; background: var(--surface); color: var(--ink);">
+        <input id="shopify-shop" type="text" placeholder="store.myshopify.com" pattern="^[a-z0-9](?:[a-z0-9-]*[a-z0-9])?\.myshopify\.com$" title="Enter a .myshopify.com domain" style="width: 100%; padding: 10px; margin: 6px 0 12px; border: 1px solid var(--line); border-radius: 8px; background: var(--surface); color: var(--ink);">
         <label style="font-size: .75rem; color: var(--ink-3); font-weight: 600;">Access token (custom app)</label>
-        <input id="shopify-token" type="password" placeholder="shpat_…" style="width: 100%; padding: 10px; margin: 6px 0 12px; border: 1px solid var(--line); border-radius: 8px; background: var(--surface); color: var(--ink);">
+        <input id="shopify-token" type="password" placeholder="shpat_…" pattern="^shpat_[A-Za-z0-9]+$" minlength="20" title="Enter a Shopify custom app access token starting with shpat_" style="width: 100%; padding: 10px; margin: 6px 0 12px; border: 1px solid var(--line); border-radius: 8px; background: var(--surface); color: var(--ink);">
       </div>
 
       <div id="tiktok-fields" style="display:none;">
         <label style="font-size: .75rem; color: var(--ink-3); font-weight: 600;">Region</label>
-        <select id="tiktok-manual-region" style="width: 100%; padding: 10px; margin: 6px 0 12px; border: 1px solid var(--line); border-radius: 8px; background: var(--surface); color: var(--ink);">
+        <select id="tiktok-manual-region" style="width: 100%; padding: 10px; margin: 6px 0 12px; border: 1px solid var(--line); border-radius: 8px; background: var(--surface); color: var(--ink);" aria-label="TikTok Shop region">
           <option value="us" selected>US TikTok Shop</option>
           <option value="uk">UK / EU TikTok Shop</option>
-          <option value="">Global / Other</option>
         </select>
         <label style="font-size: .75rem; color: var(--ink-3); font-weight: 600;">Shop / Seller ID</label>
         <input id="tiktok-seller" type="text" placeholder="Your TikTok shop ID" style="width: 100%; padding: 10px; margin: 6px 0 12px; border: 1px solid var(--line); border-radius: 8px; background: var(--surface); color: var(--ink);">
@@ -172,14 +170,9 @@
 {% endif %}
 
 <div class="card" style="margin-top:24px;">
-  <div class="card-head"><h3>Webhook URLs</h3></div>
+  <div class="card-head"><h3>Secure Webhooks</h3></div>
   <div style="padding:0 16px 16px;">
-    <p style="font-size:.8rem; color:var(--ink-3); margin-bottom:12px;">Paste these endpoints into your channel developer settings. Add <code>?merchant_id=YOUR_MERCHANT_ID</code> to each URL.</p>
-    <ul style="font-size:.8rem; line-height:1.8; color:var(--ink); list-style:none; padding:0;">
-      <li><strong>Shopify:</strong> <code>https://vantavcommerce.com/api/v1/webhooks/shopify-orders?merchant_id={{ merchant.id }}</code></li>
-      <li><strong>TikTok:</strong> <code>https://vantavcommerce.com/api/v1/webhooks/tiktok-orders?merchant_id={{ merchant.id }}</code></li>
-      <li><strong>Amazon:</strong> <code>https://vantavcommerce.com/api/v1/webhooks/amazon-orders?merchant_id={{ merchant.id }}</code></li>
-    </ul>
+    <p style="font-size:.8rem; color:var(--ink-3); margin-bottom:12px;">Webhook endpoints are provisioned per account and do not expose your merchant ID in the URL. Contact support to retrieve your secure webhook URLs or enable developer access in Settings → Integrations.</p>
   </div>
 </div>
 

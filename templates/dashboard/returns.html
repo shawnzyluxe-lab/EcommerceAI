@@ -8,10 +8,10 @@
 </section>
 
 <div class="kpi-grid">
-  <div class="card kpi-card"><div class="kpi-label">Return rate</div><div class="kpi-value">2.4%</div><div class="kpi-delta down">▼ 0.5% vs last 30 days</div></div>
-  <div class="card kpi-card"><div class="kpi-label">Open returns</div><div class="kpi-value">14</div></div>
-  <div class="card kpi-card"><div class="kpi-label">Refunds issued</div><div class="kpi-value">$2,840</div><div class="kpi-delta down">▼ 3.1% vs last 30 days</div></div>
-  <div class="card kpi-card"><div class="kpi-label">Avg resolution</div><div class="kpi-value">2.1d</div></div>
+  <div class="card kpi-card"><div class="kpi-label">Return rate</div><div class="kpi-value">—</div></div>
+  <div class="card kpi-card"><div class="kpi-label">Open returns</div><div class="kpi-value">—</div></div>
+  <div class="card kpi-card"><div class="kpi-label">Refunds issued</div><div class="kpi-value">—</div></div>
+  <div class="card kpi-card"><div class="kpi-label">Avg resolution</div><div class="kpi-value">—</div></div>
 </div>
 
 <div class="card">
@@ -20,8 +20,19 @@
     <table>
       <thead><tr><th>Order</th><th>Product</th><th>Reason</th><th class="num">Refund</th><th>Status</th></tr></thead>
       <tbody>
-        <tr><td class="b mono">#1037</td><td>Prometheus Ceramic Mug</td><td>Arrived broken</td><td class="num mono">$19.99</td><td><span class="tag tag-amber">In review</span></td></tr>
-        <tr><td class="b mono">#1029</td><td>Prometheus Hoodie</td><td>Wrong size</td><td class="num mono">$59.99</td><td><span class="tag tag-green">Approved</span></td></tr>
+        {% for r in returns_rows | default([]) %}
+        <tr>
+          <td class="b mono">{{ r.order_id }}</td>
+          <td>{{ r.product }}</td>
+          <td>{{ r.reason }}</td>
+          <td class="num mono">{% if r.refund_amount is number %}${{ '%.2f'|format(r.refund_amount) }}{% else %}—{% endif %}</td>
+          <td><span class="tag tag-ghost">{{ r.status }}</span></td>
+        </tr>
+        {% else %}
+        <tr>
+          <td colspan="5" style="text-align: center; color: var(--ink-3); padding: 24px;">No return requests to display. Returns and refunds will appear once connected.</td>
+        </tr>
+        {% endfor %}
       </tbody>
     </table>
   </div>

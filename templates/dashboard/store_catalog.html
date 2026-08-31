@@ -4,41 +4,40 @@
 
 <section class="page-header">
   <h1>Store Catalog</h1>
-  <p>Manage and sync your products across all sales channels.</p>
+  <p>Products synced from your connected Shopify, TikTok Shop, and Amazon stores.</p>
 </section>
 
 <div class="card">
   <div class="card-head">
-    <h3>Catalog</h3>
-    <span class="spacer"></span>
-    <button class="btn btn-primary">+ Add Product</button>
+    <h3>Synced products</h3>
   </div>
   <div style="display: flex; gap: 10px; margin-bottom: 14px; flex-wrap: wrap;">
     <input type="text" placeholder="Search products, SKU, or tags…" class="btn" style="justify-content: flex-start; text-align: left; flex: 1; min-width: 200px;">
-    <button class="btn">Filters</button>
-    <button class="btn">Collections</button>
-    <button class="btn">More</button>
   </div>
   <div class="table-wrap">
     <table>
       <thead>
-        <tr><th>Product</th><th>SKU</th><th class="num">Price</th><th class="num">Inventory</th><th>Channels</th><th>Status</th></tr>
+        <tr><th>Product</th><th>SKU</th><th class="num">Inventory</th><th>Channels</th><th>Status</th></tr>
       </thead>
       <tbody>
-        {% for p in catalog_rows | default([
-          {'title':'Prometheus Insulated Bottle','sku':'PRM-BTL-001','price':34.99,'stock':128,'status':'Active'},
-          {'title':'Prometheus Hoodie','sku':'PRM-HOD-002','price':59.99,'stock':64,'status':'Active'},
-          {'title':'Prometheus Snapback','sku':'PRM-HAT-003','price':29.99,'stock':210,'status':'Active'},
-          {'title':'Prometheus Backpack','sku':'PRM-BAG-004','price':89.99,'stock':39,'status':'Low'},
-          {'title':'Prometheus Ceramic Mug','sku':'PRM-MUG-005','price':19.99,'stock':0,'status':'Out'}
-        ]) %}
+        {% set channel_abbr = {'shopify':'SH','tiktok':'TT','amazon':'AZ'} %}
+        {% for p in catalog_rows %}
         <tr>
           <td class="b">{{ p.title }}</td>
           <td class="mono">{{ p.sku }}</td>
-          <td class="num mono">${{ '%.2f'|format(p.price) }}</td>
-          <td class="num {% if p.stock > 50 %}up{% elif p.stock > 0 %}amber{% else %}down{% endif %}">{{ p.stock }} in stock</td>
-          <td><span class="tag tag-ghost">SH</span> <span class="tag tag-ghost">AZ</span> <span class="tag tag-ghost">TT</span></td>
+          <td class="num {% if p.on_hand == 0 %}down{% elif p.status == 'Low' %}amber{% else %}up{% endif %}">{{ p.on_hand }} in stock</td>
+          <td>
+            {% for c in p.channels %}
+            <span class="tag tag-ghost">{{ channel_abbr.get(c, c[:2]|upper) }}</span>
+            {% endfor %}
+          </td>
           <td><span class="tag {% if p.status == 'Active' %}tag-green{% elif p.status == 'Low' %}tag-amber{% else %}tag-red{% endif %}">{{ p.status }}</span></td>
+        </tr>
+        {% else %}
+        <tr>
+          <td colspan="5" style="text-align: center; color: var(--ink-3); padding: 24px;">
+            No synced products yet. Connect a store in Settings → Stores to start syncing.
+          </td>
         </tr>
         {% endfor %}
       </tbody>

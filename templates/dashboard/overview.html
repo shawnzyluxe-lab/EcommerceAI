@@ -34,18 +34,24 @@
     <a href="/subscribe" class="btn btn-primary">View plans</a>
   </div>
 </div>
-{% elif show_onboarding and connected|length == 0 %}
+{% elif connected|length == 0 %}
 <div class="card" style="border: 1px solid var(--accent); background: var(--accent-bg); margin-bottom: 18px;">
-  <div style="display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap;">
-    <div>
-      <div style="font-weight: 700; color: var(--ink); margin-bottom: 4px;">Welcome to Vantav</div>
-      <div style="font-size: .85rem; color: var(--ink-2);">Connect your first store to start tracking true profit, alerts, and recommended actions.</div>
+  <div style="display: flex; align-items: flex-start; gap: 16px; flex-wrap: wrap;">
+    <div style="flex: 1; min-width: 220px;">
+      <div style="font-weight: 700; color: var(--ink); margin-bottom: 8px;">Welcome to Vantav</div>
+      <ol style="font-size: .85rem; color: var(--ink-2); line-height: 1.8; padding-left: 1.2rem; margin: 0;">
+        <li><strong>Choose a plan</strong> — done</li>
+        <li><strong>Connect Shopify, TikTok Shop, or Amazon</strong></li>
+        <li><strong>Invite team members</strong> (optional)</li>
+        <li><strong>Ask the assistant anything</strong></li>
+      </ol>
     </div>
-    <a href="/dashboard/settings?tab=stores&onboarding=1" class="btn btn-primary">Connect a store</a>
+    <a href="/dashboard/settings?tab=stores&onboarding=1" class="btn btn-primary" style="align-self: center;">Connect your first store</a>
   </div>
 </div>
 {% endif %}
 
+{% if connected|length > 0 %}
 <div class="workflow-pillars" style="margin-top: 18px;">
 
   <!-- PILLAR 01: TRUE PROFIT -->
@@ -185,9 +191,9 @@
           </div>
 
           <div style="display: flex; gap: 8px; flex-wrap: wrap;">
-            <button class="btn btn-primary" id="approve-hero-btn" onclick="approveHeroAction({{ hero_action.id }})">Approve & Execute</button>
+            <button class="btn btn-primary" id="approve-hero-btn" onclick="approveHeroAction({{ hero_action.id }})">Approve & Run</button>
             <button class="btn" onclick="dismissHeroAction({{ hero_action.id }})">Dismiss</button>
-            <a href="/dashboard/action-gate" class="btn btn-ghost">Modify</a>
+            <a href="/dashboard/pending-actions" class="btn btn-ghost">Modify</a>
           </div>
         </div>
       </div>
@@ -197,12 +203,12 @@
         <span style="color: var(--purple);">→</span>
         <span style="width: 24px; height: 24px; border-radius: 50%; background: var(--purple-bg); color: var(--purple); display: inline-flex; align-items: center; justify-content: center; font-weight: 700;">2</span> Approve
         <span style="color: var(--purple);">→</span>
-        <span style="width: 24px; height: 24px; border-radius: 50%; background: var(--purple-bg); color: var(--purple); display: inline-flex; align-items: center; justify-content: center; font-weight: 700;">3</span> Execute
+        <span style="width: 24px; height: 24px; border-radius: 50%; background: var(--purple-bg); color: var(--purple); display: inline-flex; align-items: center; justify-content: center; font-weight: 700;">3</span> Run
       </div>
       {% else %}
       <div style="padding: 24px; text-align: center; color: var(--ink-3); border: 1px dashed var(--line); border-radius: 10px; flex: 1; display: flex; flex-direction: column; justify-content: center;">
-        <p style="margin-bottom: 14px;">No recommended actions yet. Run the assistant to detect opportunities.</p>
-        <button class="btn btn-primary" id="run-analysis-btn" onclick="runAssistantAnalysis()" style="align-self: center;">Run Assistant Analysis</button>
+        <p style="margin-bottom: 14px;">No recommended actions yet. Ask the assistant to find opportunities.</p>
+        <button class="btn btn-primary" id="run-analysis-btn" onclick="runAssistantAnalysis()" style="align-self: center;">Ask the assistant</button>
       </div>
       {% endif %}
     </div>
@@ -211,16 +217,18 @@
 </div>
 
 <div style="text-align: center; margin-top: 22px;">
-  <div style="font-size: 1.1rem; font-weight: 800; letter-spacing: .18em; color: var(--purple);">REVIEW • APPROVE • EXECUTE</div>
+  <div style="font-size: 1.1rem; font-weight: 800; letter-spacing: .18em; color: var(--purple);">REVIEW • APPROVE • RUN</div>
   <div style="font-size: .85rem; color: var(--ink-3); margin-top: 6px;">Vantav is watching.</div>
 </div>
+{% endif %}
 
+{% if connected|length > 0 %}
 <!-- AI operator banner -->
 <div class="ai-banner">
   <div class="ai-avatar">🤖</div>
   <div style="flex: 1;">
-    <div style="font-weight: 700; color: var(--ink); font-size: .95rem;">Vantav is your AI operations layer.</div>
-    <div style="font-size: .82rem; color: var(--ink-2); margin-top: 3px;">We monitor. We analyze. We recommend. You approve. We execute.</div>
+    <div style="font-weight: 700; color: var(--ink); font-size: .95rem;">Vantav is your AI-powered commerce assistant.</div>
+    <div style="font-size: .82rem; color: var(--ink-2); margin-top: 3px;">We monitor. We analyze. We recommend. You approve. We run it.</div>
   </div>
   <a href="/dashboard/commerce-hub" class="btn btn-primary" style="flex: none;">Connect More Channels</a>
 </div>
@@ -269,6 +277,7 @@
   </div>
 </div>
 {% endif %}
+{% endif %}
 
 <style>
 .hidden { display: none !important; }
@@ -289,7 +298,7 @@ async function runAssistantAnalysis() {
   } catch (e) {
     alert('Network error. Please try again.');
   } finally {
-    if (btn) { btn.disabled = false; btn.textContent = 'Run Assistant Analysis'; }
+    if (btn) { btn.disabled = false; btn.textContent = 'Ask the assistant'; }
   }
 }
 
@@ -307,7 +316,7 @@ async function approveHeroAction(actionId) {
   } catch (e) {
     alert('Network error. Please try again.');
   } finally {
-    if (btn) { btn.disabled = false; btn.textContent = 'Approve & Execute'; }
+    if (btn) { btn.disabled = false; btn.textContent = 'Approve & Run'; }
   }
 }
 

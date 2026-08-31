@@ -21,9 +21,9 @@
   <div class="card">
     <div class="card-head"><h3>Current Plan</h3></div>
     <div style="background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); padding: 18px; margin-bottom: 14px;">
-      <div style="font-size: 1.2rem; font-weight: 700; margin-bottom: 4px; color: var(--ink);">{{ plan }}</div>
+      <div style="font-size: 1.2rem; font-weight: 700; margin-bottom: 4px; color: var(--ink);">{{ tier_limits.display_name | default(plan) | default('Basic Tier') }}</div>
       <div id="plan-desc" style="font-size: .85rem; color: var(--ink-2); margin-bottom: 14px;">{% if concierge %}Concierge Bundle included{% else %}Upgrade anytime to unlock more stores, actions, and advanced features.{% endif %}</div>
-      <div style="font-size: 1.6rem; font-weight: 800; margin-bottom: 4px; color: var(--ink);">{% if plan == 'Vantav Operator' %}$199{% elif plan == 'Vantav Growth' %}$399{% elif plan == 'Vantav Scale' %}$799{% else %}Custom{% endif %}<span style="font-size: .85rem; color: var(--ink-3);">/mo</span></div>
+      <div style="font-size: 1.6rem; font-weight: 800; margin-bottom: 4px; color: var(--ink);">{% if tier_limits.monthly_price %}${{ tier_limits.monthly_price }}{% else %}Custom{% endif %}<span style="font-size: .85rem; color: var(--ink-3);">/mo</span></div>
       {% if concierge %}<div style="font-size: .85rem; color: var(--ink-2); margin-top: 6px;">+ Concierge Bundle $999</div>{% endif %}
       {% if billing_account and billing_account.billing_cycle_end %}
       <div id="renewal-date" style="font-size: .8rem; color: var(--ink-3); margin-top: 6px;">Current cycle ends {{ billing_account.billing_cycle_end }}</div>
@@ -53,16 +53,11 @@
 
 <div class="card">
   <div class="card-head"><h3>Usage this cycle</h3></div>
-  {% set usage = {
-    'Orders': (billing_account.metered_usage_units | default(0), tier_limits.orders | default(1000)),
-    'Approved actions': (billing_account.approved_actions | default(0), tier_limits.actions | default(50)),
-    'Connected stores': (connected | default([]) | length, tier_limits.stores | default(2)),
-    'Team users': (team_users | default([]) | length, tier_limits.users | default(3))
-  } %}
-  {% for label, vals in usage.items() %}
-  {% set used = vals[0] | float %}
-  {% set limit = vals[1] | float %}
-  {% set raw_pct = used / limit * 100 %}
+  {% if usage_overview %}
+  {% for label, used, limit in usage_overview %}
+  {% set used = used | float %}
+  {% set limit = limit | float %}
+  {% set raw_pct = (used / limit * 100) if limit > 0 else 0 %}
   {% set pct = raw_pct if raw_pct < 100 else 100 %}
   <div style="margin-bottom: 14px;">
     <div style="display: flex; justify-content: space-between; font-size: .85rem; margin-bottom: 5px; color: var(--ink-2);">
@@ -73,20 +68,22 @@
     </div>
   </div>
   {% endfor %}
+  {% else %}
+  <div style="font-size: .85rem; color: var(--ink-3);">Usage data will appear after your store is connected.</div>
+  {% endif %}
 </div>
 
 <div class="card">
   <div class="card-head"><h3>Invoices</h3></div>
   <div class="table-wrap">
     <table>
-      <thead><tr><th>Invoice</th><th>Date</th><th class="num">Amount</th><th>Status</th><th></th></tr></thead>
+      <thead><tr><th>Invoice</th><th>Date</th><th class="num">Amount</th><th>Status</th></tr></thead>
       <tbody>
         <tr>
           <td class="b">Current accrued balance</td>
           <td>—</td>
           <td class="num mono">${{ '{:,.2f}'.format(billing_account.accrued_invoice_value | default(0.0)) }}</td>
           <td><span class="tag tag-ghost">Open</span></td>
-          <td class="num">—</td>
         </tr>
       </tbody>
     </table>
@@ -103,12 +100,12 @@
       <label class="upgrade-plan-label" style="display: flex; align-items: center; gap: 10px; padding: 12px; border: 1px solid var(--line); border-radius: 10px; cursor: pointer; background: var(--bg);">
         <input type="radio" name="upgrade-plan" value="operator" {% if plan == 'Vantav Operator' %}checked{% endif %} style="accent-color: var(--purple);">
         <div>
-          <div style="font-weight: 700; color: var(--ink);">Vantav Operator — $199/mo</div>
+          <div style="font-weight: 700; color: var(--ink);">Vantav Starter — $199/mo</div>
           <div style="font-size: .8rem; color: var(--ink-3);">Up to 2 stores with recommendations, alerts, and standard support</div>
         </div>
       </label>
       <label class="upgrade-plan-label" style="display: flex; align-items: center; gap: 10px; padding: 12px; border: 1px solid var(--purple); border-radius: 10px; cursor: pointer; background: var(--surface); position: relative;">
-        <input type="radio" name="upgrade-plan" value="growth" {% if plan != 'Vantav Scale' %}checked{% endif %} style="accent-color: var(--purple);">
+        <input type="radio" name="upgrade-plan" value="growth" {% if plan == 'Vantav Growth' %}checked{% endif %} style="accent-color: var(--purple);">
         <div>
           <div style="font-weight: 700; color: var(--ink);">Vantav Growth — $399/mo <span style="font-size:.65rem; color:var(--purple);">MOST POPULAR</span></div>
           <div style="font-size: .8rem; color: var(--ink-3);">Up to 5 stores with forecasting, cross-store reporting, and priority support</div>

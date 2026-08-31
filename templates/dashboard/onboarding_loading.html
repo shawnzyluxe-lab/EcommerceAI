@@ -29,12 +29,12 @@
 
     <div class="flex items-center space-x-2 border-b border-borderMuted/40 pb-4">
       <span class="w-2 h-2 rounded-full bg-accentGold animate-ping"></span>
-      <span class="font-mono text-xs tracking-[0.2em] text-accentGold font-bold">PROMETHEUS // INITIALIZATION ENGINE</span>
+      <span class="font-mono text-xs tracking-[0.2em] text-accentGold font-bold">VANTAV // INITIALIZING</span>
     </div>
 
     <div class="space-y-1">
-      <h2 class="text-lg font-bold text-white uppercase tracking-wide">Syncing Your Store Telemetry</h2>
-      <p class="text-xs text-gray-400 font-mono">Your credentials are secure. The Assistant is running an initial audit on your past 14 days of store transactions.</p>
+      <h2 class="text-lg font-bold text-white uppercase tracking-wide">Syncing Your Store Data</h2>
+      <p class="text-xs text-gray-400 font-mono">Your credentials are secure. Vantav is pulling the last 14 days of orders, costs, and alerts so we can show you what to do first.</p>
     </div>
 
     <div class="w-full bg-onyx border border-borderMuted rounded-sm p-1.5 overflow-hidden h-7 flex items-center">
@@ -63,10 +63,10 @@
       const returnUrl = params.get("return") || "/dashboard";
 
       const sequence = [
-        { percent: 15, l1: "SYSTEM: Credentials authenticated successfully via secure tunnel API.", l2: "SYSTEM: Pulling 14-day historical multi-channel order history.", l3: "> Connecting to Shopify REST endpoints..." },
-        { percent: 45, l1: "SYSTEM: Pulling 14-day historical multi-channel order history.", l2: "SYSTEM: Harvest complete. Normalized historical rows to database schemas.", l3: "> Transmitting data cache to relational tables..." },
-        { percent: 75, l1: "SYSTEM: Harvest complete. Normalized historical rows to database schemas.", l2: "SYSTEM: Assistant initialization complete.", l3: "> Running regression analytics and margin audits..." },
-        { percent: 100, l1: "SYSTEM: Assistant initialization complete.", l2: "SYSTEM: Regression analytics and margin audits completed.", l3: "> [SUCCESS] Dashboard telemetry arrays fully populated." }
+        { percent: 15, l1: "Credentials authenticated securely.", l2: "Pulling 14 days of orders from connected channels.", l3: "> Connecting to your store..." },
+        { percent: 45, l1: "Pulling 14 days of orders from connected channels.", l2: "Orders matched to costs and shipping data.", l3: "> Building your profit picture..." },
+        { percent: 75, l1: "Orders matched to costs and shipping data.", l2: "Vantav AI is ready.", l3: "> Finding your first recommendations..." },
+        { percent: 100, l1: "Vantav AI is ready.", l2: "Your first recommendations are ready.", l3: "> [SUCCESS] Opening your dashboard." }
       ];
 
       let stage = 0;

@@ -22,7 +22,7 @@
   </style>
   {% block head %}{% endblock %}
 </head>
-<body data-merchant-name="{{ merchant.name | default('there') }}" data-account-holder-name="{{ merchant.account_holder_name | default(merchant.name) | default('there') }}" data-merchant-timezone="{{ merchant.timezone | default('UTC') }}" data-theme="{{ merchant.theme | default('prometheus-dark') }}" style="--brand-accent: {{ merchant.brand_color | default('#8b5cf6') }}; --brand-accent-2: {{ merchant.brand_color_secondary | default('#a78bfa') }};">
+<body data-merchant-name="{{ merchant.name | default('there') }}" data-account-holder-name="{{ merchant.account_holder_name | default(merchant.name) | default('there') }}" data-merchant-timezone="{{ merchant.timezone | default('UTC') }}" data-theme="{{ merchant.theme | default('prometheus-dark') }}" data-connected-count="{{ connected | length }}" style="--brand-accent: {{ merchant.brand_color | default('#8b5cf6') }}; --brand-accent-2: {{ merchant.brand_color_secondary | default('#a78bfa') }};">
   <script>
   (function applyTheme(){
     const themeVars = ['--bg','--surface','--surface-elevated','--ink','--ink-2','--ink-3','--line','--line-2'];
@@ -73,7 +73,7 @@
         </div>
         <div class="brand-text">
           <span class="brand-name">VANTAV</span>
-          <span class="brand-tagline">Commerce OS</span>
+          <span class="brand-tagline">AI assistant</span>
         </div>
       </div>
 
@@ -106,8 +106,8 @@
       <div class="sidebar-footer">
         <div class="plan-card">
           <div class="plan-icon">{% if merchant.tier and 'Enterprise' in merchant.tier %}♛{% else %}★{% endif %}</div>
-          <div class="plan-name">{{ merchant.tier | default('Enterprise Plan') }}</div>
-          <div class="plan-note">Unlimited access</div>
+          <div class="plan-name">{{ tier_limits.display_name | default(merchant.tier) | default('Enterprise Plan') }}</div>
+          <div class="plan-note">{% if tier_limits.monthly_price %}${{ tier_limits.monthly_price }}/mo · {% endif %}{{ tier_limits.orders | default('—') }} orders · {{ tier_limits.stores | default('—') }} stores</div>
           <a href="/dashboard/settings?tab=billing" class="plan-link">View Plan</a>
         </div>
         <div class="user-row">
@@ -137,9 +137,9 @@
           </div>
           <span class="brand-name">VANTAV</span>
         </a>
-        <div class="breadcrumb">{{ merchant.name | default('Your store') }} / {{ active_page | replace('_ai', '') | replace('_', ' ') | title }}</div>
+        <div class="breadcrumb">{{ merchant.name | default('Your store') }} / {{ (page_label or active_page) | replace('_ai', '') | replace('_', ' ') | title }}</div>
         <div class="topbar-actions">
-          <div class="tier-badge" id="current-merchant-tier-badge">{{ merchant.tier | default('Enterprise Plan') }}</div>
+          <div class="tier-badge" id="current-merchant-tier-badge">{{ tier_limits.display_name | default(merchant.tier) | default('Enterprise Plan') }}</div>
           <a href="/site-logout" class="btn btn-ghost">Log out</a>
         </div>
       </header>
@@ -448,14 +448,21 @@
     {% if assistant_login_greeting %}
     (function greetOnLogin(){
       const name = (document.body.dataset.accountHolderName || document.body.dataset.merchantName || 'there').split(' ')[0];
+      const connectedCount = parseInt(document.body.dataset.connectedCount || '0', 10);
       const hour = new Date().getHours();
       const salutation = hour < 5 || hour >= 22 ? 'Good night' : hour < 12 ? 'Good morning' : hour < 17 ? 'Good afternoon' : 'Good evening';
-      addMessage('assistant', `${salutation}, ${name}. I reviewed your channels overnight — pulling today's briefing now.`);
+      if (connectedCount === 0) {
+        addMessage('assistant', `Welcome back. You haven't connected a store yet — start with Shopify, TikTok Shop, or Amazon and I can begin monitoring.`);
+      } else {
+        addMessage('assistant', `${salutation}, ${name}. I reviewed your channels overnight — pulling today's briefing now.`);
+      }
       if(!popup.classList.contains('open')) toggleAIPopup();
-      setTimeout(() => {
-        input.value = 'What needs my attention today?';
-        sendAIPopupMessage();
-      }, 700);
+      if (connectedCount > 0) {
+        setTimeout(() => {
+          input.value = 'What needs my attention today?';
+          sendAIPopupMessage();
+        }, 700);
+      }
     })();
     {% endif %}
 
@@ -477,7 +484,7 @@
         <button class="btn btn-primary" style="padding:6px 12px;" onclick="sendSupportMessage()">Send</button>
       </div>
     </div>
-    <button id="support-fab" onclick="toggleSupport()" style="width:52px; height:52px; border-radius:50%; border:none; background:var(--accent); color:#fff; font-size:22px; cursor:pointer; box-shadow:0 6px 20px rgba(0,0,0,.2); display:flex; align-items:center; justify-content:center; position:relative;">
+    <button id="support-fab" onclick="toggleSupport()" aria-label="Open support" title="Open support" style="width:52px; height:52px; border-radius:50%; border:none; background:var(--accent); color:#fff; font-size:22px; cursor:pointer; box-shadow:0 6px 20px rgba(0,0,0,.2); display:flex; align-items:center; justify-content:center; position:relative;">
       ✉
       <span id="support-badge" style="display:none; position:absolute; top:-2px; right:-2px; background:var(--red); color:#fff; font-size:.65rem; padding:2px 6px; border-radius:99px; font-weight:700;">0</span>
     </button>
