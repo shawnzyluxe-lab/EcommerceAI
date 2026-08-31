@@ -169,11 +169,26 @@
         <label for="password">Password</label>
         <input type="password" id="password" name="password" required autocomplete="current-password" placeholder="••••••••">
 
+        <label style="display:flex; align-items:center; gap:.5rem; font-size:.8rem; color:var(--muted); margin:-.5rem 0 1.1rem; cursor:pointer;">
+          <input type="checkbox" onchange="togglePassword('password')">
+          Show password
+        </label>
+
         <button type="submit" id="btn">Log in</button>
+      </form>
+
+      <form id="forgot-form" style="display:none;" onsubmit="submitForgot(event)">
+        <label for="forgot-email">Email</label>
+        <input type="email" id="forgot-email" required autocomplete="email" placeholder="you@company.com">
+
+        <button type="submit" id="forgot-btn">Send reset link</button>
+        <button type="button" style="background:transparent; color:var(--muted); font-weight:500; margin-top:.5rem;" onclick="showForgot(false)">Back to log in</button>
       </form>
     </div>
 
     <div class="links">
+      <a href="#" onclick="showForgot(true); return false;">Forgot password?</a>
+      &nbsp;·&nbsp;
       Don't have access? <a href="/subscribe">Get started</a>
     </div>
 
@@ -256,6 +271,50 @@
         error.style.display = 'block';
         btn.disabled = false;
         btn.textContent = 'Log in';
+      }
+    }
+
+    function togglePassword(id) {
+      const input = document.getElementById(id);
+      input.type = input.type === 'password' ? 'text' : 'password';
+    }
+
+    function showForgot(show) {
+      document.getElementById('login-form').style.display = show ? 'none' : 'block';
+      document.getElementById('forgot-form').style.display = show ? 'block' : 'none';
+    }
+
+    async function submitForgot(e) {
+      e.preventDefault();
+      const btn = document.getElementById('forgot-btn');
+      const error = document.getElementById('error');
+      btn.disabled = true;
+      btn.textContent = 'Sending…';
+      error.style.display = 'none';
+
+      try {
+        const r = await fetch('/api/v1/auth/forgot-password', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email: document.getElementById('forgot-email').value })
+        });
+        const data = await r.json();
+        if (!r.ok) throw new Error(data.detail || 'Unable to send reset link.');
+        error.textContent = data.detail;
+        error.style.background = 'rgba(39,174,96,.1)';
+        error.style.borderColor = 'rgba(39,174,96,.25)';
+        error.style.color = '#27ae60';
+        error.style.display = 'block';
+        document.getElementById('forgot-form').reset();
+      } catch (err) {
+        error.textContent = err.message;
+        error.style.background = 'rgba(251,113,133,.1)';
+        error.style.borderColor = 'rgba(251,113,133,.25)';
+        error.style.color = '#fb7185';
+        error.style.display = 'block';
+      } finally {
+        btn.disabled = false;
+        btn.textContent = 'Send reset link';
       }
     }
   </script>
