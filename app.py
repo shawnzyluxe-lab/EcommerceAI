@@ -7507,12 +7507,32 @@ def _set_pending_internal():
 
 
 def _clear_merchant_data(merchant_id):
-    for model in (ProfitFeedOrder, AdSpendFeed, UnifiedOrder, ActionEvidence, PendingAction, Alert, Product, MerchantChannel, MerchantSetting):
+    """Remove all seeded/order/alert data for a merchant, committing per table."""
+    stmts = [
+        ("DELETE FROM action_evidence WHERE action_id IN (SELECT id FROM pending_actions WHERE merchant_id=:mid)", None),
+        ("DELETE FROM pending_actions WHERE merchant_id=:mid", None),
+        ("DELETE FROM alert_matrix_alerts WHERE merchant_id=:mid", None),
+        ("DELETE FROM profit_feed_orders WHERE merchant_id=:mid", None),
+        ("DELETE FROM ad_spend_feed WHERE merchant_id=:mid", None),
+        ("DELETE FROM order_items WHERE order_id IN (SELECT id FROM orders WHERE merchant_id=:mid)", None),
+        ("DELETE FROM orders WHERE merchant_id=:mid", None),
+        ("DELETE FROM product_financial_ledger WHERE tenant_id=:mid", None),
+        ("DELETE FROM daily_costs WHERE sku IN (SELECT sku FROM products WHERE merchant_id=:mid)", None),
+        ("DELETE FROM products WHERE merchant_id=:mid", None),
+        ("DELETE FROM merchant_channels WHERE merchant_id=:mid", None),
+        ("DELETE FROM merchant_settings WHERE merchant_id=:mid", None),
+        ("DELETE FROM marketing_campaigns WHERE merchant_id=:mid", None),
+    ]
+    for sql, _ in stmts:
         try:
-            model.query.filter_by(merchant_id=merchant_id).delete()
+            db.session.execute(text(sql), {"mid": merchant_id})
+            db.session.commit()
         except Exception as e:
-            logger.warning(f"[Seed] Could not clear {model.__tablename__} for {merchant_id}: {e}")
-    db.session.commit()
+            logger.warning(f"[Seed] Could not clear data for {merchant_id}: {e}")
+            try:
+                db.session.rollback()
+            except Exception:
+                pass
 
 
 def _ensure_billing(merchant_id, plan):
@@ -7549,7 +7569,7 @@ def _seed_business_accounts():
         profile.password_hash = generate_password_hash(acct["password"], method="pbkdf2:sha256")
         profile.account_tier = acct.get("tier", "Vantav Scale")
         profile.sandbox_status = acct.get("sandbox_status", "approved")
-        profile.live_access_enabled = 1 if acct.get("sandbox_status") == "approved" else 0
+        profile.live_access_enabled = 1 if profile.sandbox_status == "approved" else 0
         db.session.add(profile)
         db.session.commit()
 
