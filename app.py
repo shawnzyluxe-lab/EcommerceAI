@@ -198,9 +198,9 @@ manager = ConnectionManager()
 # ============================================================
 
 SITE_WALL_PASSWORD = os.environ.get("SITE_WALL_PASSWORD", "")
-MASTER_ADMIN_EMAIL = os.environ.get("MASTER_ADMIN_EMAIL", "shawn@shawnzyluxe.com")
+MASTER_ADMIN_EMAIL = os.environ.get("MASTER_ADMIN_EMAIL", "shawn@vantavcommerce.com")
 MASTER_ADMIN_EMAILS = [e.strip().lower() for e in MASTER_ADMIN_EMAIL.split(",") if e.strip()]
-ENGINEER_EMAIL = os.environ.get("ENGINEER_EMAIL", "engineer@shawnzyluxe.com")
+ENGINEER_EMAIL = os.environ.get("ENGINEER_EMAIL", "engineer@vantavcommerce.com")
 ENGINEER_EMAILS = [e.strip().lower() for e in ENGINEER_EMAIL.split(",") if e.strip()]
 RECAPTCHA_SITE_KEY = os.environ.get("RECAPTCHA_SITE_KEY", "")
 RECAPTCHA_SECRET_KEY = os.environ.get("RECAPTCHA_SECRET_KEY", "")
