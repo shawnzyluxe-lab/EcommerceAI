@@ -80,7 +80,7 @@ services:
       - key: SHOPIFY_CLIENT_SECRET
         sync: false
       - key: OAUTH_REDIRECT_URI
-        value: https://vantavcommerce.com
+        value: https://vantavcommerce.com/api/v1/auth/shopify/callback
       # Alert channels (comma-separated for ALERT_EMAIL)
       - key: ALERT_EMAIL
         sync: false
