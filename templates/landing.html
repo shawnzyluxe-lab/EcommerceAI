@@ -4,540 +4,719 @@
   <link rel="icon" type="image/x-icon" href="/static/images/favicon.ico">
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Vantav | See Your True Profit Across Shopify, TikTok Shop &amp; Amazon</title>
-  <meta name="description" content="Vantav connects Shopify, TikTok Shop, and Amazon into one dashboard that shows true net profit after fees, shipping, ads, and refunds — then flags margin leaks and drafts the fix for your approval.">
-  <meta property="og:title" content="Vantav | The commerce operating system that shows what you actually keep">
-  <meta property="og:description" content="True profit by channel and SKU, alerts before problems spread, and AI-drafted actions you approve in one tap.">
+  <title>Vantav | Know exactly what your store keeps, not just what it sells</title>
+  <meta name="description" content="Vantav brings Shopify, TikTok Shop and Amazon into one dashboard, subtracts every fee, ad, shipping label and refund, and tells you which products and channels actually make money.">
+  <meta property="og:title" content="Vantav | Know exactly what your store keeps">
+  <meta property="og:description" content="One dashboard for Shopify, TikTok Shop and Amazon that shows real profit per order, warns you before a product loses money, and suggests the fix.">
   <meta property="og:image" content="/static/videos/how-it-works.jpg">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
   <style>
     :root {
-      --bg: #0c0c11;
-      --bg-2: #101019;
-      --card: #14141c;
-      --ink: #f4f2f9;
-      --muted: #c6c3d2;
-      --dim: #8f8ba0;
-      --line: #23232d;
-      --purple: #8b5cf6;
+      --bg: #08080c;
+      --bg-soft: #0d0d14;
+      --card: #12121b;
+      --card-2: #16161f;
+      --ink: #f7f6fb;
+      --muted: #b9b6c8;
+      --dim: #837f95;
+      --line: #22222e;
+      --line-2: #2c2c3a;
+      --purple: #7c5cff;
       --purple-2: #a78bfa;
       --teal: #2dd4bf;
-      --red: #f87171;
+      --green: #34d399;
+      --red: #fb7185;
+      --amber: #fbbf24;
+      --radius: 18px;
     }
     * { box-sizing: border-box; }
-    html { scroll-behavior: smooth; }
+    html { scroll-behavior: smooth; -webkit-text-size-adjust: 100%; }
     body {
       margin: 0;
       background: var(--bg);
       color: var(--ink);
-      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-      min-height: 100vh;
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+      font-feature-settings: 'cv02','cv03','cv04','ss01';
+      -webkit-font-smoothing: antialiased;
       overflow-x: hidden;
+      line-height: 1.6;
     }
     a { color: inherit; text-decoration: none; }
-    .wrap { max-width: 1080px; margin: 0 auto; padding: 0 1.5rem; }
-    .section-head { text-align: center; max-width: 680px; margin: 0 auto 2.5rem; }
-    .section-head h2 { font-size: clamp(1.5rem, 4vw, 2.1rem); letter-spacing: -.02em; margin: 0 0 .6rem; }
-    .section-head p { color: var(--muted); font-size: 1rem; line-height: 1.65; margin: 0; }
-    .kicker {
-      display: inline-block; font-size: .7rem; text-transform: uppercase; letter-spacing: .14em;
-      color: var(--teal); margin-bottom: .75rem; font-weight: 700;
-    }
-
-    /* header */
-    header {
-      position: sticky; top: 0; z-index: 20;
-      display: flex; align-items: center; justify-content: space-between;
-      padding: 1rem 1.5rem;
-      border-bottom: 1px solid var(--line);
-      background: rgba(12,12,17,.88);
-      backdrop-filter: blur(10px);
-      flex-wrap: wrap; gap: .75rem;
-    }
-    .brand { display: flex; align-items: center; gap: .6rem; font-weight: 800; letter-spacing: -0.02em; }
-    .brand-mark {
-      width: 28px; height: 28px; border-radius: 7px;
-      background: #14141c;
-      display: grid; place-items: center;
-      box-shadow: 0 4px 10px rgba(139,92,246,.25);
-    }
-    .brand-mark svg { width: 18px; height: 18px; }
-    .brand span { font-size: 1.1rem; }
-    .nav { display: flex; align-items: center; gap: .25rem; }
-    .nav a {
-      font-size: .85rem; color: var(--muted); font-weight: 500;
-      padding: .5rem .9rem; border-radius: 8px;
-    }
-    .nav a:hover { color: var(--ink); background: #1b1b25; }
-    .nav .nav-link-desktop { display: inline-block; }
-    .nav .btn {
-      background: linear-gradient(135deg, var(--purple) 0%, #0c0c11 100%);
-      color: var(--ink); font-weight: 700; padding: .55rem 1.1rem; border-radius: 8px;
-      box-shadow: 0 4px 12px rgba(139,92,246,.25);
-    }
-
-    /* hero */
-    .hero { text-align: center; padding: 4.5rem 1.5rem 2.5rem; }
+    img { max-width: 100%; display: block; }
+    h1, h2, h3 { letter-spacing: -0.03em; line-height: 1.1; margin: 0; font-weight: 800; }
+    p { margin: 0; }
+    .wrap { max-width: 1160px; margin: 0 auto; padding: 0 1.5rem; }
     .eyebrow {
-      display: inline-block; font-size: .7rem; text-transform: uppercase; letter-spacing: .14em;
-      color: var(--teal); border: 1px solid rgba(45,212,191,.35); padding: .35rem .7rem; border-radius: 99px;
-      margin-bottom: 1.25rem;
+      display: inline-flex; align-items: center; gap: .5rem;
+      font-size: .72rem; text-transform: uppercase; letter-spacing: .16em; font-weight: 700;
+      color: var(--teal);
     }
-    h1 {
-      font-size: clamp(1.8rem, 6vw, 3.4rem);
-      font-weight: 800; letter-spacing: -0.03em; line-height: 1.08;
-      margin: 0 auto 1.25rem; max-width: 15ch;
-      overflow-wrap: break-word; word-break: normal;
-      background: linear-gradient(135deg, #f4f2f9 30%, var(--purple-2) 100%);
-      -webkit-background-clip: text; background-clip: text;
-      -webkit-text-fill-color: transparent;
+    .eyebrow::before { content: ''; width: 22px; height: 1px; background: rgba(45,212,191,.6); }
+    .lede { color: var(--muted); font-size: 1.05rem; }
+
+    /* ---------- header ---------- */
+    header {
+      position: sticky; top: 0; z-index: 50;
+      background: rgba(8,8,12,.82);
+      backdrop-filter: blur(14px);
+      border-bottom: 1px solid rgba(34,34,46,.9);
     }
-    .hero .lede {
-      font-size: 1.1rem; color: var(--muted); line-height: 1.65;
-      max-width: 620px; margin: 0 auto 2rem;
-      overflow-wrap: break-word;
+    .header-inner {
+      max-width: 1160px; margin: 0 auto; padding: .85rem 1.5rem;
+      display: flex; align-items: center; justify-content: space-between; gap: 1rem;
     }
-    .ctas { display: flex; gap: .75rem; justify-content: center; flex-wrap: wrap; }
+    .brand { display: flex; align-items: center; gap: .6rem; font-weight: 900; letter-spacing: -.03em; font-size: 1.12rem; }
+    .brand-mark {
+      width: 30px; height: 30px; border-radius: 9px; display: grid; place-items: center;
+      background: linear-gradient(150deg, #2a1c5e, #12121b);
+      border: 1px solid rgba(124,92,255,.4);
+      box-shadow: 0 6px 16px rgba(124,92,255,.25);
+    }
+    .brand-mark svg { width: 16px; height: 16px; }
+    nav.top { display: flex; align-items: center; gap: .15rem; }
+    nav.top a.link {
+      font-size: .88rem; color: var(--muted); font-weight: 500; padding: .5rem .8rem; border-radius: 9px;
+      transition: color .15s, background .15s;
+    }
+    nav.top a.link:hover { color: var(--ink); background: #16161f; }
+    .btn {
+      display: inline-flex; align-items: center; justify-content: center; gap: .5rem;
+      font-weight: 650; border-radius: 11px; border: 1px solid transparent;
+      cursor: pointer; font-size: .95rem; font-family: inherit;
+      transition: transform .15s, box-shadow .15s, border-color .15s, background .15s;
+    }
+    .btn:hover { transform: translateY(-1px); }
     .btn-primary {
-      background: linear-gradient(135deg, var(--purple) 0%, #0c0c11 100%);
-      color: var(--ink); font-weight: 700; padding: .9rem 1.6rem; border-radius: 10px;
-      box-shadow: 0 6px 18px rgba(139,92,246,.28);
-      border: none; cursor: pointer; font-size: 1rem;
+      background: linear-gradient(135deg, #8b6cff, #5b34e8);
+      color: #fff; padding: .8rem 1.4rem;
+      box-shadow: 0 10px 26px rgba(124,92,255,.32);
     }
-    .btn-secondary {
-      border: 1px solid var(--line); color: var(--ink); background: transparent;
-      padding: .9rem 1.6rem; border-radius: 10px; font-weight: 600; font-size: 1rem;
+    .btn-ghost {
+      background: rgba(255,255,255,.03); color: var(--ink);
+      border-color: var(--line-2); padding: .8rem 1.4rem;
     }
-    .btn-secondary:hover { border-color: var(--purple); }
-    .hero-note { color: var(--dim); font-size: .82rem; margin: 1.1rem 0 0; }
-    .logos { display: flex; gap: 1.5rem; justify-content: center; flex-wrap: wrap; margin-top: 2.5rem; }
-    .logos span { color: var(--dim); font-size: .8rem; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; }
+    .btn-ghost:hover { border-color: var(--purple-2); }
+    .btn-sm { padding: .55rem 1rem; font-size: .88rem; border-radius: 9px; }
+    .hide-sm { display: inline-flex; }
 
-    /* video */
-    .walkthrough { padding: 1rem 1.5rem 4.5rem; text-align: center; }
-    .video-frame {
-      position: relative;
-      border: 1px solid var(--line); border-radius: 16px; overflow: hidden;
-      background: #0b0b12; box-shadow: 0 18px 50px rgba(0,0,0,.55);
-      max-width: 960px; margin: 0 auto;
+    /* ---------- hero ---------- */
+    .hero { position: relative; padding: 5rem 0 3rem; overflow: hidden; }
+    .hero::before {
+      content: ''; position: absolute; inset: -30% 20% 40% -10%;
+      background: radial-gradient(60% 50% at 30% 30%, rgba(124,92,255,.28), transparent 70%);
+      filter: blur(20px); pointer-events: none;
     }
-    .video-frame video { display: block; width: 100%; height: auto; }
-    .chapters {
-      display: flex; flex-wrap: wrap; gap: .5rem; justify-content: center;
-      margin: 1.25rem auto 0; max-width: 820px;
+    .hero::after {
+      content: ''; position: absolute; top: -10%; right: -15%; width: 55%; height: 70%;
+      background: radial-gradient(50% 50% at 60% 40%, rgba(45,212,191,.16), transparent 70%);
+      pointer-events: none;
     }
+    .hero-grid {
+      position: relative; display: grid; grid-template-columns: minmax(0, 1.05fr) minmax(0, 1fr);
+      gap: 3.5rem; align-items: center;
+    }
+    .pill {
+      display: inline-flex; align-items: center; gap: .5rem;
+      border: 1px solid rgba(124,92,255,.35); background: rgba(124,92,255,.08);
+      color: #d9d2ff; border-radius: 99px; padding: .38rem .85rem;
+      font-size: .78rem; font-weight: 600;
+    }
+    .pill .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--green); box-shadow: 0 0 0 4px rgba(52,211,153,.16); }
+    h1 { font-size: clamp(2.1rem, 4.6vw, 3.5rem); font-weight: 900; margin: 1.25rem 0 1.1rem; }
+    h1 .grad {
+      background: linear-gradient(100deg, #a78bfa, #2dd4bf);
+      -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent;
+    }
+    .hero p.lede { font-size: 1.12rem; max-width: 52ch; }
+    .hero-ctas { display: flex; gap: .75rem; flex-wrap: wrap; margin: 1.9rem 0 1rem; }
+    .hero-note { color: var(--dim); font-size: .85rem; display: flex; gap: 1.1rem; flex-wrap: wrap; }
+    .hero-note span { display: inline-flex; align-items: center; gap: .35rem; }
+    .hero-note svg { width: 14px; height: 14px; color: var(--green); }
+
+    /* screenshot frame */
+    .shot {
+      position: relative; border-radius: 14px; overflow: hidden;
+      border: 1px solid var(--line-2); background: #0b0b12;
+      box-shadow: 0 30px 70px rgba(0,0,0,.6), 0 0 0 1px rgba(255,255,255,.02) inset;
+    }
+    .shot-bar {
+      display: flex; align-items: center; gap: .4rem;
+      padding: .55rem .8rem; background: #101018; border-bottom: 1px solid var(--line);
+    }
+    .shot-bar i { width: 9px; height: 9px; border-radius: 50%; background: #2f2f3d; display: block; }
+    .shot-bar .url {
+      margin-left: .6rem; font-size: .68rem; color: var(--dim);
+      background: #0b0b12; border: 1px solid var(--line); border-radius: 6px;
+      padding: .18rem .6rem; font-style: normal;
+    }
+    .hero .shot { width: calc(100% + 5rem); max-width: none; }
+
+    /* logo strip */
+    .strip {
+      margin-top: 4rem; padding: 1.5rem 0; border-top: 1px solid var(--line); border-bottom: 1px solid var(--line);
+      display: flex; align-items: center; justify-content: center; gap: 2.5rem; flex-wrap: wrap;
+    }
+    .strip small { color: var(--dim); font-size: .78rem; letter-spacing: .04em; }
+    .strip b { color: var(--muted); font-size: .95rem; font-weight: 700; letter-spacing: -.01em; }
+
+    /* ---------- generic section ---------- */
+    section.band { padding: 5.5rem 0; }
+    section.band.tight { padding: 4rem 0; }
+    .head { max-width: 660px; margin-bottom: 3rem; }
+    .head.center { text-align: center; margin-left: auto; margin-right: auto; }
+    .head h2 { font-size: clamp(1.7rem, 3.4vw, 2.5rem); margin: .9rem 0 .9rem; }
+    .head p { color: var(--muted); font-size: 1.05rem; }
+    .divider { height: 1px; background: linear-gradient(90deg, transparent, var(--line-2), transparent); }
+
+    /* ---------- problem cards ---------- */
+    .compare { display: grid; grid-template-columns: repeat(2, minmax(0,1fr)); gap: 1.25rem; }
+    .compare > div {
+      border: 1px solid var(--line); border-radius: var(--radius); padding: 1.6rem;
+      background: var(--card);
+    }
+    .compare .bad { border-color: rgba(251,113,133,.22); background: linear-gradient(180deg, rgba(251,113,133,.06), transparent); }
+    .compare .good { border-color: rgba(52,211,153,.24); background: linear-gradient(180deg, rgba(52,211,153,.07), transparent); }
+    .compare h3 { font-size: 1.05rem; margin-bottom: 1rem; }
+    .compare ul { margin: 0; padding: 0; list-style: none; display: grid; gap: .8rem; }
+    .compare li { display: flex; gap: .65rem; color: var(--muted); font-size: .95rem; line-height: 1.55; }
+    .compare li svg { flex: 0 0 16px; width: 16px; height: 16px; margin-top: .25rem; }
+    .compare .bad li svg { color: var(--red); }
+    .compare .good li svg { color: var(--green); }
+
+    /* ---------- video ---------- */
+    .video-wrap {
+      position: relative; border-radius: 20px; overflow: hidden;
+      border: 1px solid var(--line-2); background: #0a0a10;
+      box-shadow: 0 40px 90px rgba(0,0,0,.65);
+    }
+    .video-wrap::before {
+      content: ''; position: absolute; inset: -1px; border-radius: 20px; pointer-events: none;
+      background: linear-gradient(120deg, rgba(124,92,255,.35), transparent 40%, rgba(45,212,191,.28));
+      -webkit-mask: linear-gradient(#000,#000) content-box, linear-gradient(#000,#000);
+      -webkit-mask-composite: xor; mask-composite: exclude; padding: 1px; z-index: 2;
+    }
+    video { width: 100%; display: block; background: #000; }
+    .chapters { display: flex; flex-wrap: wrap; gap: .5rem; margin-top: 1.25rem; justify-content: center; }
     .chapters button {
-      background: #14141c; border: 1px solid var(--line); color: var(--muted);
-      font-size: .78rem; padding: .4rem .8rem; border-radius: 99px; cursor: pointer;
-      font-family: inherit;
+      background: var(--card); border: 1px solid var(--line); color: var(--muted);
+      font-size: .82rem; font-weight: 550; padding: .5rem .9rem; border-radius: 99px;
+      cursor: pointer; font-family: inherit; transition: all .15s;
     }
-    .chapters button:hover { color: var(--ink); border-color: var(--purple); }
+    .chapters button:hover { color: var(--ink); border-color: var(--purple); background: rgba(124,92,255,.1); }
+    .chapters button b { color: var(--purple-2); font-weight: 700; margin-right: .35rem; }
 
-    /* problem / solution */
-    .compare {
-      display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;
-      max-width: 860px; margin: 0 auto;
+    /* ---------- alternating feature rows ---------- */
+    .rows { display: grid; gap: 5rem; }
+    .row { display: grid; grid-template-columns: minmax(0,1fr) minmax(0,1.15fr); gap: 3rem; align-items: center; }
+    .row.flip .copy { order: 2; }
+    .row .num {
+      display: inline-grid; place-items: center; width: 30px; height: 30px; border-radius: 9px;
+      background: rgba(124,92,255,.14); border: 1px solid rgba(124,92,255,.3);
+      color: var(--purple-2); font-size: .8rem; font-weight: 800; margin-bottom: 1rem;
     }
-    .compare-card {
-      background: var(--card); border: 1px solid var(--line); border-radius: 16px; padding: 1.5rem;
-    }
-    .compare-card h3 { margin: 0 0 1rem; font-size: 1rem; letter-spacing: .01em; }
-    .compare-card ul { margin: 0; padding: 0; list-style: none; }
-    .compare-card li { font-size: .9rem; color: var(--muted); line-height: 1.5; padding: .45rem 0 .45rem 1.5rem; position: relative; }
-    .compare-card li::before { position: absolute; left: 0; font-weight: 700; }
-    .before li::before { content: "\00d7"; color: var(--red); }
-    .after li::before { content: "\2713"; color: var(--teal); }
-    .after { border-color: rgba(139,92,246,.4); box-shadow: 0 8px 30px rgba(139,92,246,.08); }
+    .row h3 { font-size: clamp(1.35rem, 2.4vw, 1.75rem); margin-bottom: .85rem; }
+    .row p { color: var(--muted); font-size: 1.02rem; }
+    .row ul { margin: 1.25rem 0 0; padding: 0; list-style: none; display: grid; gap: .6rem; }
+    .row li { display: flex; gap: .6rem; font-size: .95rem; color: var(--muted); }
+    .row li svg { flex: 0 0 16px; width: 16px; height: 16px; margin-top: .28rem; color: var(--teal); }
 
-    /* features */
-    .features {
-      display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 1rem;
+    /* ---------- feature grid ---------- */
+    .cards { display: grid; grid-template-columns: repeat(3, minmax(0,1fr)); gap: 1.25rem; }
+    .card {
+      border: 1px solid var(--line); border-radius: var(--radius); padding: 1.5rem;
+      background: linear-gradient(180deg, var(--card-2), var(--card));
+      transition: border-color .18s, transform .18s;
     }
-    .feature-card {
-      background: var(--card); border: 1px solid var(--line); border-radius: 16px; padding: 1.6rem;
-      overflow-wrap: break-word;
+    .card:hover { border-color: var(--line-2); transform: translateY(-3px); }
+    .card .ico {
+      width: 34px; height: 34px; border-radius: 10px; display: grid; place-items: center;
+      background: rgba(124,92,255,.12); border: 1px solid rgba(124,92,255,.22); margin-bottom: 1rem;
     }
-    .feature-card h3 { margin: 0 0 .45rem; font-size: 1.05rem; }
-    .feature-card p { margin: 0; color: var(--muted); font-size: .92rem; line-height: 1.55; }
-    .icon { width: 40px; height: 40px; border-radius: 10px; display: grid; place-items: center; margin-bottom: 1rem; background: rgba(139,92,246,.12); color: var(--purple-2); font-size: 1.15rem; font-weight: 700; }
-    .icon.teal { background: rgba(45,212,191,.12); color: var(--teal); }
+    .card .ico svg { width: 17px; height: 17px; color: var(--purple-2); }
+    .card h4 { font-size: 1rem; font-weight: 700; margin: 0 0 .5rem; letter-spacing: -.01em; }
+    .card p { color: var(--dim); font-size: .92rem; line-height: 1.6; }
 
-    /* steps */
-    .steps { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 1rem; counter-reset: step; }
-    .step {
-      background: linear-gradient(180deg, var(--bg-2) 0%, var(--card) 100%);
-      border: 1px solid var(--line); border-radius: 16px; padding: 1.6rem;
-    }
-    .step-num {
-      width: 30px; height: 30px; border-radius: 99px; display: grid; place-items: center;
-      background: rgba(139,92,246,.15); color: var(--purple-2); font-weight: 800; font-size: .85rem;
-      margin-bottom: .9rem;
-    }
-    .step h3 { margin: 0 0 .4rem; font-size: 1.02rem; }
-    .step p { margin: 0; color: var(--muted); font-size: .9rem; line-height: 1.55; }
+    /* ---------- steps ---------- */
+    .steps { display: grid; grid-template-columns: repeat(3, minmax(0,1fr)); gap: 1.25rem; counter-reset: s; }
+    .step { border: 1px solid var(--line); border-radius: var(--radius); padding: 1.5rem; background: var(--card); }
+    .step .n { color: var(--purple-2); font-size: .78rem; font-weight: 800; letter-spacing: .12em; text-transform: uppercase; }
+    .step h4 { font-size: 1.05rem; margin: .6rem 0 .5rem; }
+    .step p { color: var(--dim); font-size: .92rem; }
 
-    /* pricing */
-    .plans { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 1rem; }
+    /* ---------- pricing ---------- */
+    .plans { display: grid; grid-template-columns: repeat(3, minmax(0,1fr)); gap: 1.25rem; align-items: stretch; }
     .plan {
-      background: var(--card); border: 1px solid var(--line); border-radius: 16px; padding: 1.6rem;
-      display: flex; flex-direction: column;
+      border: 1px solid var(--line); border-radius: var(--radius); padding: 1.75rem;
+      background: var(--card); display: flex; flex-direction: column;
     }
-    .plan.popular { border-color: var(--purple); box-shadow: 0 10px 34px rgba(139,92,246,.14); }
-    .plan .tag {
-      font-size: .65rem; letter-spacing: .12em; text-transform: uppercase; color: var(--dim); font-weight: 700;
+    .plan.featured {
+      border-color: rgba(124,92,255,.5);
+      background: linear-gradient(180deg, rgba(124,92,255,.11), var(--card));
+      box-shadow: 0 20px 50px rgba(124,92,255,.14);
     }
-    .plan.popular .tag { color: var(--purple-2); }
-    .plan h3 { margin: .5rem 0 .35rem; font-size: 1.1rem; }
-    .plan .price { font-size: 1.9rem; font-weight: 800; letter-spacing: -.02em; }
-    .plan .price span { font-size: .85rem; font-weight: 500; color: var(--dim); }
-    .plan ul { margin: 1rem 0 1.5rem; padding: 0; list-style: none; }
-    .plan li { font-size: .87rem; color: var(--muted); line-height: 1.5; padding: .3rem 0 .3rem 1.35rem; position: relative; }
-    .plan li::before { content: "\2713"; position: absolute; left: 0; color: var(--teal); font-weight: 700; }
-    .plan .plan-cta {
-      margin-top: auto; text-align: center; border: 1px solid var(--line); border-radius: 10px;
-      padding: .7rem 1rem; font-weight: 600; font-size: .9rem;
-    }
-    .plan.popular .plan-cta { background: linear-gradient(135deg, var(--purple) 0%, #0c0c11 100%); border-color: transparent; }
-    .pricing-note { text-align: center; color: var(--dim); font-size: .85rem; margin: 1.25rem 0 0; }
+    .plan .tag { font-size: .74rem; font-weight: 800; letter-spacing: .1em; text-transform: uppercase; color: var(--purple-2); }
+    .plan .price { font-size: 2.1rem; font-weight: 900; letter-spacing: -.03em; margin: .6rem 0 .2rem; }
+    .plan .price span { font-size: .9rem; font-weight: 600; color: var(--dim); letter-spacing: 0; }
+    .plan .who { color: var(--muted); font-size: .92rem; min-height: 2.8em; }
+    .plan ul { list-style: none; margin: 1.25rem 0 1.75rem; padding: 0; display: grid; gap: .55rem; }
+    .plan li { display: flex; gap: .55rem; font-size: .9rem; color: var(--muted); }
+    .plan li svg { flex: 0 0 15px; width: 15px; height: 15px; margin-top: .3rem; color: var(--green); }
+    .plan .btn { margin-top: auto; width: 100%; }
+    .plan-note { text-align: center; color: var(--dim); font-size: .88rem; margin-top: 1.5rem; }
 
-    /* faq */
-    .faq { max-width: 760px; margin: 0 auto; }
+    /* ---------- faq ---------- */
+    .faq { display: grid; gap: .75rem; max-width: 820px; margin: 0 auto; }
     details {
-      background: var(--card); border: 1px solid var(--line); border-radius: 12px;
-      padding: 1rem 1.2rem; margin-bottom: .65rem;
+      border: 1px solid var(--line); border-radius: 13px; background: var(--card); overflow: hidden;
     }
-    details summary {
-      cursor: pointer; font-weight: 600; font-size: .95rem; list-style: none;
-      display: flex; justify-content: space-between; align-items: center; gap: 1rem;
+    details[open] { border-color: var(--line-2); }
+    summary {
+      cursor: pointer; padding: 1.05rem 1.3rem; font-weight: 650; font-size: .98rem;
+      display: flex; justify-content: space-between; align-items: center; gap: 1rem; list-style: none;
     }
-    details summary::-webkit-details-marker { display: none; }
-    details summary::after { content: "+"; color: var(--purple-2); font-weight: 700; }
-    details[open] summary::after { content: "\2013"; }
-    details p { color: var(--muted); font-size: .9rem; line-height: 1.6; margin: .8rem 0 0; }
+    summary::-webkit-details-marker { display: none; }
+    summary::after { content: '+'; color: var(--purple-2); font-size: 1.2rem; font-weight: 400; }
+    details[open] summary::after { content: '\2212'; }
+    details p { padding: 0 1.3rem 1.2rem; color: var(--muted); font-size: .95rem; line-height: 1.7; }
 
-    /* trust + final cta */
-    .trust { border-top: 1px solid var(--line); padding: 2.5rem 1.5rem; text-align: center; }
-    .trust p { color: var(--muted); font-size: .9rem; margin: 0 0 1rem; }
-    .badges { display: flex; gap: .75rem; justify-content: center; flex-wrap: wrap; }
-    .badge {
-      border: 1px solid var(--line); border-radius: 99px; padding: .35rem .85rem;
-      font-size: .75rem; color: var(--muted); background: #0f0f14;
+    /* ---------- final cta ---------- */
+    .final {
+      position: relative; border: 1px solid rgba(124,92,255,.32); border-radius: 24px;
+      padding: 3.5rem 2rem; text-align: center; overflow: hidden;
+      background: linear-gradient(160deg, rgba(124,92,255,.16), rgba(45,212,191,.06) 60%, var(--card));
     }
-    .final-cta {
-      text-align: center; padding: 4rem 1.5rem;
-      background: radial-gradient(60% 120% at 50% 0%, rgba(139,92,246,.16) 0%, transparent 70%);
-    }
-    .final-cta h2 { font-size: clamp(1.5rem, 4vw, 2.1rem); margin: 0 0 .7rem; letter-spacing: -.02em; }
-    .final-cta p { color: var(--muted); margin: 0 auto 1.8rem; max-width: 520px; line-height: 1.6; }
+    .final h2 { font-size: clamp(1.7rem, 3.4vw, 2.4rem); margin-bottom: .9rem; }
+    .final p { color: var(--muted); max-width: 52ch; margin: 0 auto 2rem; }
+    .final .hero-ctas { justify-content: center; }
 
-    footer { border-top: 1px solid var(--line); padding: 1.5rem; text-align: center; color: var(--muted); font-size: .8rem; }
+    /* ---------- footer ---------- */
+    footer { border-top: 1px solid var(--line); padding: 2.5rem 0; margin-top: 5rem; }
+    .foot { display: flex; justify-content: space-between; gap: 1.5rem; flex-wrap: wrap; align-items: center; }
+    .foot-links { display: flex; gap: 1.4rem; flex-wrap: wrap; }
+    .foot-links a { color: var(--dim); font-size: .88rem; }
+    .foot-links a:hover { color: var(--ink); }
+    .foot small { color: var(--dim); font-size: .82rem; }
 
-    section.pad { padding: 4rem 0; }
-    section.pad-tight { padding: 2.5rem 0 4rem; }
-
-    @media (max-width: 760px) {
-      .nav .nav-link-desktop { display: none; }
-      .compare { grid-template-columns: 1fr; }
-    }
-    @media (max-width: 600px) {
-      header { padding: .85rem 1rem; }
-      .nav { width: 100%; justify-content: center; }
-      .hero { padding: 3rem 1rem 2rem; }
-      h1 { max-width: 100%; }
-      .hero .lede { font-size: 1rem; }
-      .ctas { flex-direction: column; align-items: stretch; }
-      .ctas a { width: 100%; text-align: center; }
-      .wrap { padding: 0 1rem; }
-      section.pad { padding: 3rem 0; }
+    @media (max-width: 900px) {
+      .hero-grid, .row, .row.flip { grid-template-columns: 1fr; gap: 2.5rem; }
+      .row.flip .copy { order: 0; }
+      .hero .shot { width: 100%; }
+      .cards, .steps, .plans, .compare { grid-template-columns: 1fr; }
+      section.band { padding: 3.5rem 0; }
+      .rows { gap: 3.5rem; }
+      .hide-sm { display: none; }
+      .hero { padding-top: 3rem; }
     }
   </style>
 </head>
 <body>
-  <header>
-    <div class="brand">
-      <div class="brand-mark">
-        <svg viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg" aria-label="Vantav logo">
-          <defs>
-            <linearGradient id="vantav-v" x1="8" y1="8" x2="24" y2="26" gradientUnits="userSpaceOnUse">
-              <stop offset="0" stop-color="#8b5cf6"/>
-              <stop offset="1" stop-color="#14b8a6"/>
-            </linearGradient>
-          </defs>
-          <path d="M9 11 L16 25 L23 11" stroke="url(#vantav-v)" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>
-        </svg>
-      </div>
-      <span>VANTAV</span>
-    </div>
-    <nav class="nav">
-      <a class="nav-link-desktop" href="#how-it-works">How it works</a>
-      <a class="nav-link-desktop" href="#features">Features</a>
-      <a class="nav-link-desktop" href="#pricing">Pricing</a>
-      <a class="nav-link-desktop" href="#faq">FAQ</a>
-      <a href="/login">Log in</a>
-      <a href="/subscribe" class="btn">Get Started</a>
+
+<header>
+  <div class="header-inner">
+    <a class="brand" href="/">
+      <span class="brand-mark">
+        <svg viewBox="0 0 24 24" fill="none"><path d="M3 4l9 16 9-16" stroke="#a78bfa" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </span>
+      <span>Vantav</span>
+    </a>
+    <nav class="top">
+      <a class="link hide-sm" href="#how-it-works">How it works</a>
+      <a class="link hide-sm" href="#features">Features</a>
+      <a class="link hide-sm" href="#pricing">Pricing</a>
+      <a class="link hide-sm" href="#faq">FAQ</a>
+      <a class="link" href="/login">Log in</a>
+      <a class="btn btn-primary btn-sm" href="/subscribe">Start free</a>
     </nav>
-  </header>
+  </div>
+</header>
 
-  <main>
-    <section class="hero">
-      <div class="eyebrow">Now available</div>
-      <h1>Revenue is not profit. Vantav shows the difference.</h1>
-      <p class="lede">Connect Shopify, TikTok Shop, and Amazon in one place. Vantav subtracts marketplace fees, shipping, discounts, refunds, and ad spend to show what you actually keep — then flags the leaks and drafts the fix for your approval.</p>
-      <div class="ctas">
-        <a href="/subscribe" class="btn-primary">View Plans</a>
-        <a href="#how-it-works" class="btn-secondary">Watch the 84-second tour</a>
+<!-- ============ HERO ============ -->
+<section class="hero">
+  <div class="wrap hero-grid">
+    <div>
+      <span class="pill"><span class="dot"></span> Live for Shopify, TikTok Shop &amp; Amazon sellers</span>
+      <h1>Your store sold $24,806.<br><span class="grad">You kept $7,187.</span></h1>
+      <p class="lede">Vantav connects your sales channels and subtracts every real cost — platform fees, ad spend, shipping labels, product cost and refunds — so you can see the profit you actually keep, per order, per product, per channel.</p>
+      <div class="hero-ctas">
+        <a class="btn btn-primary" href="/subscribe">Start free — no card required</a>
+        <a class="btn btn-ghost" href="#how-it-works">
+          <svg viewBox="0 0 24 24" fill="currentColor" style="width:15px;height:15px"><path d="M8 5v14l11-7z"/></svg>
+          Watch the 84-second tour
+        </a>
       </div>
-      <p class="hero-note">No store credentials required to preview &middot; 48-hour sandbox on every plan</p>
-      <div class="logos">
-        <span>Shopify</span>
-        <span>TikTok Shop</span>
-        <span>Amazon</span>
-        <span>Stripe</span>
+      <div class="hero-note">
+        <span><svg viewBox="0 0 24 24" fill="none"><path d="M20 6L9 17l-5-5" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg> Set up in an afternoon</span>
+        <span><svg viewBox="0 0 24 24" fill="none"><path d="M20 6L9 17l-5-5" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg> Read-only store access</span>
+        <span><svg viewBox="0 0 24 24" fill="none"><path d="M20 6L9 17l-5-5" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg> Cancel anytime</span>
       </div>
-    </section>
+    </div>
+    <div class="shot">
+      <div class="shot-bar"><i></i><i></i><i></i><span class="url">app.vantavcommerce.com</span></div>
+      <img src="{{ url_for('static', filename='images/shots/assistant.webp') }}" alt="The Vantav dashboard showing net profit, alerts and the AI assistant briefing a store owner" width="1800" loading="eager">
+    </div>
+  </div>
+  <div class="wrap">
+    <div class="strip">
+      <small>Works with</small>
+      <b>Shopify</b><b>TikTok Shop</b><b>Amazon</b><b>Stripe</b>
+      <small>&mdash; more channels on request</small>
+    </div>
+  </div>
+</section>
 
-    <section id="how-it-works" class="wrap walkthrough">
-      <div class="section-head">
-        <span class="kicker">See how it works</span>
-        <h2>A real merchant dashboard, start to finish</h2>
-        <p>Sign in, meet Vantav AI, read true profit, catch a margin leak on TikTok, and approve the fix — recorded live in the product, no slideware.</p>
+<!-- ============ PROBLEM ============ -->
+<section class="band tight">
+  <div class="wrap">
+    <div class="head center">
+      <span class="eyebrow">The problem</span>
+      <h2>Sales dashboards tell you what you sold. Not what you earned.</h2>
+      <p>Every channel reports revenue its own way, and none of them subtract everything. That is how a best-selling product quietly loses money for weeks.</p>
+    </div>
+    <div class="compare">
+      <div class="bad">
+        <h3>Running your store today</h3>
+        <ul>
+          <li><svg viewBox="0 0 24 24" fill="none"><path d="M18 6L6 18M6 6l12 12" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"/></svg> Three dashboards, a spreadsheet, and a guess at the end of the month</li>
+          <li><svg viewBox="0 0 24 24" fill="none"><path d="M18 6L6 18M6 6l12 12" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"/></svg> Ad spend and marketplace fees never land in the same place as sales</li>
+          <li><svg viewBox="0 0 24 24" fill="none"><path d="M18 6L6 18M6 6l12 12" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"/></svg> You find out a product was unprofitable after you have reordered it</li>
+          <li><svg viewBox="0 0 24 24" fill="none"><path d="M18 6L6 18M6 6l12 12" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"/></svg> Best sellers go out of stock while slow movers tie up cash</li>
+        </ul>
       </div>
-      <div class="video-frame">
-        <video id="tour-video" controls preload="metadata" playsinline poster="{{ url_for('static', filename='videos/how-it-works.jpg') }}">
-          <source src="{{ url_for('static', filename='videos/how-it-works.mp4') }}" type="video/mp4">
-          Your browser does not support the video tag.
-        </video>
+      <div class="good">
+        <h3>Running your store on Vantav</h3>
+        <ul>
+          <li><svg viewBox="0 0 24 24" fill="none"><path d="M20 6L9 17l-5-5" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg> One number you can trust: what you kept today, after everything</li>
+          <li><svg viewBox="0 0 24 24" fill="none"><path d="M20 6L9 17l-5-5" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg> Profit broken down by channel, product and individual order</li>
+          <li><svg viewBox="0 0 24 24" fill="none"><path d="M20 6L9 17l-5-5" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg> A warning the same day a product or ad starts losing money</li>
+          <li><svg viewBox="0 0 24 24" fill="none"><path d="M20 6L9 17l-5-5" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg> A suggested fix, with the numbers behind it, waiting for your yes</li>
+        </ul>
       </div>
-      <div class="chapters">
-        <button type="button" data-t="8">Vantav AI greets you</button>
-        <button type="button" data-t="16">True net profit</button>
-        <button type="button" data-t="25">Ask it a question</button>
-        <button type="button" data-t="32">Alerts</button>
-        <button type="button" data-t="42">Approve an action</button>
-        <button type="button" data-t="50">Profit by channel &amp; SKU</button>
-        <button type="button" data-t="58">Operations</button>
-        <button type="button" data-t="67">Growth tools</button>
-      </div>
-    </section>
+    </div>
+  </div>
+</section>
 
-    <section class="wrap pad-tight">
-      <div class="section-head">
-        <span class="kicker">The problem</span>
-        <h2>Your channel dashboards each tell you half the story</h2>
-        <p>Shopify shows revenue. TikTok shows ad spend. Amazon shows settlements. None of them tell you which product made money today.</p>
-      </div>
-      <div class="compare">
-        <div class="compare-card before">
-          <h3>Without Vantav</h3>
+<!-- ============ VIDEO ============ -->
+<section class="band" id="how-it-works">
+  <div class="wrap">
+    <div class="head center">
+      <span class="eyebrow" style="justify-content:center">See how it works</span>
+      <h2>A real store, start to finish, in 84 seconds</h2>
+      <p>No slides. This is a live account: signing in, reading true profit, spotting a TikTok product that is losing money, and approving the fix.</p>
+    </div>
+    <div class="video-wrap">
+      <video id="tour-video" controls preload="metadata" playsinline
+             poster="{{ url_for('static', filename='videos/how-it-works.jpg') }}">
+        <source src="{{ url_for('static', filename='videos/how-it-works.mp4') }}" type="video/mp4">
+        Your browser does not support the video tag. <a href="{{ url_for('static', filename='videos/how-it-works.mp4') }}">Download the tour</a>.
+      </video>
+    </div>
+    <div class="chapters">
+      <button type="button" data-t="8"><b>0:08</b>Your morning briefing</button>
+      <button type="button" data-t="16"><b>0:16</b>What you actually kept</button>
+      <button type="button" data-t="25"><b>0:25</b>Ask it a question</button>
+      <button type="button" data-t="32"><b>0:32</b>Warnings</button>
+      <button type="button" data-t="42"><b>0:42</b>Approving a fix</button>
+      <button type="button" data-t="50"><b>0:50</b>Profit by product</button>
+      <button type="button" data-t="58"><b>0:58</b>Orders &amp; inventory</button>
+      <button type="button" data-t="67"><b>1:07</b>Growing the store</button>
+    </div>
+  </div>
+</section>
+
+<div class="wrap"><div class="divider"></div></div>
+
+<!-- ============ FEATURE ROWS ============ -->
+<section class="band" id="features">
+  <div class="wrap">
+    <div class="head center">
+      <span class="eyebrow" style="justify-content:center">What you get</span>
+      <h2>Everything you need to run on profit, not sales</h2>
+      <p>Built for owners running more than one channel who need one honest place to look.</p>
+    </div>
+    <div class="rows">
+
+      <div class="row">
+        <div class="copy">
+          <span class="num">01</span>
+          <h3>See the profit on every order</h3>
+          <p>Vantav pulls in each order with its real costs attached: product cost, the platform's cut, the shipping label, the discount, the ad spend it took to win the sale, and any refund. What is left is your profit — and you can see it order by order.</p>
           <ul>
-            <li>Spreadsheets stitched together at the end of the month</li>
-            <li>Ad spend judged on ROAS, not margin</li>
-            <li>Fees, shipping, and refunds discovered after the fact</li>
-            <li>Stockouts found when a customer complains</li>
-            <li>"Good revenue month, so why is the bank balance flat?"</li>
+            <li><svg viewBox="0 0 24 24" fill="none"><path d="M20 6L9 17l-5-5" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg> Revenue, costs and net profit side by side for any date range</li>
+            <li><svg viewBox="0 0 24 24" fill="none"><path d="M20 6L9 17l-5-5" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg> Losing orders flagged in red so patterns are obvious</li>
+            <li><svg viewBox="0 0 24 24" fill="none"><path d="M20 6L9 17l-5-5" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg> Margin per channel, so you know where to spend next</li>
           </ul>
         </div>
-        <div class="compare-card after">
-          <h3>With Vantav</h3>
+        <div class="shot">
+          <div class="shot-bar"><i></i><i></i><i></i><span class="url">Profit dashboard</span></div>
+          <img src="{{ url_for('static', filename='images/shots/profit.webp') }}" alt="Profit dashboard listing gross revenue, product cost, ad spend, fees, shipping and refunds, with profit shown per order" width="1800" loading="lazy">
+        </div>
+      </div>
+
+      <div class="row flip">
+        <div class="copy">
+          <span class="num">02</span>
+          <h3>Get warned while it still matters</h3>
+          <p>Vantav watches your channels around the clock and tells you in plain English what changed: an ad set now losing $14 an order, a best seller five days from selling out, an Amazon listing that breaks even at best. Each warning explains the numbers behind it.</p>
           <ul>
-            <li>One number you can trust: true net profit, updated continuously</li>
-            <li>Margin per channel, per SKU, per order</li>
-            <li>Every cost line subtracted automatically</li>
-            <li>Alerts before a leak compounds</li>
-            <li>A ready-to-approve action attached to each problem</li>
+            <li><svg viewBox="0 0 24 24" fill="none"><path d="M20 6L9 17l-5-5" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg> Ranked by how much money is at stake</li>
+            <li><svg viewBox="0 0 24 24" fill="none"><path d="M20 6L9 17l-5-5" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg> Snooze, resolve, or turn one straight into a purchase order</li>
+            <li><svg viewBox="0 0 24 24" fill="none"><path d="M20 6L9 17l-5-5" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg> Stock-out and delivery-delay warnings included</li>
           </ul>
         </div>
+        <div class="shot">
+          <div class="shot-bar"><i></i><i></i><i></i><span class="url">Warnings</span></div>
+          <img src="{{ url_for('static', filename='images/shots/alerts.webp') }}" alt="Warning feed showing a TikTok ad spend problem, a product five days from stockout, and break-even Amazon orders" width="1800" loading="lazy">
+        </div>
       </div>
-    </section>
 
-    <section id="features" class="wrap pad">
-      <div class="section-head">
-        <span class="kicker">What you get</span>
-        <h2>Everything you need to run profit, not just sales</h2>
-        <p>Built for operators juggling multiple channels who need one place to see what is really happening.</p>
-      </div>
-      <div class="features">
-        <div class="feature-card">
-          <div class="icon">$</div>
-          <h3>True profit by channel, SKU, and order</h3>
-          <p>Know exactly what you keep after marketplace fees, shipping, discounts, refunds, and ad spend — not just top-line revenue.</p>
-        </div>
-        <div class="feature-card">
-          <div class="icon teal">!</div>
-          <h3>Alerts that catch leaks early</h3>
-          <p>Ad spend outrunning its margin, refund rates doubling, a best seller five days from stockout, orders past their promised delivery date.</p>
-        </div>
-        <div class="feature-card">
-          <div class="icon">&#10003;</div>
-          <h3>Actions you approve in one tap</h3>
-          <p>Pause the losing ad set, reorder 240 units, raise a price on Amazon. Every action shows the numbers behind it and nothing runs without your approval.</p>
-        </div>
-        <div class="feature-card">
-          <div class="icon teal">AI</div>
-          <h3>Vantav AI, on your live data</h3>
-          <p>Ask "where am I losing margin?" in plain English and get a per-channel answer from your own numbers. It greets you with a briefing the moment you log in.</p>
-        </div>
-        <div class="feature-card">
-          <div class="icon">&#8635;</div>
-          <h3>Inventory &amp; reorder forecasting</h3>
-          <p>SKU velocity, days of cover, and recommended reorder timing so you stop selling out of your winners and over-buying the rest.</p>
-        </div>
-        <div class="feature-card">
-          <div class="icon teal">&#9783;</div>
-          <h3>Operations in one place</h3>
-          <p>Orders, inventory, suppliers, and returns across Shopify, TikTok Shop, and Amazon — with a health score that tells you where to look first.</p>
-        </div>
-      </div>
-    </section>
-
-    <section class="wrap pad-tight">
-      <div class="section-head">
-        <span class="kicker">Getting started</span>
-        <h2>Live in an afternoon</h2>
-      </div>
-      <div class="steps">
-        <div class="step">
-          <div class="step-num">1</div>
-          <h3>Connect your channels</h3>
-          <p>Authorize Shopify, TikTok Shop, and Amazon. Credentials are encrypted, and you can preview Vantav in a sandbox before connecting anything.</p>
-        </div>
-        <div class="step">
-          <div class="step-num">2</div>
-          <h3>See your real numbers</h3>
-          <p>Vantav pulls orders, fees, ad spend, and returns, then rebuilds your P&amp;L by channel and SKU so you can see where margin actually comes from.</p>
-        </div>
-        <div class="step">
-          <div class="step-num">3</div>
-          <h3>Approve the fixes</h3>
-          <p>Alerts arrive with a drafted action and its projected impact. You approve, edit, or skip — and Vantav tracks the result.</p>
-        </div>
-      </div>
-    </section>
-
-    <section id="pricing" class="wrap pad">
-      <div class="section-head">
-        <span class="kicker">Pricing</span>
-        <h2>Simple plans for every stage</h2>
-        <p>Every plan includes true-profit reporting, alerts, recommendations, and the approval workflow. You only scale stores, speed, and depth.</p>
-      </div>
-      <div class="plans">
-        <div class="plan">
-          <span class="tag">Start</span>
-          <h3>Vantav Operator</h3>
-          <div class="price">$199<span>/mo</span></div>
+      <div class="row">
+        <div class="copy">
+          <span class="num">03</span>
+          <h3>A recommended fix — nothing happens without your yes</h3>
+          <p>For every problem it finds, Vantav drafts the action: pause that ad set, reorder 240 units, raise the price on Amazon. You see the expected impact and the reasoning first. Approve it and Vantav carries it out; dismiss it and nothing changes.</p>
           <ul>
-            <li>Up to 2 connected stores</li>
-            <li>True-profit reporting</li>
-            <li>Alerts and clear recommendations</li>
-            <li>Basic inventory forecasting</li>
-            <li>3 users &middot; standard support</li>
+            <li><svg viewBox="0 0 24 24" fill="none"><path d="M20 6L9 17l-5-5" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg> Every action shows expected weekly impact before you approve</li>
+            <li><svg viewBox="0 0 24 24" fill="none"><path d="M20 6L9 17l-5-5" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg> Edit it first if you would do it differently</li>
+            <li><svg viewBox="0 0 24 24" fill="none"><path d="M20 6L9 17l-5-5" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg> Full history of what was approved and what it changed</li>
           </ul>
-          <a href="/subscribe" class="plan-cta">Start with Operator</a>
         </div>
-        <div class="plan popular">
-          <span class="tag">Most popular</span>
-          <h3>Vantav Growth</h3>
-          <div class="price">$399<span>/mo</span></div>
+        <div class="shot">
+          <div class="shot-bar"><i></i><i></i><i></i><span class="url">Recommended actions</span></div>
+          <img src="{{ url_for('static', filename='images/shots/actions.webp') }}" alt="Recommended action card proposing pausing an unprofitable TikTok ad set, with confidence and expected impact, awaiting approval" width="1800" loading="lazy">
+        </div>
+      </div>
+
+      <div class="row flip">
+        <div class="copy">
+          <span class="num">04</span>
+          <h3>Ask your store a question, in plain English</h3>
+          <p>"Where am I losing margin?" "What needs my attention?" Vantav's assistant answers from your own live numbers, not generic advice. It greets you with a briefing the moment you log in, so you know the state of the business before your first coffee.</p>
           <ul>
-            <li>Everything in Operator</li>
-            <li>Up to 5 stores, refreshed every 15 minutes</li>
-            <li>SKU velocity and stockout forecasting</li>
-            <li>Projected impact on every suggestion</li>
-            <li>10 users &middot; priority support</li>
+            <li><svg viewBox="0 0 24 24" fill="none"><path d="M20 6L9 17l-5-5" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg> A daily briefing on sign-in: profit, warnings, top priority</li>
+            <li><svg viewBox="0 0 24 24" fill="none"><path d="M20 6L9 17l-5-5" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg> Answers cite the channels, products and orders behind them</li>
+            <li><svg viewBox="0 0 24 24" fill="none"><path d="M20 6L9 17l-5-5" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg> Approve the recommended action right from the chat</li>
           </ul>
-          <a href="/subscribe" class="plan-cta">Start with Growth</a>
         </div>
-        <div class="plan">
-          <span class="tag">Scale</span>
-          <h3>Vantav Scale</h3>
-          <div class="price">$799<span>/mo</span></div>
-          <ul>
-            <li>Everything in Growth</li>
-            <li>Up to 15 stores, portfolio-wide intelligence</li>
-            <li>Custom alert rules and advanced permissions</li>
-            <li>API and data access, complete audit history</li>
-            <li>Priority onboarding and support</li>
-          </ul>
-          <a href="/subscribe" class="plan-cta">Start with Scale</a>
+        <div class="shot">
+          <div class="shot-bar"><i></i><i></i><i></i><span class="url">Vantav assistant</span></div>
+          <img src="{{ url_for('static', filename='images/shots/overview.webp') }}" alt="Vantav overview with the assistant summarising net profit, connected channels and the top recommended next step" width="1800" loading="lazy">
         </div>
       </div>
-      <p class="pricing-note">Need the done-for-you launch? The $999 Concierge Bundle can be added to any plan at checkout. <a href="/subscribe" style="color:var(--purple-2)">See full plan details</a></p>
-    </section>
 
-    <section id="faq" class="wrap pad-tight">
-      <div class="section-head">
-        <span class="kicker">FAQ</span>
-        <h2>Questions merchants ask first</h2>
+    </div>
+  </div>
+</section>
+
+<!-- ============ SMALL FEATURE GRID ============ -->
+<section class="band tight">
+  <div class="wrap">
+    <div class="head center">
+      <span class="eyebrow" style="justify-content:center">Also included</span>
+      <h2>The rest of the day-to-day</h2>
+    </div>
+    <div class="cards">
+      <div class="card">
+        <div class="ico"><svg viewBox="0 0 24 24" fill="none"><path d="M3 3v18h18" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><path d="M7 14l4-4 3 3 5-6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+        <h4>Inventory &amp; reorder timing</h4>
+        <p>How fast each product sells, how many days of stock are left, and when to reorder so you stop selling out of winners and over-buying the rest.</p>
       </div>
-      <div class="faq">
-        <details open>
-          <summary>Which channels does Vantav support?</summary>
-          <p>Shopify, TikTok Shop, and Amazon today, with Stripe for payments. Costs, fees, and ad spend from those channels feed the same profit engine, so numbers are comparable across all of them.</p>
-        </details>
-        <details>
-          <summary>How is "true profit" different from what Shopify shows me?</summary>
-          <p>Shopify reports revenue and a limited cost view. Vantav subtracts marketplace and payment fees, shipping, discounts, refunds and returns, COGS, and channel ad spend — so the number you see is what lands in the bank, broken down by channel and SKU.</p>
-        </details>
-        <details>
-          <summary>Does Vantav change anything in my store on its own?</summary>
-          <p>No. Every recommendation — pausing an ad set, reordering stock, changing a price — arrives as an action with its supporting numbers. Nothing executes until you approve it, and you can edit or skip any suggestion.</p>
-        </details>
-        <details>
-          <summary>Can I try it before connecting my stores?</summary>
-          <p>Yes. Every plan starts with a 48-hour sandbox using sample data, so you can walk the full dashboard before authorizing any channel.</p>
-        </details>
-        <details>
-          <summary>How are my credentials handled?</summary>
-          <p>API credentials are encrypted at rest, scoped to the permissions each integration requires, and never shared between merchants. See our <a href="/security" style="color:var(--purple-2)">security page</a> for details.</p>
-        </details>
-        <details>
-          <summary>How long does setup take?</summary>
-          <p>Most merchants connect their channels and see a populated dashboard the same afternoon. Historical orders backfill in the background.</p>
-        </details>
+      <div class="card">
+        <div class="ico"><svg viewBox="0 0 24 24" fill="none"><rect x="3" y="4" width="18" height="16" rx="2" stroke="currentColor" stroke-width="2"/><path d="M3 9h18M9 20V9" stroke="currentColor" stroke-width="2"/></svg></div>
+        <h4>Orders, suppliers and returns</h4>
+        <p>Fulfilment, late deliveries, supplier lead times and returns for every channel in one list — with a health score that points you at what to look at first.</p>
       </div>
-    </section>
-
-    <section class="trust">
-      <p>Built for Shopify, TikTok Shop, and Amazon sellers who want clearer numbers.</p>
-      <div class="badges">
-        <span class="badge">48-hour sandbox</span>
-        <span class="badge">Encrypted API credentials</span>
-        <span class="badge">No store credentials required to preview</span>
-        <span class="badge">Cancel anytime</span>
+      <div class="card">
+        <div class="ico"><svg viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="2"/><path d="M12 8v4l3 2" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg></div>
+        <h4>Forecasts you can plan around</h4>
+        <p>Projected sales and cash needs for the coming weeks, based on your own history rather than a generic industry curve.</p>
       </div>
-    </section>
-
-    <section class="final-cta">
-      <h2>See what your store actually keeps</h2>
-      <p>Start with the sandbox, connect a channel when you are ready, and let Vantav tell you where the margin is going.</p>
-      <div class="ctas">
-        <a href="/subscribe" class="btn-primary">View Plans</a>
-        <a href="/login" class="btn-secondary">Log in</a>
+      <div class="card">
+        <div class="ico"><svg viewBox="0 0 24 24" fill="none"><path d="M12 3l8 4v6c0 4.5-3.4 7.3-8 8-4.6-.7-8-3.5-8-8V7l8-4z" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/></svg></div>
+        <h4>Fraud &amp; chargeback screening</h4>
+        <p>Risky orders flagged before you ship them, so a fake order does not cost you the product and the fee.</p>
       </div>
-    </section>
-  </main>
+      <div class="card">
+        <div class="ico"><svg viewBox="0 0 24 24" fill="none"><path d="M20 7H4a1 1 0 00-1 1v9a1 1 0 001 1h16a1 1 0 001-1V8a1 1 0 00-1-1z" stroke="currentColor" stroke-width="2"/><path d="M16 7V5a2 2 0 00-2-2h-4a2 2 0 00-2 2v2" stroke="currentColor" stroke-width="2"/></svg></div>
+        <h4>Product research</h4>
+        <p>See which of your categories carry real margin and which competitors are pricing you out, before you commit to the next order.</p>
+      </div>
+      <div class="card">
+        <div class="ico"><svg viewBox="0 0 24 24" fill="none"><path d="M4 6h16M4 12h10M4 18h7" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg></div>
+        <h4>Weekly summary by email</h4>
+        <p>A short recap of profit, what changed and what you approved — useful for a partner, an accountant or an investor update.</p>
+      </div>
+    </div>
+  </div>
+</section>
 
-  <footer>
-    &copy; 2026 Vantav LLC.
-    <a href="/terms" style="color:var(--muted)">Terms</a> &middot;
-    <a href="/privacy" style="color:var(--muted)">Privacy</a> &middot;
-    <a href="/refund" style="color:var(--muted)">Refund</a> &middot;
-    <a href="/security" style="color:var(--muted)">Security</a> &middot;
-    <a href="/status" style="color:var(--muted)">Status</a>
-  </footer>
+<!-- ============ ONBOARDING ============ -->
+<section class="band tight">
+  <div class="wrap">
+    <div class="head center">
+      <span class="eyebrow" style="justify-content:center">Getting started</span>
+      <h2>Connected and useful the same afternoon</h2>
+    </div>
+    <div class="steps">
+      <div class="step">
+        <span class="n">Step 1</span>
+        <h4>Connect your channels</h4>
+        <p>Sign in to Shopify, TikTok Shop or Amazon through their official connection screens. Vantav asks for read-only access to orders, products and fees.</p>
+      </div>
+      <div class="step">
+        <span class="n">Step 2</span>
+        <h4>Add your costs once</h4>
+        <p>Enter product cost and shipping, or import them from a spreadsheet. Vantav backfills your recent order history so you have real numbers immediately.</p>
+      </div>
+      <div class="step">
+        <span class="n">Step 3</span>
+        <h4>Work from the briefing</h4>
+        <p>From then on, every sign-in opens with your profit, your warnings and the one action worth doing first.</p>
+      </div>
+    </div>
+  </div>
+</section>
 
-  <script>
-    // Chapter buttons scrub the walkthrough instead of forcing a rewatch.
-    (function(){
-      const video = document.getElementById('tour-video');
-      if(!video) return;
-      document.querySelectorAll('.chapters button').forEach(btn => {
-        btn.addEventListener('click', () => {
-          video.currentTime = parseFloat(btn.dataset.t || '0');
-          video.play().catch(() => {});
-          video.scrollIntoView({block: 'center', behavior: 'smooth'});
-        });
+<!-- ============ PRICING ============ -->
+<section class="band" id="pricing">
+  <div class="wrap">
+    <div class="head center">
+      <span class="eyebrow" style="justify-content:center">Pricing</span>
+      <h2>Simple monthly pricing</h2>
+      <p>Start free, connect a channel, and see your real numbers before you pay for anything.</p>
+    </div>
+    <div class="plans">
+      <div class="plan">
+        <span class="tag">Operator</span>
+        <div class="price">$199<span>/month</span></div>
+        <p class="who">For a single-channel store getting its numbers straight.</p>
+        <ul>
+          <li><svg viewBox="0 0 24 24" fill="none"><path d="M20 6L9 17l-5-5" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg> One sales channel</li>
+          <li><svg viewBox="0 0 24 24" fill="none"><path d="M20 6L9 17l-5-5" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg> True profit per order and product</li>
+          <li><svg viewBox="0 0 24 24" fill="none"><path d="M20 6L9 17l-5-5" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg> Warnings and daily briefing</li>
+          <li><svg viewBox="0 0 24 24" fill="none"><path d="M20 6L9 17l-5-5" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg> Email support</li>
+        </ul>
+        <a class="btn btn-ghost" href="/subscribe">Choose Operator</a>
+      </div>
+      <div class="plan featured">
+        <span class="tag">Growth &middot; most popular</span>
+        <div class="price">$399<span>/month</span></div>
+        <p class="who">For multi-channel stores that need the assistant and recommended actions.</p>
+        <ul>
+          <li><svg viewBox="0 0 24 24" fill="none"><path d="M20 6L9 17l-5-5" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg> Everything in Operator</li>
+          <li><svg viewBox="0 0 24 24" fill="none"><path d="M20 6L9 17l-5-5" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg> All three channels connected</li>
+          <li><svg viewBox="0 0 24 24" fill="none"><path d="M20 6L9 17l-5-5" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg> Assistant with recommended actions</li>
+          <li><svg viewBox="0 0 24 24" fill="none"><path d="M20 6L9 17l-5-5" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg> Inventory and reorder timing</li>
+        </ul>
+        <a class="btn btn-primary" href="/subscribe">Choose Growth</a>
+      </div>
+      <div class="plan">
+        <span class="tag">Scale</span>
+        <div class="price">$799<span>/month</span></div>
+        <p class="who">For larger operations that want every module and higher limits.</p>
+        <ul>
+          <li><svg viewBox="0 0 24 24" fill="none"><path d="M20 6L9 17l-5-5" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg> Everything in Growth</li>
+          <li><svg viewBox="0 0 24 24" fill="none"><path d="M20 6L9 17l-5-5" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg> Forecasting, fraud screening, product research</li>
+          <li><svg viewBox="0 0 24 24" fill="none"><path d="M20 6L9 17l-5-5" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg> Unlimited history and exports</li>
+          <li><svg viewBox="0 0 24 24" fill="none"><path d="M20 6L9 17l-5-5" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg> Priority support</li>
+        </ul>
+        <a class="btn btn-ghost" href="/subscribe">Choose Scale</a>
+      </div>
+    </div>
+    <p class="plan-note">Prefer it set up for you? Our team connects your channels, imports your costs and tunes your warnings for a one-time $999. <a href="/subscribe" style="color:var(--purple-2)">See all plans &rarr;</a></p>
+  </div>
+</section>
+
+<!-- ============ FAQ ============ -->
+<section class="band tight" id="faq">
+  <div class="wrap">
+    <div class="head center">
+      <span class="eyebrow" style="justify-content:center">Questions</span>
+      <h2>Straight answers</h2>
+    </div>
+    <div class="faq">
+      <details open>
+        <summary>Which channels can I connect?</summary>
+        <p>Shopify, TikTok Shop and Amazon today, with Stripe for payments. If you sell somewhere else, tell us — we add channels based on what customers actually need.</p>
+      </details>
+      <details>
+        <summary>What exactly does "true profit" include?</summary>
+        <p>Revenue minus product cost, marketplace and payment fees, shipping and fulfilment, discounts, refunds, and the ad spend attributed to those sales. It is the number left in your bank account, not gross sales.</p>
+      </details>
+      <details>
+        <summary>Will Vantav change anything in my store on its own?</summary>
+        <p>No. It drafts the recommendation and shows you the numbers behind it. Nothing is paused, reordered or repriced until you approve it, and you can edit or dismiss any suggestion.</p>
+      </details>
+      <details>
+        <summary>Can I try it before paying?</summary>
+        <p>Yes. Create an account and you get a full workspace to explore with your own connected data before you commit to a plan.</p>
+      </details>
+      <details>
+        <summary>How do you handle my store credentials?</summary>
+        <p>You connect through each platform's own authorisation screen — we never ask for your store password. Access is read-only for reporting, tokens are encrypted, and you can disconnect a channel at any time.</p>
+      </details>
+      <details>
+        <summary>How long does setup take?</summary>
+        <p>Connecting a channel takes a few minutes. Most stores are looking at accurate profit the same afternoon; the only manual part is entering product costs, and you can import those from a spreadsheet.</p>
+      </details>
+      <details>
+        <summary>Do I need an analyst or a developer?</summary>
+        <p>No. Vantav is built for the owner or operator. If you can read your Shopify dashboard, you can run Vantav — and you can always just ask the assistant.</p>
+      </details>
+    </div>
+  </div>
+</section>
+
+<!-- ============ FINAL CTA ============ -->
+<section class="band tight">
+  <div class="wrap">
+    <div class="final">
+      <h2>Find out what your store actually keeps</h2>
+      <p>Connect a channel, add your costs, and see your real margin today — not at the end of the month.</p>
+      <div class="hero-ctas">
+        <a class="btn btn-primary" href="/subscribe">Start free — no card required</a>
+        <a class="btn btn-ghost" href="#how-it-works">Watch the tour first</a>
+      </div>
+    </div>
+  </div>
+</section>
+
+<footer>
+  <div class="wrap foot">
+    <div>
+      <a class="brand" href="/">
+        <span class="brand-mark">
+          <svg viewBox="0 0 24 24" fill="none"><path d="M3 4l9 16 9-16" stroke="#a78bfa" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </span>
+        <span>Vantav</span>
+      </a>
+      <small>Profit clarity for multi-channel commerce.</small>
+    </div>
+    <div class="foot-links">
+      <a href="#how-it-works">How it works</a>
+      <a href="#features">Features</a>
+      <a href="#pricing">Pricing</a>
+      <a href="#faq">FAQ</a>
+      <a href="/login">Log in</a>
+      <a href="/subscribe">Start free</a>
+    </div>
+  </div>
+  <div class="wrap" style="margin-top:1.5rem"><small style="color:var(--dim);font-size:.8rem">&copy; {{ current_year or 2025 }} Vantav. All rights reserved.</small></div>
+</footer>
+
+<script>
+  (function () {
+    const video = document.getElementById('tour-video');
+    if (!video) return;
+    document.querySelectorAll('.chapters button').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        video.currentTime = parseFloat(btn.dataset.t || '0');
+        video.play().catch(function () {});
+        video.scrollIntoView({ block: 'center', behavior: 'smooth' });
       });
-    })();
-  </script>
+    });
+  })();
+</script>
 </body>
 </html>
