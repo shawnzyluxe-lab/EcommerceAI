@@ -4,8 +4,37 @@
   <link rel="icon" type="image/x-icon" href="/static/images/favicon.ico">
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Vantav Pricing</title>
-  <script src="https://www.google.com/recaptcha/api.js?render={{ recaptcha_site_key }}" async defer></script>
+  <title>Vantav Pricing | Plans for Shopify, TikTok Shop and Amazon sellers</title>
+  <meta name="description" content="Vantav pricing: Operator $199, Growth $399 and Scale $799 a month. True-profit reporting, alerts and approved fixes across Shopify, TikTok Shop and Amazon. Cancel anytime.">
+  <link rel="canonical" href="https://vantavcommerce.com/subscribe">
+  <meta property="og:type" content="website">
+  <meta property="og:site_name" content="Vantav">
+  <meta property="og:url" content="https://vantavcommerce.com/subscribe">
+  <meta property="og:title" content="Vantav pricing — plans for multi-channel sellers">
+  <meta property="og:description" content="Operator, Growth and Scale plans. True profit per order across Shopify, TikTok Shop and Amazon, with alerts and fixes you approve. Cancel anytime.">
+  <meta property="og:image" content="https://vantavcommerce.com/static/videos/how-it-works.jpg">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="Vantav pricing — plans for multi-channel sellers">
+  <meta name="twitter:description" content="Operator, Growth and Scale plans. True profit per order across Shopify, TikTok Shop and Amazon, with alerts and fixes you approve.">
+  <meta name="twitter:image" content="https://vantavcommerce.com/static/videos/how-it-works.jpg">
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "Product",
+    "name": "Vantav",
+    "description": "AI-powered commerce assistant for Shopify, TikTok Shop and Amazon sellers.",
+    "brand": { "@type": "Organization", "name": "Vantav" },
+    "offers": {
+      "@type": "AggregateOffer",
+      "priceCurrency": "USD",
+      "lowPrice": "199",
+      "highPrice": "799",
+      "offerCount": "3",
+      "url": "https://vantavcommerce.com/subscribe"
+    }
+  }
+  </script>
+  {% if recaptcha_site_key %}<script src="https://www.google.com/recaptcha/api.js?render={{ recaptcha_site_key }}" async defer></script>{% endif %}
   <script>window.dataLayer = window.dataLayer || [];</script>
   {% if gtm_id %}<script>(function(w,d,s,l,i){w[l]=w[l]||[];w[l].push({'gtm.start':new Date().getTime(),event:'gtm.js'});var f=d.getElementsByTagName(s)[0],j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src='https://www.googletagmanager.com/gtm.js?id='+i+dl;f.parentNode.insertBefore(j,f);})(window,document,'script','dataLayer','{{ gtm_id }}');</script>{% endif %}
   {% if meta_pixel_id %}<script>!function(f,b,e,v,n,t,s){if(f.fbq)return;n=f.fbq=function(){n.callMethod?n.callMethod.apply(n,arguments):n.queue.push(arguments)};if(!f._fbq)f._fbq=n;n.push=n;n.loaded=!0;n.version='2.0';n.queue=[];t=b.createElement(e);t.async=!0;t.src=v;s=b.getElementsByTagName(e)[0];s.parentNode.insertBefore(t,s)}(window,document,'script','https://connect.facebook.net/en_US/fbevents.js');fbq('init','{{ meta_pixel_id }}');fbq('track','PageView');</script><noscript><img height="1" width="1" style="display:none" src="https://www.facebook.com/tr?id={{ meta_pixel_id }}&ev=PageView&noscript=1"/></noscript>{% endif %}
@@ -25,6 +54,15 @@
     .plan .badge { display: inline-block; font-size: .65rem; letter-spacing: .1em; text-transform: uppercase; padding: .25rem .5rem; border-radius: 999px; border: 1px solid var(--line); color: var(--muted); margin-bottom: .75rem; }
     .plan.popular .badge { border-color: var(--accent); color: var(--accent); }
     .plan h3 { margin: 0 0 .25rem; font-size: 1.25rem; }
+    .plan .who { margin: 0 0 .75rem; font-size: .82rem; color: var(--muted); }
+    .trust { list-style: none; display: flex; flex-wrap: wrap; justify-content: center; gap: .5rem 1.25rem; padding: 0; margin: -1.5rem auto 2.5rem; max-width: 780px; font-size: .82rem; color: var(--muted); }
+    .trust li { position: relative; padding-left: 1.1rem; }
+    .trust li::before { content: ""; position: absolute; left: 0; top: .45em; width: .45rem; height: .45rem; border-radius: 999px; background: var(--success); }
+    .faq { max-width: 780px; margin: 3rem auto 0; }
+    .faq h3 { text-align: center; font-size: 1.4rem; margin: 0 0 1.25rem; }
+    .faq details { border: 1px solid var(--line); border-radius: 14px; background: var(--card); padding: .9rem 1.1rem; margin-bottom: .6rem; }
+    .faq summary { cursor: pointer; font-weight: 600; font-size: .95rem; }
+    .faq p { margin: .7rem 0 0; color: var(--muted); font-size: .9rem; line-height: 1.6; }
     .plan .price { font-size: 2rem; font-weight: 700; color: var(--ink); margin-bottom: .75rem; }
     .plan .price span { font-size: .85rem; font-weight: 400; color: var(--muted); }
     .plan ul { list-style: none; padding: 0; margin: 0 0 1.5rem; }
@@ -51,11 +89,18 @@
     <div class="topbar">Vantav Plans</div>
     <h1>Choose your Vantav plan</h1>
     <p class="sub">Simple pricing for every stage of your business. Every plan includes the full Vantav experience: track what matters, know what needs attention, get clear recommendations, and approve the next step.</p>
+    <ul class="trust">
+      <li>Cancel anytime &mdash; access runs to the end of the billing period</li>
+      <li>No setup fee, no annual contract</li>
+      <li>Payments secured by Stripe</li>
+      <li>Full refund within 48 hours of signup if no work has begun</li>
+    </ul>
 
     <div class="plans">
       <div class="plan">
         <span class="badge">START</span>
         <h3>Vantav Operator</h3>
+        <p class="who">For one store getting its numbers straight</p>
         <div class="price">$199<span>/mo</span></div>
         <ul>
           <li>Up to 2 connected stores</li>
@@ -75,6 +120,7 @@
       <div class="plan popular">
         <span class="badge">MOST POPULAR</span>
         <h3>Vantav Growth</h3>
+        <p class="who">For growing brands selling on several channels</p>
         <div class="price">$399<span>/mo</span></div>
         <ul>
           <li>Everything in Operator</li>
@@ -97,6 +143,7 @@
       <div class="plan">
         <span class="badge">SCALE</span>
         <h3>Vantav Scale</h3>
+        <p class="who">For multi-brand portfolios and agencies</p>
         <div class="price">$799<span>/mo</span></div>
         <ul>
           <li>Everything in Growth</li>
@@ -132,6 +179,30 @@
         Add Concierge Bundle to my selected plan
       </label>
     </div>
+
+    <section class="faq">
+      <h3>Common questions</h3>
+      <details>
+        <summary>Is there a free trial?</summary>
+        <p>There is no free trial today. Instead, if you sign up and no onboarding or consulting work has started, email support within 48 hours and we refund the charge in full.</p>
+      </details>
+      <details>
+        <summary>Can I cancel whenever I want?</summary>
+        <p>Yes. Cancel from Billing at any time; your account stays active until the end of the current billing period, and we do not charge cancellation fees.</p>
+      </details>
+      <details>
+        <summary>How long does setup take?</summary>
+        <p>Most sellers connect their first channel and read accurate profit numbers the same afternoon. Historical orders backfill automatically after the connection.</p>
+      </details>
+      <details>
+        <summary>Which channels are supported?</summary>
+        <p>Shopify, TikTok Shop and Amazon, plus Stripe for payment fees. More integrations are added regularly &mdash; ask support if you need a specific one.</p>
+      </details>
+      <details>
+        <summary>Can I switch plans later?</summary>
+        <p>Yes. Upgrade or downgrade at any time and billing is prorated by Stripe on your next invoice.</p>
+      </details>
+    </section>
 
     <footer>
       &copy; 2026 Vantav LLC. <a href="/terms">Terms</a> &middot; <a href="/privacy">Privacy</a> &middot; <a href="/refund">Refund</a>

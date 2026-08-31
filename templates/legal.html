@@ -5,6 +5,18 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>{% block legal_title %}{% endblock %} — Vantav</title>
+  <meta name="description" content="{% block legal_description %}{% endblock %}">
+  <link rel="canonical" href="https://vantavcommerce.com{{ request.path }}">
+  <meta property="og:type" content="website">
+  <meta property="og:site_name" content="Vantav">
+  <meta property="og:url" content="https://vantavcommerce.com{{ request.path }}">
+  <meta property="og:title" content="{{ self.legal_title() }} — Vantav">
+  <meta property="og:description" content="{{ self.legal_description() }}">
+  <meta property="og:image" content="https://vantavcommerce.com/static/videos/how-it-works.jpg">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="{{ self.legal_title() }} — Vantav">
+  <meta name="twitter:description" content="{{ self.legal_description() }}">
+  <meta name="twitter:image" content="https://vantavcommerce.com/static/videos/how-it-works.jpg">
   <style>
     :root {
       --bg: #0c0c11;

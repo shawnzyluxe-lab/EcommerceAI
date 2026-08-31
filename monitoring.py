@@ -425,14 +425,21 @@ def security_headers(response):
         "frame-ancestors 'none';"
     )
     if request_is_https():
-        response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains"
+        response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains; preload"
     return response
 
 
 def request_is_https() -> bool:
-    """Best-effort HTTPS detection for HSTS header."""
-    return os.environ.get("HTTPS", "off").lower() in ("on", "1") or \
-           os.environ.get("HTTP_X_FORWARDED_PROTO", "") == "https"
+    """Best-effort HTTPS detection for HSTS, including behind a TLS-terminating proxy."""
+    if os.environ.get("HTTPS", "off").lower() in ("on", "1"):
+        return True
+    try:
+        forwarded = (request.headers.get("X-Forwarded-Proto") or "").split(",")[0].strip().lower()
+        if forwarded:
+            return forwarded == "https"
+        return bool(request.is_secure)
+    except Exception:
+        return False
 
 
 def register_app(app):

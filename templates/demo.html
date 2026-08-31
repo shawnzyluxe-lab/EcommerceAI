@@ -5,7 +5,18 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Vantav — See how it works</title>
-  <meta name="description" content="Watch a quick walkthrough of Vantav: real-time profit, multi-channel sync, and AI-drafted actions you approve.">
+  <meta name="description" content="Watch the Vantav walkthrough: a live store audited end to end — true profit per order, multi-channel sync, and AI-drafted fixes you approve in two clicks.">
+  <link rel="canonical" href="https://vantavcommerce.com/demo">
+  <meta property="og:type" content="website">
+  <meta property="og:site_name" content="Vantav">
+  <meta property="og:url" content="https://vantavcommerce.com/demo">
+  <meta property="og:title" content="Vantav — see how it works">
+  <meta property="og:description" content="An 84-second tour of a live store: real profit per order, alerts that catch wasted ad spend, and fixes you approve.">
+  <meta property="og:image" content="https://vantavcommerce.com/static/videos/how-it-works.jpg">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="Vantav — see how it works">
+  <meta name="twitter:description" content="An 84-second tour of a live store: real profit per order, alerts that catch wasted ad spend, and fixes you approve.">
+  <meta name="twitter:image" content="https://vantavcommerce.com/static/videos/how-it-works.jpg">
   <style>
     :root {
       --bg: #0c0c11;
@@ -127,9 +138,11 @@
 
     <section class="wrap demo">
       <div class="video-wrap">
-        <video controls preload="metadata" playsinline autoplay muted>
-          <source src="{{ url_for('static', filename='videos/demo.mp4') }}" type="video/mp4">
+        <video controls preload="metadata" playsinline
+               poster="{{ url_for('static', filename='videos/how-it-works.jpg') }}">
+          <source src="{{ url_for('static', filename='videos/how-it-works.mp4') }}" type="video/mp4">
           Your browser does not support the video tag.
+          <a href="{{ url_for('static', filename='videos/how-it-works.mp4') }}">Download the tour</a>.
         </video>
       </div>
       <div class="ctas">

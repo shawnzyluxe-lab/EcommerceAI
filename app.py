@@ -35,7 +35,7 @@ logging.basicConfig(
 )
 logger = logging.getLogger("shawnzyluxe_core")
 from urllib.parse import urlencode, quote
-from flask import Flask, render_template, request, redirect, url_for, session, flash, jsonify, send_file, make_response, after_this_request, current_app, g
+from flask import Flask, render_template, request, redirect, url_for, session, flash, jsonify, send_file, send_from_directory, make_response, after_this_request, current_app, g, Response
 from flask_sock import Sock
 from dotenv import load_dotenv
 
@@ -826,7 +826,10 @@ def enforce_tier_limits(merchant_id, requested_feature):
 def site_wall_protect():
     if not site_wall_enabled():
         return None
-    if request.endpoint in ('home', 'login', 'site_login', 'site_logout', 'subscribe', 'checkout', 'thank_you', 'session_heartbeat', 'create_stripe_checkout', 'beta_apply', 'api_beta_apply', 'auth_login', 'auth_signup', 'auth_provision_node', 'shopify_orders_webhook', 'shopify_gdpr_customer_data_request', 'shopify_gdpr_customer_redact', 'shopify_gdpr_shop_redact', 'shopify_app_uninstalled', 'tiktok_orders_webhook', 'amazon_orders_webhook', 'stripe_billing_webhook', 'supplier_po_update', 'execute_mitigation', 'generate_magic_link', 'magic_login', 'register_merchant', 'shopify_oauth_callback', 'tiktok_oauth_callback', 'health_check', 'api_v1_health', 'api_monitoring_health', 'api_monitoring_alerts', 'legal_terms', 'legal_privacy', 'legal_refund', 'static'):
+    if request.endpoint is None:
+        # Unknown path: let Flask return a real 404 instead of hiding it behind a login redirect.
+        return None
+    if request.endpoint in ('home', 'login', 'site_login', 'site_logout', 'subscribe', 'checkout', 'thank_you', 'session_heartbeat', 'create_stripe_checkout', 'beta_apply', 'api_beta_apply', 'auth_login', 'auth_signup', 'auth_provision_node', 'shopify_orders_webhook', 'shopify_gdpr_customer_data_request', 'shopify_gdpr_customer_redact', 'shopify_gdpr_shop_redact', 'shopify_app_uninstalled', 'tiktok_orders_webhook', 'amazon_orders_webhook', 'stripe_billing_webhook', 'supplier_po_update', 'execute_mitigation', 'generate_magic_link', 'magic_login', 'register_merchant', 'shopify_oauth_callback', 'tiktok_oauth_callback', 'health_check', 'api_v1_health', 'api_monitoring_health', 'api_monitoring_alerts', 'legal_terms', 'legal_privacy', 'legal_refund', 'legal_security', 'status_page', 'demo', 'robots_txt', 'sitemap_xml', 'favicon_ico', 'static'):
         return None
     if site_wall_authenticated():
         return None
@@ -1708,6 +1711,59 @@ def status_page():
     health_response, _ = health_check()
     health = health_response.get_json()
     return render_template('status.html', health=health)
+
+
+PUBLIC_PATHS = ('/', '/subscribe', '/demo', '/security', '/status', '/terms', '/privacy', '/refund', '/login')
+
+
+def _site_root() -> str:
+    return (os.environ.get('SITE_BASE_URL') or 'https://vantavcommerce.com').rstrip('/')
+
+
+@app.route('/robots.txt')
+@limiter.exempt
+def robots_txt():
+    body = "\n".join([
+        "User-agent: *",
+        "Allow: /",
+        "Disallow: /dashboard",
+        "Disallow: /admin",
+        "Disallow: /engineer",
+        "Disallow: /api/",
+        "Disallow: /checkout",
+        f"Sitemap: {_site_root()}/sitemap.xml",
+        "",
+    ])
+    return Response(body, mimetype='text/plain')
+
+
+@app.route('/sitemap.xml')
+@limiter.exempt
+def sitemap_xml():
+    root = _site_root()
+    today = datetime.utcnow().date().isoformat()
+    urls = "".join(
+        f"<url><loc>{root}{path}</loc><lastmod>{today}</lastmod></url>"
+        for path in PUBLIC_PATHS
+    )
+    body = (
+        '<?xml version="1.0" encoding="UTF-8"?>'
+        '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">'
+        f'{urls}</urlset>'
+    )
+    return Response(body, mimetype='application/xml')
+
+
+@app.route('/favicon.ico')
+@limiter.exempt
+def favicon_ico():
+    return send_from_directory(os.path.join(app.root_path, 'static', 'images'), 'favicon.ico',
+                              mimetype='image/vnd.microsoft.icon')
+
+
+@app.errorhandler(404)
+def not_found(_error):
+    return render_template('404.html'), 404
 
 
 @app.route('/dashboard')
