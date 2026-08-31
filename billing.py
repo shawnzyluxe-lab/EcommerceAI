@@ -219,8 +219,8 @@ def verify_checkout_session(session_id: str) -> Dict[str, Any]:
 
 def get_stripe_balance() -> Dict[str, Any]:
     """Return Stripe account balance with available and pending amounts."""
-    _ensure_configured()
     try:
+        _ensure_configured()
         bal = stripe.Balance.retrieve()
         available = [
             {"amount": b.amount, "currency": b.currency, "amount_decimal": b.amount / 100}
