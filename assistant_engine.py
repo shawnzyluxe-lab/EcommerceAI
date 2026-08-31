@@ -212,6 +212,41 @@ def _inventory_answer(snap: Dict[str, Any]) -> Optional[str]:
     return "\n".join(lines)
 
 
+def _action_answer(snap: Dict[str, Any]) -> Optional[str]:
+    """Rank pending Action Gate items by expected weekly impact."""
+    actions = snap.get("pending_actions") or []
+    if not actions:
+        return None
+
+    def _impact(action: Dict[str, Any]) -> float:
+        evidence = action.get("evidence") or {}
+        return abs(float(evidence.get("expected_weekly_impact_max") or 0))
+
+    ranked = sorted(actions, key=_impact, reverse=True)
+    top = ranked[0]
+    evidence = top.get("evidence") or {}
+    lines = [f"Do this first: {top.get('title', '')}"]
+    if top.get("detail"):
+        lines.append(top["detail"])
+    impact = _impact(top)
+    confidence = evidence.get("confidence_score")
+    facts = []
+    if impact:
+        facts.append(f"worth about ${impact:,.0f} a week")
+    if confidence:
+        facts.append(f"{round(float(confidence) * 100 if float(confidence) <= 1 else float(confidence))}% confidence")
+    if facts:
+        lines.append("Vantav rates it " + " at ".join(facts) + ". Approve it in the Action Gate.")
+    else:
+        lines.append("Approve it in the Action Gate.")
+
+    if len(ranked) > 1:
+        lines.append("Then, in order:")
+        for action in ranked[1:4]:
+            lines.append(f"• {action.get('title', '')}")
+    return "\n\n".join(lines)
+
+
 def _local_answer(merchant_id: str, message: str) -> Dict[str, Any]:
     """Fallback when no LLM key is available: keyword-driven tool calls and summary."""
     msg = message.lower()
@@ -251,6 +286,11 @@ def _local_answer(merchant_id: str, message: str) -> Dict[str, Any]:
 
     snap = agent_context.get_snapshot(merchant_id)
     logger.info("[Assistant] No LLM key configured; answering %s from live data only.", merchant_id)
+
+    if any(w in msg for w in ["top action", "what should i do", "do first", "pending action", "approve"]):
+        action_answer = _action_answer(snap)
+        if action_answer:
+            return {"answer": action_answer, "did": did}
 
     if any(w in msg for w in ["losing margin", "margin", "channel", "profit by", "least profitable"]):
         margin_answer = _margin_answer(merchant_id, snap)
