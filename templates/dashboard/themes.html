@@ -9,8 +9,8 @@
 
 <div class="theme-grid" id="theme-grid">
   {% for t in [
-    {'slug':'prometheus-dark','name':'Prometheus Dark','active': merchant.theme == 'prometheus-dark'},
-    {'slug':'prometheus-light','name':'Prometheus Light','active': merchant.theme == 'prometheus-light'},
+    {'slug':'prometheus-dark','name':'Vantav Dark','active': merchant.theme == 'prometheus-dark'},
+    {'slug':'prometheus-light','name':'Vantav Light','active': merchant.theme == 'prometheus-light'},
     {'slug':'luxury-editorial','name':'Luxury Editorial','active': merchant.theme == 'luxury-editorial'},
     {'slug':'minimal-clean','name':'Minimal Clean','active': merchant.theme == 'minimal-clean'}
   ] %}
@@ -33,6 +33,13 @@
 (function(){
   const grid = document.getElementById('theme-grid');
   const toast = document.getElementById('theme-toast');
+
+  const themeLabels = {
+    'prometheus-dark': 'Vantav Dark',
+    'prometheus-light': 'Vantav Light',
+    'luxury-editorial': 'Luxury Editorial',
+    'minimal-clean': 'Minimal Clean'
+  };
 
   function showToast(msg){
     toast.textContent = msg;
@@ -68,7 +75,7 @@
         const btn = card.querySelector('button');
         btn.textContent = isActive ? 'Customize' : 'Activate';
       });
-      showToast(data.theme.replace(/-/g, ' ').replace(/\b\w/g, l => l.toUpperCase()) + ' theme activated.');
+      showToast((themeLabels[data.theme] || data.theme.replace(/-/g, ' ').replace(/\b\w/g, l => l.toUpperCase())) + ' theme activated.');
     } catch (e) {
       showToast('Network error. Please try again.');
     }

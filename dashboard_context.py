@@ -720,8 +720,8 @@ NAV_GROUPS = [
         "label": "Intelligence",
         "links": [
             {"id": "alerts", "label": "Alerts", "url": "/dashboard/alerts", "icon": "⚠", "badge": str(len(ALERTS))},
-            {"id": "action_gate", "label": "Action Gate", "url": "/dashboard/action-gate", "icon": "✓"},
-            {"id": "profit_engine", "label": "Profit Dashboard", "url": "/dashboard/profit-engine", "icon": "$"},
+            {"id": "action_gate", "label": "Pending Actions", "url": "/dashboard/pending-actions", "icon": "✓"},
+            {"id": "profit_engine", "label": "Profit Dashboard", "url": "/dashboard/profit-dashboard", "icon": "$"},
             {"id": "predictions", "label": "Predictions", "url": "/dashboard/predictions", "icon": "◐"},
             {"id": "product_research", "label": "Product Research", "url": "/dashboard/product-research", "icon": "◎"},
             {"id": "analytics", "label": "Analytics", "url": "/dashboard/analytics", "icon": "▤"},
@@ -834,6 +834,36 @@ def context(active_page=None, merchant=None, merchant_id=None):
         "inventory_value": sum(row["on_hand"] * row["unit_cost"] for row in inventory_rows),
     }
     inventory_needs_cost_setup = bool(inventory_rows) and any(row["unit_cost"] == 0 for row in inventory_rows)
+
+    # Product catalog rows: Vantav-managed vs synced from connected channels.
+    products_rows = []
+    catalog_rows = []
+    if active_page in ("products", "store_catalog") and merchant_id:
+        try:
+            for p in Product.query.filter_by(merchant_id=merchant_id).all():
+                on_hand = int(p.on_hand or 0)
+                reorder = int(p.reorder_point or 10)
+                if on_hand == 0:
+                    status = "Out"
+                elif on_hand <= reorder:
+                    status = "Low"
+                else:
+                    status = "Active"
+                raw_channels = p.channel_ids or {}
+                if isinstance(raw_channels, str):
+                    channels = [raw_channels]
+                elif isinstance(raw_channels, dict):
+                    channels = [k for k in raw_channels.keys() if raw_channels[k]]
+                else:
+                    channels = []
+                row = {"title": p.title, "sku": p.sku, "on_hand": on_hand, "status": status, "channels": channels}
+                if channels:
+                    catalog_rows.append(row)
+                else:
+                    products_rows.append(row)
+        except Exception:
+            pass
+
     # Always serve fresh headline numbers even if BRIEFING is mutated elsewhere.
     briefing = dict(BRIEFING)
     briefing["revenue"] = gross
@@ -929,6 +959,9 @@ def context(active_page=None, merchant=None, merchant_id=None):
                 "billing_cycle_end": billing.billing_cycle_end if billing else "",
             }
             tier_limits = {
+                "name": tier_key,
+                "display_name": meta.get("display_name", tier_key),
+                "monthly_price": meta.get("monthly_price", 0),
                 "orders": meta.get("monthly_order_limit", 500),
                 "actions": meta.get("max_monthly_actions", 50),
                 "stores": meta.get("max_store_connections", 2),
@@ -940,7 +973,16 @@ def context(active_page=None, merchant=None, merchant_id=None):
         except Exception:
             pass
 
-    # Usage overview for the settings page.
+    # Channel list from persistent connections.
+    try:
+        channel_data = channels_module.list_channels(merchant_id) if merchant_id else CHANNELS
+    except Exception:
+        channel_data = CHANNELS
+
+    connected = [c for c in channel_data if c.get("state") == "connected"]
+    team_users = []
+
+    # Single source of truth for account/billing usage bars.
     usage_overview = []
     if merchant_id:
         try:
@@ -949,15 +991,11 @@ def context(active_page=None, merchant=None, merchant_id=None):
             usage_overview = [
                 ("Orders", order_count, tier_limits.get("orders", 500)),
                 ("Products", product_count, tier_limits.get("products", 10000)),
+                ("Connected stores", len(connected), tier_limits.get("stores", 2)),
+                ("Team seats", len(team_users), tier_limits.get("users", 1)),
             ]
         except Exception:
             pass
-
-    # Channel list from persistent connections.
-    try:
-        channel_data = channels_module.list_channels(merchant_id) if merchant_id else CHANNELS
-    except Exception:
-        channel_data = CHANNELS
 
     # Ensure the merchant dict carries the timezone so templates can render local time.
     merchant_obj = dict(merchant or {
@@ -989,7 +1027,7 @@ def context(active_page=None, merchant=None, merchant_id=None):
         "ai_greeting": _ai_greeting(merchant_id, merchant_obj),
         "suggestions": COMMAND_SUGGESTIONS,
         "channels": channel_data,
-        "connected": [c for c in channel_data if c.get("state") == "connected"],
+        "connected": connected,
         "briefing": briefing,
         "alerts": live_alerts,
         "profit_rows": profit_rows,
@@ -1002,6 +1040,8 @@ def context(active_page=None, merchant=None, merchant_id=None):
         "inventory_rows": inventory_rows,
         "inventory_kpis": inventory_kpis,
         "inventory_needs_cost_setup": inventory_needs_cost_setup,
+        "products": products_rows,
+        "catalog_rows": catalog_rows,
         "usage_overview": usage_overview,
         "series": SALES_SERIES,
         "series_max": max(p["value"] for p in SALES_SERIES),
@@ -1028,7 +1068,7 @@ def context(active_page=None, merchant=None, merchant_id=None):
         "channel_totals": channel_totals,
         "billing_account": billing_account,
         "tier_limits": tier_limits,
-        "team_users": [],
+        "team_users": team_users,
         "thresholds": {
             "slow_p95_ms": monitoring_module.SLOW_P95_MS,
             "error_rate_threshold": monitoring_module.ERROR_RATE_THRESHOLD,

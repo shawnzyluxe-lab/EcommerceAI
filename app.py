@@ -340,6 +340,8 @@ def _canonical_tier(raw_tier: str) -> str:
     mapping = {
         "Basic Tier": "Basic Tier",
         "Vantav Operator": "Vantav Operator",
+        "Vantav Starter": "Vantav Operator",
+        "Starter": "Vantav Operator",
         "Operator": "Vantav Operator",
         "Vantav Growth": "Vantav Growth",
         "Growth": "Vantav Growth",
@@ -752,7 +754,10 @@ def get_merchant_context():
     if sandbox_status == "sandbox" and profile.sandbox_expires_at and profile.sandbox_expires_at <= now:
         sandbox_status = "expired"
         sandbox_expired = True
-    display_name = profile.business_name or (profile.admin_email.split("@")[0] if profile.admin_email and "@" in profile.admin_email else view_merchant_id)
+    fallback_name = (profile.admin_email.split("@")[0].replace(".", " ").title() if profile.admin_email and "@" in profile.admin_email else view_merchant_id)
+    display_name = profile.business_name or fallback_name
+    if not display_name or display_name.startswith("Provisioned") or display_name.startswith("Storefront "):
+        display_name = fallback_name
     billing = SaaSBilling.query.get(view_merchant_id)
     concierge_bundle = False
     if billing and billing.add_ons:
@@ -829,7 +834,7 @@ def site_wall_protect():
     if request.endpoint is None:
         # Unknown path: let Flask return a real 404 instead of hiding it behind a login redirect.
         return None
-    if request.endpoint in ('home', 'login', 'site_login', 'site_logout', 'subscribe', 'checkout', 'thank_you', 'session_heartbeat', 'create_stripe_checkout', 'beta_apply', 'api_beta_apply', 'trial', 'api_trial_apply', 'auth_login', 'auth_signup', 'auth_provision_node', 'shopify_orders_webhook', 'shopify_gdpr_customer_data_request', 'shopify_gdpr_customer_redact', 'shopify_gdpr_shop_redact', 'shopify_app_uninstalled', 'tiktok_orders_webhook', 'amazon_orders_webhook', 'stripe_billing_webhook', 'supplier_po_update', 'execute_mitigation', 'generate_magic_link', 'magic_login', 'register_merchant', 'shopify_oauth_callback', 'tiktok_oauth_callback', 'health_check', 'api_v1_health', 'api_monitoring_health', 'api_monitoring_alerts', 'legal_terms', 'legal_privacy', 'legal_refund', 'legal_security', 'status_page', 'demo', 'robots_txt', 'sitemap_xml', 'favicon_ico', 'static'):
+    if request.endpoint in ('home', 'login', 'site_login', 'site_logout', 'subscribe', 'checkout', 'thank_you', 'session_heartbeat', 'create_stripe_checkout', 'beta_apply', 'api_beta_apply', 'trial', 'api_trial_apply', 'auth_login', 'auth_signup', 'auth_provision_node', 'shopify_orders_webhook', 'shopify_gdpr_customer_data_request', 'shopify_gdpr_customer_redact', 'shopify_gdpr_shop_redact', 'shopify_app_uninstalled', 'tiktok_orders_webhook', 'amazon_orders_webhook', 'stripe_billing_webhook', 'supplier_po_update', 'execute_mitigation', 'generate_magic_link', 'magic_login', 'register_merchant', 'shopify_oauth_callback', 'tiktok_oauth_callback', 'amazon_oauth_callback', 'health_check', 'api_v1_health', 'api_monitoring_health', 'api_monitoring_alerts', 'legal_terms', 'legal_privacy', 'legal_refund', 'legal_security', 'status_page', 'demo', 'robots_txt', 'sitemap_xml', 'favicon_ico', 'static'):
         return None
     if site_wall_authenticated():
         return None
@@ -896,6 +901,9 @@ TIKTOK_APP_SECRET = os.environ.get("TIKTOK_APP_SECRET", "")
 TIKTOK_SERVICE_ID = os.environ.get("TIKTOK_SERVICE_ID", "")
 TIKTOK_AUTH_REGION = os.environ.get("TIKTOK_AUTH_REGION", "")
 TIKTOK_REDIRECT_URI = "https://vantavcommerce.com/api/v1/auth/tiktok/callback"
+
+AMAZON_SPAPI_APP_ID = os.environ.get("AMAZON_SPAPI_APP_ID", "")
+AMAZON_SPAPI_OAUTH_REDIRECT_URI = os.environ.get("AMAZON_SPAPI_OAUTH_REDIRECT_URI", "https://vantavcommerce.com/api/v1/auth/amazon/callback")
 
 
 def _tiktok_creds_for_region(region: str = ""):
@@ -1487,12 +1495,12 @@ def _notify_team_new_waitlist(app, plan_label: str):
 def _confirm_waitlist_to_applicant(app, plan_label: str):
     """Send a confirmation email to the applicant."""
     body = (
-        f"<h2>You're on the Prometheus OS beta waitlist</h2>"
+        f"<h2>You're on the Vantav beta waitlist</h2>"
         f"<p>Thanks for applying for the <b>{plan_label}</b>. We review every application and will email you within 48 hours if you're selected.</p>"
         f"<p>In the meantime, you can join our community or book a short onboarding call.</p>"
         f"<p>- The Vantav Team</p>"
     )
-    dispatch_external_email(app.email, "Prometheus OS Beta — Application Received", body)
+    dispatch_external_email(app.email, "Vantav Beta — Application Received", body)
 
 
 def generate_and_send_supplier_po(sku, units_required):
@@ -1820,6 +1828,7 @@ def dashboard():
     ctx["show_onboarding"] = (
         request.args.get('onboarding') == '1'
         or (request.args.get('checkout') == 'success' and not ctx.get('connected'))
+        or not ctx.get('connected')
     )
     # Fresh merchant logins get the Vantav AI greeting + quick run on arrival.
     greet = request.cookies.get(LOGIN_GREETING_COOKIE) == "1"
@@ -1843,6 +1852,7 @@ def _dashboard_context(active_page):
     ctx["show_onboarding"] = (
         request.args.get('onboarding') == '1'
         or (request.args.get('checkout') == 'success' and not ctx.get('connected'))
+        or not ctx.get('connected')
     )
     return ctx
 
@@ -1856,6 +1866,13 @@ def dashboard_page(page):
         return redirect(url_for('choose_tier'))
     s = get_current_user()
     active_page = page.replace('-', '_')
+    page_label = None
+    canonical_map = {
+        'pending_actions': ('action_gate', 'Pending Actions'),
+        'profit_dashboard': ('profit_engine', 'Profit Dashboard'),
+    }
+    if active_page in canonical_map:
+        active_page, page_label = canonical_map[active_page]
     # Pages merged into the unified Settings page.
     if active_page in ('billing', 'integrations', 'themes', 'commerce_hub'):
         redirect_kwargs = {'page': 'settings', 'tab': 'billing' if active_page == 'billing' else 'stores'}
@@ -1865,7 +1882,7 @@ def dashboard_page(page):
                 redirect_kwargs['concierge_bundle'] = 'true'
         return redirect(url_for('dashboard_page', **redirect_kwargs))
     valid_pages = {
-        'overview', 'command_center', 'commerce_hub', 'alerts', 'action_gate', 'profit_engine', 'startup_pack',
+        'overview', 'command_center', 'commerce_hub', 'alerts', 'action_gate', 'pending_actions', 'profit_engine', 'profit_dashboard', 'startup_pack',
         'predictions', 'product_research', 'fulfillment', 'fraud', 'suppliers',
         'marketing', 'support', 'automations', 'team_ai', 'health_score',
         'mobile', 'store_catalog', 'products', 'orders', 'customers',
@@ -1909,14 +1926,19 @@ def dashboard_page(page):
         # Brand Build is locked behind the Concierge Bundle add-on.
         if active_page == 'startup_pack' and not merchant.get('concierge_bundle'):
             return redirect(url_for('dashboard_page', page='settings', tab='billing'))
-    template = 'dashboard/{}.html'.format(page.replace('-', '_'))
+    template_name = active_page
+    if active_page in ('action_gate', 'profit_engine'):
+        template_name = 'action_gate' if active_page == 'action_gate' else 'profit_engine'
+    template = 'dashboard/{}.html'.format(template_name)
     try:
-        return render_template(template, **ctx)
+        return render_template(template, **ctx,
+                               page_label=page_label)
     except Exception:
         return render_template('dashboard/page.html', **ctx,
-                               page_title=active_page.replace('_', ' ').title(),
+                               page_title=(page_label or active_page.replace('_', ' ')).title(),
                                page_description='This module is being rebuilt to the new commercial-grade standard.',
-                               page_content='')
+                               page_content='',
+                               page_label=page_label)
 
 
 @app.route('/choose-tier')
@@ -1935,11 +1957,11 @@ def choose_tier():
             'name': 'Vantav Basic',
             'price': 'Free',
             'description': 'For solo operators just getting started.',
-            'features': ['Profit dashboard', 'Live alerts', 'Email support'],
+            'features': ['True profit by channel', 'Live alerts', 'Email support'],
         },
         {
             'id': 'Vantav Operator',
-            'name': 'Vantav Operator',
+            'name': 'Vantav Starter',
             'price': '$199/mo',
             'description': 'Core tools to run one store end-to-end.',
             'features': ['Everything in Basic', 'Inventory & orders', 'Product catalog', 'Multi-channel connections'],
@@ -1948,15 +1970,15 @@ def choose_tier():
             'id': 'Vantav Growth',
             'name': 'Vantav Growth',
             'price': '$399/mo',
-            'description': 'Growth automation and advanced analytics.',
-            'features': ['Everything in Operator', 'Marketing & automations', 'AI Assistant', 'Analytics & predictions'],
+            'description': 'More stores, seats, and recommendations for growing brands.',
+            'features': ['Everything in Starter', 'Up to 5 connected stores', 'More recommendations', 'Priority support'],
         },
         {
             'id': 'Vantav Scale',
             'name': 'Vantav Scale',
             'price': '$799/mo',
-            'description': 'Enterprise-grade controls and fraud protection.',
-            'features': ['Everything in Growth', 'Fraud & risk tools', 'Supplier hub', 'Reports & API access'],
+            'description': 'Command centre for multi-brand portfolios and high-volume teams.',
+            'features': ['Everything in Growth', 'Up to 15 connected stores', 'Advanced monitoring', 'API access'],
         },
     ]
     ctx = context(active_page='choose_tier', merchant=merchant, merchant_id=merchant_id)
@@ -4573,10 +4595,11 @@ def auth_signup():
 
     # 3. Provision tenant and billing records
     merchant_id = f"tenant_{uuid.uuid4().hex[:8]}"
+    name_from_email = email.split("@")[0].replace(".", " ").title()
     try:
         db.session.add(MerchantProfile(
             merchant_id=merchant_id,
-            business_name=f"Storefront {merchant_id}",
+            business_name=name_from_email,
             admin_email=email,
             account_tier=tier,
             password_hash=generate_password_hash(password, method="pbkdf2:sha256"),
@@ -4657,10 +4680,11 @@ def auth_provision_node():
         return jsonify({"detail": "Invalid system tier parameters provided."}), 400
 
     merchant_id = f"tenant_{uuid.uuid4().hex[:8]}"
+    name_from_email = email.split("@")[0].replace(".", " ").title()
     try:
         db.session.add(MerchantProfile(
             merchant_id=merchant_id,
-            business_name=f"Provisioned {role}",
+            business_name=name_from_email,
             admin_email=email,
             account_tier=tier,
             password_hash=generate_password_hash(password, method="pbkdf2:sha256"),
@@ -4682,7 +4706,7 @@ def auth_provision_node():
             total_unified_balance=0.0,
             true_net_profit=0.0,
             gross_revenue=0.0,
-            ai_briefing=f"Provisioned {role} account. Choose a plan and connect your first store.",
+            ai_briefing="Welcome. Choose a plan and connect your first store to start tracking profit, alerts, and recommended actions.",
         ))
         db.session.flush()
 
@@ -6639,6 +6663,43 @@ def tiktok_oauth_callback():
     except Exception as e:
         logger.error(f"[TikTok OAuth] {e}")
         return redirect("/dashboard/settings?tab=stores&onboarding=1&oauth_sync=error")
+
+
+@app.route('/api/v1/auth/amazon/connect')
+def amazon_oauth_connect():
+    """Step 1: Redirect merchant to Amazon Seller Central app authorization (SP-API)."""
+    merchant = get_merchant_context()
+    if not merchant:
+        return redirect("/login?error=auth_required")
+    if not merchant.get("live_access_enabled"):
+        return redirect("/dashboard/commerce-hub?oauth_sync=error")
+    if not AMAZON_SPAPI_APP_ID or not AMAZON_SPAPI_OAUTH_REDIRECT_URI:
+        return redirect("/dashboard/settings?tab=stores&onboarding=1&amazon_oauth=manual")
+
+    state = f"{merchant['id']}:{secrets.token_urlsafe(8)}"
+    auth_url = (
+        "https://sellercentral.amazon.com/apps/authorize/consent"
+        f"?application_id={AMAZON_SPAPI_APP_ID}"
+        f"&state={quote(state, safe='')}"
+        f"&redirect_uri={quote(AMAZON_SPAPI_OAUTH_REDIRECT_URI, safe='')}"
+        "&version=beta"
+    )
+    return redirect(auth_url)
+
+
+@app.route('/api/v1/auth/amazon/callback')
+def amazon_oauth_callback():
+    """Step 2: Amazon redirects here after merchant consents. We guide them to manual SP-API credentials for now."""
+    merchant = get_merchant_context()
+    if not merchant or not merchant.get("live_access_enabled"):
+        return redirect("/dashboard/commerce-hub?oauth_sync=error")
+    spapi_oauth_code = request.args.get("spapi_oauth_code")
+    state = request.args.get("state", "")
+    if not spapi_oauth_code:
+        return redirect("/dashboard/settings?tab=stores&onboarding=1&oauth_sync=error")
+    # Amazon SP-API OAuth yields a short-lived code that must be exchanged server-side with the app client secret.
+    # Persist it as a pending credential and ask the merchant to complete the AWS/LWA details in Advanced setup.
+    return redirect(f"/dashboard/settings?tab=stores&onboarding=1&amazon_code={spapi_oauth_code}&oauth_sync=amazon_pending")
 
 
 @app.route('/account/login')

@@ -1,9 +1,9 @@
 {% extends 'dashboard/base.html' %}
-{% block title %}Action Gate — {{ brand.name }} {{ brand.product }}{% endblock %}
+{% block title %}Pending Actions — {{ brand.name }} {{ brand.product }}{% endblock %}
 {% block content %}
 
 <section class="page-header">
-  <h1>Action Gate</h1>
+  <h1>Pending Actions</h1>
   <p>Suggested moves that need your approval before they execute.</p>
 </section>
 
@@ -15,7 +15,7 @@
   </div>
   {% if pending_actions %}
     <div style="padding: 0 16px 16px;">
-      <p style="font-size:.7rem; color:var(--ink-3); text-transform:uppercase; letter-spacing:.08em; margin:16px 0 12px;">// PILLAR 3: EXECUTIVE RECOMMENDATIONS</p>
+      <p style="font-size:.7rem; color:var(--ink-3); text-transform:uppercase; letter-spacing:.08em; margin:16px 0 12px;">Recommended next moves</p>
       {% for action in pending_actions %}
         {% include 'dashboard/_compliance_card.html' %}
       {% endfor %}

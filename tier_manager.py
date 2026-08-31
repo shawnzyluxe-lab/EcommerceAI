@@ -7,7 +7,8 @@ from models import db, MerchantProfile, SaaSBilling, MerchantChannel, PendingAct
 
 TIER_LIMITS: Dict[str, Dict[str, Any]] = {
     "Basic Tier": {
-        "display_name": "Basic Tier",
+        "display_name": "Vantav Basic",
+        "monthly_price": 0,
         "monthly_order_limit": 500,
         "max_monthly_actions": 50,
         "max_store_connections": 2,
@@ -24,6 +25,7 @@ TIER_LIMITS: Dict[str, Dict[str, Any]] = {
     # Legacy beta tiers mapped to Growth-equivalent limits for existing accounts.
     "Beta Tier": {
         "display_name": "Vantav Growth",
+        "monthly_price": 399,
         "monthly_order_limit": 5000,
         "max_monthly_actions": 300,
         "max_store_connections": 5,
@@ -43,6 +45,7 @@ TIER_LIMITS: Dict[str, Dict[str, Any]] = {
     },
     "Beta + Startup Pack": {
         "display_name": "Vantav Growth + Concierge",
+        "monthly_price": 1398,
         "monthly_order_limit": 5000,
         "max_monthly_actions": 300,
         "max_store_connections": 5,
@@ -62,6 +65,7 @@ TIER_LIMITS: Dict[str, Dict[str, Any]] = {
     },
     "Pro Tier": {
         "display_name": "Vantav Growth",
+        "monthly_price": 399,
         "monthly_order_limit": 50000,
         "max_monthly_actions": 300,
         "max_store_connections": 5,
@@ -81,6 +85,7 @@ TIER_LIMITS: Dict[str, Dict[str, Any]] = {
     },
     "Enterprise AI Tier": {
         "display_name": "Vantav Scale",
+        "monthly_price": 799,
         "monthly_order_limit": 999999,
         "max_monthly_actions": 999999,
         "max_store_connections": 15,
@@ -100,7 +105,8 @@ TIER_LIMITS: Dict[str, Dict[str, Any]] = {
         "api_access": True,
     },
     "Vantav Operator": {
-        "display_name": "Vantav Operator",
+        "display_name": "Vantav Starter",
+        "monthly_price": 199,
         "monthly_order_limit": 1000,
         "max_monthly_actions": 50,
         "max_store_connections": 2,
@@ -119,6 +125,7 @@ TIER_LIMITS: Dict[str, Dict[str, Any]] = {
     },
     "Vantav Growth": {
         "display_name": "Vantav Growth",
+        "monthly_price": 399,
         "monthly_order_limit": 5000,
         "max_monthly_actions": 300,
         "max_store_connections": 5,
@@ -138,6 +145,7 @@ TIER_LIMITS: Dict[str, Dict[str, Any]] = {
     },
     "Vantav Scale": {
         "display_name": "Vantav Scale",
+        "monthly_price": 799,
         "monthly_order_limit": 50000,
         "max_monthly_actions": 999999,
         "max_store_connections": 15,
@@ -158,6 +166,7 @@ TIER_LIMITS: Dict[str, Dict[str, Any]] = {
     },
     "Concierge Bundle": {
         "display_name": "Concierge Bundle",
+        "monthly_price": 999,
         "monthly_order_limit": 50000,
         "max_monthly_actions": 999999,
         "max_store_connections": 15,
