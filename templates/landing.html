@@ -152,6 +152,7 @@
       padding: .18rem .6rem; font-style: normal;
     }
     .hero .shot { width: calc(100% + 5rem); max-width: none; }
+    .hero .shot img { max-height: 460px; object-fit: cover; object-position: top left; }
 
     /* logo strip */
     .strip {
@@ -160,6 +161,19 @@
     }
     .strip small { color: var(--dim); font-size: .78rem; letter-spacing: .04em; }
     .strip b { color: var(--muted); font-size: .95rem; font-weight: 700; letter-spacing: -.01em; }
+
+    /* stats band */
+    .stats {
+      margin-top: 2.5rem; display: grid; grid-template-columns: repeat(4, minmax(0,1fr)); gap: 1px;
+      background: var(--line); border: 1px solid var(--line); border-radius: var(--radius); overflow: hidden;
+    }
+    .stats > div { background: var(--card); padding: 1.5rem 1.4rem; }
+    .stats b {
+      display: block; font-size: clamp(1.15rem, 1.9vw, 1.5rem); font-weight: 800; letter-spacing: -.02em;
+      background: linear-gradient(100deg, var(--ink), var(--purple-2));
+      -webkit-background-clip: text; background-clip: text; color: transparent; margin-bottom: .45rem;
+    }
+    .stats small { color: var(--dim); font-size: .82rem; line-height: 1.5; display: block; }
 
     /* ---------- generic section ---------- */
     section.band { padding: 5.5rem 0; }
@@ -304,6 +318,7 @@
       .row.flip .copy { order: 0; }
       .hero .shot { width: 100%; }
       .cards, .steps, .plans, .compare { grid-template-columns: 1fr; }
+      .stats { grid-template-columns: repeat(2, minmax(0,1fr)); }
       section.band { padding: 3.5rem 0; }
       .rows { gap: 3.5rem; }
       .hide-sm { display: none; }
@@ -337,8 +352,8 @@
   <div class="wrap hero-grid">
     <div>
       <span class="pill"><span class="dot"></span> Live for Shopify, TikTok Shop &amp; Amazon sellers</span>
-      <h1>Your store sold $24,806.<br><span class="grad">You kept $7,187.</span></h1>
-      <p class="lede">Vantav connects your sales channels and subtracts every real cost — platform fees, ad spend, shipping labels, product cost and refunds — so you can see the profit you actually keep, per order, per product, per channel.</p>
+      <h1>Sell everywhere.<br><span class="grad">Keep more of it.</span></h1>
+      <p class="lede">Vantav is the profit dashboard for Shopify, TikTok Shop and Amazon sellers. It subtracts every fee, ad, shipping label and refund, shows you what you truly kept, and tells you exactly what to fix today — before it costs you another week.</p>
       <div class="hero-ctas">
         <a class="btn btn-primary" href="/subscribe">Start free — no card required</a>
         <a class="btn btn-ghost" href="#how-it-works">
@@ -353,8 +368,8 @@
       </div>
     </div>
     <div class="shot">
-      <div class="shot-bar"><i></i><i></i><i></i><span class="url">app.vantavcommerce.com</span></div>
-      <img src="{{ url_for('static', filename='images/shots/assistant.webp') }}" alt="The Vantav dashboard showing net profit, alerts and the AI assistant briefing a store owner" width="1800" loading="eager">
+      <div class="shot-bar"><i></i><i></i><i></i><span class="url">Live account &middot; today</span></div>
+      <img src="{{ url_for('static', filename='images/shots/hero.webp') }}" alt="Vantav showing actual net earnings, warnings about ad spend and stock, and the assistant briefing a store owner" width="1418" height="840" loading="eager">
     </div>
   </div>
   <div class="wrap">
@@ -362,6 +377,24 @@
       <small>Works with</small>
       <b>Shopify</b><b>TikTok Shop</b><b>Amazon</b><b>Stripe</b>
       <small>&mdash; more channels on request</small>
+    </div>
+    <div class="stats">
+      <div>
+        <b>$24,806 &rarr; $7,187</b>
+        <small>Revenue in, profit actually kept &mdash; on the live account in the tour</small>
+      </div>
+      <div>
+        <b>6 costs subtracted</b>
+        <small>Product cost, platform fees, ad spend, shipping, discounts, refunds</small>
+      </div>
+      <div>
+        <b>$198 / week</b>
+        <small>Wasted ad spend the assistant caught in a single ad set</small>
+      </div>
+      <div>
+        <b>One afternoon</b>
+        <small>From connecting a channel to reading accurate profit</small>
+      </div>
     </div>
   </div>
 </section>
@@ -371,7 +404,7 @@
   <div class="wrap">
     <div class="head center">
       <span class="eyebrow">The problem</span>
-      <h2>Sales dashboards tell you what you sold. Not what you earned.</h2>
+      <h2>Your sales dashboard is lying to you by omission</h2>
       <p>Every channel reports revenue its own way, and none of them subtract everything. That is how a best-selling product quietly loses money for weeks.</p>
     </div>
     <div class="compare">
@@ -402,8 +435,8 @@
   <div class="wrap">
     <div class="head center">
       <span class="eyebrow" style="justify-content:center">See how it works</span>
-      <h2>A real store, start to finish, in 84 seconds</h2>
-      <p>No slides. This is a live account: signing in, reading true profit, spotting a TikTok product that is losing money, and approving the fix.</p>
+      <h2>Watch a $24,806 month get audited in 84 seconds</h2>
+      <p>No slides, no mock-ups. A live account: signing in, reading true profit, catching a TikTok ad set burning $198 a week, and approving the fix in two clicks.</p>
     </div>
     <div class="video-wrap">
       <video id="tour-video" controls preload="metadata" playsinline
@@ -432,8 +465,8 @@
   <div class="wrap">
     <div class="head center">
       <span class="eyebrow" style="justify-content:center">What you get</span>
-      <h2>Everything you need to run on profit, not sales</h2>
-      <p>Built for owners running more than one channel who need one honest place to look.</p>
+      <h2>Run your store on profit, not vanity revenue</h2>
+      <p>Built for owners running more than one channel who are done reconciling three dashboards and a spreadsheet.</p>
     </div>
     <div class="rows">
 
@@ -501,7 +534,7 @@
         </div>
         <div class="shot">
           <div class="shot-bar"><i></i><i></i><i></i><span class="url">Vantav assistant</span></div>
-          <img src="{{ url_for('static', filename='images/shots/overview.webp') }}" alt="Vantav overview with the assistant summarising net profit, connected channels and the top recommended next step" width="1800" loading="lazy">
+          <img src="{{ url_for('static', filename='images/shots/assistant.webp') }}" alt="The Vantav assistant answering a question with net profit, connected channels and the top recommended next step" width="940" loading="lazy">
         </div>
       </div>
 
@@ -514,7 +547,7 @@
   <div class="wrap">
     <div class="head center">
       <span class="eyebrow" style="justify-content:center">Also included</span>
-      <h2>The rest of the day-to-day</h2>
+      <h2>And the rest of your day-to-day, handled</h2>
     </div>
     <div class="cards">
       <div class="card">
@@ -556,7 +589,7 @@
   <div class="wrap">
     <div class="head center">
       <span class="eyebrow" style="justify-content:center">Getting started</span>
-      <h2>Connected and useful the same afternoon</h2>
+      <h2>Live in three steps, useful the same afternoon</h2>
     </div>
     <div class="steps">
       <div class="step">
@@ -583,8 +616,8 @@
   <div class="wrap">
     <div class="head center">
       <span class="eyebrow" style="justify-content:center">Pricing</span>
-      <h2>Simple monthly pricing</h2>
-      <p>Start free, connect a channel, and see your real numbers before you pay for anything.</p>
+      <h2>One caught mistake pays for the month</h2>
+      <p>Start free, connect a channel, and see your real numbers before you pay for anything. Cancel any time.</p>
     </div>
     <div class="plans">
       <div class="plan">
@@ -672,8 +705,8 @@
 <section class="band tight">
   <div class="wrap">
     <div class="final">
-      <h2>Find out what your store actually keeps</h2>
-      <p>Connect a channel, add your costs, and see your real margin today — not at the end of the month.</p>
+      <h2>Find out what your store actually keeps &mdash; today</h2>
+      <p>Connect a channel, add your costs, and read your real margin this afternoon instead of at the end of the month. No card required, cancel any time.</p>
       <div class="hero-ctas">
         <a class="btn btn-primary" href="/subscribe">Start free — no card required</a>
         <a class="btn btn-ghost" href="#how-it-works">Watch the tour first</a>
