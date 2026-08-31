@@ -2,7 +2,7 @@
 
 Provides password hashing, HMAC-signed session tokens, a volatile session vault,
 and Flask RBAC decorators. Designed to be imported by app.py and applied to
-high-sensitivity endpoints such as the Action Gate approve path.
+high-sensitivity endpoints such as the Actions approve path.
 """
 import base64
 import hashlib

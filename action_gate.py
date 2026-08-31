@@ -1,4 +1,4 @@
-"""Action Gate — human-in-the-loop approval for AI-drafted operations."""
+"""Actions — human-in-the-loop approval for AI-drafted operations."""
 import json
 import logging
 import uuid
@@ -229,7 +229,7 @@ def create_action(merchant_id: str, action_type: str, title: str, detail: str, p
 
     # Autopilot: if safe, execute immediately.
     if _autopilot_should_execute(action_type, _parse(action.payload), memory, merchant_id, snapshot):
-        logger.info(f"[Action Gate] Autopilot executing action {action.id} for {merchant_id}")
+        logger.info(f"[Actions] Autopilot executing action {action.id} for {merchant_id}")
         before = snapshot or _capture_snapshot(merchant_id)
         result = _execute_action(action, _parse(action.payload), evidence=evidence)
         action.status = "executed"
@@ -330,7 +330,7 @@ def verify_overdue_actions(merchant_id: Optional[str] = None, hours: int = 48) -
         try:
             results.append(verify_action(action.id, merchant_id))
         except Exception as e:
-            logger.warning(f"[Action Gate] Verification failed for action {action.id}: {e}")
+            logger.warning(f"[Actions] Verification failed for action {action.id}: {e}")
     return results
 
 
@@ -427,7 +427,7 @@ def refresh_actions(merchant_id: str):
                     alert_id=alert.id,
                 )
             except ValueError as e:
-                logger.warning(f"[Action Gate] Guardrail blocked alert action: {e}")
+                logger.warning(f"[Actions] Guardrail blocked alert action: {e}")
 
 
 def _infer_action_from_alert(alert: Alert):
@@ -619,7 +619,7 @@ def _execute_action(action: PendingAction, payload: Dict[str, Any], evidence: Op
             total_unified_balance=0.0,
             true_net_profit=0.0,
             gross_revenue=0.0,
-            ai_briefing=f"Action Gate approved: {po_ref} created for {quantity} units of {sku} from {supplier} ({lead_days}-day lead).",
+            ai_briefing=f"Actions approved: {po_ref} created for {quantity} units of {sku} from {supplier} ({lead_days}-day lead).",
         ))
         db.session.commit()
 

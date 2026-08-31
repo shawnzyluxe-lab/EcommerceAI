@@ -2,7 +2,7 @@
 
 This module computes a weighted ordinary least-squares fit across per-SKU daily
 profit points and translates a structurally degraded trend into a corrective
-draft action for the Action Gate.
+draft action for Actions.
 """
 
 import datetime

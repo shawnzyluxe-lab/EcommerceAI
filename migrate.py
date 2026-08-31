@@ -413,7 +413,7 @@ def run_migrations():
             "CREATE INDEX IF NOT EXISTS idx_products_tenant_covering ON products (merchant_id, sku) INCLUDE (on_hand, reorder_point)",
         )
 
-        # High-performance indexes for the True Profit Engine and AI COO Regression Engine
+        # High-performance indexes for the Profit Dashboard and AI COO Regression Engine
         _run(
             "idx.daily_costs.sku_date",
             "CREATE INDEX IF NOT EXISTS idx_daily_costs_sku_date ON daily_costs (sku, log_date DESC)",

@@ -1,4 +1,4 @@
-"""Real-time Profit Feed for Prometheus OS.
+"""Real-time Profit Feed for Vantav.
 
 Aggregates channel orders and ad spend into a true-profit view.
 """
@@ -247,7 +247,7 @@ def _orders_with_ad_attribution(merchant_id, limit=50, since=None):
 
 
 def get_recent_orders(merchant_id, limit=50):
-    """Recent orders for the Profit Engine table."""
+    """Recent orders for the Profit Dashboard table."""
     return _orders_with_ad_attribution(merchant_id, limit=limit)
 
 

@@ -47,7 +47,7 @@ TOOLS: List[Dict[str, Any]] = [
         "type": "function",
         "function": {
             "name": "get_pending_actions",
-            "description": "Return pending Action Gate items awaiting approval.",
+            "description": "Return pending actions awaiting approval.",
             "parameters": {"type": "object", "properties": {}},
         },
     },
@@ -116,7 +116,7 @@ TOOLS: List[Dict[str, Any]] = [
         "type": "function",
         "function": {
             "name": "approve_action",
-            "description": "Approve and execute a pending Action Gate item by ID.",
+            "description": "Approve and execute a pending action by ID.",
             "parameters": {
                 "type": "object",
                 "properties": {"action_id": {"type": "integer"}},
@@ -128,7 +128,7 @@ TOOLS: List[Dict[str, Any]] = [
         "type": "function",
         "function": {
             "name": "deny_action",
-            "description": "Deny a pending Action Gate item by ID.",
+            "description": "Deny a pending action by ID.",
             "parameters": {
                 "type": "object",
                 "properties": {"action_id": {"type": "integer"}, "reason": {"type": "string"}},
