@@ -58,7 +58,7 @@ if SENTRY_DSN:
     except Exception as e:
         print(f"[SENTRY] Init failed: {e}")
 
-from models import db, Tenant, ConnectedChannel, ActiveSession, BusinessMetric, CommerceChannel, MerchantChannel, SupportMetric, MarketingStudio, PredictiveLogistics, OutboundTransmission, SaaSBilling, LocalProductCatalog, MerchantProfile, TenantOAuthToken, MerchantMetric, SystemExceptionLog, ProcessedWebhookEvent, AdSpendAnalytic, GeneratedPurchaseOrder, AIAgent, AgentMessage, SupportMessage, MerchantDecisionLog, MagicLoginToken, TrendingProduct, ProductFinancialLedger, MerchantSetting, ProfitFeedOrder, AdSpendFeed, Alert, BetaWaitlistApplication, PendingAction, StartupPackProject, BusinessMemory, WorkspaceSeat, IntegrationLink, SecureChannelCredential, Product, UnifiedOrder, OrderItem, AdminAuditLog, AdminPlatformControl
+from models import db, Tenant, ConnectedChannel, ActiveSession, BusinessMetric, CommerceChannel, MerchantChannel, SupportMetric, MarketingStudio, PredictiveLogistics, OutboundTransmission, SaaSBilling, LocalProductCatalog, MerchantProfile, TenantOAuthToken, MerchantMetric, SystemExceptionLog, ProcessedWebhookEvent, AdSpendAnalytic, GeneratedPurchaseOrder, AIAgent, AgentMessage, SupportMessage, MerchantDecisionLog, MagicLoginToken, TrendingProduct, ProductFinancialLedger, MerchantSetting, ProfitFeedOrder, AdSpendFeed, Alert, BetaWaitlistApplication, PendingAction, StartupPackProject, BusinessMemory, WorkspaceSeat, IntegrationLink, SecureChannelCredential, Product, UnifiedOrder, OrderItem, AdminAuditLog, AdminPlatformControl, ApiCredential
 import profit_feed
 import cache_barrier
 import billing as billing_module
@@ -1660,7 +1660,7 @@ def subscribe():
     host = request.host.split(':')[0].lower()
     if host in ('shawnzyluxe.com', 'www.shawnzyluxe.com'):
         return render_template('coming_soon.html')
-    return render_template('subscribe.html', recaptcha_site_key=RECAPTCHA_SITE_KEY, meta_pixel_id=os.environ.get('META_PIXEL_ID', ''), tiktok_pixel_id=os.environ.get('TIKTOK_PIXEL_ID', ''), gtm_id=os.environ.get('GTM_ID', ''))
+    return render_template('subscribe.html', tiers=TierManager.get_plan_options(), recaptcha_site_key=RECAPTCHA_SITE_KEY, meta_pixel_id=os.environ.get('META_PIXEL_ID', ''), tiktok_pixel_id=os.environ.get('TIKTOK_PIXEL_ID', ''), gtm_id=os.environ.get('GTM_ID', ''))
 
 
 @app.route('/checkout')
@@ -1883,11 +1883,14 @@ def dashboard_page(page):
             if request.args.get('concierge_bundle') == 'true':
                 redirect_kwargs['concierge_bundle'] = 'true'
         return redirect(url_for('dashboard_page', **redirect_kwargs))
+    # Product pages merged into the unified Catalog page.
+    if active_page in ('products', 'store_catalog'):
+        return redirect(url_for('dashboard_page', page='catalog'))
     valid_pages = {
         'overview', 'command_center', 'commerce_hub', 'alerts', 'action_gate', 'actions', 'pending_actions', 'profit_engine', 'profit', 'profit_dashboard', 'startup_pack',
         'predictions', 'product_research', 'fulfillment', 'fraud', 'suppliers',
         'marketing', 'support', 'automations', 'team_ai', 'health_score',
-        'mobile', 'store_catalog', 'products', 'orders', 'customers',
+        'mobile', 'store_catalog', 'products', 'catalog', 'orders', 'customers',
         'inventory', 'shipments', 'returns', 'analytics', 'discounts', 'apps',
         'reports', 'settings', 'tiktok_studio',
         'monitoring', 'regression_chart', 'onboarding_loading'
@@ -1953,36 +1956,8 @@ def choose_tier():
     if not _merchant_requires_tier_selection(merchant):
         return redirect(url_for('dashboard'))
     merchant_id = merchant['id']
-    tiers = [
-        {
-            'id': 'Basic Tier',
-            'name': 'Vantav Basic',
-            'price': 'Free',
-            'description': 'For solo operators just getting started.',
-            'features': ['True profit by channel', 'Live alerts', 'Email support'],
-        },
-        {
-            'id': 'Vantav Operator',
-            'name': 'Vantav Starter',
-            'price': '$199/mo',
-            'description': 'Core tools to run one store end-to-end.',
-            'features': ['Everything in Basic', 'Inventory & orders', 'Product catalog', 'Multi-channel connections'],
-        },
-        {
-            'id': 'Vantav Growth',
-            'name': 'Vantav Growth',
-            'price': '$399/mo',
-            'description': 'More stores, seats, and recommendations for growing brands.',
-            'features': ['Everything in Starter', 'Up to 5 connected stores', 'More recommendations', 'Priority support'],
-        },
-        {
-            'id': 'Vantav Scale',
-            'name': 'Vantav Scale',
-            'price': '$799/mo',
-            'description': 'Command centre for multi-brand portfolios and high-volume teams.',
-            'features': ['Everything in Growth', 'Up to 15 connected stores', 'Advanced monitoring', 'API access'],
-        },
-    ]
+    current_tier = merchant.get('tier') or 'Basic Tier'
+    tiers = TierManager.get_plan_options(current_tier)
     ctx = context(active_page='choose_tier', merchant=merchant, merchant_id=merchant_id)
     ctx['nav_groups'] = []
     ctx['active_page'] = 'choose_tier'
@@ -4241,6 +4216,44 @@ def api_merchant_account():
         setting.setting_value = account_holder_name
     db.session.commit()
     return jsonify({"updated": True, "business_name": profile.business_name, "account_holder_name": account_holder_name or merchant["account_holder_name"]}), 200
+
+
+@app.route('/api/v1/merchant/usage', methods=['GET'])
+@require_roles([UserRole.ADMIN, UserRole.MERCHANT, UserRole.ENGINEER])
+def api_merchant_usage():
+    """Return canonical usage counts and plan limits for the merchant."""
+    merchant = get_merchant_context()
+    if not merchant:
+        return jsonify({"error": "No merchant context"}), 403
+    return jsonify({"usage": TierManager.get_usage(merchant["id"])}), 200
+
+
+@app.route('/api/v1/developer/api-key', methods=['GET', 'POST'])
+@require_roles([UserRole.ADMIN, UserRole.MERCHANT, UserRole.ENGINEER])
+def api_developer_api_key():
+    """Return the merchant's public API key / webhook alias or regenerate the key pair."""
+    merchant = get_merchant_context()
+    if not merchant:
+        return jsonify({"error": "No merchant context"}), 403
+    merchant_id = merchant["id"]
+    if request.method == 'POST':
+        public_key, secret_key, cred = ApiCredential.generate_for(merchant_id)
+        return jsonify({
+            "public_key": public_key,
+            "public_key_masked": cred.mask_public(),
+            "secret_key": secret_key,
+            "webhook_alias": cred.webhook_alias,
+            "webhook_url": f"{request.url_root.rstrip('/')}/api/v1/webhooks/incoming/{cred.webhook_alias}",
+        }), 200
+    cred = ApiCredential.query.filter_by(merchant_id=merchant_id).first()
+    if not cred:
+        return jsonify({"public_key": None, "webhook_alias": None, "webhook_url": None}), 200
+    return jsonify({
+        "public_key": cred.public_key,
+        "public_key_masked": cred.mask_public(),
+        "webhook_alias": cred.webhook_alias,
+        "webhook_url": f"{request.url_root.rstrip('/')}/api/v1/webhooks/incoming/{cred.webhook_alias}",
+    }), 200
 
 
 @app.route('/api/v1/merchant/business-memory', methods=['GET', 'POST'])

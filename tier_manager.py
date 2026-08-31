@@ -3,7 +3,7 @@ import os
 from datetime import datetime, timedelta
 from typing import Any, Dict, List, Optional
 
-from models import db, MerchantProfile, SaaSBilling, MerchantChannel, PendingAction
+from models import db, MerchantProfile, SaaSBilling, MerchantChannel, PendingAction, UnifiedOrder, Product, WorkspaceSeat
 
 TIER_LIMITS: Dict[str, Dict[str, Any]] = {
     "Basic Tier": {
@@ -220,6 +220,109 @@ PLAN_TO_TIER = {
     "beta_startup": "Vantav Growth",
 }
 
+TIER_DESCRIPTIONS = {
+    "Basic Tier": {
+        "name": "Vantav Basic",
+        "price": "Free",
+        "who": "For solo operators just getting started",
+        "summary": "Core profit visibility and alerts for one store.",
+        "features": ["True profit by channel", "Live alerts", "Email support"],
+        "all_features": [
+            "True profit by channel",
+            "Live alerts",
+            "Email support",
+        ],
+        "popular": False,
+    },
+    "Vantav Operator": {
+        "name": "Vantav Starter",
+        "price": "$199/mo",
+        "who": "For 1 store getting its numbers straight",
+        "summary": "Best for one store. Sync orders, inventory, and profit across Shopify, TikTok Shop, and Amazon.",
+        "features": [
+            "Up to 2 connected stores",
+            "All supported ecommerce integrations",
+            "True-profit reporting",
+            "3 users",
+            "Basic inventory forecasting",
+        ],
+        "all_features": [
+            "Up to 2 connected stores",
+            "All supported ecommerce integrations",
+            "True-profit reporting",
+            "Full revenue, cost, margin, refund, and inventory view",
+            "Alerts when something needs attention",
+            "Clear, actionable recommendations",
+            "See the reasoning behind every recommendation",
+            "Approve, edit, or skip any suggestion",
+            "Basic inventory forecasting",
+            "3 users",
+            "Standard support",
+        ],
+        "popular": False,
+    },
+    "Vantav Growth": {
+        "name": "Vantav Growth",
+        "price": "$399/mo",
+        "who": "For up to 5 stores across several channels",
+        "summary": "More stores, seats, and recommendations for growing brands.",
+        "features": [
+            "Everything in Starter",
+            "Up to 5 connected stores",
+            "Smarter issue detection",
+            "10 users",
+            "Priority support",
+        ],
+        "all_features": [
+            "Everything in Starter",
+            "Up to 5 connected stores",
+            "Updates every 15 minutes",
+            "Smarter issue detection",
+            "Product sell-through and stockout forecasting",
+            "Recommended reorder timing",
+            "See projected financial impact of each suggestion",
+            "More recommendations each month",
+            "Compare performance across stores",
+            "Longer historical analysis",
+            "Track completed actions and results",
+            "Action history & business context",
+            "10 users",
+            "Priority support",
+        ],
+        "popular": True,
+    },
+    "Vantav Scale": {
+        "name": "Vantav Scale",
+        "price": "$799/mo",
+        "who": "For 15+ stores, multi-brand portfolios and agencies",
+        "summary": "Command centre for multi-brand portfolios and high-volume teams.",
+        "features": [
+            "Everything in Growth",
+            "Up to 15 connected stores",
+            "Portfolio-wide intelligence",
+            "API access",
+            "Priority onboarding",
+            "Priority support",
+        ],
+        "all_features": [
+            "Everything in Growth",
+            "Up to 15 connected stores",
+            "Portfolio-wide intelligence",
+            "Advanced cross-store monitoring",
+            "Higher monthly action allowance",
+            "Advanced forecasting",
+            "Multi-brand reporting",
+            "Custom alert rules",
+            "Advanced permissions",
+            "Complete action / audit history",
+            "API and data access",
+            "Priority onboarding",
+            "Priority support",
+        ],
+        "popular": False,
+    },
+}
+
 TIER_PAGE_ACCESS = {
     # Basic Tier
     "overview": "Basic Tier",
@@ -234,6 +337,7 @@ TIER_PAGE_ACCESS = {
     "orders": "Vantav Operator",
     "products": "Vantav Operator",
     "store_catalog": "Vantav Operator",
+    "catalog": "Vantav Operator",
     "commerce_hub": "Vantav Operator",
     "customers": "Vantav Operator",
     # Vantav Growth
@@ -272,6 +376,47 @@ class TierManager:
         return TIER_LIMITS.get(tier, TIER_LIMITS["Basic Tier"])
 
     @staticmethod
+    def get_tier_description(tier: str) -> Dict[str, Any]:
+        """Return canonical name, price, summary, features and tagline for a tier."""
+        desc = TIER_DESCRIPTIONS.get(tier)
+        if desc:
+            return desc
+        # Fallback to the next lower known tier by rank.
+        rank = TierManager.tier_rank(tier)
+        fallback_id = None
+        fallback_rank = -1
+        for tier_id, tier_desc in TIER_DESCRIPTIONS.items():
+            r = TierManager.tier_rank(tier_id)
+            if r <= rank and r > fallback_rank:
+                fallback_rank = r
+                fallback_id = tier_id
+        return TIER_DESCRIPTIONS.get(fallback_id or "Basic Tier", TIER_DESCRIPTIONS["Basic Tier"])
+
+    @staticmethod
+    def get_plan_options(current_tier: Optional[str] = None) -> List[Dict[str, Any]]:
+        """Return canonical plan choices, sorted from Basic to Scale."""
+        ordered = sorted(
+            ((tid, TierManager.tier_rank(tid)) for tid in TIER_DESCRIPTIONS.keys()),
+            key=lambda x: x[1],
+        )
+        options = []
+        for tier_id, _ in ordered:
+            desc = TierManager.get_tier_description(tier_id)
+            options.append({
+                "id": tier_id,
+                "name": desc["name"],
+                "price": desc["price"],
+                "who": desc["who"],
+                "summary": desc["summary"],
+                "description": desc["summary"],
+                "features": desc["features"],
+                "all_features": desc["all_features"],
+                "popular": desc["popular"],
+                "is_current": tier_id == current_tier,
+            })
+        return options
+
+    @staticmethod
     def tier_rank(tier: str) -> int:
         return TIER_ORDER.get(tier, 0)
 
@@ -304,6 +449,35 @@ class TierManager:
             PendingAction.status.in_(["approved", "executed"]),
             PendingAction.decided_at >= start,
         ).count()
+
+    @staticmethod
+    def get_usage(merchant_id: str) -> Dict[str, Any]:
+        """Return canonical usage counts and limits for a merchant."""
+        if not merchant_id:
+            return {}
+        try:
+            start_of_month = datetime.utcnow().replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+            order_count = UnifiedOrder.query.filter(
+                UnifiedOrder.merchant_id == merchant_id,
+                UnifiedOrder.created_at >= start_of_month,
+            ).count()
+            product_count = Product.query.filter_by(merchant_id=merchant_id).count()
+            store_count = MerchantChannel.query.filter_by(merchant_id=merchant_id).count()
+            user_count = WorkspaceSeat.query.filter_by(merchant_id=merchant_id).count() or 1
+            approved_actions = TierManager.current_action_count(merchant_id)
+            profile = MerchantProfile.query.get(merchant_id)
+            billing = SaaSBilling.query.get(merchant_id)
+            tier = (profile.account_tier if profile else None) or (billing.current_plan if billing else None) or "Basic Tier"
+            meta = TierManager.get_tier_meta(tier)
+            return {
+                "orders": {"used": order_count, "limit": meta.get("monthly_order_limit", 500)},
+                "stores": {"used": store_count, "limit": meta.get("max_store_connections", 2)},
+                "users": {"used": user_count, "limit": meta.get("max_users", 1)},
+                "actions": {"used": approved_actions, "limit": meta.get("max_monthly_actions", 50)},
+                "products": {"used": product_count, "limit": 10000},
+            }
+        except Exception:
+            return {}
 
     @staticmethod
     def can_add_store(merchant_id: str) -> bool:

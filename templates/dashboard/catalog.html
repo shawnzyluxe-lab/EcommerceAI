@@ -1,0 +1,104 @@
+{% extends 'dashboard/base.html' %}
+{% block title %}Catalog — {{ brand.name }} {{ brand.product }}{% endblock %}
+{% block content %}
+
+<section class="page-header">
+  <h1>Catalog</h1>
+  <p>All products in one place: Vantav-managed and channel-synced.</p>
+</section>
+
+<div style="display: flex; gap: 8px; border-bottom: 1px solid var(--line); margin-bottom: 18px;">
+  <button class="btn tab-btn active" data-tab="my-products" onclick="switchCatalogTab('my-products')" style="border-bottom-left-radius: 0; border-bottom-right-radius: 0; border-bottom: none; background: transparent; color: var(--ink);">My Products</button>
+  <button class="btn tab-btn" data-tab="channel-catalog" onclick="switchCatalogTab('channel-catalog')" style="border-bottom-left-radius: 0; border-bottom-right-radius: 0; border-bottom: none; background: transparent; color: var(--ink-3);">Channel Catalog</button>
+</div>
+
+<div id="tab-my-products" class="catalog-tab">
+  <div class="card">
+    <div class="card-head">
+      <h3>Vantav-managed products</h3>
+      <span class="spacer"></span>
+      <button class="btn btn-primary" id="add-product-btn" disabled title="Add products after you connect your first store.">+ Add Product</button>
+    </div>
+    <div style="display: flex; gap: 10px; margin-bottom: 14px; flex-wrap: wrap;">
+      <input type="text" placeholder="Search products, SKU, or tags…" class="btn" style="justify-content: flex-start; text-align: left; flex: 1; min-width: 200px;">
+    </div>
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr><th>Product</th><th>SKU</th><th class="num">Inventory</th><th>Channels</th><th>Status</th></tr>
+        </thead>
+        <tbody>
+          {% for p in products %}
+          <tr>
+            <td class="b">{{ p.title }}</td>
+            <td class="mono">{{ p.sku }}</td>
+            <td class="num {% if p.on_hand == 0 %}down{% elif p.status == 'Low' %}amber{% else %}up{% endif %}">{{ p.on_hand }} in stock</td>
+            <td><span class="tag tag-ghost">Vantav</span></td>
+            <td><span class="tag {% if p.status == 'Active' %}tag-green{% elif p.status == 'Low' %}tag-amber{% else %}tag-red{% endif %}">{{ p.status }}</span></td>
+          </tr>
+          {% else %}
+          <tr>
+            <td colspan="5" style="text-align: center; color: var(--ink-3); padding: 24px;">
+              Your catalog will appear here after you connect a store or add products manually.
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<div id="tab-channel-catalog" class="catalog-tab" style="display: none;">
+  <div class="card">
+    <div class="card-head">
+      <h3>Synced products</h3>
+    </div>
+    <div style="display: flex; gap: 10px; margin-bottom: 14px; flex-wrap: wrap;">
+      <input type="text" placeholder="Search products, SKU, or tags…" class="btn" style="justify-content: flex-start; text-align: left; flex: 1; min-width: 200px;">
+    </div>
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr><th>Product</th><th>SKU</th><th class="num">Inventory</th><th>Channels</th><th>Status</th></tr>
+        </thead>
+        <tbody>
+          {% set channel_abbr = {'shopify':'SH','tiktok':'TT','amazon':'AZ'} %}
+          {% for p in catalog_rows %}
+          <tr>
+            <td class="b">{{ p.title }}</td>
+            <td class="mono">{{ p.sku }}</td>
+            <td class="num {% if p.on_hand == 0 %}down{% elif p.status == 'Low' %}amber{% else %}up{% endif %}">{{ p.on_hand }} in stock</td>
+            <td>
+              {% for c in p.channels %}
+              <span class="tag tag-ghost">{{ channel_abbr.get(c, c[:2]|upper) }}</span>
+              {% endfor %}
+            </td>
+            <td><span class="tag {% if p.status == 'Active' %}tag-green{% elif p.status == 'Low' %}tag-amber{% else %}tag-red{% endif %}">{{ p.status }}</span></td>
+          </tr>
+          {% else %}
+          <tr>
+            <td colspan="5" style="text-align: center; color: var(--ink-3); padding: 24px;">
+              Your catalog will appear here after you connect a store or add products manually.
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<script>
+function switchCatalogTab(tab) {
+  document.querySelectorAll('.catalog-tab').forEach(el => el.style.display = 'none');
+  document.getElementById('tab-' + tab).style.display = 'block';
+  document.querySelectorAll('.tab-btn').forEach(btn => {
+    const isActive = btn.dataset.tab === tab;
+    btn.style.color = isActive ? 'var(--ink)' : 'var(--ink-3)';
+    btn.classList.toggle('active', isActive);
+  });
+}
+</script>
+
+{% endblock %}
