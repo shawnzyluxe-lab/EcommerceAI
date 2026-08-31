@@ -11,9 +11,6 @@ import smtplib
 import logging
 import asyncio
 import time
-import contextlib
-import io
-import runpy
 import dataclasses
 from threading import Thread
 from email.mime.text import MIMEText
@@ -7451,90 +7448,6 @@ def admin_catch_all(path):
         '<a class="btn" href="/admin">Return to Admin Home</a></div>'
     )
     return render_template('dashboard/page.html', **ctx), 404
-
-
-@app.route('/api/internal/seed-and-reset', methods=['POST'])
-@limiter.limit("10 per minute")
-def _seed_and_reset_internal():
-    """Protected endpoint to seed/reset a showcase merchant and set an exact password."""
-    token = request.headers.get('X-Internal-Seed-Token', '')
-    expected = os.environ.get('INTERNAL_SEED_TOKEN', '')
-    if not expected or not hmac.compare_digest(token, expected):
-        return jsonify({"error": "Forbidden"}), 403
-
-    data = request.get_json(silent=True) or {}
-    email = (data.get("email") or "").strip().lower()
-    password = data.get("password", "")
-    if not email or not password or "@" not in email:
-        return jsonify({"error": "Missing or invalid email/password"}), 400
-
-    # Look up an existing merchant or generate a deterministic new one.
-    profile = (
-        MerchantProfile.query.filter_by(admin_email=email)
-        .order_by(MerchantProfile.created_at.desc())
-        .first()
-    )
-    if profile:
-        merchant_id = profile.merchant_id
-    else:
-        merchant_id = data.get("merchant_id") or f"merchant_{secrets.token_hex(4)}"
-        if MerchantProfile.query.get(merchant_id):
-            return jsonify({"error": "merchant_id already exists"}), 409
-
-    business_name = (data.get("business_name") or profile.business_name or email.split("@")[0].replace(".", " ").title()).strip()
-    prefix = (data.get("sku_prefix") or email.split("@")[0][:4].upper().replace(".", "") + "-").strip()
-    tier = (data.get("tier") or "Vantav Scale").strip()
-
-    # Preserve original env so the script does not leak into the app process.
-    env_keys = [
-        "SHOWCASE_MERCHANT_ID", "SHOWCASE_EMAIL", "SHOWCASE_PASSWORD",
-        "SHOWCASE_BUSINESS_NAME", "SHOWCASE_SKU_PREFIX", "SHOWCASE_TIER",
-        "SEED_DEMO_DATA",
-    ]
-    original = {k: os.environ.get(k) for k in env_keys}
-    stdout_capture = io.StringIO()
-    if data.get("seed_data", True):
-        try:
-            os.environ["SHOWCASE_MERCHANT_ID"] = merchant_id
-            os.environ["SHOWCASE_EMAIL"] = email
-            os.environ["SHOWCASE_PASSWORD"] = password
-            os.environ["SHOWCASE_BUSINESS_NAME"] = business_name
-            os.environ["SHOWCASE_SKU_PREFIX"] = prefix
-            os.environ["SHOWCASE_TIER"] = tier
-            os.environ["SEED_DEMO_DATA"] = "true"
-
-            script_path = os.path.join(os.path.dirname(__file__), "scripts", "seed_showcase_merchant.py")
-            with contextlib.redirect_stdout(stdout_capture):
-                runpy.run_path(script_path, run_name="__main__")
-        except Exception as e:
-            logger.exception("seed-and-reset failed")
-            return jsonify({"error": "Seed failed", "detail": str(e), "stdout": stdout_capture.getvalue()}), 500
-        finally:
-            for k, v in original.items():
-                if v is None:
-                    os.environ.pop(k, None)
-                else:
-                    os.environ[k] = v
-
-    # Re-fetch inside the current request context and force the password hash.
-    profile = MerchantProfile.query.get(merchant_id)
-    if not profile:
-        profile = MerchantProfile.query.filter_by(admin_email=email).first()
-    if not profile:
-        return jsonify({"error": "Merchant profile not found after seed", "stdout": stdout_capture.getvalue()}), 500
-    profile.admin_email = email
-    profile.password_hash = generate_password_hash(password, method="pbkdf2:sha256")
-    profile.account_tier = tier
-    profile.sandbox_status = "approved"
-    profile.live_access_enabled = 1
-    db.session.commit()
-
-    return jsonify({
-        "status": "ok",
-        "merchant_id": profile.merchant_id,
-        "email": profile.admin_email,
-        "stdout": stdout_capture.getvalue(),
-    }), 200
 
 
 if __name__ == '__main__':
