@@ -54,6 +54,20 @@ def _platform_default_name(platform: str) -> str:
     return base
 
 
+def _relative_sync(dt: Optional[datetime]) -> str:
+    if not dt:
+        return "Never"
+    now = datetime.utcnow()
+    delta = (now - dt).total_seconds()
+    if delta < 60:
+        return "Just now"
+    if delta < 3600:
+        return f"{int(delta // 60)} min ago"
+    if delta < 86400:
+        return f"{int(delta // 3600)} hr ago"
+    return f"{int(delta // 86400)} days ago"
+
+
 def list_channels(merchant_id: str) -> List[Dict[str, Any]]:
     """Return the canonical channel catalog with merchant-specific connection state."""
     if not merchant_id:
@@ -89,7 +103,7 @@ def list_channels(merchant_id: str) -> List[Dict[str, Any]]:
             "orders": mc.pending_orders if mc else 0,
             "revenue": float(revenue_rows.get(platform, 0.0)),
             "conversion_rate": mc.conversion_rate if mc else 0.0,
-            "sync": "Never" if state == "disconnected" else (token.updated_at.isoformat() if token else "now"),
+            "sync": "Never" if state == "disconnected" else _relative_sync(token.updated_at if token else datetime.utcnow()),
         })
     return channels
 

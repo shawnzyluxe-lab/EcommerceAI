@@ -35,18 +35,53 @@
   </div>
 </div>
 {% elif connected|length == 0 %}
-<div class="card" style="border: 1px solid var(--accent); background: var(--accent-bg); margin-bottom: 18px;">
-  <div style="display: flex; align-items: flex-start; gap: 16px; flex-wrap: wrap;">
-    <div style="flex: 1; min-width: 220px;">
-      <div style="font-weight: 700; color: var(--ink); margin-bottom: 8px;">Welcome to Vantav</div>
-      <ol style="font-size: .85rem; color: var(--ink-2); line-height: 1.8; padding-left: 1.2rem; margin: 0;">
-        <li><strong>Choose a plan</strong> — done</li>
-        <li><strong>Connect Shopify, TikTok Shop, or Amazon</strong></li>
-        <li><strong>Invite team members</strong> (optional)</li>
-        <li><strong>Ask the assistant anything</strong></li>
-      </ol>
+<div class="card" style="border: 1px solid var(--line); background: var(--surface); margin-bottom: 18px;">
+  <div style="padding: 20px 22px 24px;">
+    <div style="font-weight: 700; color: var(--ink); margin-bottom: 4px; font-size: 1.15rem;">Let's set up Vantav</div>
+    <p style="font-size: .9rem; color: var(--ink-2); margin: 0 0 20px;">Three quick steps to turn your stores into a command centre.</p>
+
+    <div class="setup-steps">
+      <div class="setup-step active" id="setup-step-1">
+        <div class="step-badge">1</div>
+        <div class="step-body">
+          <div style="font-weight: 600; color: var(--ink);">Connect your first store</div>
+          <p class="step-desc">Vantav watches Shopify, TikTok Shop, and Amazon for margin leaks, stockouts, and late orders.</p>
+          <div style="display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 8px;">
+            <button class="btn btn-primary" onclick="startShopifyOAuth()">Connect Shopify</button>
+            <button class="btn" style="background: var(--ink-2); color: var(--ink); border-color: var(--line);" onclick="startTiktokOAuth()">Connect TikTok Shop</button>
+            <button class="btn" style="background: var(--ink-2); color: var(--ink); border-color: var(--line);" onclick="startAmazonSetup()">Connect Amazon</button>
+          </div>
+          <div id="oauth-status" style="font-size: .8rem; color: var(--ink-3); min-height: 1.2em;"></div>
+        </div>
+      </div>
+
+      <div class="setup-step" id="setup-step-2">
+        <div class="step-badge">2</div>
+        <div class="step-body">
+          <div style="font-weight: 600; color: var(--ink);">Invite your team</div>
+          <p class="step-desc">Optional — add one teammate now so they can approve actions too.</p>
+          <form id="overview-invite-form" onsubmit="submitOverviewInvite(event)" style="display: flex; gap: 8px; flex-wrap: wrap; align-items: center;">
+            <input type="email" id="overview-invite-email" required placeholder="teammate@example.com" style="min-width: 220px; padding: 8px 10px; border-radius: 8px; border: 1px solid var(--line); background: var(--surface); color: var(--ink);">
+            <button type="submit" class="btn">Send invite</button>
+            <button type="button" class="btn btn-ghost" onclick="skipOverviewInvite()">Skip for now</button>
+          </form>
+          <div id="invite-message" style="font-size: .8rem; margin-top: 8px; min-height: 1.2em;"></div>
+        </div>
+      </div>
+
+      <div class="setup-step" id="setup-step-3">
+        <div class="step-badge">3</div>
+        <div class="step-body">
+          <div style="font-weight: 600; color: var(--ink);">Ask your assistant</div>
+          <p class="step-desc">After you connect a store, try one of these:</p>
+          <div class="setup-chips">
+            <button class="chip" onclick="askAssistantChip('What should I watch this week?')">What should I watch this week?</button>
+            <button class="chip" onclick="askAssistantChip('Where is my biggest margin leak?')">Where is my biggest margin leak?</button>
+            <button class="chip" onclick="askAssistantChip('Show my top action')">Show my top action</button>
+          </div>
+        </div>
+      </div>
     </div>
-    <a href="/dashboard/settings?tab=stores&onboarding=1" class="btn btn-primary" style="align-self: center;">Connect your first store</a>
   </div>
 </div>
 {% endif %}
@@ -207,8 +242,8 @@
       </div>
       {% else %}
       <div style="padding: 24px; text-align: center; color: var(--ink-3); border: 1px dashed var(--line); border-radius: 10px; flex: 1; display: flex; flex-direction: column; justify-content: center;">
-        <p style="margin-bottom: 14px;">No recommended actions yet. Ask the assistant to find opportunities.</p>
-        <button class="btn btn-primary" id="run-analysis-btn" onclick="runAssistantAnalysis()" style="align-self: center;">Ask the assistant</button>
+        <p style="margin-bottom: 14px;">No recommendations yet — we'll suggest the first move once your store data finishes syncing.</p>
+        <button class="btn btn-primary" id="run-analysis-btn" onclick="runAssistantAnalysis()" style="align-self: center;">Refresh recommendations</button>
       </div>
       {% endif %}
     </div>
@@ -281,9 +316,90 @@
 
 <style>
 .hidden { display: none !important; }
+.setup-steps { display: flex; flex-direction: column; gap: 14px; }
+.setup-step { display: flex; gap: 14px; padding: 16px; border: 1px solid var(--line); border-radius: 12px; background: var(--bg); }
+.setup-step.active { border-color: var(--accent); background: var(--accent-bg); }
+.setup-step.completed { opacity: .6; }
+.step-badge { width: 28px; height: 28px; border-radius: 50%; background: var(--accent); color: #fff; display: grid; place-items: center; font-weight: 700; font-size: .8rem; flex: none; }
+.setup-step:not(.active):not(.completed) .step-badge { background: var(--line); color: var(--ink-3); }
+.step-body { flex: 1; min-width: 220px; }
+.step-desc { font-size: .82rem; color: var(--ink-2); margin: 4px 0 12px; }
+.setup-chips { display: flex; gap: 8px; flex-wrap: wrap; }
+.setup-chips .chip { cursor: pointer; }
+@keyframes spin { to { transform: rotate(360deg); } }
 </style>
 
 <script>
+function getShopifyDomainForOverview() {
+  let shop = (window.prompt('Enter your Shopify store domain (for example, store.myshopify.com):') || '').trim().toLowerCase();
+  shop = shop.replace(/^https?:\/\//, '').replace(/\/.*$/, '');
+  if (!/^[a-z0-9](?:[a-z0-9-]*[a-z0-9])?\.myshopify\.com$/.test(shop)) {
+    alert('Enter a .myshopify.com domain like store.myshopify.com.');
+    return '';
+  }
+  return shop;
+}
+
+function startShopifyOAuth() {
+  const status = document.getElementById('oauth-status');
+  const shop = getShopifyDomainForOverview();
+  if (!shop) return;
+  if (status) status.innerHTML = '<span style="display:inline-block;width:12px;height:12px;border:2px solid var(--accent);border-top-color:transparent;border-radius:50%;animation:spin 1s linear infinite;margin-right:6px;vertical-align:middle;"></span>Connecting… Waiting for Shopify to approve the app';
+  window.location.href = '/api/v1/auth/shopify/connect?shop=' + encodeURIComponent(shop);
+}
+
+function startTiktokOAuth() {
+  const region = (window.prompt('Choose TikTok Shop region: US or UK/EU? (type us or uk)', 'us') || 'us').trim().toLowerCase();
+  if (!['us', 'uk'].includes(region)) {
+    alert('Enter us or uk.');
+    return;
+  }
+  const status = document.getElementById('oauth-status');
+  if (status) status.innerHTML = '<span style="display:inline-block;width:12px;height:12px;border:2px solid var(--accent);border-top-color:transparent;border-radius:50%;animation:spin 1s linear infinite;margin-right:6px;vertical-align:middle;"></span>Connecting… Waiting for TikTok Shop to approve the app';
+  window.location.href = '/api/v1/auth/tiktok/connect?region=' + encodeURIComponent(region);
+}
+
+function startAmazonSetup() {
+  window.location.href = '/dashboard/settings?tab=stores&onboarding=1&connect=amazon';
+}
+
+async function submitOverviewInvite(e) {
+  e.preventDefault();
+  const email = document.getElementById('overview-invite-email').value.trim().toLowerCase();
+  const msg = document.getElementById('invite-message');
+  if (!email) return;
+  try {
+    const res = await fetch('/api/v1/workspace/invite', {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({email, role: 'merchant'}), credentials: 'same-origin'});
+    const data = await res.json();
+    if (res.ok || res.status === 409) {
+      if (msg) msg.textContent = 'Invite sent.';
+      if (msg) msg.style.color = 'var(--green)';
+      document.getElementById('setup-step-2').classList.add('completed');
+      document.getElementById('setup-step-2').classList.remove('active');
+      document.getElementById('setup-step-3').classList.add('active');
+    } else {
+      if (msg) { msg.textContent = data.detail || 'Invite failed'; msg.style.color = 'var(--red)'; }
+    }
+  } catch (err) {
+    if (msg) { msg.textContent = err.message; msg.style.color = 'var(--red)'; }
+  }
+}
+
+function skipOverviewInvite() {
+  const msg = document.getElementById('invite-message');
+  if (msg) { msg.textContent = 'Skipped for now.'; msg.style.color = 'var(--ink-3)'; }
+  document.getElementById('setup-step-2').classList.add('completed');
+  document.getElementById('setup-step-2').classList.remove('active');
+  document.getElementById('setup-step-3').classList.add('active');
+}
+
+function askAssistantChip(text) {
+  const input = document.getElementById('ai-popup-input');
+  if (input) input.value = text;
+  if (window.toggleAIPopup) window.toggleAIPopup();
+  if (window.sendAIPopupMessage) window.sendAIPopupMessage();
+}
+
 async function runAssistantAnalysis() {
   const btn = document.getElementById('run-analysis-btn');
   if (btn) { btn.disabled = true; btn.textContent = 'Running…'; }

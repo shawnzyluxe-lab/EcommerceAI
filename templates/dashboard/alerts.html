@@ -19,6 +19,11 @@
     </div>
   </div>
   <div class="alert-feed" id="alert-feed">
+    {% if not alerts %}
+    <div style="padding: 24px; text-align: center; color: var(--ink-3); border: 1px dashed var(--line); border-radius: 10px;">
+      No alerts yet — we'll notify you here when inventory is low, an order is delayed, or a refund spike happens.
+    </div>
+    {% endif %}
     {% for a in alerts %}
     <div class="alert-item {{ a.level }}" data-id="{{ a.id }}">
       <div class="alert-bar"></div>
@@ -55,7 +60,7 @@ async function refreshAlerts() {
     const data = await res.json();
     const feed = document.getElementById('alert-feed');
     if (!data.alerts.length) {
-      feed.innerHTML = '<div style="padding:20px;color:var(--ink-3)">No open alerts.</div>';
+      feed.innerHTML = '<div style="padding: 24px; text-align: center; color: var(--ink-3); border: 1px dashed var(--line); border-radius: 10px;">No alerts yet — we\'ll notify you here when inventory is low, an order is delayed, or a refund spike happens.</div>';
       return;
     }
     feed.innerHTML = data.alerts.map(a => {

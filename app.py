@@ -834,7 +834,7 @@ def site_wall_protect():
     if request.endpoint is None:
         # Unknown path: let Flask return a real 404 instead of hiding it behind a login redirect.
         return None
-    if request.endpoint in ('home', 'login', 'site_login', 'site_logout', 'subscribe', 'checkout', 'thank_you', 'session_heartbeat', 'create_stripe_checkout', 'beta_apply', 'api_beta_apply', 'trial', 'api_trial_apply', 'auth_login', 'auth_signup', 'auth_provision_node', 'shopify_orders_webhook', 'shopify_gdpr_customer_data_request', 'shopify_gdpr_customer_redact', 'shopify_gdpr_shop_redact', 'shopify_app_uninstalled', 'tiktok_orders_webhook', 'amazon_orders_webhook', 'stripe_billing_webhook', 'supplier_po_update', 'execute_mitigation', 'generate_magic_link', 'magic_login', 'register_merchant', 'shopify_oauth_callback', 'tiktok_oauth_callback', 'health_check', 'api_v1_health', 'api_monitoring_health', 'api_monitoring_alerts', 'legal_terms', 'legal_privacy', 'legal_refund', 'legal_security', 'status_page', 'demo', 'robots_txt', 'sitemap_xml', 'favicon_ico', 'static'):
+    if request.endpoint in ('home', 'login', 'site_login', 'site_logout', 'subscribe', 'checkout', 'thank_you', 'session_heartbeat', 'create_stripe_checkout', 'beta_apply', 'api_beta_apply', 'trial', 'api_trial_apply', 'auth_login', 'auth_signup', 'auth_provision_node', 'shopify_orders_webhook', 'shopify_gdpr_customer_data_request', 'shopify_gdpr_customer_redact', 'shopify_gdpr_shop_redact', 'shopify_app_uninstalled', 'tiktok_orders_webhook', 'amazon_orders_webhook', 'stripe_billing_webhook', 'supplier_po_update', 'execute_mitigation', 'generate_magic_link', 'magic_login', 'register_merchant', 'shopify_oauth_callback', 'tiktok_oauth_callback', 'amazon_oauth_callback', 'health_check', 'api_v1_health', 'api_monitoring_health', 'api_monitoring_alerts', 'legal_terms', 'legal_privacy', 'legal_refund', 'legal_security', 'status_page', 'demo', 'robots_txt', 'sitemap_xml', 'favicon_ico', 'static'):
         return None
     if site_wall_authenticated():
         return None
@@ -901,6 +901,9 @@ TIKTOK_APP_SECRET = os.environ.get("TIKTOK_APP_SECRET", "")
 TIKTOK_SERVICE_ID = os.environ.get("TIKTOK_SERVICE_ID", "")
 TIKTOK_AUTH_REGION = os.environ.get("TIKTOK_AUTH_REGION", "")
 TIKTOK_REDIRECT_URI = "https://vantavcommerce.com/api/v1/auth/tiktok/callback"
+
+AMAZON_SPAPI_APP_ID = os.environ.get("AMAZON_SPAPI_APP_ID", "")
+AMAZON_SPAPI_OAUTH_REDIRECT_URI = os.environ.get("AMAZON_SPAPI_OAUTH_REDIRECT_URI", "https://vantavcommerce.com/api/v1/auth/amazon/callback")
 
 
 def _tiktok_creds_for_region(region: str = ""):
@@ -6660,6 +6663,43 @@ def tiktok_oauth_callback():
     except Exception as e:
         logger.error(f"[TikTok OAuth] {e}")
         return redirect("/dashboard/settings?tab=stores&onboarding=1&oauth_sync=error")
+
+
+@app.route('/api/v1/auth/amazon/connect')
+def amazon_oauth_connect():
+    """Step 1: Redirect merchant to Amazon Seller Central app authorization (SP-API)."""
+    merchant = get_merchant_context()
+    if not merchant:
+        return redirect("/login?error=auth_required")
+    if not merchant.get("live_access_enabled"):
+        return redirect("/dashboard/commerce-hub?oauth_sync=error")
+    if not AMAZON_SPAPI_APP_ID or not AMAZON_SPAPI_OAUTH_REDIRECT_URI:
+        return redirect("/dashboard/settings?tab=stores&onboarding=1&amazon_oauth=manual")
+
+    state = f"{merchant['id']}:{secrets.token_urlsafe(8)}"
+    auth_url = (
+        "https://sellercentral.amazon.com/apps/authorize/consent"
+        f"?application_id={AMAZON_SPAPI_APP_ID}"
+        f"&state={quote(state, safe='')}"
+        f"&redirect_uri={quote(AMAZON_SPAPI_OAUTH_REDIRECT_URI, safe='')}"
+        "&version=beta"
+    )
+    return redirect(auth_url)
+
+
+@app.route('/api/v1/auth/amazon/callback')
+def amazon_oauth_callback():
+    """Step 2: Amazon redirects here after merchant consents. We guide them to manual SP-API credentials for now."""
+    merchant = get_merchant_context()
+    if not merchant or not merchant.get("live_access_enabled"):
+        return redirect("/dashboard/commerce-hub?oauth_sync=error")
+    spapi_oauth_code = request.args.get("spapi_oauth_code")
+    state = request.args.get("state", "")
+    if not spapi_oauth_code:
+        return redirect("/dashboard/settings?tab=stores&onboarding=1&oauth_sync=error")
+    # Amazon SP-API OAuth yields a short-lived code that must be exchanged server-side with the app client secret.
+    # Persist it as a pending credential and ask the merchant to complete the AWS/LWA details in Advanced setup.
+    return redirect(f"/dashboard/settings?tab=stores&onboarding=1&amazon_code={spapi_oauth_code}&oauth_sync=amazon_pending")
 
 
 @app.route('/account/login')

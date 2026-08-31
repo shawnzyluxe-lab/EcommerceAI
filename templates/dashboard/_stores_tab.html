@@ -25,12 +25,11 @@
     <span class="spacer"></span>
     <span id="sync-status" style="font-size:.8rem; color:var(--ink-3);"></span>
   </div>
-  <div id="channel-grid" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 12px; padding: 16px 0;">
+  <div id="channel-grid" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 12px; padding: 16px 0;">
     {% for ch in channels %}
     <div data-platform="{{ ch.platform }}" style="border: 1px solid var(--line); border-radius: 12px; padding: 16px; text-align: center; {% if ch.platform not in ('shopify','tiktok','amazon') %}opacity:.6;{% endif %}">
       <div style="width: 40px; height: 40px; border-radius: 8px; background: {{ ch.color }}; color: #fff; display: grid; place-items: center; font-weight: 800; margin: 0 auto 8px; font-size: .8rem;">{{ ch.abbr }}</div>
       <div style="font-weight: 600; font-size: .85rem;">{{ ch.name }}</div>
-      <div style="font-size:.7rem; color:var(--ink-3); margin:4px 0;">{{ ch.state }}</div>
       {% if ch.platform in ('shopify','tiktok','amazon') %}
         {% if SANDBOX %}
           {% if ch.state == 'connected' %}
@@ -39,19 +38,27 @@
           <span class="tag tag-ghost" style="margin-top: 10px; display: inline-block;">Disabled in sandbox</span>
           {% endif %}
         {% else %}
-        {% if ch.state == 'connected' %}
-        <button class="btn" style="margin-top: 10px; width: 100%; font-size: .72rem; padding: 5px 8px;" onclick="openConnectModal('{{ ch.platform }}')">Manage</button>
-        {% elif not merchant.live_access_enabled %}
-        <a href="/subscribe" class="tag tag-ghost" style="margin-top: 10px; display: inline-block;">Subscribe to connect</a>
-        {% elif ch.platform == 'tiktok' and ch.state != 'connected' %}
-        <select id="tiktok-region" style="margin-top: 8px; width: 100%; padding: 5px; font-size: .72rem; border-radius: 6px; border: 1px solid var(--line); background: var(--surface); color: var(--ink);" aria-label="TikTok Shop region">
-          <option value="us" selected>US TikTok Shop</option>
-          <option value="uk">UK / EU TikTok Shop</option>
-        </select>
-        <button class="btn" style="margin-top: 6px; width: 100%; font-size: .72rem; padding: 5px 8px;" onclick="openConnectModal('tiktok')">Connect</button>
-        {% else %}
-        <button class="btn" style="margin-top: 10px; width: 100%; font-size: .72rem; padding: 5px 8px;" onclick="openConnectModal('{{ ch.platform }}')">Connect</button>
-        {% endif %}
+          {% if ch.state == 'connected' %}
+          <div style="margin-top: 10px;">
+            <span class="tag tag-green" style="display: inline-block;">Connected</span>
+            <div style="font-size: .7rem; color: var(--ink-3); margin-top: 6px;">Last sync: {{ ch.sync }}</div>
+            <button class="btn" style="margin-top: 8px; width: 100%; font-size: .72rem; padding: 5px 8px;" onclick="syncChannel('{{ ch.platform }}')">Sync now</button>
+          </div>
+          {% elif not merchant.live_access_enabled %}
+          <a href="/subscribe" class="tag tag-ghost" style="margin-top: 10px; display: inline-block;">Subscribe to connect</a>
+          {% else %}
+            {% if ch.platform == 'tiktok' %}
+            <select id="tiktok-region" style="margin-top: 8px; width: 100%; padding: 5px; font-size: .72rem; border-radius: 6px; border: 1px solid var(--line); background: var(--surface); color: var(--ink);" aria-label="TikTok Shop region">
+              <option value="us" selected>US TikTok Shop</option>
+              <option value="uk">UK / EU TikTok Shop</option>
+            </select>
+            <button class="btn btn-primary" style="margin-top: 6px; width: 100%; font-size: .72rem; padding: 5px 8px;" onclick="openConnectModal('tiktok')">Connect TikTok Shop</button>
+            {% elif ch.platform == 'shopify' %}
+            <button class="btn btn-primary" style="margin-top: 10px; width: 100%; font-size: .72rem; padding: 5px 8px;" onclick="openConnectModal('shopify')">Connect Shopify</button>
+            {% else %}
+            <button class="btn btn-primary" style="margin-top: 10px; width: 100%; font-size: .72rem; padding: 5px 8px;" onclick="openConnectModal('amazon')">Connect Amazon</button>
+            {% endif %}
+          {% endif %}
         {% endif %}
       {% else %}
       <span class="tag tag-ghost" style="margin-top: 10px; display: inline-block;">Coming soon</span>
@@ -77,9 +84,12 @@
             <td><span class="tag tag-green">{{ 'Demo' if SANDBOX else 'Live' }}</span></td>
             <td class="num">{{ c.orders }}</td>
             <td>{{ c.sync }}</td>
-            {% if not SANDBOX %}
-            <td><button class="btn" style="font-size: .72rem; padding: 4px 8px;" onclick="disconnectChannel('{{ c.platform }}')">Disconnect</button></td>
-            {% endif %}
+            <td>
+              <button class="btn" style="font-size: .72rem; padding: 4px 8px;" onclick="syncChannel('{{ c.platform }}')">Sync now</button>
+              {% if not SANDBOX %}
+              <button class="btn" style="font-size: .72rem; padding: 4px 8px; margin-left: 6px;" onclick="disconnectChannel('{{ c.platform }}')">Disconnect</button>
+              {% endif %}
+            </td>
           </tr>
           {% endif %}
           {% endfor %}
@@ -88,9 +98,13 @@
     </div>
   </div>
 
-  <div class="card" id="connect-panel">
-    <div class="card-head"><h3>Manual connection (advanced)</h3></div>
-    <p style="font-size:.8rem; color:var(--ink-3); margin:0 16px 12px;">Use this only when you have custom app or developer credentials. For Shopify, the Connect button above is the normal route.</p>
+  <details id="advanced-details" class="card" style="padding: 0; overflow: hidden;">
+    <summary style="padding: 16px 18px; cursor: pointer; font-weight: 700; color: var(--ink); list-style: none; display: flex; justify-content: space-between; align-items: center;">
+      <span>Advanced / developer setup</span>
+      <span style="font-size: .8rem; color: var(--ink-3); font-weight: 500;">Manual tokens</span>
+    </summary>
+    <div id="connect-panel" style="padding: 0 18px 18px;">
+    <p style="font-size:.8rem; color:var(--ink-3); margin:0 0 12px;">Use this only when you have custom app or developer credentials. For Shopify and TikTok Shop, the Connect button above is the normal route.</p>
     <form id="connect-form" onsubmit="submitConnect(event)">
       <label style="font-size: .75rem; color: var(--ink-3); font-weight: 600;">Platform</label>
       <select id="platform" style="width: 100%; padding: 10px; margin: 6px 0 12px; border: 1px solid var(--line); border-radius: 8px; background: var(--surface); color: var(--ink);" onchange="toggleFields()">
@@ -149,25 +163,9 @@
       {% endif %}
     </form>
     <div id="form-message" style="margin-top:10px; font-size:.8rem;"></div>
-  </div>
-</div>
-
-{% if not SANDBOX %}
-<div class="card" style="margin-top:24px;">
-  <div class="card-head"><h3>Sync Channels</h3></div>
-  <div style="padding:0 16px 16px;">
-    <p style="font-size:.8rem; color:var(--ink-3); margin-bottom:12px;">Pull the latest orders and products from connected marketplaces.</p>
-    <div style="display:flex; flex-wrap:wrap; gap:10px; align-items:center;">
-      <button class="btn" id="sync-shopify-btn" onclick="syncChannel('shopify')" disabled>Sync Shopify</button>
-      <span id="sync-shopify-status" style="font-size:.8rem; color:var(--ink-3);"></span>
-      <button class="btn" id="sync-tiktok-btn" onclick="syncChannel('tiktok')" disabled>Sync TikTok Shop</button>
-      <span id="sync-tiktok-status" style="font-size:.8rem; color:var(--ink-3);"></span>
-      <button class="btn" id="sync-amazon-btn" onclick="syncChannel('amazon')" disabled>Sync Amazon</button>
-      <span id="sync-amazon-status" style="font-size:.8rem; color:var(--ink-3);"></span>
     </div>
-  </div>
-</div>
-{% endif %}
+  </details>
+
 
 <div class="card" style="margin-top:24px;">
   <div class="card-head"><h3>Secure Webhooks</h3></div>
@@ -219,6 +217,9 @@ function openConnectModal(platform) {
     window.location.href = '/api/v1/auth/shopify/connect?shop=' + encodeURIComponent(shop);
     return;
   }
+  // Amazon: open the Advanced / developer setup accordion so the merchant can complete SP-API credentials.
+  const details = document.getElementById('advanced-details');
+  if (details) details.open = true;
   document.getElementById('platform').value = platform;
   toggleFields();
   document.getElementById('connect-panel').scrollIntoView({behavior: 'smooth'});
@@ -285,25 +286,22 @@ async function disconnectChannel(platform) {
 async function syncChannel(platform) {
   const btn = document.getElementById('sync-' + platform + '-btn');
   const status = document.getElementById('sync-' + platform + '-status');
-  if (!btn || btn.disabled) return;
-  btn.disabled = true;
-  status.textContent = 'Syncing…';
+  if (btn && btn.disabled) return;
+  if (btn) btn.disabled = true;
+  if (status) status.textContent = 'Syncing…';
   try {
     const res = await fetch('/api/v1/channels/' + platform + '/sync', {method: 'POST'});
     const data = await res.json();
     if (res.ok) {
-      status.textContent = `Synced ${data.orders_synced || 0} orders, ${data.products_synced || 0} products.`;
-      status.style.color = 'var(--green)';
+      if (status) { status.textContent = `Synced ${data.orders_synced || 0} orders, ${data.products_synced || 0} products.`; status.style.color = 'var(--green)'; }
       loadChannels();
     } else {
-      status.textContent = data.detail || 'Sync failed';
-      status.style.color = 'var(--red)';
+      if (status) { status.textContent = data.detail || 'Sync failed'; status.style.color = 'var(--red)'; }
     }
   } catch (e) {
-    status.textContent = e.message;
-    status.style.color = 'var(--red)';
+    if (status) { status.textContent = e.message; status.style.color = 'var(--red)'; }
   } finally {
-    btn.disabled = false;
+    if (btn) btn.disabled = false;
   }
 }
 
@@ -341,15 +339,27 @@ function renderChannels(channels) {
     } else if (SANDBOX && c.state !== 'connected') {
       action = '<span class="tag tag-ghost" style="margin-top: 10px; display: inline-block;">Disabled in sandbox</span>';
     } else if (c.state === 'connected') {
-      action = `<span class="tag tag-green" style="margin-top: 10px; display: inline-block;">${SANDBOX ? 'Connected (demo)' : 'Connected'}</span>`;
+      action = `
+        <div style="margin-top: 10px;">
+          <span class="tag tag-green" style="display: inline-block;">${SANDBOX ? 'Connected (demo)' : 'Connected'}</span>
+          <div style="font-size: .7rem; color: var(--ink-3); margin-top: 6px;">Last sync: ${c.sync}</div>
+          <button class="btn" style="margin-top: 8px; width: 100%; font-size: .72rem; padding: 5px 8px;" onclick="syncChannel('${c.platform}')">Sync now</button>
+        </div>`;
     } else {
-      action = `<button class="btn" style="margin-top: 10px; width: 100%; font-size: .72rem; padding: 5px 8px;" onclick="openConnectModal('${c.platform}')">${c.state === 'connected' ? 'Manage' : 'Connect'}</button>`;
+      let inner;
+      if (c.platform === 'tiktok') {
+        inner = `<select id="tiktok-region" style="margin-top: 8px; width: 100%; padding: 5px; font-size: .72rem; border-radius: 6px; border: 1px solid var(--line); background: var(--surface); color: var(--ink);" aria-label="TikTok Shop region"><option value="us" selected>US TikTok Shop</option><option value="uk">UK / EU TikTok Shop</option></select><button class="btn btn-primary" style="margin-top: 6px; width: 100%; font-size: .72rem; padding: 5px 8px;" onclick="openConnectModal('tiktok')">Connect TikTok Shop</button>`;
+      } else if (c.platform === 'shopify') {
+        inner = `<button class="btn btn-primary" style="margin-top: 10px; width: 100%; font-size: .72rem; padding: 5px 8px;" onclick="openConnectModal('shopify')">Connect Shopify</button>`;
+      } else {
+        inner = `<button class="btn btn-primary" style="margin-top: 10px; width: 100%; font-size: .72rem; padding: 5px 8px;" onclick="openConnectModal('amazon')">Connect Amazon</button>`;
+      }
+      action = inner;
     }
     return `
     <div data-platform="${c.platform}" style="border: 1px solid var(--line); border-radius: 12px; padding: 16px; text-align: center; ${isSupported ? '' : 'opacity:.6;'}">
       <div style="width: 40px; height: 40px; border-radius: 8px; background: ${c.color}; color: #fff; display: grid; place-items: center; font-weight: 800; margin: 0 auto 8px; font-size: .8rem;">${c.abbr}</div>
       <div style="font-weight: 600; font-size: .85rem;">${c.name}</div>
-      <div style="font-size:.7rem; color:var(--ink-3); margin:4px 0;">${c.state}</div>
       ${action}
     </div>
   `}).join('');
@@ -365,22 +375,30 @@ function renderChannels(channels) {
         <td><span class="tag tag-green">${SANDBOX ? 'Demo' : 'Live'}</span></td>
         <td class="num">${c.orders}</td>
         <td>${c.sync}</td>
-        ${SANDBOX ? '' : `<td><button class="btn" style="font-size: .72rem; padding: 4px 8px;" onclick="disconnectChannel('${c.platform}')">Disconnect</button></td>`}
+        <td>
+          <button class="btn" style="font-size: .72rem; padding: 4px 8px;" onclick="syncChannel('${c.platform}')">Sync now</button>
+          ${SANDBOX ? '' : `<button class="btn" style="font-size: .72rem; padding: 4px 8px; margin-left: 6px;" onclick="disconnectChannel('${c.platform}')">Disconnect</button>`}
+        </td>
       </tr>
     `).join('');
   }
 
   const status = document.getElementById('sync-status');
   if (status) status.textContent = 'Last refresh: ' + new Date().toLocaleTimeString();
-
-  ['shopify', 'tiktok', 'amazon'].forEach(platform => {
-    const btn = document.getElementById('sync-' + platform + '-btn');
-    if (btn) {
-      const connected = channels.find(c => c.platform === platform && c.state === 'connected');
-      btn.disabled = !connected;
-    }
-  });
 }
+
+(function initStoresTab() {
+  const params = new URLSearchParams(window.location.search);
+  if (params.get('connect') === 'amazon' || params.get('amazon_oauth') === 'manual' || params.get('amazon_code')) {
+    const details = document.getElementById('advanced-details');
+    if (details) {
+      details.open = true;
+      document.getElementById('platform').value = 'amazon';
+      toggleFields();
+      document.getElementById('connect-panel').scrollIntoView({behavior: 'smooth'});
+    }
+  }
+})();
 
 setInterval(loadChannels, 30000);
 </script>

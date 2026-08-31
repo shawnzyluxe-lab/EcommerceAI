@@ -334,7 +334,7 @@
       alerts: { chips: ['Why is the top alert firing', 'What should I do first', 'Run assistant analysis'], types: [] },
       billing: { chips: ['Show my plan', 'What features can I unlock', 'Upgrade when ready'], types: [] },
       settings: { chips: ['Set my margin floor', 'Update business rules', 'Invite team member'], types: [] },
-      overview: { chips: ['What needs my attention', 'Where am I losing margin', 'Show my top action'], types: [] },
+      overview: { chips: ['What should I watch this week?', 'Where is my biggest margin leak?', 'Show my top action'], types: [] },
       default: { chips: ['Run assistant analysis', 'Show my top profit drain', 'What needs my attention'], types: [] }
     };
     const ctx = PAGE_CONTEXT[page] || PAGE_CONTEXT.default;
@@ -452,7 +452,7 @@
       const hour = new Date().getHours();
       const salutation = hour < 5 || hour >= 22 ? 'Good night' : hour < 12 ? 'Good morning' : hour < 17 ? 'Good afternoon' : 'Good evening';
       if (connectedCount === 0) {
-        addMessage('assistant', `Welcome back. You haven't connected a store yet — start with Shopify, TikTok Shop, or Amazon and I can begin monitoring.`);
+        addMessage('assistant', `Hi ${name}. To start, connect one store. I can then watch for low inventory, missed profits, and late orders.`);
       } else {
         addMessage('assistant', `${salutation}, ${name}. I reviewed your channels overnight — pulling today's briefing now.`);
       }
