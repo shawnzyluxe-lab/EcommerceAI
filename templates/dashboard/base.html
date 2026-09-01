@@ -179,8 +179,8 @@
         {% block content %}{% endblock %}
       </main>
       <footer class="app-footer" style="padding: 16px 24px; border-top: 1px solid var(--line); margin-top: auto; font-size: .75rem; color: var(--ink-3); display: flex; justify-content: space-between; flex-wrap: wrap; gap: 8px;">
-        <span>SOC 2 Type II in progress · 256-bit encryption · Data never sold</span>
-        <span><a href="/security" style="color: var(--ink-3);">Security</a> · <a href="/status" style="color: var(--ink-3);">Status</a></span>
+        <span>SOC 2 Type II in progress · 256-bit encryption · Data never sold · &copy; Vantav, all rights reserved</span>
+        <span>{% if merchant.id %}Licensed to {{ merchant.id }}{% if merchant.email %} — {{ merchant.email }}{% endif %} · {% endif %}<a href="/security" style="color: var(--ink-3);">Security</a> · <a href="/status" style="color: var(--ink-3);">Status</a></span>
       </footer>
     </div>
   </div>

@@ -1,3 +1,8 @@
+# Copyright (c) 2026 Vantav / Shawnzyluxe. All rights reserved.
+# This file is part of the Vantav Commerce Platform and is proprietary software.
+# Unauthorized copying, modification, distribution, or use is strictly prohibited.
+# See LICENSE for the full proprietary license terms.
+
 """Live merchant data context for the assistant."""
 import json
 from datetime import datetime, timedelta

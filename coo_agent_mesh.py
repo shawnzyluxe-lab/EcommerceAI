@@ -1,3 +1,8 @@
+# Copyright (c) 2026 Vantav / Shawnzyluxe. All rights reserved.
+# This file is part of the Vantav Commerce Platform and is proprietary software.
+# Unauthorized copying, modification, distribution, or use is strictly prohibited.
+# See LICENSE for the full proprietary license terms.
+
 """Multi-Agent Cooperative Executive Network (COO mesh).
 
 Specialized Finance and Logistics agents evaluate live SKU telemetry, then a

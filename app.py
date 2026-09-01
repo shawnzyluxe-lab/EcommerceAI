@@ -1,3 +1,8 @@
+# Copyright (c) 2026 Vantav / Shawnzyluxe. All rights reserved.
+# This file is part of the Vantav Commerce Platform and is proprietary software.
+# Unauthorized copying, modification, distribution, or use is strictly prohibited.
+# See LICENSE for the full proprietary license terms.
+
 import os
 import re
 import hmac
@@ -40,6 +45,22 @@ from flask_sock import Sock
 from dotenv import load_dotenv
 
 load_dotenv()
+
+# Vantav license-key gating. A production instance must have a valid VANTAV_LICENSE_KEY
+# set in the environment; without it the app refuses to start.
+VANTAV_LICENSE_KEY = os.environ.get("VANTAV_LICENSE_KEY", "")
+VANTAV_LICENSE_ENFORCE = os.environ.get("VANTAV_LICENSE_ENFORCE", "0").lower() in ("1", "true", "yes")
+
+
+def _validate_vantav_license():
+    """Abort startup unless a valid Vantav license key is configured."""
+    if not VANTAV_LICENSE_ENFORCE:
+        return
+    if not VANTAV_LICENSE_KEY or len(VANTAV_LICENSE_KEY) < 32:
+        raise RuntimeError(
+            "VANTAV_LICENSE_KEY is missing or invalid. This Vantav instance is not licensed."
+        )
+
 
 SEED_DEMO_DATA = os.environ.get("SEED_DEMO_DATA", "false").lower() in ("1", "true", "yes")
 
@@ -7591,6 +7612,8 @@ def _set_pending_internal():
 
 
 if __name__ == '__main__':
+    _validate_vantav_license()
     app.run(debug=True, port=3000)
 else:
+    _validate_vantav_license()
     _start_mview_refresh_worker()

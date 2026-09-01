@@ -1,3 +1,8 @@
+# Copyright (c) 2026 Vantav / Shawnzyluxe. All rights reserved.
+# This file is part of the Vantav Commerce Platform and is proprietary software.
+# Unauthorized copying, modification, distribution, or use is strictly prohibited.
+# See LICENSE for the full proprietary license terms.
+
 """Stripe billing integration for Vantav."""
 import os
 import json

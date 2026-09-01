@@ -1,3 +1,8 @@
+# Copyright (c) 2026 Vantav / Shawnzyluxe. All rights reserved.
+# This file is part of the Vantav Commerce Platform and is proprietary software.
+# Unauthorized copying, modification, distribution, or use is strictly prohibited.
+# See LICENSE for the full proprietary license terms.
+
 """Startup Pack intake — concierge model. Merchant submits a brief; admin delivers curated suppliers and direction."""
 import json
 from typing import Dict, Any, List
