@@ -881,7 +881,7 @@ def site_wall_protect():
     if request.endpoint is None:
         # Unknown path: let Flask return a real 404 instead of hiding it behind a login redirect.
         return None
-    if request.endpoint in ('home', 'login', 'site_login', 'site_logout', 'subscribe', 'checkout', 'thank_you', 'session_heartbeat', 'create_stripe_checkout', 'beta_apply', 'api_beta_apply', 'trial', 'api_trial_apply', 'auth_login', 'auth_signup', 'auth_forgot_password', 'auth_reset_password', 'reset_password', 'auth_provision_node', 'shopify_orders_webhook', 'shopify_gdpr_customer_data_request', 'shopify_gdpr_customer_redact', 'shopify_gdpr_shop_redact', 'shopify_app_uninstalled', 'tiktok_orders_webhook', 'amazon_orders_webhook', 'stripe_billing_webhook', 'supplier_po_update', 'execute_mitigation', 'generate_magic_link', 'magic_login', 'register_merchant', 'shopify_oauth_callback', 'tiktok_oauth_callback', 'amazon_oauth_callback', 'health_check', 'api_v1_health', 'api_monitoring_health', 'api_monitoring_alerts', 'legal_terms', 'legal_privacy', 'legal_refund', 'legal_security', 'status_page', 'demo', 'robots_txt', 'sitemap_xml', 'favicon_ico', 'static'):
+    if request.endpoint in ('home', 'how_it_works', 'features', 'pricing', 'faq', 'login', 'site_login', 'site_logout', 'subscribe', 'checkout', 'thank_you', 'session_heartbeat', 'create_stripe_checkout', 'beta_apply', 'api_beta_apply', 'trial', 'api_trial_apply', 'auth_login', 'auth_signup', 'auth_forgot_password', 'auth_reset_password', 'reset_password', 'auth_provision_node', 'shopify_orders_webhook', 'shopify_gdpr_customer_data_request', 'shopify_gdpr_customer_redact', 'shopify_gdpr_shop_redact', 'shopify_app_uninstalled', 'tiktok_orders_webhook', 'amazon_orders_webhook', 'stripe_billing_webhook', 'supplier_po_update', 'execute_mitigation', 'generate_magic_link', 'magic_login', 'register_merchant', 'shopify_oauth_callback', 'tiktok_oauth_callback', 'amazon_oauth_callback', 'health_check', 'api_v1_health', 'api_monitoring_health', 'api_monitoring_alerts', 'legal_terms', 'legal_privacy', 'legal_refund', 'legal_security', 'status_page', 'demo', 'robots_txt', 'sitemap_xml', 'favicon_ico', 'static'):
         return None
     if site_wall_authenticated():
         return None
@@ -1700,6 +1700,42 @@ def home():
     return render_template('landing.html')
 
 
+@app.route('/how-it-works')
+@limiter.exempt
+def how_it_works():
+    host = request.host.split(':')[0].lower()
+    if host in ('shawnzyluxe.com', 'www.shawnzyluxe.com'):
+        return render_template('coming_soon.html')
+    return render_template('how_it_works.html')
+
+
+@app.route('/features')
+@limiter.exempt
+def features():
+    host = request.host.split(':')[0].lower()
+    if host in ('shawnzyluxe.com', 'www.shawnzyluxe.com'):
+        return render_template('coming_soon.html')
+    return render_template('features.html')
+
+
+@app.route('/pricing')
+@limiter.exempt
+def pricing():
+    host = request.host.split(':')[0].lower()
+    if host in ('shawnzyluxe.com', 'www.shawnzyluxe.com'):
+        return render_template('coming_soon.html')
+    return render_template('pricing.html')
+
+
+@app.route('/faq')
+@limiter.exempt
+def faq():
+    host = request.host.split(':')[0].lower()
+    if host in ('shawnzyluxe.com', 'www.shawnzyluxe.com'):
+        return render_template('coming_soon.html')
+    return render_template('faq.html')
+
+
 @app.route('/subscribe')
 @limiter.exempt
 def subscribe():
@@ -1768,7 +1804,7 @@ def status_page():
     return render_template('status.html', health=health)
 
 
-PUBLIC_PATHS = ('/', '/subscribe', '/trial', '/demo', '/security', '/status', '/terms', '/privacy', '/refund', '/login')
+PUBLIC_PATHS = ('/', '/how-it-works', '/features', '/pricing', '/faq', '/subscribe', '/trial', '/demo', '/security', '/status', '/terms', '/privacy', '/refund', '/login')
 
 
 def _site_root() -> str:

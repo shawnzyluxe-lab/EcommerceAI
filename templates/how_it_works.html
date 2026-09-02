@@ -1,0 +1,138 @@
+{% extends "public_base.html" %}
+
+{% block title %}How Vantav works | Profit, alerts and approved actions{% endblock %}
+
+{% block head_extra %}
+  <meta name="description" content="See how Vantav turns Shopify, TikTok Shop and Amazon data into one clear profit number and the one action worth doing today.">
+  <link rel="canonical" href="https://vantavcommerce.com/how-it-works">
+  <meta property="og:type" content="website">
+  <meta property="og:site_name" content="Vantav">
+  <meta property="og:url" content="https://vantavcommerce.com/how-it-works">
+  <meta property="og:title" content="How Vantav works | Profit, alerts and approved actions">
+  <meta property="og:description" content="Watch a live account get audited and fixed in 84 seconds.">
+  <meta property="og:image" content="https://vantavcommerce.com/static/videos/how-it-works.jpg">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="How Vantav works | Profit, alerts and approved actions">
+  <meta name="twitter:description" content="Watch a live account get audited and fixed in 84 seconds.">
+  <meta name="twitter:image" content="https://vantavcommerce.com/static/videos/how-it-works.jpg">
+{% endblock %}
+
+{% block content %}
+<!-- ============ PROBLEM ============ -->
+<section class="band tight">
+  <div class="wrap">
+    <div class="head center">
+      <span class="eyebrow">The problem</span>
+      <h2>Reports tell you what happened. They never tell you what to do.</h2>
+      <p>Every channel shows you its own numbers, none of them subtract everything, and none of them act. That is how a best seller quietly loses money for weeks while you are busy running the business.</p>
+    </div>
+    <div class="compare">
+      <div class="bad">
+        <h3>Running your store today</h3>
+        <ul>
+          <li><svg viewBox="0 0 24 24" fill="none" aria-hidden="true" focusable="false"><path d="M18 6L6 18M6 6l12 12" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"/></svg> Three dashboards, a spreadsheet, and a guess at the end of the month</li>
+          <li><svg viewBox="0 0 24 24" fill="none" aria-hidden="true" focusable="false"><path d="M18 6L6 18M6 6l12 12" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"/></svg> Ad spend and marketplace fees never land in the same place as sales</li>
+          <li><svg viewBox="0 0 24 24" fill="none" aria-hidden="true" focusable="false"><path d="M18 6L6 18M6 6l12 12" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"/></svg> You find out a product was unprofitable after you have reordered it</li>
+          <li><svg viewBox="0 0 24 24" fill="none" aria-hidden="true" focusable="false"><path d="M18 6L6 18M6 6l12 12" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"/></svg> Even when you spot a problem, fixing it means logging into three places</li>
+        </ul>
+      </div>
+      <div class="good">
+        <h3>Running your store on Vantav</h3>
+        <ul>
+          <li><svg viewBox="0 0 24 24" fill="none" aria-hidden="true" focusable="false"><path d="M20 6L9 17l-5-5" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg> One number you can trust: what you kept today, after everything</li>
+          <li><svg viewBox="0 0 24 24" fill="none" aria-hidden="true" focusable="false"><path d="M20 6L9 17l-5-5" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg> Profit broken down by channel, product and individual order</li>
+          <li><svg viewBox="0 0 24 24" fill="none" aria-hidden="true" focusable="false"><path d="M20 6L9 17l-5-5" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg> A warning the same day a product or ad starts losing money</li>
+          <li><svg viewBox="0 0 24 24" fill="none" aria-hidden="true" focusable="false"><path d="M20 6L9 17l-5-5" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg> The fix already drafted and carried out for you the moment you approve it</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ VIDEO ============ -->
+<section class="band" id="how-it-works">
+  <div class="wrap">
+    <div class="head center">
+      <span class="eyebrow" style="justify-content:center">See how it works</span>
+      <h2>Watch a $24,806 month get audited and fixed in 84 seconds</h2>
+      <p>No slides, no mock-ups. A live account: signing in to the briefing, reading what was actually kept, catching a TikTok ad set burning $198 a week, and approving the fix in two clicks.</p>
+    </div>
+    <div class="video-wrap">
+      <video id="tour-video" controls preload="metadata" playsinline
+             poster="{{ url_for('static', filename='videos/how-it-works.jpg') }}">
+        <source src="{{ url_for('static', filename='videos/how-it-works.mp4') }}" type="video/mp4">
+        Your browser does not support the video tag. <a href="{{ url_for('static', filename='videos/how-it-works.mp4') }}">Download the tour</a>.
+      </video>
+    </div>
+    <div class="chapters">
+      <button type="button" data-t="8"><b>0:08</b>Your morning briefing</button>
+      <button type="button" data-t="16"><b>0:16</b>What you actually kept</button>
+      <button type="button" data-t="25"><b>0:25</b>Ask it a question</button>
+      <button type="button" data-t="32"><b>0:32</b>Warnings</button>
+      <button type="button" data-t="42"><b>0:42</b>Approving a fix</button>
+      <button type="button" data-t="50"><b>0:50</b>Profit by product</button>
+      <button type="button" data-t="58"><b>0:58</b>Orders &amp; inventory</button>
+      <button type="button" data-t="67"><b>1:07</b>Growing the store</button>
+    </div>
+  </div>
+</section>
+
+<div class="wrap"><div class="divider"></div></div>
+
+<!-- ============ ONBOARDING ============ -->
+<section class="band tight">
+  <div class="wrap">
+    <div class="head center">
+      <span class="eyebrow" style="justify-content:center">Getting started</span>
+      <h2>Live in three steps, useful the same afternoon</h2>
+    </div>
+    <div class="steps">
+      <div class="step">
+        <span class="n">Step 1</span>
+        <h4>Connect your channels</h4>
+        <p>Sign in to Shopify, TikTok Shop or Amazon through their official connection screens. Vantav asks for read-only access to orders, products and fees.</p>
+      </div>
+      <div class="step">
+        <span class="n">Step 2</span>
+        <h4>Add your costs once</h4>
+        <p>Enter product cost and shipping, or import them from a spreadsheet. Vantav backfills your recent order history so you have real numbers immediately.</p>
+      </div>
+      <div class="step">
+        <span class="n">Step 3</span>
+        <h4>Work from the briefing</h4>
+        <p>From then on, every sign-in opens with your profit, your warnings and the one action worth doing first.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ FINAL CTA ============ -->
+<section class="band tight">
+  <div class="wrap">
+    <div class="final">
+      <h2>Stop reading reports. Start approving fixes.</h2>
+      <p>Connect a channel, add your costs, and this afternoon your store tells you what it kept and what to do about it. No setup fee, cancel any time.</p>
+      <div class="hero-ctas">
+        <a class="btn btn-primary" href="{{ url_for('trial') }}">Start your free 24-hour trial</a>
+        <a class="btn btn-ghost" href="{{ url_for('pricing') }}">See pricing</a>
+      </div>
+    </div>
+  </div>
+</section>
+{% endblock %}
+
+{% block scripts %}
+<script>
+  (function () {
+    const video = document.getElementById('tour-video');
+    if (!video) return;
+    document.querySelectorAll('.chapters button').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        video.currentTime = parseFloat(btn.dataset.t || '0');
+        video.play().catch(function () {});
+        video.scrollIntoView({ block: 'center', behavior: 'smooth' });
+      });
+    });
+  })();
+</script>
+{% endblock %}
