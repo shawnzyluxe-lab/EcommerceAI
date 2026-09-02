@@ -42,7 +42,7 @@
           "lowPrice": "199",
           "highPrice": "799",
           "offerCount": "3",
-          "url": "https://vantavcommerce.com/pricing"
+          "url": "https://vantavcommerce.com/subscribe"
         }
       }
     ]
@@ -55,12 +55,11 @@
 <section class="hero">
   <div class="wrap hero-grid">
     <div>
-      <p class="qualifier">For e-commerce operators doing $5k+/month across multiple channels.</p>
-      <span class="pill"><span class="dot"></span> AI-powered profit command centre</span>
-      <h1>Your revenue isn't your profit.<br><span class="grad">Vantav shows exactly what you kept — and tells you what to fix next.</span></h1>
-      <p class="lede story">Vantav just found <span class="waste">$198/week</span> you're wasting. In two clicks it was paused, and that money stayed in the account.</p>
+      <span class="pill"><span class="dot"></span> AI-powered commerce assistant</span>
+      <h1>Stop switching tabs between<br><span class="grad">Shopify, TikTok Shop and Amazon.</span></h1>
+      <p class="lede">Run all three from one calm command centre. Vantav watches your channels, tells you the one thing worth fixing today, and gets it done the moment you say yes. No spreadsheets, no month-end surprises.</p>
       <div class="hero-ctas">
-        <a class="btn btn-primary" href="{{ url_for('trial') }}">Find out what your store actually kept &rarr;</a>
+        <a class="btn btn-primary" href="{{ url_for('trial') }}">Start your free 24-hour trial</a>
         <a class="btn btn-ghost" href="{{ url_for('how_it_works') }}">
           <svg viewBox="0 0 24 24" fill="currentColor" style="width:15px;height:15px"><path d="M8 5v14l11-7z"/></svg>
           Watch the 84-second tour
@@ -73,15 +72,9 @@
         <span><svg viewBox="0 0 24 24" fill="none" aria-hidden="true" focusable="false"><path d="M20 6L9 17l-5-5" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg> Nothing installed on your store</span>
       </div>
     </div>
-    <div class="shot" style="position:relative;">
+    <div class="shot">
       <div class="shot-bar"><i></i><i></i><i></i><span class="url">Live account &middot; today</span></div>
       <img src="{{ url_for('static', filename='images/shots/hero.webp') }}" alt="Vantav showing profit per order, an alert about TikTok ad spend, and a recommended fix waiting to be approved" width="1418" height="781" loading="eager">
-      <div class="example-card">
-        <div class="example-tag">Detected 4 minutes ago</div>
-        <div class="example-title">TikTok ad set is burning $198/week</div>
-        <p>Cost per purchase is 2.4&times; your target. Pause it?</p>
-        <a class="btn btn-primary" href="{{ url_for('trial') }}" style="width:100%;margin-top:.7rem;padding:.7rem">Approve pause &rarr;</a>
-      </div>
     </div>
   </div>
   <div class="wrap">
