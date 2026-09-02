@@ -1,0 +1,74 @@
+{% extends "public_base.html" %}
+
+{% block title %}Vantav FAQ | Free trial, channels, security and setup{% endblock %}
+
+{% block head_extra %}
+  <meta name="description" content="Answers about Vantav pricing, supported channels, true profit, free trial, security and how long setup takes.">
+  <link rel="canonical" href="https://vantavcommerce.com/faq">
+  <meta property="og:type" content="website">
+  <meta property="og:site_name" content="Vantav">
+  <meta property="og:url" content="https://vantavcommerce.com/faq">
+  <meta property="og:title" content="Vantav FAQ | Free trial, channels, security and setup">
+  <meta property="og:description" content="Straight answers about the free 24-hour trial, supported channels, true profit and setup time.">
+  <meta property="og:image" content="https://vantavcommerce.com/static/videos/how-it-works.jpg">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="Vantav FAQ | Free trial, channels, security and setup">
+  <meta name="twitter:description" content="Straight answers about the free 24-hour trial, supported channels, true profit and setup time.">
+  <meta name="twitter:image" content="https://vantavcommerce.com/static/videos/how-it-works.jpg">
+{% endblock %}
+
+{% block content %}
+<!-- ============ FAQ ============ -->
+<section class="band tight" id="faq">
+  <div class="wrap">
+    <div class="head center">
+      <span class="eyebrow" style="justify-content:center">Questions</span>
+      <h2>Straight answers</h2>
+    </div>
+    <div class="faq">
+      <details open>
+        <summary>Which channels can I connect?</summary>
+        <p>Shopify, TikTok Shop and Amazon today, with Stripe for payments. If you sell somewhere else, tell us — we add channels based on what customers actually need.</p>
+      </details>
+      <details>
+        <summary>What exactly does "true profit" include?</summary>
+        <p>Revenue minus product cost, marketplace and payment fees, shipping and fulfilment, discounts, refunds, and the ad spend attributed to those sales. It is the number left in your bank account, not gross sales.</p>
+      </details>
+      <details>
+        <summary>Will Vantav change anything in my store on its own?</summary>
+        <p>No. It drafts the recommendation and shows you the numbers behind it. Nothing is paused, reordered or repriced until you approve it, and you can edit or dismiss any suggestion.</p>
+      </details>
+      <details>
+        <summary>How does the free 24-hour trial work?</summary>
+        <p>Tell us about your store and we review it the same day. Once you are approved you get full access for 24 hours &mdash; no card, nothing to cancel. The trial is for sellers already live on Shopify, TikTok Shop or Amazon doing at least $5,000 a month, so we can show you real findings instead of an empty screen.</p>
+      </details>
+      <details>
+        <summary>What if it is not right for my store?</summary>
+        <p>Cancel any time and your access runs to the end of the billing period. If you have just signed up and no onboarding work has started, email support within 48 hours and we refund the charge in full.</p>
+      </details>
+      <details>
+        <summary>How do you handle my store credentials?</summary>
+        <p>You connect through each platform's own authorisation screen — we never ask for your store password. Access is read-only for reporting, tokens are encrypted, and you can disconnect a channel at any time.</p>
+      </details>
+      <details>
+        <summary>How long does setup take?</summary>
+        <p>Connecting a channel takes a few minutes. Most stores are looking at accurate profit the same afternoon; the only manual part is entering product costs, and you can import those from a spreadsheet.</p>
+      </details>
+    </div>
+  </div>
+</section>
+
+<!-- ============ FINAL CTA ============ -->
+<section class="band tight">
+  <div class="wrap">
+    <div class="final">
+      <h2>Still have questions?</h2>
+      <p>Start a free 24-hour trial and see your own numbers. We review applications the same day.</p>
+      <div class="hero-ctas">
+        <a class="btn btn-primary" href="{{ url_for('trial') }}">Start your free 24-hour trial</a>
+        <a class="btn btn-ghost" href="{{ url_for('pricing') }}">See pricing</a>
+      </div>
+    </div>
+  </div>
+</section>
+{% endblock %}
