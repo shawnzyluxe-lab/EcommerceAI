@@ -881,13 +881,13 @@ def site_wall_protect():
     if request.endpoint is None:
         # Unknown path: let Flask return a real 404 instead of hiding it behind a login redirect.
         return None
-    if request.endpoint in ('home', 'how_it_works', 'features', 'pricing', 'faq', 'login', 'site_login', 'site_logout', 'subscribe', 'checkout', 'thank_you', 'session_heartbeat', 'create_stripe_checkout', 'beta_apply', 'api_beta_apply', 'trial', 'api_trial_apply', 'auth_login', 'auth_signup', 'auth_forgot_password', 'auth_reset_password', 'reset_password', 'auth_provision_node', 'shopify_orders_webhook', 'shopify_gdpr_customer_data_request', 'shopify_gdpr_customer_redact', 'shopify_gdpr_shop_redact', 'shopify_app_uninstalled', 'tiktok_orders_webhook', 'amazon_orders_webhook', 'stripe_billing_webhook', 'supplier_po_update', 'execute_mitigation', 'generate_magic_link', 'magic_login', 'register_merchant', 'shopify_oauth_callback', 'tiktok_oauth_callback', 'amazon_oauth_callback', 'health_check', 'api_v1_health', 'api_monitoring_health', 'api_monitoring_alerts', 'legal_terms', 'legal_privacy', 'legal_refund', 'legal_security', 'status_page', 'demo', 'robots_txt', 'sitemap_xml', 'favicon_ico', 'static'):
+    if request.endpoint in ('home', 'how_it_works', 'features', 'pricing', 'faq', 'site_login', 'site_logout', 'subscribe', 'checkout', 'thank_you', 'session_heartbeat', 'create_stripe_checkout', 'beta_apply', 'api_beta_apply', 'trial', 'api_trial_apply', 'shopify_orders_webhook', 'shopify_gdpr_customer_data_request', 'shopify_gdpr_customer_redact', 'shopify_gdpr_shop_redact', 'shopify_app_uninstalled', 'tiktok_orders_webhook', 'amazon_orders_webhook', 'stripe_billing_webhook', 'supplier_po_update', 'execute_mitigation', 'shopify_oauth_callback', 'tiktok_oauth_callback', 'amazon_oauth_callback', 'health_check', 'api_v1_health', 'api_monitoring_health', 'api_monitoring_alerts', 'legal_terms', 'legal_privacy', 'legal_refund', 'legal_security', 'status_page', 'demo', 'robots_txt', 'sitemap_xml', 'favicon_ico', 'static'):
         return None
     if site_wall_authenticated():
         return None
     if request.path.startswith('/api/'):
         return jsonify({"error": "Session expired or missing. Please log in."}), 403
-    return redirect(url_for('login'))
+    return redirect(url_for('site_login'))
 
 
 @app.before_request
@@ -1804,7 +1804,7 @@ def status_page():
     return render_template('status.html', health=health)
 
 
-PUBLIC_PATHS = ('/', '/how-it-works', '/features', '/pricing', '/faq', '/subscribe', '/trial', '/demo', '/security', '/status', '/terms', '/privacy', '/refund', '/login')
+PUBLIC_PATHS = ('/', '/how-it-works', '/features', '/pricing', '/faq', '/subscribe', '/trial', '/demo', '/security', '/status', '/terms', '/privacy', '/refund')
 
 
 def _site_root() -> str:
@@ -4533,11 +4533,11 @@ def site_login():
             # Site-wall sessions do not impersonate any merchant; a real login is still required.
             db.session.add(ActiveSession(token=token, merchant_id=None, role="SiteWall", created_at=now, last_seen=now))
             db.session.commit()
-            response = redirect(url_for('home'))
+            response = redirect(url_for('login'))
             _set_session_cookie(response, token)
             return response
         error = True
-    return redirect(url_for('login', error=1)) if error else redirect(url_for('login'))
+    return render_template('gate.html', shop_name='Vantav', error=error)
 
 
 @app.route('/site-logout')
